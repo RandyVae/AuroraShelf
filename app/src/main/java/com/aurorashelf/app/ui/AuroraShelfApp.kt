@@ -145,10 +145,7 @@ import com.aurorashelf.app.data.OfflineCacheState
 import com.aurorashelf.app.data.OfflineVideo
 import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
 import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
-import com.aurorashelf.app.ui.theme.AuroraBackground
 import com.aurorashelf.app.ui.theme.AuroraCoral
-import com.aurorashelf.app.ui.theme.AuroraMuted
-import com.aurorashelf.app.ui.theme.AuroraSurface
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -404,7 +401,7 @@ private fun HomeScreen(
             item {
                 LinearProgressIndicator(
                     color = AuroraCoral,
-                    trackColor = Color.White.copy(alpha = 0.08f),
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp)
@@ -420,7 +417,7 @@ private fun HomeScreen(
                 ) {
                     Text("为你推荐", style = MaterialTheme.typography.titleLarge)
                     Spacer(Modifier.weight(1f))
-                    Text("持续更新", style = MaterialTheme.typography.labelMedium, color = AuroraMuted)
+                    Text("持续更新", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -469,7 +466,7 @@ private fun HomeScreen(
             item(key = "end-of-feed") {
                 Text(
                     text = "已加载全部内容",
-                    color = AuroraMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 18.dp),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
@@ -532,7 +529,7 @@ private fun HomeHeader(
                     )
                 }
                 HorizontalDivider(
-                    color = Color.White.copy(alpha = 0.12f),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
                     modifier = Modifier
                         .height(24.dp)
                         .width(1.dp),
@@ -566,14 +563,14 @@ private fun SourceMenu(sourceUrl: String, onSource: (String) -> Unit) {
             Text(
                 text = ContentSourceCatalog.displayName(sourceUrl),
                 style = MaterialTheme.typography.labelMedium,
-                color = AuroraMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Icon(
                 Icons.Default.ArrowDropDown,
                 contentDescription = "选择视频源",
-                tint = AuroraMuted,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -584,7 +581,7 @@ private fun SourceMenu(sourceUrl: String, onSource: (String) -> Unit) {
                     text = {
                         Column {
                             Text(source.name, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-                            Text(source.description, style = MaterialTheme.typography.bodySmall, color = AuroraMuted)
+                            Text(source.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     },
                     leadingIcon = {
@@ -674,11 +671,11 @@ private fun StatusBanner(message: String, onRefresh: () -> Unit) {
             .fillMaxWidth()
             .padding(horizontal = 24.dp),
     ) {
-        Icon(Icons.Outlined.Info, contentDescription = null, tint = AuroraMuted)
+        Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             text = message,
             style = MaterialTheme.typography.bodyMedium,
-            color = AuroraMuted,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onRefresh) {
@@ -697,7 +694,8 @@ private fun HeroVideoCard(
     val usesCompactNavigation = LocalWindowLayout.current.compactDock
     Surface(
         shape = RoundedCornerShape(24.dp),
-        color = AuroraSurface,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = Color.White,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 20.dp)
@@ -813,14 +811,14 @@ private fun VideoListRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(video.author, style = MaterialTheme.typography.labelMedium, color = AuroraMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(video.views, style = MaterialTheme.typography.labelMedium, color = AuroraMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(video.author, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(video.views, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             IconButton(onClick = onFavorite) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
-                    tint = if (isFavorite) AuroraCoral else AuroraMuted,
+                    tint = if (isFavorite) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -885,7 +883,7 @@ private fun VideoGridCard(
                 Text(
                     text = "${video.author} · ${video.views}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = AuroraMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -900,7 +898,7 @@ private fun VideoGridCard(
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
-                    tint = if (isFavorite) AuroraCoral else AuroraMuted,
+                    tint = if (isFavorite) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(21.dp),
                 )
             }
@@ -923,7 +921,7 @@ private fun MediaImage(video: VideoItem, modifier: Modifier = Modifier) {
         model = imageBytes,
         contentDescription = video.title,
         contentScale = ContentScale.Crop,
-        modifier = modifier.background(AuroraSurface),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
     )
 }
 
@@ -1115,8 +1113,8 @@ private fun EmptyState(message: String) {
             .fillMaxWidth()
             .padding(vertical = 96.dp),
     ) {
-        Icon(Icons.Outlined.FavoriteBorder, contentDescription = null, tint = AuroraMuted, modifier = Modifier.size(42.dp))
-        Text(message, color = AuroraMuted)
+        Icon(Icons.Outlined.FavoriteBorder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
+        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -1139,7 +1137,7 @@ private fun SearchScreen(
             it.title.contains(query, ignoreCase = true) || it.author.contains(query, ignoreCase = true)
         }
     }
-    Surface(color = AuroraBackground, modifier = Modifier.fillMaxSize()) {
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 36.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -1240,7 +1238,7 @@ private fun SettingsScreen(
         item {
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text("设置", style = MaterialTheme.typography.headlineMedium)
-                Text("内容源与离线缓存", color = AuroraMuted)
+                Text("内容源与离线缓存", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item {
@@ -1252,7 +1250,7 @@ private fun SettingsScreen(
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text("视频源", style = MaterialTheme.typography.titleLarge)
-                    Text("选择后立即刷新，无需填写地址", color = AuroraMuted, style = MaterialTheme.typography.bodyMedium)
+                    Text("选择后立即刷新，无需填写地址", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
@@ -1309,7 +1307,7 @@ private fun SettingsScreen(
                     Text("离线缓存", style = MaterialTheme.typography.titleLarge)
                     Text(
                         "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
-                        color = AuroraMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -1330,7 +1328,7 @@ private fun SettingsScreen(
                 ) {
                     Text(
                         "播放视频时点击顶部的缓存按钮，即可在这里管理。",
-                        color = AuroraMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(18.dp),
                     )
@@ -1388,7 +1386,7 @@ private fun OfflineCacheRow(
                         },
                     )
                 }.joinToString(" · ")
-                Text(detail, color = AuroraMuted, style = MaterialTheme.typography.bodySmall)
+                Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 if (cached.state == OfflineCacheState.DOWNLOADING) {
                     LinearProgressIndicator(
                         progress = { (cached.percentDownloaded / 100f).coerceIn(0f, 1f) },
@@ -1442,7 +1440,7 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
             )
             Column(Modifier.weight(1f)) {
                 Text(source.name, style = MaterialTheme.typography.titleMedium)
-                Text(source.description, style = MaterialTheme.typography.bodySmall, color = AuroraMuted)
+                Text(source.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -1468,7 +1466,11 @@ private fun PlayerScreen(
     val selectedEpisodeLabel = episodes.firstOrNull { it.pageUrl == playbackUrl }?.label
     val cachedVideo = cachedVideos.firstOrNull { it.id == OfflineCacheManager.idFor(playbackUrl) }
     val haptic = LocalHapticFeedback.current
-    Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
+    Surface(
+        color = Color.Black,
+        contentColor = Color.White,
+        modifier = Modifier.fillMaxSize(),
+    ) {
         Box {
             NativeSitePlayer(pageUrl = playbackUrl, isFullscreen = isFullscreen, onFullscreenChange = { isFullscreen = it })
             if (!isFullscreen) {
@@ -1506,6 +1508,7 @@ private fun PlayerScreen(
             ) {
                 GlassSurface(
                     shape = RoundedCornerShape(22.dp),
+                    forceDark = true,
                     modifier = Modifier
                         .navigationBarsPadding()
                         .padding(horizontal = 18.dp, vertical = 14.dp)
@@ -1570,6 +1573,7 @@ private fun PlayerTopBar(
     }
     GlassSurface(
         shape = RoundedCornerShape(30.dp),
+        forceDark = true,
         modifier = modifier.fillMaxWidth(),
     ) {
         Row(
@@ -1629,10 +1633,17 @@ private fun PlayerTopBar(
 private fun GlassSurface(
     shape: Shape,
     modifier: Modifier = Modifier,
+    forceDark: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val hazeState = LocalHazeState.current
-    val materialColor = MaterialTheme.colorScheme.surface
+    val materialColor = if (forceDark) Color(0xFF111722) else MaterialTheme.colorScheme.surface
+    val surfaceContentColor = if (forceDark) Color.White else MaterialTheme.colorScheme.onSurface
+    val outlineColor = if (forceDark) {
+        Color.White.copy(alpha = 0.15f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
+    }
     val glassModifier = if (hazeState != null) {
         Modifier.hazeEffect(
             state = hazeState,
@@ -1650,13 +1661,13 @@ private fun GlassSurface(
         modifier = modifier
             .clip(shape)
             .then(glassModifier)
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.18f), shape)
+            .background(materialColor.copy(alpha = 0.18f), shape)
             .border(
-                BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                BorderStroke(1.dp, outlineColor),
                 shape,
             ),
     ) {
-        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        CompositionLocalProvider(LocalContentColor provides surfaceContentColor) {
             content()
         }
     }
