@@ -46,11 +46,14 @@ class AuroraFlowTest {
 
     @Test fun settingsValidatesAddressAndShowsOfflineCache() {
         compose.onNodeWithContentDescription("站点设置").performClick()
-        val customAddressIndex = 2 + ContentSourceCatalog.sources.size
-        compose.onNodeWithTag("settings-list").performScrollToIndex(customAddressIndex)
-        compose.onNode(hasSetTextAction()).performTextReplacement("javascript:alert(1)")
+        compose.onNodeWithTag("settings-video-sources").performClick()
+        compose.onNodeWithTag("video-sources-page").performScrollToIndex(ContentSourceCatalog.sources.size + 3)
+        compose.onNodeWithText("自定义站点").assertExists()
+        compose.onAllNodes(hasSetTextAction()).onLast().performTextReplacement("javascript:alert(1)")
         compose.onNodeWithText("保存并刷新").assertIsNotEnabled()
-        compose.onNodeWithText("离线缓存").performScrollTo().assertExists()
+        compose.onNodeWithTag("video-sources-page").performScrollToIndex(0)
+        compose.onNodeWithContentDescription("返回设置").performClick()
+        compose.onNodeWithText("离线缓存").assertExists()
         compose.onNodeWithText("减少透明度").assertDoesNotExist()
         compose.onNodeWithText("隐私与安全").assertDoesNotExist()
     }
@@ -64,7 +67,8 @@ class AuroraFlowTest {
     @Test fun comicsDestinationShowsSourcesAndCategories() {
         compose.onNodeWithContentDescription("漫画").performClick()
         compose.onNodeWithTag("comic-library-title").assertExists()
-        compose.onNodeWithText("包子漫画").assertExists()
+        compose.onNodeWithContentDescription("选择漫画源").performClick()
+        compose.onNodeWithText("包子漫画").assertExists().performClick()
         compose.onNodeWithText("全部").assertExists()
         compose.onNodeWithText("搜索漫画").assertExists()
     }

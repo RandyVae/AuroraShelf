@@ -1,7 +1,18 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+val sourceSecrets = Properties().apply {
+    rootProject.file("source-secrets.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
+}
+
+fun sourceSecret(name: String): String =
+    providers.environmentVariable(name).orNull ?: sourceSecrets.getProperty(name).orEmpty()
+
+fun String.asBuildConfigString(): String = "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
     namespace = "com.aurorashelf.app"
@@ -11,8 +22,18 @@ android {
         applicationId = "com.aurorashelf.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 127
-        versionName = "2.11.0"
+        versionCode = 128
+        versionName = "2.12.0"
+
+        buildConfigField("String", "PICACG_API_KEY", sourceSecret("PICACG_API_KEY").asBuildConfigString())
+        buildConfigField(
+            "String",
+            "PICACG_SIGNATURE_SECRET",
+            sourceSecret("PICACG_SIGNATURE_SECRET").asBuildConfigString(),
+        )
+        buildConfigField("String", "JM_TOKEN_SECRET", sourceSecret("JM_TOKEN_SECRET").asBuildConfigString())
+        buildConfigField("String", "JM_TOKEN_SECRET_2", sourceSecret("JM_TOKEN_SECRET_2").asBuildConfigString())
+        buildConfigField("String", "JM_DATA_SECRET", sourceSecret("JM_DATA_SECRET").asBuildConfigString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

@@ -64,6 +64,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -175,6 +176,8 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 private val LocalWindowLayout = staticCompositionLocalOf { WindowLayout.calculate(393f, 690f, false) }
 private val LocalDockHeight = staticCompositionLocalOf { 112.dp }
 private val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
+
+private enum class SettingsRoute { OVERVIEW, VIDEO_SOURCES, OFFLINE_CACHE }
 
 @Composable
 fun AuroraShelfApp(
@@ -302,6 +305,8 @@ fun AuroraShelfApp(
                     onPreviousChapter = comicViewModel::previousChapter,
                     onNextChapter = comicViewModel::nextChapter,
                     onRetryChapter = comicViewModel::retryChapter,
+                    onAuthenticate = comicViewModel::authenticate,
+                    onSignOut = comicViewModel::signOut,
                 )
 
                 AppDestination.FAVORITES -> LibraryScreen(
@@ -1274,10 +1279,15 @@ private fun SettingsScreen(
     val cachedVideos by cacheManager.entries.collectAsStateWithLifecycle()
     var sourceUrl by remember(currentUrl) { mutableStateOf(currentUrl) }
     var showClearConfirmation by remember { mutableStateOf(false) }
+    var route by rememberSaveable { mutableStateOf(SettingsRoute.OVERVIEW) }
     val addressError = SourceAddress.error(sourceUrl)
     val selectedSourceId = ContentSourceCatalog.find(currentUrl)?.id
     val downloadedBytes = cachedVideos.sumOf(OfflineVideo::bytesDownloaded)
     val completedCount = cachedVideos.count(OfflineVideo::isPlayableOffline)
+
+    BackHandler(enabled = route != SettingsRoute.OVERVIEW) {
+        route = SettingsRoute.OVERVIEW
+    }
 
     if (showClearConfirmation) {
         AlertDialog(
@@ -1295,6 +1305,54 @@ private fun SettingsScreen(
             },
         )
     }
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = Modifier.fillMaxSize(),
+    ) {
+        AnimatedContent(
+            targetState = route,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "settings-route",
+        ) { currentRoute ->
+            when (currentRoute) {
+                SettingsRoute.OVERVIEW -> SettingsOverview(
+                    selectedSource = ContentSourceCatalog.find(currentUrl),
+                    completedCount = completedCount,
+                    downloadedBytes = downloadedBytes,
+                    onVideoSources = { route = SettingsRoute.VIDEO_SOURCES },
+                    onOfflineCache = { route = SettingsRoute.OFFLINE_CACHE },
+                )
+                SettingsRoute.VIDEO_SOURCES -> VideoSourcesPage(
+                    sourceUrl = sourceUrl,
+                    selectedSourceId = selectedSourceId,
+                    addressError = addressError,
+                    onSourceUrl = { sourceUrl = it },
+                    onSave = onSave,
+                    onBack = { route = SettingsRoute.OVERVIEW },
+                )
+                SettingsRoute.OFFLINE_CACHE -> OfflineCachePage(
+                    cachedVideos = cachedVideos,
+                    completedCount = completedCount,
+                    downloadedBytes = downloadedBytes,
+                    onBack = { route = SettingsRoute.OVERVIEW },
+                    onOpenCached = onOpenCached,
+                    onClear = { showClearConfirmation = true },
+                    onRetry = cacheManager::retry,
+                    onRemove = cacheManager::remove,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsOverview(
+    selectedSource: ContentSource?,
+    completedCount: Int,
+    downloadedBytes: Long,
+    onVideoSources: () -> Unit,
+    onOfflineCache: () -> Unit,
+) {
     LazyColumn(
         contentPadding = PaddingValues(
             start = 24.dp,
@@ -1314,51 +1372,223 @@ private fun SettingsScreen(
                 Text("内容源与离线缓存", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        item { SettingsSectionLabel("内容") }
         item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 8.dp),
+            SettingsNavigationCard {
+                SettingsNavigationRow(
+                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                    title = "视频源",
+                    supporting = "管理内置来源和自定义站点",
+                    value = selectedSource?.name ?: "自定义视频源",
+                    onClick = onVideoSources,
+                    modifier = Modifier.testTag("settings-video-sources"),
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
+                SettingsNavigationRow(
+                    icon = { Icon(Icons.Default.Download, contentDescription = null) },
+                    title = "离线缓存",
+                    supporting = "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
+                    onClick = onOfflineCache,
+                    modifier = Modifier.testTag("settings-offline-cache"),
+                )
+            }
+        }
+        item { SettingsSectionLabel("体验") }
+        item {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Default.Settings, contentDescription = null, tint = AuroraCoral)
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text("视频源", style = MaterialTheme.typography.titleLarge)
-                    Text("选择后立即刷新，无需填写地址", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(18.dp),
+                ) {
+                    Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("跟随系统外观", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "自动使用 Material You 动态色、日间或夜间主题",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             }
         }
-        items(ContentSourceCatalog.sources, key = ContentSource::id) { source ->
-            SourceOption(
-                source = source,
-                selected = selectedSourceId == source.id,
-                onClick = { onSave(source.baseUrl) },
+    }
+}
+
+@Composable
+private fun SettingsSectionLabel(label: String) {
+    Text(
+        label,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 6.dp, top = 12.dp, bottom = 2.dp),
+    )
+}
+
+@Composable
+private fun SettingsNavigationCard(content: @Composable () -> Unit) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column { content() }
+    }
+}
+
+@Composable
+private fun SettingsNavigationRow(
+    icon: @Composable () -> Unit,
+    title: String,
+    supporting: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    value: String? = null,
+) {
+    val haptic = LocalHapticFeedback.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(role = Role.Button) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+    ) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.size(44.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center, content = { icon() })
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                supporting,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
             )
         }
+        value?.let {
+            Text(
+                it,
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 126.dp),
+            )
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.ArrowForward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SettingsPageHeader(title: String, subtitle: String, onBack: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+    ) {
+        IconButton(onClick = onBack) {
+            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回设置")
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun VideoSourcesPage(
+    sourceUrl: String,
+    selectedSourceId: String?,
+    addressError: String?,
+    onSourceUrl: (String) -> Unit,
+    onSave: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    var filter by rememberSaveable { mutableStateOf("") }
+    val filteredSources = remember(filter) {
+        ContentSourceCatalog.sources.filter {
+            filter.isBlank() || it.name.contains(filter, ignoreCase = true) ||
+                it.description.contains(filter, ignoreCase = true)
+        }
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = LocalDockHeight.current + 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).testTag("video-sources-page"),
+    ) {
+        item { SettingsPageHeader("视频源", "选择后立即刷新首页内容", onBack) }
+        item {
+            OutlinedTextField(
+                value = filter,
+                onValueChange = { filter = it },
+                placeholder = { Text("搜索视频源") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (filteredSources.isEmpty()) {
+            item {
+                Text(
+                    "没有匹配的视频源",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                )
+            }
+        } else {
+            items(filteredSources, key = ContentSource::id) { source ->
+                SourceOption(
+                    source = source,
+                    selected = selectedSourceId == source.id,
+                    onClick = { onSave(source.baseUrl) },
+                )
+            }
+        }
+        item { SettingsSectionLabel("自定义站点") }
         item {
             Surface(
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
-                shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f)),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.padding(20.dp),
-                ) {
-                    Text("高级自定义", style = MaterialTheme.typography.titleMedium)
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        "仅适用于与默认站点结构兼容的地址。不会在地址中保存账号信息。",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                     OutlinedTextField(
                         value = sourceUrl,
-                        onValueChange = { sourceUrl = it },
+                        onValueChange = onSourceUrl,
                         label = { Text("站点地址") },
                         placeholder = { Text("https://example.com") },
                         isError = addressError != null,
-                        supportingText = { Text(addressError ?: "仅用于兼容同结构的自定义站点") },
+                        supportingText = { Text(addressError ?: "请输入完整站点根地址") },
                         singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Button(
                         onClick = { onSave(sourceUrl) },
                         enabled = addressError == null,
-                        colors = ButtonDefaults.buttonColors(containerColor = AuroraCoral),
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -1369,51 +1599,73 @@ private fun SettingsScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OfflineCachePage(
+    cachedVideos: List<OfflineVideo>,
+    completedCount: Int,
+    downloadedBytes: Long,
+    onBack: () -> Unit,
+    onOpenCached: (VideoItem) -> Unit,
+    onClear: () -> Unit,
+    onRetry: (OfflineVideo) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = LocalDockHeight.current + 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).testTag("offline-cache-page"),
+    ) {
         item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 10.dp),
-            ) {
-                Icon(Icons.Default.Download, contentDescription = null, tint = AuroraCoral)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("离线缓存", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                if (cachedVideos.isNotEmpty()) {
-                    IconButton(onClick = { showClearConfirmation = true }) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = "清空全部缓存")
-                    }
-                }
-            }
+            SettingsPageHeader(
+                title = "离线缓存",
+                subtitle = "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
+                onBack = onBack,
+            )
         }
         if (cachedVideos.isEmpty()) {
             item {
                 Surface(
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
-                    shape = RoundedCornerShape(18.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f)),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(24.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(
-                        "播放视频时点击顶部的缓存按钮，即可在这里管理。",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(18.dp),
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(36.dp),
+                        )
+                        Text("暂无离线内容", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "播放视频时点击缓存按钮，任务和已下载内容会显示在这里。",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             }
         } else {
+            item {
+                TextButton(onClick = onClear, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Default.DeleteSweep, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("清空全部缓存")
+                }
+            }
             items(cachedVideos, key = OfflineVideo::id) { cached ->
                 OfflineCacheRow(
                     cached = cached,
                     onOpen = { if (cached.isPlayableOffline) onOpenCached(cached.asVideoItem()) },
-                    onRetry = { cacheManager.retry(cached) },
-                    onRemove = { cacheManager.remove(cached.id) },
+                    onRetry = { onRetry(cached) },
+                    onRemove = { onRemove(cached.id) },
                 )
             }
         }
@@ -1487,24 +1739,20 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             if (!selected) onClick()
         },
-        color = if (selected) {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-        } else {
-            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-        },
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.16f),
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.36f)
+            else Color.Transparent,
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 15.dp, vertical = 12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.Default.PlayArrow,
@@ -1512,8 +1760,11 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
                 tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
             )
             Column(Modifier.weight(1f)) {
-                Text(source.name, style = MaterialTheme.typography.titleMedium)
+                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 Text(source.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (selected) {
+                Text("使用中", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
         }
     }
