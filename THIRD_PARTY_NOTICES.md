@@ -19,3 +19,12 @@ Compose interface. Haze is Copyright 2024 Chris Banes and contributors and is
 licensed under the Apache License 2.0.
 
 Project: <https://github.com/chrisbanes/haze>
+
+## AndroidLiquidGlass / Backdrop
+
+AuroraShelf uses Backdrop 2.0.1 and Shapes 1.2.1 from
+AndroidLiquidGlass. Copyright Kyant and contributors; licensed under the
+Apache License 2.0. Portions of the liquid bottom-navigation interaction are
+adapted from the project's Apache-licensed sample and are marked in source.
+
+Project: <https://github.com/Kyant0/AndroidLiquidGlass>

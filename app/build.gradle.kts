@@ -11,8 +11,8 @@ android {
         applicationId = "com.aurorashelf.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 121
-        versionName = "2.8.1"
+        versionCode = 122
+        versionName = "2.8.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -67,6 +67,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("dev.chrisbanes.haze:haze:1.7.3")
     implementation("dev.chrisbanes.haze:haze-materials:1.7.3")
+    implementation("io.github.kyant0:backdrop:2.0.1")
+    implementation("io.github.kyant0:shapes:1.2.1")
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
     implementation("org.jsoup:jsoup:1.21.2")
