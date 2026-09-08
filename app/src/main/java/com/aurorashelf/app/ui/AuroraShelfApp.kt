@@ -1,3 +1,8 @@
+@file:OptIn(
+    dev.chrisbanes.haze.ExperimentalHazeApi::class,
+    dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi::class,
+)
+
 package com.aurorashelf.app.ui
 
 import androidx.activity.compose.BackHandler
@@ -13,6 +18,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -102,6 +108,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
@@ -145,13 +152,21 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import dev.chrisbanes.haze.HazeInputScale
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.materials.HazeMaterials
+import dev.chrisbanes.haze.rememberHazeState
 
 private val LocalWindowLayout = staticCompositionLocalOf { WindowLayout.calculate(393f, 690f, false) }
 private val LocalDockHeight = staticCompositionLocalOf { 112.dp }
+private val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 
 @Composable
 fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val hazeState = rememberHazeState()
 
     BackHandler(enabled = state.selectedVideo != null || state.isSearchOpen || state.destination != AppDestination.HOME) {
         when {
@@ -162,7 +177,7 @@ fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
     }
 
     Surface(
-        color = AuroraBackground,
+        color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -175,12 +190,17 @@ fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
         val windowLayout = WindowLayout.calculate(
             maxWidth.value, (maxHeight - statusHeight - dockHeight).value, isLandscape,
         )
-        CompositionLocalProvider(LocalWindowLayout provides windowLayout, LocalDockHeight provides dockHeight) {
+        CompositionLocalProvider(
+            LocalWindowLayout provides windowLayout,
+            LocalDockHeight provides dockHeight,
+            LocalHazeState provides hazeState,
+        ) {
         AnimatedContent(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .widthIn(max = if (windowLayout.compactDock) 760.dp else 680.dp)
                 .fillMaxSize()
+                .hazeSource(state = hazeState)
                 .then(if (windowLayout.compactDock) Modifier.padding(start = 80.dp) else Modifier)
                 .then(
                 if (state.isSearchOpen || state.selectedVideo != null) {
@@ -188,8 +208,7 @@ fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
             } else Modifier),
             targetState = state.destination,
             transitionSpec = {
-                (fadeIn(spring(stiffness = 500f)) + scaleIn(initialScale = 0.985f)) togetherWith
-                    (fadeOut() + scaleOut(targetScale = 1.01f))
+                fadeIn(spring(stiffness = 520f)) togetherWith fadeOut()
             },
             label = "destination",
         ) { destination ->
@@ -348,27 +367,24 @@ private fun HomeScreen(
             .testTag("home-feed")
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
-        stickyHeader(key = "home-pinned-header") {
+        item(key = "home-header") {
+            HomeHeader(
+                sourceUrl = state.sourceUrl,
+                onSource = onSource,
+                onSearch = onSearch,
+                onSettings = onSettings,
+            )
+        }
+        stickyHeader(key = "home-pinned-categories") {
             Surface(
-                color = AuroraBackground,
+                color = MaterialTheme.colorScheme.background.copy(alpha = 0.98f),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.padding(bottom = 10.dp),
-                ) {
-                    HomeHeader(
-                        sourceUrl = state.sourceUrl,
-                        onSource = onSource,
-                        onSearch = onSearch,
-                        onSettings = onSettings,
-                    )
-                    CategoryBar(
-                        selected = state.category,
-                        sourceUrl = state.sourceUrl,
-                        onCategory = onCategory,
-                    )
-                }
+                CategoryBar(
+                    selected = state.category,
+                    sourceUrl = state.sourceUrl,
+                    onCategory = onCategory,
+                )
             }
         }
         state.message?.let { message ->
@@ -573,7 +589,7 @@ private fun CategoryBar(
 ) {
     val haptic = LocalHapticFeedback.current
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
@@ -581,32 +597,45 @@ private fun CategoryBar(
     ) {
         FeedCategory.availableFor(sourceUrl).forEach { category ->
             val isSelected = selected == category
-            val containerColor by animateColorAsState(
-                targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+            val contentColor by animateColorAsState(
+                targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 animationSpec = spring(stiffness = 500f, dampingRatio = 0.78f),
                 label = "category-color",
             )
-            val cornerRadius by animateDpAsState(
-                targetValue = if (isSelected) 22.dp else 14.dp,
+            val indicatorWidth by animateDpAsState(
+                targetValue = if (isSelected) 22.dp else 0.dp,
                 animationSpec = spring(stiffness = 420f, dampingRatio = 0.72f),
-                label = "category-shape",
+                label = "category-indicator",
             )
             Surface(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onCategory(category)
                 },
-                color = containerColor,
-                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                shape = RoundedCornerShape(cornerRadius),
-                tonalElevation = if (isSelected) 2.dp else 0.dp,
-                    modifier = Modifier.heightIn(min = 44.dp),
+                color = Color.Transparent,
+                contentColor = contentColor,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.heightIn(min = 44.dp),
             ) {
-                Text(
-                    text = category.displayLabel(sourceUrl),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 5.dp),
+                ) {
+                    Text(
+                        text = category.displayLabel(sourceUrl),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .width(indicatorWidth)
+                            .height(3.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                }
             }
         }
     }
@@ -723,8 +752,9 @@ private fun VideoListRow(
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         },
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-        shape = RoundedCornerShape(22.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f)),
         modifier = modifier.fillMaxWidth().animateContentSize(),
     ) {
         Row(
@@ -823,71 +853,69 @@ private fun ExpressiveBottomBar(
     onSelect: (AppDestination) -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
-    Surface(
+    GlassSurface(
+        shape = RoundedCornerShape(32.dp),
         modifier = Modifier.fillMaxWidth().height(68.dp),
-        color = Color(0xFF10151F),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(34.dp),
-        tonalElevation = 0.dp,
-        shadowElevation = 4.dp,
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxSize().padding(horizontal = 5.dp, vertical = 4.dp),
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().padding(5.dp),
         ) {
-            AppDestination.entries.forEach { destination ->
-                val icon = when (destination) {
-                    AppDestination.HOME -> Icons.Default.Home
-                    AppDestination.DISCOVER -> Icons.Default.Explore
-                    AppDestination.FAVORITES -> Icons.Default.Favorite
-                    AppDestination.HISTORY -> Icons.Default.History
-                    AppDestination.SETTINGS -> Icons.Default.Settings
-                }
-                val isSelected = selected == destination
-                val indicatorColor by animateColorAsState(
-                    targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                    animationSpec = spring(stiffness = 500f, dampingRatio = 0.78f),
-                    label = "navigation-indicator",
-                )
-                Surface(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onSelect(destination)
-                    },
-                    color = Color.Transparent,
-                    contentColor = if (isSelected) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxSize(),
+            val destinations = AppDestination.entries
+            val itemWidth = maxWidth / destinations.size
+            val selectedIndex = destinations.indexOf(selected).coerceAtLeast(0)
+            val indicatorOffset by animateDpAsState(
+                targetValue = itemWidth * selectedIndex,
+                animationSpec = spring(stiffness = 380f, dampingRatio = 0.76f),
+                label = "liquid-navigation-position",
+            )
+            Surface(
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                contentColor = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(27.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+                modifier = Modifier
+                    .offset(x = indicatorOffset)
+                    .width(itemWidth)
+                    .fillMaxHeight(),
+            ) {}
+            Row(modifier = Modifier.fillMaxSize()) {
+                destinations.forEach { destination ->
+                    val icon = when (destination) {
+                        AppDestination.HOME -> Icons.Default.Home
+                        AppDestination.DISCOVER -> Icons.Default.Explore
+                        AppDestination.FAVORITES -> Icons.Default.Favorite
+                        AppDestination.HISTORY -> Icons.Default.History
+                        AppDestination.SETTINGS -> Icons.Default.Settings
+                    }
+                    val isSelected = selected == destination
+                    val itemColor by animateColorAsState(
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        animationSpec = spring(stiffness = 500f, dampingRatio = 0.8f),
+                        label = "navigation-content-color",
+                    )
+                    Surface(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onSelect(destination)
+                        },
+                        color = Color.Transparent,
+                        contentColor = itemColor,
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
                     ) {
-                        Surface(
-                            color = indicatorColor,
-                            contentColor = if (isSelected) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.width(56.dp).height(32.dp),
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxSize(),
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(icon, contentDescription = destination.label, modifier = Modifier.size(22.dp))
-                            }
+                            Icon(icon, contentDescription = destination.label, modifier = Modifier.size(21.dp))
+                            Text(
+                                text = destination.label,
+                                style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, lineHeight = 13.sp),
+                                maxLines = 1,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
                         }
-                        Spacer(Modifier.height(1.dp))
-                        Text(
-                            text = destination.label,
-                            style = MaterialTheme.typography.labelMedium.copy(lineHeight = 14.sp),
-                            maxLines = 1,
-                        )
                     }
                 }
             }
@@ -901,11 +929,8 @@ private fun CompactNavigationRail(
     onSelect: (AppDestination) -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
-    Surface(
-        color = Color(0xFF10151F),
-        contentColor = MaterialTheme.colorScheme.onSurface,
+    GlassSurface(
         shape = RoundedCornerShape(28.dp),
-        tonalElevation = 0.dp,
         modifier = Modifier.width(64.dp),
     ) {
         Column(
@@ -966,7 +991,7 @@ private fun LibraryScreen(
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
-        item { Text(title, style = MaterialTheme.typography.headlineLarge) }
+        item { Text(title, style = MaterialTheme.typography.headlineMedium) }
         if (videos.isEmpty()) {
             item {
                 EmptyState(message = emptyMessage)
@@ -1107,18 +1132,18 @@ private fun SettingsScreen(
         contentPadding = PaddingValues(
             start = 24.dp,
             end = 24.dp,
-            top = 28.dp,
+            top = 22.dp,
             bottom = LocalDockHeight.current + 24.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()
             .testTag("settings-list")
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("设置", style = MaterialTheme.typography.headlineLarge)
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("设置", style = MaterialTheme.typography.headlineMedium)
                 Text("内容源与离线缓存", color = AuroraMuted)
             }
         }
@@ -1144,9 +1169,9 @@ private fun SettingsScreen(
         }
         item {
             Surface(
-                color = AuroraSurface,
-                shape = RoundedCornerShape(22.dp),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f)),
             ) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -1202,9 +1227,9 @@ private fun SettingsScreen(
         if (cachedVideos.isEmpty()) {
             item {
                 Surface(
-                    color = AuroraSurface,
-                    shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
+                    shape = RoundedCornerShape(18.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
@@ -1295,21 +1320,29 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             if (!selected) onClick()
         },
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, if (selected) AuroraCoral.copy(alpha = 0.55f) else Color.White.copy(alpha = 0.06f)),
+        color = if (selected) {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        } else {
+            MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+        },
+        contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.42f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.16f),
+        ),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 15.dp, vertical = 12.dp),
         ) {
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.Default.PlayArrow,
                 contentDescription = null,
-                tint = if (selected) AuroraCoral else LocalContentColor.current,
+                tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
             )
             Column(Modifier.weight(1f)) {
                 Text(source.name, style = MaterialTheme.typography.titleMedium)
@@ -1502,19 +1535,34 @@ private fun GlassSurface(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = shape,
-        tonalElevation = 3.dp,
-        shadowElevation = 4.dp,
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f),
-        ),
-        modifier = modifier,
+    val hazeState = LocalHazeState.current
+    val materialColor = MaterialTheme.colorScheme.surface
+    val glassModifier = if (hazeState != null) {
+        Modifier.hazeEffect(
+            state = hazeState,
+            style = HazeMaterials.thin(materialColor),
+        ) {
+            blurRadius = 28.dp
+            noiseFactor = 0.045f
+            inputScale = HazeInputScale.Auto
+            blurredEdgeTreatment = BlurredEdgeTreatment(shape)
+        }
+    } else {
+        Modifier.background(materialColor.copy(alpha = 0.88f), shape)
+    }
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .then(glassModifier)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.18f), shape)
+            .border(
+                BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                shape,
+            ),
     ) {
-        Box(modifier = Modifier.clip(shape)) { content() }
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            content()
+        }
     }
 }
 

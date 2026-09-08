@@ -1,8 +1,8 @@
-# 极光视界 · Android 2.7.0
+# 极光视界 · Android 2.8.0
 
-按用户选定的「方案 1」重新实现的 Android 客户端。深色背景、珊瑚色选中态和 Material 3 Expressive 风格导航，采用 Kotlin、Jetpack Compose、Material 3；不是网页套壳首页。
+按用户选定的「方案 1」重新实现的 Android 客户端。采用 Kotlin、Jetpack Compose、Material 3 与 Haze 实时背景模糊；深色 Material You 界面保留真实视频源能力，并以浮动玻璃导航、吸顶分类和弹性选中动效重构视觉层级，不是网页套壳首页。
 
-## S26 Ultra 默认设置适配（2.4.0）
+## S26 Ultra 默认设置适配
 
 当前交付包可从 [GitHub Releases](https://github.com/RandyVae/AuroraShelf/releases/latest) 下载。与上一版同包名、同测试签名，版本号递增，可直接更新安装，无需卸载「极光视界」。原版应用仍不受影响。
 
@@ -76,7 +76,9 @@
 
 ## 设计与性能取舍
 
-UI 采用 Material 3 Expressive 的公开设计语言：主题色容器、对比形状、弹性 Compose 动效和自适应横竖屏导航。竖屏浮动底栏由 Material 3 `Surface` 构成，图标与文字紧凑排列，完整卡片可从导航后方滚动并最终越过遮挡；横屏改用侧边导航。
+UI 采用 Material 3 Expressive 的公开设计语言，并参考用户提供的 CoolApk 16.6.1 APK 的可观察视觉机制。竖屏浮动底栏使用 Haze 1.7.3 实时采样并模糊后方内容，完整选中胶囊在五个栏目之间弹簧滑动；分类栏在头部滚出后保持吸顶，完整卡片可从导航后方穿过并最终越过遮挡。横屏继续使用自适应侧边导航。
+
+视觉参考、差距分析和实现映射见 `docs/design-audit/coolapk-16.6.1/audit.md`。本项目没有复制参考 APK 的代码、资源或品牌资产。
 
 启动图标是无文字的单色圆角播放几何符号，使用 Android adaptive icon 前景、安全区和单色遮罩能力；不再使用复杂装饰或系统占位图标。
 
