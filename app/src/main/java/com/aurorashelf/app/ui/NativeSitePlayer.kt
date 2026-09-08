@@ -19,6 +19,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -38,7 +39,13 @@ import android.util.Log
 /** Native playback of the site's published MP4/HLS source, with no sample-content fallback. */
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
-internal fun NativeSitePlayer(pageUrl: String, isFullscreen: Boolean, onFullscreenChange: (Boolean) -> Unit) {
+internal fun NativeSitePlayer(
+    pageUrl: String,
+    isFullscreen: Boolean,
+    onFullscreenChange: (Boolean) -> Unit,
+    onVideoOrientationChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
@@ -50,7 +57,9 @@ internal fun NativeSitePlayer(pageUrl: String, isFullscreen: Boolean, onFullscre
     var attempt by remember(pageUrl) { mutableIntStateOf(0) }
     var error by remember(pageUrl) { mutableStateOf<String?>(null) }
     var isLoading by remember(pageUrl) { mutableStateOf(true) }
+    var lastKnownPortrait by remember(pageUrl) { mutableStateOf<Boolean?>(null) }
     val fullscreenChange by rememberUpdatedState(onFullscreenChange)
+    val videoOrientationChange by rememberUpdatedState(onVideoOrientationChange)
 
     LaunchedEffect(pageUrl, attempt, offlineVideo?.mediaUrl) {
         Log.i(TAG, "load start attempt=$attempt host=${runCatching { java.net.URI(pageUrl).host }.getOrNull()}")
@@ -104,6 +113,19 @@ internal fun NativeSitePlayer(pageUrl: String, isFullscreen: Boolean, onFullscre
                 Log.i(TAG, "playback state=$state position=${player.currentPosition} duration=${player.duration}")
                 isLoading = state == Player.STATE_BUFFERING
             }
+            @Suppress("DEPRECATION")
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                val isPortrait = isPortraitVideo(
+                    width = videoSize.width,
+                    height = videoSize.height,
+                    pixelWidthHeightRatio = videoSize.pixelWidthHeightRatio,
+                    unappliedRotationDegrees = videoSize.unappliedRotationDegrees,
+                ) ?: return
+                if (lastKnownPortrait != isPortrait) {
+                    lastKnownPortrait = isPortrait
+                    videoOrientationChange(isPortrait)
+                }
+            }
             override fun onPlayerError(failure: PlaybackException) {
                 Log.e(TAG, "player error code=${failure.errorCode} name=${failure.errorCodeName} cause=${failure.cause?.javaClass?.simpleName}: ${failure.cause?.message}", failure)
                 isLoading = false
@@ -134,7 +156,7 @@ internal fun NativeSitePlayer(pageUrl: String, isFullscreen: Boolean, onFullscre
         }
     }
     BackHandler(isFullscreen) { fullscreenChange(false) }
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier.background(Color.Black)) {
         AndroidView(
             factory = { viewContext -> PlayerView(viewContext).apply {
                 id = R.id.native_player
@@ -150,9 +172,7 @@ internal fun NativeSitePlayer(pageUrl: String, isFullscreen: Boolean, onFullscre
                 if (playerView.player !== player) playerView.player = player
                 playerView.setFullscreenButtonState(isFullscreen)
             },
-            modifier = Modifier.fillMaxSize().then(
-                if (isFullscreen) Modifier else Modifier.statusBarsPadding().padding(top = 82.dp).navigationBarsPadding(),
-            ),
+            modifier = Modifier.fillMaxSize(),
         )
         if (isLoading) CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
         error?.let { message ->
@@ -167,6 +187,19 @@ internal fun NativeSitePlayer(pageUrl: String, isFullscreen: Boolean, onFullscre
 }
 
 private const val TAG = "NativeSitePlayer"
+
+internal fun isPortraitVideo(
+    width: Int,
+    height: Int,
+    pixelWidthHeightRatio: Float = 1f,
+    unappliedRotationDegrees: Int = 0,
+): Boolean? {
+    if (width <= 0 || height <= 0 || pixelWidthHeightRatio <= 0f) return null
+    val isQuarterTurn = Math.floorMod(unappliedRotationDegrees, 180) == 90
+    val displayWidth = if (isQuarterTurn) height.toFloat() else width * pixelWidthHeightRatio
+    val displayHeight = if (isQuarterTurn) width * pixelWidthHeightRatio else height.toFloat()
+    return displayHeight > displayWidth
+}
 
 private fun mediaType(url: String): String = when {
     url.substringBefore('?').lowercase().endsWith(".m3u8") -> "hls"
