@@ -10,7 +10,7 @@ import javax.crypto.spec.SecretKeySpec
 
 /** Loads normal covers and decrypts Huangguo's public AES-wrapped cover bytes. */
 internal object CoverImageLoader {
-    private const val HUANGGUO_CDN_HOST = "pic.cuinhri.cn"
+    private val HUANGGUO_CDN_HOSTS = setOf("pic.cuinhri.cn", "pic.zdmhyg.cn")
     private val MEDIA_KEY = "f5d965df75336270".toByteArray(Charsets.US_ASCII)
     private val MEDIA_IV = "97b60394abc2fbe1".toByteArray(Charsets.US_ASCII)
 
@@ -38,8 +38,8 @@ internal object CoverImageLoader {
         }
     }.getOrNull()
 
-    private fun isHuangguoCover(address: String): Boolean = runCatching {
-        URI(address).host?.lowercase() == HUANGGUO_CDN_HOST
+    internal fun isHuangguoCover(address: String): Boolean = runCatching {
+        URI(address).host?.lowercase() in HUANGGUO_CDN_HOSTS
     }.getOrDefault(false)
 
     internal fun requestOrigin(referer: String): Pair<String, String>? = runCatching {

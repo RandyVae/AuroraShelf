@@ -6,6 +6,7 @@ import com.aurorashelf.app.data.SourceAddress
 import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.ContentSourceCatalog
+import com.aurorashelf.app.ui.CoverImageLoader
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,6 +33,13 @@ class LiveFeedTest {
                 it.title.isNotBlank() && SourceAddress.resolve(it.pageUrl, it.pageUrl) != null
             })
             assertTrue("Expected at least one thumbnail address", records.any { it.thumbnailUrl != null })
+            if (source.contains("huangguoai.com", ignoreCase = true)) {
+                val record = records.first { it.thumbnailUrl != null }
+                assertTrue(
+                    "Expected current Huangguo CDN cover to decrypt into an image",
+                    CoverImageLoader.load(record.thumbnailUrl!!, record.pageUrl)?.isNotEmpty() == true,
+                )
+            }
             android.util.Log.i(
                 "LiveFeedTest",
                 "Verified page1=${records.size}, page2=${nextPage.size}; content omitted",

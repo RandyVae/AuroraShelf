@@ -11,8 +11,8 @@ android {
         applicationId = "com.aurorashelf.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 122
-        versionName = "2.8.2"
+        versionCode = 123
+        versionName = "2.8.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
