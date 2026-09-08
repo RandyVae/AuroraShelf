@@ -38,7 +38,12 @@ import android.util.Log
 /** Native playback of the site's published MP4/HLS source, with no sample-content fallback. */
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
-internal fun NativeSitePlayer(pageUrl: String, isFullscreen: Boolean, onFullscreenChange: (Boolean) -> Unit) {
+internal fun NativeSitePlayer(
+    pageUrl: String,
+    isFullscreen: Boolean,
+    onFullscreenChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
@@ -134,7 +139,7 @@ internal fun NativeSitePlayer(pageUrl: String, isFullscreen: Boolean, onFullscre
         }
     }
     BackHandler(isFullscreen) { fullscreenChange(false) }
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(modifier.background(Color.Black)) {
         AndroidView(
             factory = { viewContext -> PlayerView(viewContext).apply {
                 id = R.id.native_player
@@ -150,9 +155,7 @@ internal fun NativeSitePlayer(pageUrl: String, isFullscreen: Boolean, onFullscre
                 if (playerView.player !== player) playerView.player = player
                 playerView.setFullscreenButtonState(isFullscreen)
             },
-            modifier = Modifier.fillMaxSize().then(
-                if (isFullscreen) Modifier else Modifier.statusBarsPadding().padding(top = 82.dp).navigationBarsPadding(),
-            ),
+            modifier = Modifier.fillMaxSize(),
         )
         if (isLoading) CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
         error?.let { message ->
