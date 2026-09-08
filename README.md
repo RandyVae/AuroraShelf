@@ -1,6 +1,6 @@
-# 极光视界 · Android 2.8.0
+# 极光视界 · Android 2.8.1
 
-按用户选定的「方案 1」重新实现的 Android 客户端。采用 Kotlin、Jetpack Compose、Material 3 与 Haze 实时背景模糊；深色 Material You 界面保留真实视频源能力，并以浮动玻璃导航、吸顶分类和弹性选中动效重构视觉层级，不是网页套壳首页。
+按用户选定的「方案 1」重新实现的 Android 客户端。采用 Kotlin、Jetpack Compose、Material 3 与 Haze 实时背景模糊；深色 Material You 界面保留真实视频源能力，并以浮动玻璃导航、吸顶分类和弹性选中动效重构视觉层级，不是网页套壳首页。2.8.1 为底部五个栏目补充连续横向拖动：圆形玻璃透镜跟随手指移动、放大当前栏目，并在松手后完成切换。
 
 ## S26 Ultra 默认设置适配
 
@@ -76,7 +76,7 @@
 
 ## 设计与性能取舍
 
-UI 采用 Material 3 Expressive 的公开设计语言，并参考用户提供的 CoolApk 16.6.1 APK 的可观察视觉机制。竖屏浮动底栏使用 Haze 1.7.3 实时采样并模糊后方内容，完整选中胶囊在五个栏目之间弹簧滑动；分类栏在头部滚出后保持吸顶，完整卡片可从导航后方穿过并最终越过遮挡。横屏继续使用自适应侧边导航。
+UI 采用 Material 3 Expressive 的公开设计语言，并参考用户提供的 CoolApk 16.6.1 APK 的可观察视觉机制。竖屏浮动底栏使用 Haze 1.7.3 实时采样并模糊后方内容；按住后横向拖动时，圆形玻璃透镜会连续跟手，当前图标与文字随距离放大并上浮，跨过栏目边界提供轻触反馈，松手后弹簧落位。分类栏在头部滚出后保持吸顶，完整卡片可从导航后方穿过并最终越过遮挡。横屏继续使用自适应侧边导航。
 
 视觉参考、差距分析和实现映射见 `docs/design-audit/coolapk-16.6.1/audit.md`。本项目没有复制参考 APK 的代码、资源或品牌资产。
 
@@ -92,6 +92,6 @@ UI 采用 Material 3 Expressive 的公开设计语言，并参考用户提供的
 
 ## 贡献与验收
 
-修改保持聚焦，新增行为补充测试，提交使用 Conventional Commits，代码合并通过 PR。此本地工程尚未设置远程仓库，没有创建或发布 PR。提交前查看 `CHANGELOG.md`、`design-qa.md` 与 `docs/verification.md`，不要把构建成功等同于真机播放验收通过。
+修改保持聚焦，新增行为补充测试，提交使用 Conventional Commits，代码合并通过 PR。公开仓库与版本安装包统一发布在 [RandyVae/AuroraShelf](https://github.com/RandyVae/AuroraShelf)；提交前查看 `CHANGELOG.md`、`design-qa.md` 与 `docs/verification.md`，不要把构建成功等同于真机播放验收通过。
 
 本工程没有复制原项目业务代码，也没有假定原项目授予代码再发布许可。第三方依赖及生成图标资产说明见 `docs/implementation-notes.md`；公开发布前仍需完成许可证与分发要求审查。

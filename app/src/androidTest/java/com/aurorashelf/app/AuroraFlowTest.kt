@@ -74,4 +74,15 @@ class AuroraFlowTest {
         val dockBounds = compose.onNodeWithTag("bottom-dock").getUnclippedBoundsInRoot()
         assertTrue("Feed viewport must continue behind the floating dock", feedBounds.bottom > dockBounds.top)
     }
+
+    @Test fun bottomNavigationSupportsDragSelection() {
+        compose.onNodeWithTag("liquid-navigation").performTouchInput {
+            swipe(
+                start = centerLeft,
+                end = centerRight,
+                durationMillis = 800,
+            )
+        }
+        compose.onNodeWithText("内容源与离线缓存").assertExists()
+    }
 }
