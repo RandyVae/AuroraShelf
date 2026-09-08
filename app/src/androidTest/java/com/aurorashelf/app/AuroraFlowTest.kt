@@ -1,6 +1,7 @@
 package com.aurorashelf.app
 
 import android.content.Context
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
@@ -55,7 +56,7 @@ class AuroraFlowTest {
     }
 
     @Test fun favoriteAppearsInFavorites() {
-        compose.onNodeWithText("收藏").performClick()
+        compose.onNodeWithContentDescription("收藏").performClick()
         compose.onNodeWithText("我的收藏").assertExists()
         compose.onNodeWithContentDescription("取消收藏").assertExists()
     }
@@ -78,9 +79,9 @@ class AuroraFlowTest {
     @Test fun bottomNavigationSupportsDragSelection() {
         compose.onNodeWithTag("liquid-navigation").performTouchInput {
             swipe(
-                start = centerLeft,
-                end = centerRight,
-                durationMillis = 800,
+                start = centerLeft + Offset(20f, 0f),
+                end = centerRight - Offset(20f, 0f),
+                durationMillis = 1_200,
             )
         }
         compose.onNodeWithText("内容源与离线缓存").assertExists()
