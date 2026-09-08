@@ -28,6 +28,31 @@ License. AuroraShelf does not download or execute its JavaScript at runtime.
 
 Project: <https://github.com/wgh136/pica_configs>
 
+## PicaComic protocol reference
+
+The Picacg adapter was independently implemented from the public protocol
+behavior documented by PicaComic. No GPL-licensed Haka Comic source code is
+copied into AuroraShelf. PicaComic is licensed under the MIT License.
+
+Project: <https://github.com/wgh136/PicaComic>
+
+## E-Hentai public-site reference
+
+The E-Hentai adapter parses the anonymously accessible public HTML site. The
+implementation was informed by the public behavior documented by JHenTai,
+licensed under the Apache License 2.0. AuroraShelf does not include private
+ExHentai cookies or bypass access controls.
+
+Project: <https://github.com/jiangtian616/JHenTai>
+
+## JMComic protocol reference
+
+The JMComic adapter was independently implemented from the public protocol and
+image-scrambling behavior documented by JMComic-Crawler-Python. That project is
+licensed under the MIT License.
+
+Project: <https://github.com/hect0x7/JMComic-Crawler-Python>
+
 ## AndroidLiquidGlass / Backdrop
 
 AuroraShelf uses Backdrop 2.0.1 and Shapes 1.2.1 from

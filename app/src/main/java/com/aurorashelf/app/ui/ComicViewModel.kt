@@ -1,7 +1,9 @@
 package com.aurorashelf.app.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aurorashelf.app.data.comic.EncryptedComicAuthStore
 import com.aurorashelf.app.data.comic.ComicRepository
 import com.aurorashelf.app.model.ComicDetails
 import com.aurorashelf.app.model.ComicPage
@@ -44,11 +46,13 @@ data class ComicUiState(
     val reader: ComicReaderSession? = null,
     val isReaderLoading: Boolean = false,
     val readerError: String? = null,
+    val isSourceAuthenticated: Boolean = true,
+    val isAuthorizing: Boolean = false,
+    val authError: String? = null,
 )
 
-class ComicViewModel(
-    private val repository: ComicRepository = ComicRepository(),
-) : ViewModel() {
+class ComicViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository = ComicRepository(EncryptedComicAuthStore(application))
     private val mutableUiState = MutableStateFlow(
         ComicUiState(sources = repository.availableSources),
     )
@@ -80,9 +84,45 @@ class ComicViewModel(
                 error = null,
                 details = null,
                 reader = null,
+                isSourceAuthenticated = repository.isAuthenticated(sourceId),
+                isAuthorizing = false,
+                authError = null,
             )
         }
         refresh()
+    }
+
+    fun authenticate(account: String, password: String) {
+        val sourceId = mutableUiState.value.selectedSourceId
+        if (!repository.isAuthenticationRequired(sourceId) || mutableUiState.value.isAuthorizing) return
+        viewModelScope.launch {
+            mutableUiState.update { it.copy(isAuthorizing = true, authError = null) }
+            runCatching { repository.authenticate(sourceId, account, password) }
+                .onSuccess {
+                    mutableUiState.update { it.copy(isSourceAuthenticated = true, isAuthorizing = false, authError = null) }
+                    refresh()
+                }
+                .onFailure { failure ->
+                    if (failure is CancellationException) return@onFailure
+                    mutableUiState.update { it.copy(isAuthorizing = false, authError = failure.userMessage()) }
+                }
+        }
+    }
+
+    fun signOut() {
+        val sourceId = mutableUiState.value.selectedSourceId
+        repository.signOut(sourceId)
+        listJob?.cancel()
+        mutableUiState.update {
+            it.copy(
+                comics = emptyList(),
+                page = 0,
+                isLoading = false,
+                isLoadingMore = false,
+                isSourceAuthenticated = repository.isAuthenticated(sourceId),
+                authError = null,
+            )
+        }
     }
 
     fun selectCategory(categoryId: String) {
@@ -101,6 +141,19 @@ class ComicViewModel(
     }
 
     fun refresh() {
+        val sourceId = mutableUiState.value.selectedSourceId
+        if (!repository.isAuthenticated(sourceId)) {
+            mutableUiState.update {
+                it.copy(
+                    comics = emptyList(),
+                    page = 0,
+                    isLoading = false,
+                    isLoadingMore = false,
+                    isSourceAuthenticated = false,
+                )
+            }
+            return
+        }
         loadFirstPage(mutableUiState.value.activeQuery)
     }
 
@@ -206,7 +259,13 @@ class ComicViewModel(
                 }
                 .onFailure { failure ->
                     if (failure is CancellationException) return@onFailure
-                    mutableUiState.update { it.copy(isLoading = false, error = failure.userMessage()) }
+                    mutableUiState.update {
+                        it.copy(
+                            isLoading = false,
+                            error = failure.userMessage(),
+                            isSourceAuthenticated = repository.isAuthenticated(sourceId),
+                        )
+                    }
                 }
         }
     }

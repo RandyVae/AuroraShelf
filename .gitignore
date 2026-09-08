@@ -1,6 +1,7 @@
 .gradle/
 .idea/
 local.properties
+source-secrets.properties
 **/build/
 build.nosync/
 *.iml

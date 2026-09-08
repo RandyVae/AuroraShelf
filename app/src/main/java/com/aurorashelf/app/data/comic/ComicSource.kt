@@ -16,3 +16,11 @@ internal interface ComicSource {
 
     suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage>
 }
+
+internal interface AuthenticatedComicSource : ComicSource {
+    val isAuthenticated: Boolean
+
+    suspend fun authenticate(account: String, password: String)
+
+    fun signOut()
+}

@@ -8,12 +8,17 @@ import com.aurorashelf.app.model.ComicSummary
 class ComicRepository internal constructor(
     private val sources: List<ComicSource>,
 ) {
-    constructor() : this(
+    constructor() : this(EmptyComicAuthStore)
+
+    internal constructor(authStore: ComicAuthStore) : this(
         listOf(
             KomiicComicSource(),
             BaoziComicSource(),
             CopyComicSource(),
             IkmmhComicSource(),
+            PicacgComicSource(authStore),
+            EhentaiComicSource(),
+            JmComicSource(),
         ),
     )
 
@@ -29,6 +34,21 @@ class ComicRepository internal constructor(
 
     suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage> =
         source(comic.sourceId).chapter(comic, chapterId)
+
+    fun isAuthenticationRequired(sourceId: String): Boolean = source(sourceId) is AuthenticatedComicSource
+
+    fun isAuthenticated(sourceId: String): Boolean =
+        (source(sourceId) as? AuthenticatedComicSource)?.isAuthenticated ?: true
+
+    suspend fun authenticate(sourceId: String, account: String, password: String) {
+        val authenticatedSource = source(sourceId) as? AuthenticatedComicSource
+            ?: error("该漫画源不需要账号授权")
+        authenticatedSource.authenticate(account, password)
+    }
+
+    fun signOut(sourceId: String) {
+        (source(sourceId) as? AuthenticatedComicSource)?.signOut()
+    }
 
     private fun source(id: String): ComicSource = sources.find { it.info.id == id }
         ?: error("未知漫画源：$id")

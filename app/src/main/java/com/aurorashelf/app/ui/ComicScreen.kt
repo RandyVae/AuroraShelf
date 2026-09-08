@@ -8,6 +8,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,16 +45,20 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BrokenImage
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -63,6 +68,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -79,12 +86,16 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
+import coil3.request.transformations
+import com.aurorashelf.app.data.comic.ComicPageResolver
 import com.aurorashelf.app.model.ComicDetails
 import com.aurorashelf.app.model.ComicPage
 import com.aurorashelf.app.model.ComicSummary
@@ -105,6 +116,8 @@ internal fun ComicScreen(
     onPreviousChapter: () -> Unit,
     onNextChapter: () -> Unit,
     onRetryChapter: () -> Unit,
+    onAuthenticate: (String, String) -> Unit,
+    onSignOut: () -> Unit,
 ) {
     BackHandler(enabled = state.reader != null || state.details != null) {
         if (state.reader != null) onCloseReader() else onCloseDetails()
@@ -145,6 +158,8 @@ internal fun ComicScreen(
                 onRefresh = onRefresh,
                 onLoadMore = onLoadMore,
                 onComic = onComic,
+                onAuthenticate = onAuthenticate,
+                onSignOut = onSignOut,
             )
         }
     }
@@ -161,6 +176,7 @@ internal fun ComicScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ComicLibrary(
     state: ComicUiState,
@@ -171,8 +187,12 @@ private fun ComicLibrary(
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onComic: (ComicSummary) -> Unit,
+    onAuthenticate: (String, String) -> Unit,
+    onSignOut: () -> Unit,
 ) {
     val gridState = rememberLazyGridState()
+    var showSourcePicker by remember { mutableStateOf(false) }
+    val selectedSource = state.sources.find { it.id == state.selectedSourceId }
     val shouldLoadMore by remember {
         derivedStateOf {
             val info = gridState.layoutInfo
@@ -207,27 +227,67 @@ private fun ComicLibrary(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                IconButton(onClick = onRefresh) {
+                if (selectedSource?.requiresAuthentication == true && state.isSourceAuthenticated) {
+                    TextButton(onClick = onSignOut) { Text("退出") }
+                }
+                IconButton(onClick = onRefresh, enabled = state.isSourceAuthenticated) {
                     Icon(Icons.Default.Refresh, contentDescription = "刷新漫画")
                 }
             }
         }
         item(span = { GridItemSpan(maxLineSpan) }) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            Surface(
+                onClick = { showSourcePicker = true },
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(22.dp),
+                modifier = Modifier.fillMaxWidth().testTag("comic-source-selector"),
             ) {
-                state.sources.forEach { source ->
-                    FilterChip(
-                        selected = source.id == state.selectedSourceId,
-                        onClick = { onSource(source.id) },
-                        label = { Text(source.name) },
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.size(44.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                        Text("漫画源", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            selectedSource?.name.orEmpty(),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    if (selectedSource?.requiresAuthentication == true) {
+                        Text(
+                            if (state.isSourceAuthenticated) "已登录" else "需登录",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = "选择漫画源")
                 }
             }
         }
+        if (selectedSource?.requiresAuthentication == true && !state.isSourceAuthenticated) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                ComicSourceAuthCard(
+                    isLoading = state.isAuthorizing,
+                    error = state.authError,
+                    onAuthenticate = onAuthenticate,
+                )
+            }
+        } else {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            val categories = state.sources.find { it.id == state.selectedSourceId }?.categories.orEmpty()
+            val categories = selectedSource?.categories.orEmpty()
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -295,6 +355,148 @@ private fun ComicLibrary(
                 }
             }
         }
+        }
+    }
+
+    if (showSourcePicker) {
+        ModalBottomSheet(
+            onDismissRequest = { showSourcePicker = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ) {
+            ComicSourcePicker(
+                sources = state.sources,
+                selectedSourceId = state.selectedSourceId,
+                onSource = { sourceId ->
+                    showSourcePicker = false
+                    onSource(sourceId)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComicSourcePicker(
+    sources: List<com.aurorashelf.app.model.ComicSourceInfo>,
+    selectedSourceId: String,
+    onSource: (String) -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = 620.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(bottom = 8.dp)) {
+            Text("选择漫画源", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(
+                "每个来源拥有独立分类、搜索和阅读线路",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        sources.forEach { source ->
+            val selected = source.id == selectedSourceId
+            Surface(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onSource(source.id)
+                },
+                color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            if (source.requiresAuthentication) {
+                                Text("需登录", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        Text(
+                            source.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (selected) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = "当前漫画源")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComicSourceAuthCard(
+    isLoading: Boolean,
+    error: String?,
+    onAuthenticate: (String, String) -> Unit,
+) {
+    var account by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(20.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("授权哔咔漫画", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "账号仅用于换取访问令牌，密码不会保存。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedTextField(
+                value = account,
+                onValueChange = { account = it },
+                label = { Text("邮箱账号") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("密码") },
+                singleLine = true,
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onAuthenticate(account, password) }),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+            }
+            Button(
+                onClick = { onAuthenticate(account, password) },
+                enabled = !isLoading && account.isNotBlank() && password.isNotBlank(),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(9.dp))
+                }
+                Text(if (isLoading) "正在授权" else "登录并连接")
+            }
+        }
     }
 }
 
@@ -354,96 +556,124 @@ private fun ComicDetailsScreen(
     onBack: () -> Unit,
     onChapter: (Int) -> Unit,
 ) {
-    LazyColumn(
-        contentPadding = PaddingValues(bottom = 126.dp),
-        modifier = Modifier.fillMaxSize(),
-    ) {
-        item {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp),
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回漫画列表")
-                }
-                Text("漫画详情", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-            }
-        }
-        item {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(18.dp),
-                verticalAlignment = Alignment.Top,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    modifier = Modifier.width(132.dp).aspectRatio(0.74f),
-                ) {
-                    details.comic.coverUrl?.let {
-                        AsyncImage(
-                            model = it,
-                            contentDescription = "${details.comic.title}封面",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } ?: ComicCoverPlaceholder()
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.weight(1f)) {
-                    Text(details.comic.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    if (details.comic.subtitle.isNotBlank()) {
-                        Text(details.comic.subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            contentPadding = PaddingValues(bottom = 126.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            stickyHeader {
+                Surface(color = MaterialTheme.colorScheme.background.copy(alpha = 0.96f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp),
+                    ) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回漫画列表")
+                        }
+                        Text("漫画详情", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                        details.comic.tags.take(6).forEach { tag ->
-                            Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
-                                Text(tag, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp))
+                }
+            }
+            item {
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(28.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 8.dp),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(18.dp),
+                        verticalAlignment = Alignment.Top,
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            modifier = Modifier.width(126.dp).aspectRatio(0.74f),
+                        ) {
+                            details.comic.coverUrl?.let {
+                                AsyncImage(
+                                    model = it,
+                                    contentDescription = "${details.comic.title}封面",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } ?: ComicCoverPlaceholder()
+                        }
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
+                            Text(details.comic.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            if (details.comic.subtitle.isNotBlank()) {
+                                Text(details.comic.subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                                details.comic.tags.take(6).forEach { tag ->
+                                    Surface(shape = RoundedCornerShape(9.dp), color = MaterialTheme.colorScheme.secondaryContainer) {
+                                        Text(tag, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp))
+                                    }
+                                }
+                            }
+                            if (details.chapters.isNotEmpty()) {
+                                Button(onClick = { onChapter(0) }, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+                                    Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("开始阅读")
+                                }
                             }
                         }
                     }
-                    if (details.chapters.isNotEmpty()) {
-                        Button(onClick = { onChapter(0) }, contentPadding = PaddingValues(horizontal = 18.dp)) {
-                            Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("开始阅读")
+                }
+            }
+            if (details.description.isNotBlank()) {
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = RoundedCornerShape(22.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(18.dp)) {
+                            Text("简介", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(details.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
             }
-        }
-        if (details.description.isNotBlank()) {
             item {
                 Text(
-                    details.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                    "章节 · ${details.chapters.size}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 22.dp, end = 20.dp, top = 18.dp, bottom = 4.dp),
                 )
             }
-        }
-        item {
-            Text(
-                "章节 · ${details.chapters.size}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 8.dp),
-            )
-        }
-        if (details.chapters.isEmpty()) {
-            item { ComicEmpty("该漫画暂时没有可读章节") }
-        } else {
-            itemsIndexed(details.chapters, key = { _, chapter -> chapter.id }) { index, chapter ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(role = Role.Button) { onChapter(index) }
-                        .padding(horizontal = 20.dp, vertical = 15.dp),
-                ) {
-                    Text(chapter.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (details.chapters.isEmpty()) {
+                item { ComicEmpty("该漫画暂时没有可读章节") }
+            } else {
+                itemsIndexed(details.chapters, key = { _, chapter -> chapter.id }) { index, chapter ->
+                    Surface(
+                        onClick = { onChapter(index) },
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 2.dp),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.size(36.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("${index + 1}", style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Text(chapter.title, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp), color = MaterialTheme.colorScheme.outlineVariant)
             }
         }
     }
@@ -543,42 +773,66 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
     var retryKey by remember { mutableIntStateOf(0) }
     var loadState by remember(page, retryKey) { mutableIntStateOf(0) }
     val context = LocalContext.current
-    val request = remember(page, retryKey, context) {
-        ImageRequest.Builder(context)
-            .data(page.imageUrl)
-            .httpHeaders(
-                NetworkHeaders.Builder()
-                    .set("Referer", page.referer)
-                    .set("User-Agent", "Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/139 Mobile Safari/537.36")
-                    .build(),
-            )
-            .memoryCacheKey(page.imageUrl)
-            .diskCacheKey(page.imageUrl)
-            .build()
+    val resolvedResult by produceState<Result<ComicPage>?>(
+        initialValue = page.takeIf { it.resolutionUrl == null }?.let(Result.Companion::success),
+        key1 = page,
+        key2 = retryKey,
+    ) {
+        value = runCatching { ComicPageResolver.resolve(page) }
+    }
+    val resolvedPage = resolvedResult?.getOrNull()
+    val request = remember(resolvedPage, retryKey, context) {
+        resolvedPage?.let { resolved ->
+            ImageRequest.Builder(context)
+                .data(resolved.imageUrl)
+                .httpHeaders(
+                    NetworkHeaders.Builder()
+                        .set("Referer", resolved.referer)
+                        .set("User-Agent", "Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/139 Mobile Safari/537.36")
+                        .build(),
+                )
+                .memoryCacheKey("${resolved.imageUrl}#segments=${resolved.verticalSegments}")
+                .diskCacheKey(resolved.imageUrl)
+                .apply {
+                    if (resolved.verticalSegments > 1) {
+                        transformations(JmUnscrambleTransformation(resolved.verticalSegments))
+                    }
+                }
+                .build()
+        }
     }
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier.fillMaxWidth().background(Color(0xFF111111)),
     ) {
-        AsyncImage(
-            model = request,
-            contentDescription = "第 $pageNumber 页",
-            contentScale = ContentScale.FillWidth,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
-            onLoading = { loadState = 0 },
-            onSuccess = { loadState = 1 },
-            onError = { loadState = 2 },
-        )
-        when (loadState) {
-            0 -> Box(Modifier.fillMaxWidth().height(360.dp), contentAlignment = Alignment.Center) {
+        request?.let {
+            AsyncImage(
+                model = it,
+                contentDescription = "第 $pageNumber 页",
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                onLoading = { loadState = 0 },
+                onSuccess = { loadState = 1 },
+                onError = { loadState = 2 },
+            )
+        }
+        when {
+            resolvedResult?.isFailure == true -> Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
+                TextButton(onClick = { retryKey++ }) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("第 $pageNumber 页解析失败", color = Color.White)
+                }
+            }
+            resolvedResult == null || loadState == 0 -> Box(Modifier.fillMaxWidth().height(360.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(26.dp), strokeWidth = 2.dp)
             }
-            2 -> Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
-            TextButton(onClick = { retryKey++ }) {
-                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
-                Spacer(Modifier.width(8.dp))
-                Text("第 $pageNumber 页加载失败", color = Color.White)
-            }
+            loadState == 2 -> Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
+                TextButton(onClick = { retryKey++ }) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("第 $pageNumber 页加载失败", color = Color.White)
+                }
             }
             else -> Unit
         }

@@ -23,6 +23,8 @@ data class ComicDetails(
 data class ComicPage(
     val imageUrl: String,
     val referer: String,
+    val resolutionUrl: String? = null,
+    val verticalSegments: Int = 0,
 )
 
 data class ComicCategory(
@@ -35,4 +37,5 @@ data class ComicSourceInfo(
     val name: String,
     val description: String,
     val categories: List<ComicCategory>,
+    val requiresAuthentication: Boolean = false,
 )
