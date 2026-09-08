@@ -1,4 +1,4 @@
-# 极光视界 · Android 2.9.1
+# 极光视界 · Android 2.11.0
 
 按用户选定的「方案 1」重新实现的 Android 客户端。采用 Kotlin、Jetpack Compose、Material 3、Haze 与 AndroidLiquidGlass/Backdrop；Material You 界面保留真实视频源能力，并以浮动玻璃导航、吸顶分类和弹性选中动效重构视觉层级，不是网页套壳首页。2.9.0 保留首个大幅推荐视频并将后续内容改为 YouTube 式双列信息层级；2.9.1 新增完整日间与夜间主题，默认跟随系统即时切换。
 
@@ -11,6 +11,13 @@
 没有把某个屏幕 DPI 当成三星默认值写死：相同机型的地区、系统版本、分辨率和分屏状态可能改变应用可用空间。本次最终截图在 Android 14 模拟器以 1080 × 2340、density 440 验证，并补充约 384/411 dp 两种逻辑宽度测试；不是 S26 Ultra 真机或 One UI 仿真，未强制刷新率，也不保证 120 fps。详见 `docs/s26-adaptation.md`。
 
 ## 当前范围
+
+### 在线漫画（2.11.0）
+
+- 底栏“漫画”模块内置包子漫画、拷贝漫画、Komiic、爱看漫四个原生 Kotlin 适配器，支持独立分类、搜索、详情、章节和纵向连续阅读；默认使用已验证可读的 Komiic。
+- 漫画列表接近底部自动加载下一页；阅读图片携带来源要求的 Referer，并交给 Coil 做内存与磁盘缓存，单页失败可独立重试。
+- 包子漫画和 Komiic 已完成列表、详情、章节与图片的实时链路验证；拷贝漫画在当前网络环境 DNS 不可达，爱看漫返回 HTTP 403，界面会显示真实错误并允许切源。
+- 用户提供的 Haka Comic 1.2.7 实际只有哔咔官方内容源及两个 API 镜像，不是多源聚合器。该 API 依赖登录令牌；本版遵循既定范围，不加入登录、会员、支付和下载，也不复制其 GPL-3.0 源码或客户端密钥。
 
 ### 多视频源（2.6.0）
 
@@ -69,9 +76,9 @@
 
 | 路径 | 职责 |
 | --- | --- |
-| `app/src/main/java/com/aurorashelf/app/data` | 地址校验、站点列表解析、本地收藏与历史 |
-| `app/src/main/java/com/aurorashelf/app/model` | 视频、分类、目的页面模型 |
-| `app/src/main/java/com/aurorashelf/app/ui` | 页面、状态管理、Material 3 控件和站点播放容器 |
+| `app/src/main/java/com/aurorashelf/app/data` | 视频与漫画源适配、地址校验、本地收藏与历史 |
+| `app/src/main/java/com/aurorashelf/app/model` | 视频、漫画、分类与目的页面模型 |
+| `app/src/main/java/com/aurorashelf/app/ui` | 视频/漫画页面、阅读器、状态管理和 Material 3 控件 |
 | `app/src/main/java/com/aurorashelf/app/ui/theme` | Material 3 颜色与字体 |
 | `app/src/test`、`app/src/androidTest` | 解析/校验单元测试及模拟器流程测试 |
 

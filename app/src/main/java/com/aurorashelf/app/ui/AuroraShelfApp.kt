@@ -64,13 +64,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Fullscreen
@@ -177,8 +177,12 @@ private val LocalDockHeight = staticCompositionLocalOf { 112.dp }
 private val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 
 @Composable
-fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
+fun AuroraShelfApp(
+    viewModel: AuroraViewModel = viewModel(),
+    comicViewModel: ComicViewModel = viewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val comicState by comicViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val hazeState = rememberHazeState()
@@ -213,11 +217,16 @@ fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
         }
     }
 
-    BackHandler(enabled = state.selectedVideo != null || state.isSearchOpen || state.destination != AppDestination.HOME) {
+    BackHandler(
+        enabled = state.selectedVideo != null || state.isSearchOpen || state.destination != AppDestination.HOME ||
+            comicState.reader != null || comicState.details != null,
+    ) {
         when {
             state.selectedVideo != null && isPlayerFullscreen -> isPlayerFullscreen = false
             state.selectedVideo != null -> viewModel.closeVideo()
             state.isSearchOpen -> viewModel.setSearchOpen(false)
+            state.destination == AppDestination.COMICS && comicState.reader != null -> comicViewModel.closeReader()
+            state.destination == AppDestination.COMICS && comicState.details != null -> comicViewModel.closeDetails()
             else -> viewModel.selectDestination(AppDestination.HOME)
         }
     }
@@ -278,13 +287,21 @@ fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
                     onLoadMore = viewModel::loadMore,
                 )
 
-                AppDestination.DISCOVER -> LibraryScreen(
-                    title = "发现",
-                    emptyMessage = "暂无已加载内容，请回到首页刷新",
-                    videos = state.videos,
-                    onVideo = viewModel::openVideo,
-                    onFavorite = viewModel::toggleFavorite,
-                    favoriteIds = state.favoriteIds,
+                AppDestination.COMICS -> ComicScreen(
+                    state = comicState,
+                    onSource = comicViewModel::selectSource,
+                    onCategory = comicViewModel::selectCategory,
+                    onQuery = comicViewModel::updateQuery,
+                    onSearch = comicViewModel::submitSearch,
+                    onRefresh = comicViewModel::refresh,
+                    onLoadMore = comicViewModel::loadMore,
+                    onComic = comicViewModel::openComic,
+                    onCloseDetails = comicViewModel::closeDetails,
+                    onChapter = comicViewModel::openChapter,
+                    onCloseReader = comicViewModel::closeReader,
+                    onPreviousChapter = comicViewModel::previousChapter,
+                    onNextChapter = comicViewModel::nextChapter,
+                    onRetryChapter = comicViewModel::retryChapter,
                 )
 
                 AppDestination.FAVORITES -> LibraryScreen(
@@ -315,7 +332,7 @@ fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
 
         if (windowLayout.compactDock) {
             AnimatedVisibility(
-                visible = state.selectedVideo == null && !state.isSearchOpen,
+                visible = state.selectedVideo == null && !state.isSearchOpen && comicState.reader == null,
                 enter = fadeIn() + scaleIn(initialScale = 0.94f),
                 exit = fadeOut() + scaleOut(targetScale = 0.94f),
                 modifier = Modifier
@@ -330,7 +347,7 @@ fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
             }
         } else {
             AnimatedVisibility(
-                visible = state.selectedVideo == null && !state.isSearchOpen,
+                visible = state.selectedVideo == null && !state.isSearchOpen && comicState.reader == null,
                 enter = fadeIn() + scaleIn(initialScale = 0.96f),
                 exit = fadeOut() + scaleOut(targetScale = 0.96f),
                 modifier = Modifier
@@ -1015,7 +1032,7 @@ private fun ExpressiveBottomBar(
     val haptic = LocalHapticFeedback.current
     val navigationDestinations = listOf(
         AppDestination.HOME,
-        AppDestination.DISCOVER,
+        AppDestination.COMICS,
         AppDestination.FAVORITES,
         AppDestination.HISTORY,
         AppDestination.SETTINGS,
@@ -1042,7 +1059,7 @@ private fun ExpressiveBottomBar(
         AppDestination.entries.forEach { destination ->
             val icon = when (destination) {
                 AppDestination.HOME -> Icons.Default.Home
-                AppDestination.DISCOVER -> Icons.Default.Explore
+                AppDestination.COMICS -> Icons.AutoMirrored.Filled.MenuBook
                 AppDestination.FAVORITES -> Icons.Default.Favorite
                 AppDestination.HISTORY -> Icons.Default.History
                 AppDestination.SETTINGS -> Icons.Default.Settings
@@ -1091,7 +1108,7 @@ private fun CompactNavigationRail(
             AppDestination.entries.forEach { destination ->
                 val icon = when (destination) {
                     AppDestination.HOME -> Icons.Default.Home
-                    AppDestination.DISCOVER -> Icons.Default.Explore
+                    AppDestination.COMICS -> Icons.AutoMirrored.Filled.MenuBook
                     AppDestination.FAVORITES -> Icons.Default.Favorite
                     AppDestination.HISTORY -> Icons.Default.History
                     AppDestination.SETTINGS -> Icons.Default.Settings

@@ -39,7 +39,7 @@ enum class FeedCategory(val label: String, val path: String) {
 
 enum class AppDestination(val label: String) {
     HOME("首页"),
-    DISCOVER("发现"),
+    COMICS("漫画"),
     FAVORITES("收藏"),
     HISTORY("历史"),
     SETTINGS("设置"),

@@ -61,6 +61,14 @@ class AuroraFlowTest {
         compose.onNodeWithContentDescription("取消收藏").assertExists()
     }
 
+    @Test fun comicsDestinationShowsSourcesAndCategories() {
+        compose.onNodeWithContentDescription("漫画").performClick()
+        compose.onNodeWithTag("comic-library-title").assertExists()
+        compose.onNodeWithText("包子漫画").assertExists()
+        compose.onNodeWithText("全部").assertExists()
+        compose.onNodeWithText("搜索漫画").assertExists()
+    }
+
     @Test fun remoteLibrarySurvivesRepositoryRecreation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prefs = AppPreferences(context)
