@@ -20,6 +20,14 @@ licensed under the Apache License 2.0.
 
 Project: <https://github.com/chrisbanes/haze>
 
+## pica_configs
+
+The native comic-source adapters use public endpoint and document-structure
+information from wgh136/pica_configs. The project is licensed under the MIT
+License. AuroraShelf does not download or execute its JavaScript at runtime.
+
+Project: <https://github.com/wgh136/pica_configs>
+
 ## AndroidLiquidGlass / Backdrop
 
 AuroraShelf uses Backdrop 2.0.1 and Shapes 1.2.1 from
