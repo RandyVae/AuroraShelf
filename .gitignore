@@ -10,3 +10,5 @@ dist/
 *.jks
 .DS_Store
 *.log
+docs/design-audit/**/*.png
+docs/design-audit/**/*.mp4
