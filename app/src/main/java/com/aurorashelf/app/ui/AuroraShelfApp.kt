@@ -184,13 +184,18 @@ fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
     val hazeState = rememberHazeState()
     val liquidBackdrop = rememberLayerBackdrop()
     var isPlayerFullscreen by rememberSaveable(state.selectedVideo?.id) { mutableStateOf(false) }
+    var isCurrentVideoPortrait by remember(state.selectedVideo?.id) { mutableStateOf<Boolean?>(null) }
     val originalOrientation = remember(activity) { activity?.requestedOrientation }
 
-    LaunchedEffect(activity, isPlayerFullscreen, state.selectedVideo) {
+    LaunchedEffect(activity, isPlayerFullscreen, isCurrentVideoPortrait, state.selectedVideo) {
         activity ?: return@LaunchedEffect
         val insetsController = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         if (isPlayerFullscreen && state.selectedVideo != null) {
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            activity.requestedOrientation = when (isCurrentVideoPortrait) {
+                true -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                false -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                null -> originalOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
             insetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             insetsController.hide(WindowInsetsCompat.Type.systemBars())
@@ -376,6 +381,7 @@ fun AuroraShelfApp(viewModel: AuroraViewModel = viewModel()) {
                 onBack = viewModel::closeVideo,
                 onFavorite = { viewModel.toggleFavorite(video) },
                 onFullscreenChange = { isPlayerFullscreen = it },
+                onVideoOrientationChange = { isCurrentVideoPortrait = it },
                 onVideo = viewModel::openVideo,
                 onRelatedFavorite = viewModel::toggleFavorite,
             )
@@ -1506,6 +1512,7 @@ private fun PlayerScreen(
     onBack: () -> Unit,
     onFavorite: () -> Unit,
     onFullscreenChange: (Boolean) -> Unit,
+    onVideoOrientationChange: (Boolean) -> Unit,
     onVideo: (VideoItem) -> Unit,
     onRelatedFavorite: (VideoItem) -> Unit,
 ) {
@@ -1596,6 +1603,7 @@ private fun PlayerScreen(
                 pageUrl = playbackUrl,
                 isFullscreen = isFullscreen,
                 onFullscreenChange = onFullscreenChange,
+                onVideoOrientationChange = onVideoOrientationChange,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .then(

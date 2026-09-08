@@ -1,8 +1,6 @@
 package com.aurorashelf.app
 
 import android.content.Context
-import android.content.pm.ActivityInfo
-import android.content.res.Configuration
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -98,22 +96,14 @@ class AuroraFlowTest {
         compose.onNodeWithText("内容源与离线缓存").assertExists()
     }
 
-    @Test fun playerFullscreenRotatesAndBackReturnsToDetails() {
+    @Test fun playerFullscreenHidesDetailsAndBackReturnsToDetails() {
         compose.waitUntil(timeoutMillis = 20_000) {
             compose.onAllNodesWithTag("home-grid-card").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onAllNodesWithTag("home-grid-card")[0].performClick()
         compose.onNodeWithContentDescription("全屏播放").assertIsDisplayed().performClick()
-
-        compose.waitUntil(timeoutMillis = 5_000) {
-            compose.activity.requestedOrientation == ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE &&
-                compose.activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        }
+        compose.onNodeWithTag("player-details").assertDoesNotExist()
         compose.activity.onBackPressedDispatcher.onBackPressed()
-
-        compose.waitUntil(timeoutMillis = 5_000) {
-            compose.activity.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
-        }
         compose.onNodeWithTag("player-details").assertExists()
         compose.onNodeWithContentDescription("全屏播放").assertIsDisplayed()
     }
