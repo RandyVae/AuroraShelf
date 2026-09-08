@@ -1,5 +1,11 @@
 # 更新记录
 
+## 2.8.3-navigation-cover-fix — 2026-09-08
+
+- 移除“喜欢”栏目独立的蓝色圆形按钮，五个底栏入口恢复为统一的图标、文字、点击和连续拖动样式。
+- 黄果封面兼容当前 `pic.zdmhyg.cn` CDN，同时保留旧 `pic.cuinhri.cn` 地址；继续使用站点公开的 AES-CBC 封面解密流程。
+- 新增封面 CDN 识别单元测试，并回归验证五个入口从首页拖动到设置页。
+
 ## 2.8.2-backdrop-liquid-tabs — 2026-09-08
 
 - 根据参考 APK 可观察到的资源尺寸与类名重新核对底部导航，确认其采用 AndroidLiquidGlass/Backdrop；AuroraShelf 接入同一 Apache-2.0 开源光学引擎，不复制受保护业务代码或品牌资源。

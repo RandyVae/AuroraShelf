@@ -865,6 +865,7 @@ private fun ExpressiveBottomBar(
     val navigationDestinations = listOf(
         AppDestination.HOME,
         AppDestination.DISCOVER,
+        AppDestination.FAVORITES,
         AppDestination.HISTORY,
         AppDestination.SETTINGS,
     )
@@ -880,7 +881,7 @@ private fun ExpressiveBottomBar(
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         },
         backdrop = backdrop,
-        tabSlots = listOf(0, 1, 3, 4),
+        tabSlots = listOf(0, 1, 2, 3, 4),
         visualItemCount = 5,
         modifier = Modifier
             .fillMaxWidth()
@@ -894,34 +895,6 @@ private fun ExpressiveBottomBar(
                 AppDestination.FAVORITES -> Icons.Default.Favorite
                 AppDestination.HISTORY -> Icons.Default.History
                 AppDestination.SETTINGS -> Icons.Default.Settings
-            }
-            if (destination == AppDestination.FAVORITES) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .clickable(role = Role.Button) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onSelect(destination)
-                        },
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                        shape = CircleShape,
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = destination.label,
-                                modifier = Modifier.size(23.dp),
-                            )
-                        }
-                    }
-                }
-                return@forEach
             }
             LiquidNavigationTab(
                 onClick = {
