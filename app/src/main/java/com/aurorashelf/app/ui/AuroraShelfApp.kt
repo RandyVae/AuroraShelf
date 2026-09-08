@@ -9,7 +9,9 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -20,6 +22,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -99,6 +102,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -112,6 +116,8 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -129,6 +135,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.shadow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
@@ -158,6 +165,7 @@ import dev.chrisbanes.haze.hazeEffect
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.materials.HazeMaterials
 import dev.chrisbanes.haze.rememberHazeState
+import kotlin.math.abs
 
 private val LocalWindowLayout = staticCompositionLocalOf { WindowLayout.calculate(393f, 690f, false) }
 private val LocalDockHeight = staticCompositionLocalOf { 112.dp }
@@ -853,33 +861,105 @@ private fun ExpressiveBottomBar(
     onSelect: (AppDestination) -> Unit,
 ) {
     val haptic = LocalHapticFeedback.current
-    GlassSurface(
-        shape = RoundedCornerShape(32.dp),
-        modifier = Modifier.fillMaxWidth().height(68.dp),
-    ) {
+    val destinations = AppDestination.entries
+    var dragPositionPx by remember { mutableStateOf<Float?>(null) }
+    var dragCandidateIndex by remember(selected) {
+        mutableIntStateOf(destinations.indexOf(selected).coerceAtLeast(0))
+    }
+    val isDragging = dragPositionPx != null
+
+    Box(modifier = Modifier.fillMaxWidth().height(86.dp)) {
+        GlassSurface(
+            shape = RoundedCornerShape(32.dp),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(68.dp),
+        ) {}
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize().padding(5.dp),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(68.dp)
+                .padding(5.dp)
+                .testTag("liquid-navigation")
+                .pointerInput(destinations, selected, onSelect) {
+                    fun indexFor(x: Float): Int {
+                        val slotWidth = size.width.toFloat() / destinations.size
+                        return (x / slotWidth).toInt().coerceIn(destinations.indices)
+                    }
+                    detectHorizontalDragGestures(
+                        onDragStart = { start ->
+                            val x = start.x.coerceIn(0f, size.width.toFloat())
+                            dragPositionPx = x
+                            dragCandidateIndex = indexFor(x)
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        },
+                        onHorizontalDrag = { change, _ ->
+                            change.consume()
+                            val x = change.position.x.coerceIn(0f, size.width.toFloat())
+                            dragPositionPx = x
+                            val nextIndex = indexFor(x)
+                            if (nextIndex != dragCandidateIndex) {
+                                dragCandidateIndex = nextIndex
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                        },
+                        onDragCancel = {
+                            dragPositionPx = null
+                            dragCandidateIndex = destinations.indexOf(selected).coerceAtLeast(0)
+                        },
+                        onDragEnd = {
+                            val target = destinations[dragCandidateIndex]
+                            dragPositionPx = null
+                            if (target != selected) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelect(target)
+                            }
+                        },
+                    )
+                },
         ) {
-            val destinations = AppDestination.entries
             val itemWidth = maxWidth / destinations.size
             val selectedIndex = destinations.indexOf(selected).coerceAtLeast(0)
+            val density = LocalDensity.current
+            val dragPositionDp = dragPositionPx?.let { with(density) { it.toDp() } }
+            val lensSize = 80.dp
+            val targetIndicatorWidth = if (isDragging) lensSize else itemWidth
+            val targetIndicatorHeight = if (isDragging) lensSize else maxHeight
+            val targetIndicatorOffset = if (dragPositionDp != null) {
+                (dragPositionDp - lensSize / 2).coerceIn(0.dp, maxWidth - lensSize)
+            } else {
+                itemWidth * selectedIndex
+            }
             val indicatorOffset by animateDpAsState(
-                targetValue = itemWidth * selectedIndex,
-                animationSpec = spring(stiffness = 380f, dampingRatio = 0.76f),
+                targetValue = targetIndicatorOffset,
+                animationSpec = if (isDragging) snap() else spring(stiffness = 360f, dampingRatio = 0.72f),
                 label = "liquid-navigation-position",
             )
-            Surface(
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                contentColor = MaterialTheme.colorScheme.primary,
-                shape = RoundedCornerShape(27.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)),
+            val indicatorWidth by animateDpAsState(
+                targetValue = targetIndicatorWidth,
+                animationSpec = spring(stiffness = 520f, dampingRatio = 0.68f),
+                label = "liquid-navigation-width",
+            )
+            val indicatorHeight by animateDpAsState(
+                targetValue = targetIndicatorHeight,
+                animationSpec = spring(stiffness = 520f, dampingRatio = 0.68f),
+                label = "liquid-navigation-height",
+            )
+            LiquidSelectionLens(
+                isDragging = isDragging,
+                shape = RoundedCornerShape(indicatorHeight / 2),
                 modifier = Modifier
-                    .offset(x = indicatorOffset)
-                    .width(itemWidth)
-                    .fillMaxHeight(),
-            ) {}
+                    .offset(
+                        x = indicatorOffset,
+                        y = (maxHeight - indicatorHeight) / 2,
+                    )
+                    .width(indicatorWidth)
+                    .height(indicatorHeight),
+            )
             Row(modifier = Modifier.fillMaxSize()) {
-                destinations.forEach { destination ->
+                destinations.forEachIndexed { index, destination ->
                     val icon = when (destination) {
                         AppDestination.HOME -> Icons.Default.Home
                         AppDestination.DISCOVER -> Icons.Default.Explore
@@ -888,8 +968,19 @@ private fun ExpressiveBottomBar(
                         AppDestination.SETTINGS -> Icons.Default.Settings
                     }
                     val isSelected = selected == destination
+                    val isHighlighted = if (isDragging) index == dragCandidateIndex else isSelected
+                    val itemCenterPx = with(density) { (itemWidth * (index + 0.5f)).toPx() }
+                    val influence = dragPositionPx?.let { position ->
+                        val slotWidthPx = with(density) { itemWidth.toPx() }
+                        (1f - abs(position - itemCenterPx) / slotWidthPx).coerceIn(0f, 1f)
+                    } ?: 0f
+                    val itemScale by animateFloatAsState(
+                        targetValue = 1f + influence * 0.28f,
+                        animationSpec = if (isDragging) snap() else spring(stiffness = 600f, dampingRatio = 0.72f),
+                        label = "liquid-navigation-magnification",
+                    )
                     val itemColor by animateColorAsState(
-                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        targetValue = if (isHighlighted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         animationSpec = spring(stiffness = 500f, dampingRatio = 0.8f),
                         label = "navigation-content-color",
                     )
@@ -906,7 +997,13 @@ private fun ExpressiveBottomBar(
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    scaleX = itemScale
+                                    scaleY = itemScale
+                                    translationY = -influence * 7.dp.toPx()
+                                },
                         ) {
                             Icon(icon, contentDescription = destination.label, modifier = Modifier.size(21.dp))
                             Text(
@@ -921,6 +1018,75 @@ private fun ExpressiveBottomBar(
             }
         }
     }
+}
+
+@Composable
+private fun LiquidSelectionLens(
+    isDragging: Boolean,
+    shape: Shape,
+    modifier: Modifier = Modifier,
+) {
+    val hazeState = LocalHazeState.current
+    val materialColor = MaterialTheme.colorScheme.surface
+    val hazeModifier = if (hazeState != null) {
+        Modifier.hazeEffect(
+            state = hazeState,
+            style = HazeMaterials.ultraThin(materialColor),
+        ) {
+            blurRadius = if (isDragging) 34.dp else 24.dp
+            noiseFactor = 0.035f
+            inputScale = HazeInputScale.Auto
+            blurredEdgeTreatment = BlurredEdgeTreatment(shape)
+        }
+    } else {
+        Modifier.background(materialColor.copy(alpha = 0.82f), shape)
+    }
+    val edgeBrush = if (isDragging) {
+        Brush.sweepGradient(
+            listOf(
+                Color.White.copy(alpha = 0.68f),
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                MaterialTheme.colorScheme.tertiary.copy(alpha = 0.56f),
+                Color.White.copy(alpha = 0.68f),
+            ),
+        )
+    } else {
+        Brush.linearGradient(
+            listOf(
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f),
+                Color.White.copy(alpha = 0.16f),
+            ),
+        )
+    }
+    val lensTint = if (isDragging) {
+        Brush.radialGradient(
+            listOf(
+                Color.White.copy(alpha = 0.18f),
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                materialColor.copy(alpha = 0.06f),
+            ),
+        )
+    } else {
+        Brush.linearGradient(
+            listOf(
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+            ),
+        )
+    }
+    Box(
+        modifier = modifier
+            .graphicsLayer {
+                val lensScale = if (isDragging) 1.08f else 1f
+                scaleX = lensScale
+                scaleY = lensScale
+            }
+            .shadow(if (isDragging) 12.dp else 4.dp, shape, clip = false)
+            .clip(shape)
+            .then(hazeModifier)
+            .background(lensTint, shape)
+            .border(if (isDragging) 2.dp else 1.dp, edgeBrush, shape),
+    )
 }
 
 @Composable
