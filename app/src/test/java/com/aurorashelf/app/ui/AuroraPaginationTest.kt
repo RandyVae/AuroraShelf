@@ -15,6 +15,13 @@ class AuroraPaginationTest {
         assertEquals(listOf("c", "d"), result.map(VideoItem::id))
     }
 
+    @Test
+    fun homeGridKeepsFirstVideoAsHeroAndPairsTheRest() {
+        val rows = homeGridRows(listOf(video("hero"), video("a"), video("b"), video("c")))
+
+        assertEquals(listOf(listOf("a", "b"), listOf("c")), rows.map { row -> row.map(VideoItem::id) })
+    }
+
     private fun video(id: String) = VideoItem(
         id = id,
         title = "title-$id",

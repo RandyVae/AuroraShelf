@@ -434,14 +434,27 @@ private fun HomeScreen(
                 )
             }
         }
-        items(state.videos.drop(1), key = VideoItem::id) { video ->
-            VideoListRow(
-                video = video,
-                isFavorite = video.id in state.favoriteIds,
-                onClick = { onVideo(video) },
-                onFavorite = { onFavorite(video) },
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
+        items(
+            items = homeGridRows(state.videos),
+            key = { row -> row.joinToString(separator = "|") { it.id } },
+        ) { row ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+            ) {
+                row.forEach { video ->
+                    VideoGridCard(
+                        video = video,
+                        isFavorite = video.id in state.favoriteIds,
+                        onClick = { onVideo(video) },
+                        onFavorite = { onFavorite(video) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                if (row.size == 1) Spacer(Modifier.weight(1f))
+            }
         }
         if (state.isLoadingMore) {
             item(key = "loading-more") {
@@ -465,6 +478,9 @@ private fun HomeScreen(
         }
     }
 }
+
+internal fun homeGridRows(videos: List<VideoItem>): List<List<VideoItem>> =
+    videos.drop(1).chunked(2)
 
 @Composable
 private fun HomeHeader(
@@ -805,6 +821,87 @@ private fun VideoListRow(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
                     tint = if (isFavorite) AuroraCoral else AuroraMuted,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun VideoGridCard(
+    video: VideoItem,
+    isFavorite: Boolean,
+    onClick: () -> Unit,
+    onFavorite: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(role = Role.Button) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .testTag("home-grid-card"),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16 / 10f)
+                .clip(RoundedCornerShape(16.dp)),
+        ) {
+            MediaImage(video = video, modifier = Modifier.fillMaxSize())
+            if (video.duration.isNotBlank()) {
+                Text(
+                    text = video.duration,
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .background(Color.Black.copy(alpha = 0.74f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                )
+            }
+        }
+        Row(
+            verticalAlignment = Alignment.Top,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    text = video.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    minLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "${video.author} · ${video.views}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = AuroraMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onFavorite()
+                },
+                modifier = Modifier.offset(x = 8.dp, y = (-8).dp),
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
+                    tint = if (isFavorite) AuroraCoral else AuroraMuted,
+                    modifier = Modifier.size(21.dp),
                 )
             }
         }

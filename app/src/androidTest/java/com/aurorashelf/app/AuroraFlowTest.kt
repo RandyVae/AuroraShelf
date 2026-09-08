@@ -76,6 +76,15 @@ class AuroraFlowTest {
         assertTrue("Feed viewport must continue behind the floating dock", feedBounds.bottom > dockBounds.top)
     }
 
+    @Test fun homeFeedPairsVideosInTwoColumnsAfterHero() {
+        compose.waitUntil(timeoutMillis = 20_000) {
+            compose.onAllNodesWithTag("home-grid-card").fetchSemanticsNodes().size >= 2
+        }
+        val cards = compose.onAllNodesWithTag("home-grid-card").fetchSemanticsNodes()
+        assertEquals(cards[0].boundsInRoot.top, cards[1].boundsInRoot.top, 1f)
+        assertTrue("Grid cards must occupy separate columns", cards[0].boundsInRoot.right <= cards[1].boundsInRoot.left)
+    }
+
     @Test fun bottomNavigationSupportsDragSelection() {
         compose.onNodeWithTag("liquid-navigation").performTouchInput {
             swipe(
