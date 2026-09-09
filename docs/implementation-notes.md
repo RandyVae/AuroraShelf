@@ -21,6 +21,12 @@ Material 3 Expressive 的公开组件和 motion/shape 设计原则用于视觉�
 4. 播放解析站点页面公开的视频地址并交给 Media3；不执行页面脚本，也不绕过登录、验证码或内容权限。
 5. Release 构建启用 R8 与资源收缩；开发测试证书只用于候选 APK。
 
+## 合并论坛调研（2026-09-09）
+
+按 `t66y android`、`discuz android`、`forum android compose` 检索 GitHub，没有找到达到 500 stars 且适合直接复用的 Compose 论坛解析器。较相关的 [BigAppOS/BigApp_Discuz_Android](https://github.com/BigAppOS/BigApp_Discuz_Android) 为 73 stars、Java、Apache-2.0，最后更新于 2023 年；[Comsenz/Discuz-Android](https://github.com/Comsenz/Discuz-Android) 为 67 stars、Java、非标准许可证，2026 年仍有更新；唯一命中草榴地址的 Kotlin 工程没有明确许可证。三者均未复制。
+
+本项目采用现有 Jsoup、协程和 StateFlow 实现两个小型公开页面适配器：来源并发、失败隔离、合并排序和分页由独立 Repository 负责，Compose 页面只消费统一模型；帖子正文保留站点原始排版并在限制权限的 WebView 中阅读。该取舍避免引入旧 Java 客户端架构或许可证不明代码。
+
 ## 素材
 
 生产包不捆绑演示视频或演示封面，列表图片来自用户配置的真实站点。界面图标来自 Compose Material 图标库；启动图标采用 Android adaptive icon 的单色白色圆角播放几何符号和珊瑚色背景，遵循 Android 官方图层安全区规则。图标不含文字、人物或站点内容。

@@ -75,8 +75,8 @@ class AuroraFlowTest {
         compose.onNodeWithText("直播内容正在接入").assertExists()
 
         compose.onNodeWithContentDescription("论坛").performClick()
-        compose.onNodeWithTag("forum-placeholder").assertExists()
-        compose.onNodeWithText("社区功能正在准备").assertExists()
+        compose.onNodeWithTag("forum-feed").assertExists()
+        compose.onNodeWithText("两个社区 · 合并更新").assertExists()
 
         compose.onNodeWithContentDescription("我的").performClick()
         compose.onNodeWithTag("personal-overview").assertExists()
