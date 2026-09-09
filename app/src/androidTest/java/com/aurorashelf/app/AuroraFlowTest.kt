@@ -56,12 +56,32 @@ class AuroraFlowTest {
         compose.onNodeWithText("离线缓存").assertExists()
         compose.onNodeWithText("减少透明度").assertDoesNotExist()
         compose.onNodeWithText("隐私与安全").assertDoesNotExist()
+        compose.activity.onBackPressedDispatcher.onBackPressed()
+        compose.onNodeWithTag("personal-overview").assertExists()
     }
 
     @Test fun favoriteAppearsInFavorites() {
-        compose.onNodeWithContentDescription("收藏").performClick()
+        compose.onNodeWithContentDescription("我的").performClick()
+        compose.onNodeWithTag("personal-favorites-entry").performClick()
         compose.onNodeWithText("我的收藏").assertExists()
         compose.onNodeWithContentDescription("取消收藏").assertExists()
+        compose.activity.onBackPressedDispatcher.onBackPressed()
+        compose.onNodeWithTag("personal-overview").assertExists()
+    }
+
+    @Test fun reorganizedNavigationShowsLiveForumAndPersonalHub() {
+        compose.onNodeWithContentDescription("直播").performClick()
+        compose.onNodeWithTag("live-placeholder").assertExists()
+        compose.onNodeWithText("直播内容正在接入").assertExists()
+
+        compose.onNodeWithContentDescription("论坛").performClick()
+        compose.onNodeWithTag("forum-placeholder").assertExists()
+        compose.onNodeWithText("社区功能正在准备").assertExists()
+
+        compose.onNodeWithContentDescription("我的").performClick()
+        compose.onNodeWithTag("personal-overview").assertExists()
+        compose.onNodeWithTag("personal-history-entry").assertExists()
+        compose.onNodeWithTag("personal-settings-entry").assertExists()
     }
 
     @Test fun comicsDestinationShowsSourcesAndCategories() {
@@ -105,7 +125,7 @@ class AuroraFlowTest {
                 durationMillis = 1_200,
             )
         }
-        compose.onNodeWithText("内容源与离线缓存").assertExists()
+        compose.onNodeWithTag("personal-overview").assertExists()
     }
 
     @Test fun playerFullscreenHidesDetailsAndBackReturnsToDetails() {
