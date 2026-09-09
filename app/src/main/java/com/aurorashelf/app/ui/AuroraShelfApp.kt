@@ -77,7 +77,10 @@ import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -121,6 +124,7 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -135,6 +139,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -178,6 +183,7 @@ private val LocalDockHeight = staticCompositionLocalOf { 112.dp }
 private val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 
 private enum class SettingsRoute { OVERVIEW, VIDEO_SOURCES, OFFLINE_CACHE }
+private enum class PersonalRoute { OVERVIEW, FAVORITES, HISTORY, SETTINGS }
 
 @Composable
 fun AuroraShelfApp(
@@ -192,6 +198,7 @@ fun AuroraShelfApp(
     val liquidBackdrop = rememberLayerBackdrop()
     var isPlayerFullscreen by rememberSaveable(state.selectedVideo?.id) { mutableStateOf(false) }
     var isCurrentVideoPortrait by remember(state.selectedVideo?.id) { mutableStateOf<Boolean?>(null) }
+    var personalRoute by rememberSaveable { mutableStateOf(PersonalRoute.OVERVIEW) }
     val originalOrientation = remember(activity) { activity?.requestedOrientation }
 
     LaunchedEffect(activity, isPlayerFullscreen, isCurrentVideoPortrait, state.selectedVideo) {
@@ -230,6 +237,9 @@ fun AuroraShelfApp(
             state.isSearchOpen -> viewModel.setSearchOpen(false)
             state.destination == AppDestination.COMICS && comicState.reader != null -> comicViewModel.closeReader()
             state.destination == AppDestination.COMICS && comicState.details != null -> comicViewModel.closeDetails()
+            state.destination == AppDestination.ME && personalRoute != PersonalRoute.OVERVIEW -> {
+                personalRoute = PersonalRoute.OVERVIEW
+            }
             else -> viewModel.selectDestination(AppDestination.HOME)
         }
     }
@@ -281,7 +291,10 @@ fun AuroraShelfApp(
                 AppDestination.HOME -> HomeScreen(
                     state = state,
                     onSearch = { viewModel.setSearchOpen(true) },
-                    onSettings = { viewModel.selectDestination(AppDestination.SETTINGS) },
+                    onSettings = {
+                        personalRoute = PersonalRoute.SETTINGS
+                        viewModel.selectDestination(AppDestination.ME)
+                    },
                     onSource = viewModel::saveSourceUrl,
                     onCategory = viewModel::selectCategory,
                     onVideo = viewModel::openVideo,
@@ -309,26 +322,31 @@ fun AuroraShelfApp(
                     onSignOut = comicViewModel::signOut,
                 )
 
-                AppDestination.FAVORITES -> LibraryScreen(
-                    title = "我的收藏",
-                    emptyMessage = "收藏的视频会出现在这里",
-                    videos = state.allKnownVideos.filter { it.id in state.favoriteIds },
-                    onVideo = viewModel::openVideo,
-                    onFavorite = viewModel::toggleFavorite,
-                    favoriteIds = state.favoriteIds,
+                AppDestination.LIVE -> FeaturePlaceholderScreen(
+                    title = "直播",
+                    description = "直播内容正在接入",
+                    supporting = "后续将在这里提供直播源、分类和播放能力。",
+                    icon = { Icon(Icons.Default.LiveTv, contentDescription = null, modifier = Modifier.size(34.dp)) },
+                    testTag = "live-placeholder",
                 )
 
-                AppDestination.HISTORY -> LibraryScreen(
-                    title = "观看历史",
-                    emptyMessage = "播放过的视频会保留在这里",
-                    videos = state.historyIds.mapNotNull { id -> state.allKnownVideos.find { it.id == id } },
-                    onVideo = viewModel::openVideo,
-                    onFavorite = viewModel::toggleFavorite,
-                    favoriteIds = state.favoriteIds,
+                AppDestination.FORUM -> FeaturePlaceholderScreen(
+                    title = "论坛",
+                    description = "社区功能正在准备",
+                    supporting = "后续将在这里提供主题浏览、互动和内容讨论。",
+                    icon = { Icon(Icons.Default.Forum, contentDescription = null, modifier = Modifier.size(34.dp)) },
+                    testTag = "forum-placeholder",
                 )
 
-                AppDestination.SETTINGS -> SettingsScreen(
+                AppDestination.ME -> PersonalScreen(
+                    route = personalRoute,
+                    onRoute = { personalRoute = it },
+                    favorites = state.allKnownVideos.filter { it.id in state.favoriteIds },
+                    history = state.historyIds.mapNotNull { id -> state.allKnownVideos.find { it.id == id } },
+                    favoriteIds = state.favoriteIds,
                     currentUrl = state.sourceUrl,
+                    onVideo = viewModel::openVideo,
+                    onFavorite = viewModel::toggleFavorite,
                     onSave = viewModel::saveSourceUrl,
                     onOpenCached = viewModel::openVideo,
                 )
@@ -347,7 +365,10 @@ fun AuroraShelfApp(
             ) {
                 CompactNavigationRail(
                     selected = state.destination,
-                    onSelect = viewModel::selectDestination,
+                    onSelect = { destination ->
+                        if (destination == AppDestination.ME) personalRoute = PersonalRoute.OVERVIEW
+                        viewModel.selectDestination(destination)
+                    },
                 )
             }
         } else {
@@ -367,7 +388,10 @@ fun AuroraShelfApp(
             ) {
                 ExpressiveBottomBar(
                     selected = state.destination,
-                    onSelect = viewModel::selectDestination,
+                    onSelect = { destination ->
+                        if (destination == AppDestination.ME) personalRoute = PersonalRoute.OVERVIEW
+                        viewModel.selectDestination(destination)
+                    },
                     backdrop = liquidBackdrop,
                 )
             }
@@ -1038,9 +1062,9 @@ private fun ExpressiveBottomBar(
     val navigationDestinations = listOf(
         AppDestination.HOME,
         AppDestination.COMICS,
-        AppDestination.FAVORITES,
-        AppDestination.HISTORY,
-        AppDestination.SETTINGS,
+        AppDestination.LIVE,
+        AppDestination.FORUM,
+        AppDestination.ME,
     )
     var lastNavigationIndex by remember { mutableStateOf(0) }
     LaunchedEffect(selected) {
@@ -1065,9 +1089,9 @@ private fun ExpressiveBottomBar(
             val icon = when (destination) {
                 AppDestination.HOME -> Icons.Default.Home
                 AppDestination.COMICS -> Icons.AutoMirrored.Filled.MenuBook
-                AppDestination.FAVORITES -> Icons.Default.Favorite
-                AppDestination.HISTORY -> Icons.Default.History
-                AppDestination.SETTINGS -> Icons.Default.Settings
+                AppDestination.LIVE -> Icons.Default.LiveTv
+                AppDestination.FORUM -> Icons.Default.Forum
+                AppDestination.ME -> Icons.Default.Person
             }
             LiquidNavigationTab(
                 onClick = {
@@ -1114,9 +1138,9 @@ private fun CompactNavigationRail(
                 val icon = when (destination) {
                     AppDestination.HOME -> Icons.Default.Home
                     AppDestination.COMICS -> Icons.AutoMirrored.Filled.MenuBook
-                    AppDestination.FAVORITES -> Icons.Default.Favorite
-                    AppDestination.HISTORY -> Icons.Default.History
-                    AppDestination.SETTINGS -> Icons.Default.Settings
+                    AppDestination.LIVE -> Icons.Default.LiveTv
+                    AppDestination.FORUM -> Icons.Default.Forum
+                    AppDestination.ME -> Icons.Default.Person
                 }
                 val isSelected = selected == destination
                 Surface(
@@ -1143,6 +1167,218 @@ private fun CompactNavigationRail(
 }
 
 @Composable
+private fun FeaturePlaceholderScreen(
+    title: String,
+    description: String,
+    supporting: String,
+    icon: @Composable () -> Unit,
+    testTag: String,
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(
+            start = 24.dp,
+            end = 24.dp,
+            top = 24.dp,
+            bottom = LocalDockHeight.current + 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(28.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .testTag(testTag),
+    ) {
+        item { Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+        item {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                contentColor = MaterialTheme.colorScheme.primary,
+                shape = RoundedCornerShape(32.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 52.dp),
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        shape = CircleShape,
+                        modifier = Modifier.size(72.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onPrimaryContainer) {
+                                icon()
+                            }
+                        }
+                    }
+                    Text(description, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        supporting,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                        textAlign = TextAlign.Center,
+                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        shape = RoundedCornerShape(50),
+                    ) {
+                        Text("即将开放", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PersonalScreen(
+    route: PersonalRoute,
+    onRoute: (PersonalRoute) -> Unit,
+    favorites: List<VideoItem>,
+    history: List<VideoItem>,
+    favoriteIds: Set<String>,
+    currentUrl: String,
+    onVideo: (VideoItem) -> Unit,
+    onFavorite: (VideoItem) -> Unit,
+    onSave: (String) -> Unit,
+    onOpenCached: (VideoItem) -> Unit,
+) {
+    BackHandler(enabled = route != PersonalRoute.OVERVIEW) { onRoute(PersonalRoute.OVERVIEW) }
+    AnimatedContent(
+        targetState = route,
+        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        label = "personal-route",
+    ) { currentRoute ->
+        when (currentRoute) {
+            PersonalRoute.OVERVIEW -> PersonalOverview(
+                favoriteCount = favorites.size,
+                historyCount = history.size,
+                currentSource = ContentSourceCatalog.find(currentUrl)?.name ?: "自定义视频源",
+                onFavorites = { onRoute(PersonalRoute.FAVORITES) },
+                onHistory = { onRoute(PersonalRoute.HISTORY) },
+                onSettings = { onRoute(PersonalRoute.SETTINGS) },
+            )
+            PersonalRoute.FAVORITES -> LibraryScreen(
+                title = "我的收藏",
+                emptyMessage = "收藏的视频会出现在这里",
+                videos = favorites,
+                onVideo = onVideo,
+                onFavorite = onFavorite,
+                favoriteIds = favoriteIds,
+                onBack = { onRoute(PersonalRoute.OVERVIEW) },
+                testTag = "personal-favorites",
+                emptyIcon = Icons.Outlined.FavoriteBorder,
+            )
+            PersonalRoute.HISTORY -> LibraryScreen(
+                title = "观看历史",
+                emptyMessage = "播放过的视频会保留在这里",
+                videos = history,
+                onVideo = onVideo,
+                onFavorite = onFavorite,
+                favoriteIds = favoriteIds,
+                onBack = { onRoute(PersonalRoute.OVERVIEW) },
+                testTag = "personal-history",
+                emptyIcon = Icons.Default.History,
+            )
+            PersonalRoute.SETTINGS -> SettingsScreen(
+                currentUrl = currentUrl,
+                onSave = onSave,
+                onOpenCached = onOpenCached,
+                onBack = { onRoute(PersonalRoute.OVERVIEW) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun PersonalOverview(
+    favoriteCount: Int,
+    historyCount: Int,
+    currentSource: String,
+    onFavorites: () -> Unit,
+    onHistory: () -> Unit,
+    onSettings: () -> Unit,
+) {
+    LazyColumn(
+        contentPadding = PaddingValues(
+            start = 24.dp,
+            end = 24.dp,
+            top = 22.dp,
+            bottom = LocalDockHeight.current + 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .testTag("personal-overview"),
+    ) {
+        item {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+            ) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shape = CircleShape,
+                    modifier = Modifier.size(64.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(32.dp))
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                    Text("我的", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        "收藏、历史与应用设置",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
+        item { SettingsSectionLabel("你的内容") }
+        item {
+            SettingsNavigationCard {
+                SettingsNavigationRow(
+                    icon = { Icon(Icons.Default.Favorite, contentDescription = null) },
+                    title = "收藏",
+                    supporting = "稍后继续观看已保存的内容",
+                    value = "$favoriteCount 个",
+                    onClick = onFavorites,
+                    modifier = Modifier.testTag("personal-favorites-entry"),
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
+                SettingsNavigationRow(
+                    icon = { Icon(Icons.Default.History, contentDescription = null) },
+                    title = "历史",
+                    supporting = "查看最近播放过的视频",
+                    value = "$historyCount 条",
+                    onClick = onHistory,
+                    modifier = Modifier.testTag("personal-history-entry"),
+                )
+            }
+        }
+        item { SettingsSectionLabel("应用") }
+        item {
+            SettingsNavigationCard {
+                SettingsNavigationRow(
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    title = "设置",
+                    supporting = "视频源与离线缓存",
+                    value = currentSource,
+                    onClick = onSettings,
+                    modifier = Modifier.testTag("personal-settings-entry"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun LibraryScreen(
     title: String,
     emptyMessage: String,
@@ -1150,6 +1386,9 @@ private fun LibraryScreen(
     onVideo: (VideoItem) -> Unit,
     onFavorite: (VideoItem) -> Unit,
     favoriteIds: Set<String>,
+    onBack: () -> Unit,
+    testTag: String,
+    emptyIcon: ImageVector,
 ) {
     LazyColumn(
         contentPadding = PaddingValues(
@@ -1161,12 +1400,13 @@ private fun LibraryScreen(
         verticalArrangement = Arrangement.spacedBy(18.dp),
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars),
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .testTag(testTag),
     ) {
-        item { Text(title, style = MaterialTheme.typography.headlineMedium) }
+        item { SettingsPageHeader(title, "保存在这台设备上的内容", onBack, "返回我的") }
         if (videos.isEmpty()) {
             item {
-                EmptyState(message = emptyMessage)
+                EmptyState(message = emptyMessage, icon = emptyIcon)
             }
         } else {
             items(videos, key = VideoItem::id) { video ->
@@ -1183,7 +1423,7 @@ private fun LibraryScreen(
 }
 
 @Composable
-private fun EmptyState(message: String) {
+private fun EmptyState(message: String, icon: ImageVector = Icons.Outlined.FavoriteBorder) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -1191,7 +1431,7 @@ private fun EmptyState(message: String) {
             .fillMaxWidth()
             .padding(vertical = 96.dp),
     ) {
-        Icon(Icons.Outlined.FavoriteBorder, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
         Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -1252,7 +1492,12 @@ private fun SearchScreen(
             }
             message?.let { status -> item { StatusBanner(status, onSearch) } }
             if (matches.isEmpty() && !isSearching && message == null) {
-                item { EmptyState(if (query.isBlank()) "输入关键词搜索当前视频源" else "点击搜索按钮开始查找") }
+                item {
+                    EmptyState(
+                        if (query.isBlank()) "输入关键词搜索当前视频源" else "点击搜索按钮开始查找",
+                        icon = Icons.Outlined.Search,
+                    )
+                }
             } else {
                 items(matches, key = VideoItem::id) { video ->
                     VideoListRow(
@@ -1273,6 +1518,7 @@ private fun SettingsScreen(
     currentUrl: String,
     onSave: (String) -> Unit,
     onOpenCached: (VideoItem) -> Unit,
+    onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
@@ -1319,6 +1565,7 @@ private fun SettingsScreen(
                     selectedSource = ContentSourceCatalog.find(currentUrl),
                     completedCount = completedCount,
                     downloadedBytes = downloadedBytes,
+                    onBack = onBack,
                     onVideoSources = { route = SettingsRoute.VIDEO_SOURCES },
                     onOfflineCache = { route = SettingsRoute.OFFLINE_CACHE },
                 )
@@ -1350,6 +1597,7 @@ private fun SettingsOverview(
     selectedSource: ContentSource?,
     completedCount: Int,
     downloadedBytes: Long,
+    onBack: () -> Unit,
     onVideoSources: () -> Unit,
     onOfflineCache: () -> Unit,
 ) {
@@ -1366,12 +1614,7 @@ private fun SettingsOverview(
             .testTag("settings-list")
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("设置", style = MaterialTheme.typography.headlineMedium)
-                Text("内容源与离线缓存", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
+        item { SettingsPageHeader("设置", "内容源与离线缓存", onBack, "返回我的") }
         item { SettingsSectionLabel("内容") }
         item {
             SettingsNavigationCard {
@@ -1497,13 +1740,18 @@ private fun SettingsNavigationRow(
 }
 
 @Composable
-private fun SettingsPageHeader(title: String, subtitle: String, onBack: () -> Unit) {
+private fun SettingsPageHeader(
+    title: String,
+    subtitle: String,
+    onBack: () -> Unit,
+    backDescription: String = "返回设置",
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回设置")
+            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = backDescription)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
