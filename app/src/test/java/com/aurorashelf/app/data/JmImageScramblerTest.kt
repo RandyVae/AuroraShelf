@@ -22,4 +22,11 @@ class JmImageScramblerTest {
         assertTrue(count in 2..16)
         assertEquals(0, count % 2)
     }
+
+    @Test
+    fun currentProtocolHashesFilenameWithoutItsExtension() {
+        assertEquals(12, JmImageScrambler.segmentCount(220980, "500000", "00001.webp"))
+        assertEquals(12, JmImageScrambler.segmentCount(220980, "500000", "00001.jpg?cache=1"))
+        assertEquals(12, JmImageScrambler.segmentCount(220980, "500000", "00001"))
+    }
 }

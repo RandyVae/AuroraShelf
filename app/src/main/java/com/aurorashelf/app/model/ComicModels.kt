@@ -7,6 +7,7 @@ data class ComicSummary(
     val subtitle: String = "",
     val coverUrl: String? = null,
     val tags: List<String> = emptyList(),
+    val coverReferer: String? = null,
 )
 
 data class ComicChapter(

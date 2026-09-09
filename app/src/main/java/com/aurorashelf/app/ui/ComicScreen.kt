@@ -95,6 +95,7 @@ import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import coil3.request.transformations
+import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.data.comic.ComicPageResolver
 import com.aurorashelf.app.model.ComicDetails
 import com.aurorashelf.app.model.ComicPage
@@ -518,16 +519,7 @@ private fun ComicCard(comic: ComicSummary, onClick: () -> Unit) {
             color = MaterialTheme.colorScheme.surfaceContainerHighest,
             modifier = Modifier.fillMaxWidth().aspectRatio(0.74f),
         ) {
-            if (comic.coverUrl != null) {
-                AsyncImage(
-                    model = comic.coverUrl,
-                    contentDescription = "${comic.title}封面",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            } else {
-                ComicCoverPlaceholder()
-            }
+            ComicCoverImage(comic = comic, modifier = Modifier.fillMaxSize())
         }
         Text(
             comic.title,
@@ -591,14 +583,7 @@ private fun ComicDetailsScreen(
                             color = MaterialTheme.colorScheme.surfaceContainerHighest,
                             modifier = Modifier.width(126.dp).aspectRatio(0.74f),
                         ) {
-                            details.comic.coverUrl?.let {
-                                AsyncImage(
-                                    model = it,
-                                    contentDescription = "${details.comic.title}封面",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize(),
-                                )
-                            } ?: ComicCoverPlaceholder()
+                            ComicCoverImage(comic = details.comic, modifier = Modifier.fillMaxSize())
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.weight(1f)) {
                             Text(details.comic.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -836,6 +821,41 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
             }
             else -> Unit
         }
+    }
+}
+
+@Composable
+private fun ComicCoverImage(comic: ComicSummary, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val request = remember(comic.coverUrl, comic.coverReferer, comic.sourceId, context) {
+        comic.coverUrl?.let { url ->
+            ImageRequest.Builder(context)
+                .data(url)
+                .memoryCacheKey(url)
+                .diskCacheKey(url)
+                .apply {
+                    comic.coverReferer?.let { referer ->
+                        httpHeaders(
+                            NetworkHeaders.Builder()
+                                .set("Referer", referer)
+                                .set("User-Agent", VideoRepository.USER_AGENT)
+                                .apply { if (comic.sourceId == "ehentai") set("Cookie", "nw=1") }
+                                .build(),
+                        )
+                    }
+                }
+                .build()
+        }
+    }
+    if (request == null) {
+        ComicCoverPlaceholder()
+    } else {
+        AsyncImage(
+            model = request,
+            contentDescription = "${comic.title}封面",
+            contentScale = ContentScale.Crop,
+            modifier = modifier,
+        )
     }
 }
 

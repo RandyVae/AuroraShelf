@@ -1,5 +1,6 @@
 package com.aurorashelf.app.data.comic
 
+import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.model.ComicCategory
 import com.aurorashelf.app.model.ComicChapter
 import com.aurorashelf.app.model.ComicDetails
@@ -8,8 +9,12 @@ import com.aurorashelf.app.model.ComicSourceInfo
 import com.aurorashelf.app.model.ComicSummary
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 import org.jsoup.nodes.Document
 
 internal class EhentaiComicSource : ComicSource {
@@ -53,8 +58,7 @@ internal class EhentaiComicSource : ComicSource {
             val match = GALLERY_PATTERN.find(href) ?: return@mapNotNull null
             val title = row.selectFirst(".glink")?.text().orEmpty()
             if (title.isBlank()) return@mapNotNull null
-            val image = row.selectFirst(".glthumb img")
-            val cover = image?.attr("data-src").orEmpty().ifBlank { image?.absUrl("src").orEmpty() }
+            val cover = coverUrl(row)
             val category = row.selectFirst(".glcat .cn, .glthumb .cn")?.text().orEmpty()
             val pageCount = row.select(".glthumb div, .gl4c div").asSequence()
                 .map { it.text() }.firstOrNull { PAGES_PATTERN.containsMatchIn(it) }.orEmpty()
@@ -63,8 +67,9 @@ internal class EhentaiComicSource : ComicSource {
                 id = "${match.groupValues[1]}/${match.groupValues[2]}",
                 title = title,
                 subtitle = listOf(category, pageCount).filter(String::isNotBlank).distinct().joinToString(" · "),
-                coverUrl = cover.takeIf { it.startsWith("https://") },
+                coverUrl = cover,
                 tags = row.select(".gt, .gtl, .gtr").map { it.attr("title").ifBlank(it::text) }.filter(String::isNotBlank),
+                coverReferer = ROOT,
             )
         }
     }
@@ -84,6 +89,7 @@ internal class EhentaiComicSource : ComicSource {
                 subtitle = author.ifBlank { comic.subtitle },
                 coverUrl = cover ?: comic.coverUrl,
                 tags = tags.ifEmpty { comic.tags },
+                coverReferer = ROOT,
             ),
             description = alternateTitle.takeIf { it != title }.orEmpty(),
             chapters = listOf(ComicChapter(comic.id, "完整画廊")),
@@ -99,13 +105,26 @@ internal class EhentaiComicSource : ComicSource {
             ?.let { PAGES_PATTERN.find(it)?.groupValues?.get(1)?.toIntOrNull() }
             ?: 0
         val previewPageCount = maxOf(1, (pageCount + PREVIEWS_PER_PAGE - 1) / PREVIEWS_PER_PAGE)
-        val pageLinks = buildList {
-            repeat(previewPageCount) { previewPage ->
-                val current = if (previewPage == 0) first else document("$galleryUrl?p=$previewPage")
-                addAll(current.select("#gdt a[href*=/s/]").map { it.absUrl("href") })
+        val previewDocuments = buildList {
+            add(first)
+            (1 until previewPageCount).chunked(PREVIEW_CONCURRENCY).forEach { chunk ->
+                addAll(coroutineScope {
+                    chunk.map { previewPage -> async { document("$galleryUrl?p=$previewPage") } }.awaitAll()
+                })
             }
-        }.filter(String::isNotBlank).distinct().sortedBy { PAGE_NUMBER_PATTERN.find(it)?.groupValues?.get(1)?.toIntOrNull() }
-        pageLinks.map { pageUrl -> ComicPage(imageUrl = "", referer = galleryUrl, resolutionUrl = pageUrl) }
+        }
+        val pages = previewDocuments
+            .flatMap { current -> current.select("#gdt a[href*=/s/]").map { it.absUrl("href") } }
+            .filter(String::isNotBlank)
+            .distinct()
+            .sortedBy { PAGE_NUMBER_PATTERN.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+            .map { pageUrl -> ComicPage(imageUrl = "", referer = galleryUrl, resolutionUrl = pageUrl) }
+        val readyPages = coroutineScope {
+            pages.take(INITIAL_RESOLUTION_PREFETCH).map { page ->
+                async { runCatching { ComicPageResolver.resolve(page) }.getOrDefault(page) }
+            }.awaitAll()
+        }
+        readyPages + pages.drop(readyPages.size)
     }
 
     private fun listUrl(categoryId: String, query: String): String {
@@ -118,13 +137,37 @@ internal class EhentaiComicSource : ComicSource {
 
     private fun galleryUrl(comic: ComicSummary) = "$ROOT/g/${comic.id.trim('/')}/"
 
-    private fun document(url: String): Document = Jsoup.parse(ComicHttp.get(url, HEADERS), url)
+    private fun document(url: String): Document {
+        val (body, finalUrl) = EhentaiHttp.get(url, HEADERS)
+        return Jsoup.parse(body, finalUrl)
+    }
 
-    private companion object {
+    private fun coverUrl(row: Element): String? {
+        val image = row.selectFirst(".glthumb img[data-src], .glthumb img[src]")
+        val candidate = image?.attr("data-src").orEmpty().ifBlank { image?.attr("src").orEmpty() }
+            .ifBlank {
+                COVER_PATTERN.find(row.selectFirst(".glthumb [style*='url']")?.attr("style").orEmpty())
+                    ?.groupValues?.get(1).orEmpty()
+            }
+        return when {
+            candidate.startsWith("https://") -> candidate
+            candidate.startsWith("//") -> "https:$candidate"
+            else -> ComicHttp.resolve(ROOT, candidate)?.takeIf { it.startsWith("https://") }
+        }
+    }
+
+    internal companion object {
         const val ROOT = "https://e-hentai.org"
         const val ALL_CATEGORIES = 0x3ff
         const val PREVIEWS_PER_PAGE = 20
-        val HEADERS = mapOf("Cookie" to "nw=1", "Referer" to "$ROOT/")
+        const val PREVIEW_CONCURRENCY = 4
+        const val INITIAL_RESOLUTION_PREFETCH = 4
+        val HEADERS = mapOf(
+            "Cookie" to "nw=1",
+            "Referer" to "$ROOT/",
+            "User-Agent" to VideoRepository.USER_AGENT,
+            "Accept-Language" to "zh-CN,zh;q=0.9,en;q=0.8",
+        )
         val GALLERY_PATTERN = Regex("/g/(\\d+)/([a-f0-9]+)")
         val PAGES_PATTERN = Regex("(\\d+)\\s+pages?", RegexOption.IGNORE_CASE)
         val PAGE_NUMBER_PATTERN = Regex("-(\\d+)(?:[?#]|$)")

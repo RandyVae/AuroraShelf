@@ -39,6 +39,9 @@ class LiveComicTest {
             val repository = ComicRepository()
             val comics = repository.browse(sourceId = "ehentai", categoryId = "0", page = 1)
             assertTrue("Expected E-Hentai records", comics.isNotEmpty())
+            assertTrue("Expected E-Hentai thumbnail addresses", comics.take(10).all {
+                it.coverUrl?.startsWith("https://ehgt.org/") == true && it.coverReferer == "https://e-hentai.org"
+            })
 
             val details = repository.details(comics.first())
             val pages = repository.chapter(details.comic, details.chapters.first().id)
