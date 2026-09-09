@@ -195,8 +195,11 @@ internal object JmImageScrambler {
         if (id < scrambleId) return 0
         if (id < SCRAMBLE_ALGORITHM_V2) return 10
         val modulus = if (id < SCRAMBLE_ALGORITHM_V3) 10 else 8
+        // The JM protocol hashes the basename only. Including .jpg/.webp changes
+        // the segment count and leaves the decoded page as offset horizontal bands.
+        val imageName = filename.substringAfterLast('/').substringBefore('?').substringBeforeLast('.')
         val digest = MessageDigest.getInstance("MD5")
-            .digest("$id$filename".toByteArray(StandardCharsets.UTF_8))
+            .digest("$id$imageName".toByteArray(StandardCharsets.UTF_8))
             .joinToString("") { "%02x".format(it) }
         return (digest.last().code % modulus) * 2 + 2
     }
