@@ -189,9 +189,11 @@ private enum class PersonalRoute { OVERVIEW, FAVORITES, HISTORY, SETTINGS }
 fun AuroraShelfApp(
     viewModel: AuroraViewModel = viewModel(),
     comicViewModel: ComicViewModel = viewModel(),
+    forumViewModel: ForumViewModel = viewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val comicState by comicViewModel.uiState.collectAsStateWithLifecycle()
+    val forumState by forumViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val hazeState = rememberHazeState()
@@ -229,7 +231,7 @@ fun AuroraShelfApp(
 
     BackHandler(
         enabled = state.selectedVideo != null || state.isSearchOpen || state.destination != AppDestination.HOME ||
-            comicState.reader != null || comicState.details != null,
+            comicState.reader != null || comicState.details != null || forumState.selectedPost != null,
     ) {
         when {
             state.selectedVideo != null && isPlayerFullscreen -> isPlayerFullscreen = false
@@ -237,6 +239,7 @@ fun AuroraShelfApp(
             state.isSearchOpen -> viewModel.setSearchOpen(false)
             state.destination == AppDestination.COMICS && comicState.reader != null -> comicViewModel.closeReader()
             state.destination == AppDestination.COMICS && comicState.details != null -> comicViewModel.closeDetails()
+            state.destination == AppDestination.FORUM && forumState.selectedPost != null -> forumViewModel.closePost()
             state.destination == AppDestination.ME && personalRoute != PersonalRoute.OVERVIEW -> {
                 personalRoute = PersonalRoute.OVERVIEW
             }
@@ -330,12 +333,14 @@ fun AuroraShelfApp(
                     testTag = "live-placeholder",
                 )
 
-                AppDestination.FORUM -> FeaturePlaceholderScreen(
-                    title = "论坛",
-                    description = "社区功能正在准备",
-                    supporting = "后续将在这里提供主题浏览、互动和内容讨论。",
-                    icon = { Icon(Icons.Default.Forum, contentDescription = null, modifier = Modifier.size(34.dp)) },
-                    testTag = "forum-placeholder",
+                AppDestination.FORUM -> ForumScreen(
+                    state = forumState,
+                    bottomPadding = LocalDockHeight.current,
+                    onEnsureLoaded = forumViewModel::ensureLoaded,
+                    onRefresh = forumViewModel::refresh,
+                    onLoadMore = forumViewModel::loadMore,
+                    onPost = forumViewModel::open,
+                    onClosePost = forumViewModel::closePost,
                 )
 
                 AppDestination.ME -> PersonalScreen(
@@ -355,7 +360,7 @@ fun AuroraShelfApp(
 
         if (windowLayout.compactDock) {
             AnimatedVisibility(
-                visible = state.selectedVideo == null && !state.isSearchOpen && comicState.reader == null,
+                visible = state.selectedVideo == null && !state.isSearchOpen && comicState.reader == null && forumState.selectedPost == null,
                 enter = fadeIn() + scaleIn(initialScale = 0.94f),
                 exit = fadeOut() + scaleOut(targetScale = 0.94f),
                 modifier = Modifier
@@ -373,7 +378,7 @@ fun AuroraShelfApp(
             }
         } else {
             AnimatedVisibility(
-                visible = state.selectedVideo == null && !state.isSearchOpen && comicState.reader == null,
+                visible = state.selectedVideo == null && !state.isSearchOpen && comicState.reader == null && forumState.selectedPost == null,
                 enter = fadeIn() + scaleIn(initialScale = 0.96f),
                 exit = fadeOut() + scaleOut(targetScale = 0.96f),
                 modifier = Modifier

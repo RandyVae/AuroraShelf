@@ -1,4 +1,4 @@
-# 极光视界 · Android 2.13.0
+# 极光视界 · Android 2.14.0
 
 按用户选定的「方案 1」重新实现的 Android 客户端。采用 Kotlin、Jetpack Compose、Material 3、Haze 与 AndroidLiquidGlass/Backdrop；Material You 界面保留真实视频源能力，并以浮动玻璃导航、吸顶分类和弹性选中动效重构视觉层级，不是网页套壳首页。2.9.0 保留首个大幅推荐视频并将后续内容改为 YouTube 式双列信息层级；2.9.1 新增完整日间与夜间主题，默认跟随系统即时切换。
 
@@ -12,11 +12,13 @@
 
 ## 当前范围
 
-### 导航与个人中心（2.13.0）
+### 导航、论坛与个人中心（2.14.0）
 
 - 底栏固定为首页、漫画、直播、论坛和我的五项；点击、连续拖动、跨栏震动及玻璃透镜动效保持一致，横屏显示对应侧栏图标。
 - “我的”集中收藏、观看历史和设置，以个人中心卡片展示本地条目数量与当前视频源；二级页面支持系统返回手势。
-- 首页设置按钮仍可快速进入设置；直播与论坛目前仅提供明确的正式占位状态，尚未接入内容、账号或互动后端。
+- 论坛把草榴社区技术讨论区与 91 自拍论坛性趣闲谈区的公开主题合并成一个信息流，不设置来源切换；两边并发分页、统一去重排序，任一来源临时不可用时仍显示另一边内容。
+- 论坛主题在应用内阅读，阅读时隐藏底栏；当前是匿名只读浏览，不接入登录、发帖、回复或绕过站点权限。直播仍保留明确的正式占位状态。
+- 首页设置按钮仍可快速进入设置。
 
 ### 在线漫画（2.12.1）
 
@@ -86,9 +88,9 @@
 
 | 路径 | 职责 |
 | --- | --- |
-| `app/src/main/java/com/aurorashelf/app/data` | 视频与漫画源适配、地址校验、本地收藏与历史 |
-| `app/src/main/java/com/aurorashelf/app/model` | 视频、漫画、分类与目的页面模型 |
-| `app/src/main/java/com/aurorashelf/app/ui` | 视频/漫画页面、阅读器、状态管理和 Material 3 控件 |
+| `app/src/main/java/com/aurorashelf/app/data` | 视频、漫画与论坛源适配、地址校验、本地收藏与历史 |
+| `app/src/main/java/com/aurorashelf/app/model` | 视频、漫画、论坛、分类与目的页面模型 |
+| `app/src/main/java/com/aurorashelf/app/ui` | 视频、漫画、论坛页面、阅读器、状态管理和 Material 3 控件 |
 | `app/src/main/java/com/aurorashelf/app/ui/theme` | Material 3 颜色与字体 |
 | `app/src/test`、`app/src/androidTest` | 解析/校验单元测试及模拟器流程测试 |
 
