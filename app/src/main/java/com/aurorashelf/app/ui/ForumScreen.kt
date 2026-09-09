@@ -230,6 +230,9 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 allowFileAccess = false
                 allowContentAccess = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                useWideViewPort = false
+                loadWithOverviewMode = false
+                layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
                 builtInZoomControls = true
                 displayZoomControls = false
             }
@@ -240,8 +243,10 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
-                    isLoading = false
                     canGoBack = view?.canGoBack() == true
+                    view?.applyMobileForumLayout {
+                        isLoading = false
+                    } ?: run { isLoading = false }
                 }
 
                 override fun onReceivedError(view: WebView?, request: WebResourceRequest?, failure: WebResourceError?) {
@@ -252,7 +257,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 }
 
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean =
-                    request?.url?.scheme !in setOf("https", "http")
+                    request?.url?.scheme != "https"
             }
             loadUrl(post.url)
         }
@@ -300,3 +305,79 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
         }
     }
 }
+
+@SuppressLint("SetJavaScriptEnabled")
+private fun WebView.applyMobileForumLayout(onComplete: () -> Unit) {
+    settings.javaScriptEnabled = true
+    evaluateJavascript(MOBILE_FORUM_SCRIPT) {
+        settings.javaScriptEnabled = false
+        onComplete()
+    }
+}
+
+private val MOBILE_FORUM_SCRIPT =
+    """
+    (() => {
+      let viewport = document.querySelector('meta[name="viewport"]');
+      if (!viewport) {
+        viewport = document.createElement('meta');
+        viewport.name = 'viewport';
+        document.head.appendChild(viewport);
+      }
+      viewport.content = 'width=device-width, initial-scale=1, maximum-scale=3, user-scalable=yes';
+
+      const style = document.createElement('style');
+      style.textContent = `
+        html, body {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow-x: hidden !important;
+        }
+        *, *::before, *::after { box-sizing: border-box !important; }
+        img, video, iframe {
+          max-width: 100% !important;
+          height: auto !important;
+        }
+        #main, #wrap, #postlist, .mainbox {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          margin-left: 0 !important;
+          margin-right: 0 !important;
+        }
+        #main { padding: 0 12px !important; }
+        .t > table > tbody > tr.tr1 > th[rowspan="2"],
+        td.postauthor { display: none !important; }
+        .t > table, .t > table > tbody,
+        .postcontent, .postmessage, .t_msgfontfix, .t_msgfont {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+        }
+        .t > table > tbody > tr.tr1 > th:not([rowspan]),
+        td.postcontent { padding: 10px !important; }
+        .tpc_content, .postmessage, .t_msgfont {
+          font-size: 17px !important;
+          line-height: 1.65 !important;
+          overflow-wrap: anywhere !important;
+          word-break: break-word !important;
+        }
+        .tiptop, .tipad, .postinfo { font-size: 12px !important; }
+        input, textarea, select { max-width: 100% !important; }
+      `;
+      document.head.appendChild(style);
+
+      document.querySelectorAll('img[ess-data]').forEach((image) => {
+        const source = image.getAttribute('ess-data');
+        if (source && source.startsWith('https://')) image.src = source;
+      });
+      document.querySelectorAll('img[file]').forEach((image) => {
+        const source = image.getAttribute('file');
+        if (source && source.startsWith('https://')) image.src = source;
+      });
+      return true;
+    })();
+    """.trimIndent()
