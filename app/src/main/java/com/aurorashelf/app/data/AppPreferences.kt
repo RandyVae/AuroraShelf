@@ -47,6 +47,14 @@ class AppPreferences(context: Context) {
         get() = normalizeBaseUrl(preferences.getString(KEY_SOURCE_URL, DEFAULT_SOURCE).orEmpty()).ifBlank { DEFAULT_SOURCE }
         set(value) = preferences.edit { putString(KEY_SOURCE_URL, normalizeBaseUrl(value).ifBlank { DEFAULT_SOURCE }) }
 
+    var comicSourceId: String
+        get() = preferences.getString(KEY_COMIC_SOURCE_ID, DEFAULT_COMIC_SOURCE_ID)
+            ?.takeIf(String::isNotBlank)
+            ?: DEFAULT_COMIC_SOURCE_ID
+        set(value) = preferences.edit {
+            putString(KEY_COMIC_SOURCE_ID, value.takeIf(String::isNotBlank) ?: DEFAULT_COMIC_SOURCE_ID)
+        }
+
     fun favoriteIds(): Set<String> =
         preferences.getStringSet(KEY_FAVORITES, emptySet()).orEmpty().filterNot { it.startsWith("demo-") }.toSet()
 
@@ -75,8 +83,10 @@ class AppPreferences(context: Context) {
     companion object {
         // Read from the supplied APK's address dialog; HTTPS verified on 2026-09-05.
         const val DEFAULT_SOURCE = ContentSourceCatalog.DEFAULT_BASE_URL
+        const val DEFAULT_COMIC_SOURCE_ID = "jm"
         private const val PREFERENCES_NAME = "aurora_shelf"
         private const val KEY_SOURCE_URL = "source_url"
+        private const val KEY_COMIC_SOURCE_ID = "comic_source_id"
         private const val KEY_FAVORITES = "favorite_ids"
         private const val KEY_HISTORY = "history_ids"
         private const val MAX_HISTORY = 50

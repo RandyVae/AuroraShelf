@@ -152,6 +152,7 @@ import coil3.compose.AsyncImage
 import com.aurorashelf.app.model.AppDestination
 import com.aurorashelf.app.model.ContentSource
 import com.aurorashelf.app.model.ContentSourceCatalog
+import com.aurorashelf.app.model.ComicSourceInfo
 import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.VideoItem
 import com.aurorashelf.app.data.SourceAddress
@@ -182,7 +183,7 @@ private val LocalWindowLayout = staticCompositionLocalOf { WindowLayout.calculat
 private val LocalDockHeight = staticCompositionLocalOf { 112.dp }
 private val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 
-private enum class SettingsRoute { OVERVIEW, VIDEO_SOURCES, OFFLINE_CACHE }
+private enum class SettingsRoute { OVERVIEW, VIDEO_SOURCES, COMIC_SOURCES, OFFLINE_CACHE }
 private enum class PersonalRoute { OVERVIEW, FAVORITES, HISTORY, SETTINGS }
 
 @Composable
@@ -308,7 +309,6 @@ fun AuroraShelfApp(
 
                 AppDestination.COMICS -> ComicScreen(
                     state = comicState,
-                    onSource = comicViewModel::selectSource,
                     onCategory = comicViewModel::selectCategory,
                     onQuery = comicViewModel::updateQuery,
                     onSearch = comicViewModel::submitSearch,
@@ -350,9 +350,12 @@ fun AuroraShelfApp(
                     history = state.historyIds.mapNotNull { id -> state.allKnownVideos.find { it.id == id } },
                     favoriteIds = state.favoriteIds,
                     currentUrl = state.sourceUrl,
+                    comicSources = comicState.sources,
+                    selectedComicSourceId = comicState.selectedSourceId,
                     onVideo = viewModel::openVideo,
                     onFavorite = viewModel::toggleFavorite,
                     onSave = viewModel::saveSourceUrl,
+                    onComicSource = comicViewModel::selectSource,
                     onOpenCached = viewModel::openVideo,
                 )
             }
@@ -1245,9 +1248,12 @@ private fun PersonalScreen(
     history: List<VideoItem>,
     favoriteIds: Set<String>,
     currentUrl: String,
+    comicSources: List<ComicSourceInfo>,
+    selectedComicSourceId: String,
     onVideo: (VideoItem) -> Unit,
     onFavorite: (VideoItem) -> Unit,
     onSave: (String) -> Unit,
+    onComicSource: (String) -> Unit,
     onOpenCached: (VideoItem) -> Unit,
 ) {
     BackHandler(enabled = route != PersonalRoute.OVERVIEW) { onRoute(PersonalRoute.OVERVIEW) }
@@ -1289,7 +1295,10 @@ private fun PersonalScreen(
             )
             PersonalRoute.SETTINGS -> SettingsScreen(
                 currentUrl = currentUrl,
+                comicSources = comicSources,
+                selectedComicSourceId = selectedComicSourceId,
                 onSave = onSave,
+                onComicSource = onComicSource,
                 onOpenCached = onOpenCached,
                 onBack = { onRoute(PersonalRoute.OVERVIEW) },
             )
@@ -1373,7 +1382,7 @@ private fun PersonalOverview(
                 SettingsNavigationRow(
                     icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                     title = "设置",
-                    supporting = "视频源与离线缓存",
+                    supporting = "视频源、漫画源与离线缓存",
                     value = currentSource,
                     onClick = onSettings,
                     modifier = Modifier.testTag("personal-settings-entry"),
@@ -1521,7 +1530,10 @@ private fun SearchScreen(
 @Composable
 private fun SettingsScreen(
     currentUrl: String,
+    comicSources: List<ComicSourceInfo>,
+    selectedComicSourceId: String,
     onSave: (String) -> Unit,
+    onComicSource: (String) -> Unit,
     onOpenCached: (VideoItem) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -1568,10 +1580,12 @@ private fun SettingsScreen(
             when (currentRoute) {
                 SettingsRoute.OVERVIEW -> SettingsOverview(
                     selectedSource = ContentSourceCatalog.find(currentUrl),
+                    selectedComicSource = comicSources.find { it.id == selectedComicSourceId },
                     completedCount = completedCount,
                     downloadedBytes = downloadedBytes,
                     onBack = onBack,
                     onVideoSources = { route = SettingsRoute.VIDEO_SOURCES },
+                    onComicSources = { route = SettingsRoute.COMIC_SOURCES },
                     onOfflineCache = { route = SettingsRoute.OFFLINE_CACHE },
                 )
                 SettingsRoute.VIDEO_SOURCES -> VideoSourcesPage(
@@ -1580,6 +1594,12 @@ private fun SettingsScreen(
                     addressError = addressError,
                     onSourceUrl = { sourceUrl = it },
                     onSave = onSave,
+                    onBack = { route = SettingsRoute.OVERVIEW },
+                )
+                SettingsRoute.COMIC_SOURCES -> ComicSourcesPage(
+                    sources = comicSources,
+                    selectedSourceId = selectedComicSourceId,
+                    onSource = onComicSource,
                     onBack = { route = SettingsRoute.OVERVIEW },
                 )
                 SettingsRoute.OFFLINE_CACHE -> OfflineCachePage(
@@ -1600,10 +1620,12 @@ private fun SettingsScreen(
 @Composable
 private fun SettingsOverview(
     selectedSource: ContentSource?,
+    selectedComicSource: ComicSourceInfo?,
     completedCount: Int,
     downloadedBytes: Long,
     onBack: () -> Unit,
     onVideoSources: () -> Unit,
+    onComicSources: () -> Unit,
     onOfflineCache: () -> Unit,
 ) {
     LazyColumn(
@@ -1630,6 +1652,15 @@ private fun SettingsOverview(
                     value = selectedSource?.name ?: "自定义视频源",
                     onClick = onVideoSources,
                     modifier = Modifier.testTag("settings-video-sources"),
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
+                SettingsNavigationRow(
+                    icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
+                    title = "漫画源",
+                    supporting = "管理漫画内容来源",
+                    value = selectedComicSource?.name ?: "禁漫天堂",
+                    onClick = onComicSources,
+                    modifier = Modifier.testTag("settings-comic-sources"),
                 )
                 HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
                 SettingsNavigationRow(
@@ -1856,6 +1887,65 @@ private fun VideoSourcesPage(
 }
 
 @Composable
+private fun ComicSourcesPage(
+    sources: List<ComicSourceInfo>,
+    selectedSourceId: String,
+    onSource: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    var filter by rememberSaveable { mutableStateOf("") }
+    val filteredSources = remember(filter, sources) {
+        sources.filter { source ->
+            filter.isBlank() || source.name.contains(filter, ignoreCase = true) ||
+                source.description.contains(filter, ignoreCase = true)
+        }
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = 14.dp,
+            bottom = LocalDockHeight.current + 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .testTag("comic-sources-page"),
+    ) {
+        item { SettingsPageHeader("漫画源", "选择后立即刷新漫画内容", onBack) }
+        item {
+            OutlinedTextField(
+                value = filter,
+                onValueChange = { filter = it },
+                placeholder = { Text("搜索漫画源") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+                shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (filteredSources.isEmpty()) {
+            item {
+                Text(
+                    "没有匹配的漫画源",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                )
+            }
+        } else {
+            items(filteredSources, key = ComicSourceInfo::id) { source ->
+                ComicSourceOption(
+                    source = source,
+                    selected = selectedSourceId == source.id,
+                    onClick = { onSource(source.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun OfflineCachePage(
     cachedVideos: List<OfflineVideo>,
     completedCount: Int,
@@ -2019,6 +2109,54 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
             if (selected) {
                 Text("使用中", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             }
+        }
+    }
+}
+
+@Composable
+private fun ComicSourceOption(source: ComicSourceInfo, selected: Boolean, onClick: () -> Unit) {
+    val haptic = LocalHapticFeedback.current
+    Surface(
+        onClick = {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            if (!selected) onClick()
+        },
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(
+            1.dp,
+            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.36f) else Color.Transparent,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            Icon(
+                if (selected) Icons.Default.CheckCircle else Icons.AutoMirrored.Filled.MenuBook,
+                contentDescription = null,
+                tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    source.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                when {
+                    selected -> "使用中"
+                    source.requiresAuthentication -> "需登录"
+                    else -> ""
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
