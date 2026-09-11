@@ -1,7 +1,11 @@
 package com.aurorashelf.app.ui
 
 import android.annotation.SuppressLint
+import android.Manifest
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.os.Build
+import android.view.HapticFeedbackConstants
 import android.webkit.CookieManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -9,6 +13,8 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -32,13 +38,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -48,6 +58,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -62,10 +73,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import com.aurorashelf.app.data.forum.ForumImageRequest
+import com.aurorashelf.app.data.forum.ForumImageSaver
 import com.aurorashelf.app.model.ForumPost
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun ForumScreen(
@@ -227,11 +242,43 @@ private fun ForumError(message: String, onRetry: () -> Unit) {
 @Composable
 private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val imageSaver = remember(context) { ForumImageSaver(context) }
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     var isLoading by remember(post.url) { mutableStateOf(true) }
     var error by remember(post.url) { mutableStateOf<String?>(null) }
     var canGoBack by remember(post.url) { mutableStateOf(false) }
     var loadGeneration by remember(post.url) { mutableStateOf(0) }
+    var pendingImageRequest by remember(post.url) { mutableStateOf<ForumImageRequest?>(null) }
+    var permissionImageRequest by remember(post.url) { mutableStateOf<ForumImageRequest?>(null) }
+    var isSavingImage by remember(post.url) { mutableStateOf(false) }
+    val saveImage: (ForumImageRequest) -> Unit = { request ->
+        if (!isSavingImage) {
+            isSavingImage = true
+            coroutineScope.launch {
+                val result = imageSaver.save(request)
+                isSavingImage = false
+                snackbarHostState.showSnackbar(
+                    result.fold(
+                        onSuccess = { "图片已保存到系统相册" },
+                        onFailure = { failure -> failure.message ?: "图片保存失败，请稍后重试" },
+                    ),
+                )
+            }
+        }
+    }
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { isGranted ->
+        val request = permissionImageRequest
+        permissionImageRequest = null
+        if (isGranted && request != null) {
+            saveImage(request)
+        } else if (!isGranted) {
+            coroutineScope.launch { snackbarHostState.showSnackbar("没有存储权限，无法保存图片") }
+        }
+    }
     val webView = remember(post.url) {
         WebView(context).apply {
             settings.apply {
@@ -272,6 +319,22 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
 
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean =
                     request?.url?.scheme != "https"
+            }
+            setOnLongClickListener {
+                val hit = hitTestResult
+                val isImage = hit.type == WebView.HitTestResult.IMAGE_TYPE ||
+                    hit.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE
+                val imageUrl = hit.extra.orEmpty()
+                if (!isImage || imageUrl.isBlank()) return@setOnLongClickListener false
+                performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                val currentPageUrl = url ?: post.url
+                pendingImageRequest = ForumImageRequest(
+                    imageUrl = imageUrl,
+                    pageUrl = currentPageUrl,
+                    userAgent = settings.userAgentString,
+                    cookies = CookieManager.getInstance().getCookie(currentPageUrl),
+                )
+                true
             }
             loadForumPost(post.url)
         }
@@ -354,7 +417,58 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     TextButton(onClick = { webView.reload() }) { Text("重新加载") }
                 }
             }
+            if (isSavingImage) {
+                Surface(
+                    color = MaterialTheme.colorScheme.inverseSurface,
+                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    shape = RoundedCornerShape(18.dp),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp).testTag("forum-image-saving"),
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                    ) {
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Text("正在保存图片…", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+            )
         }
+    }
+
+    pendingImageRequest?.let { request ->
+        AlertDialog(
+            onDismissRequest = { pendingImageRequest = null },
+            icon = { Icon(Icons.Default.Image, contentDescription = null) },
+            title = { Text("保存图片到相册？") },
+            text = { Text("图片将保存到系统相册的 Pictures/AuroraShelf 文件夹。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingImageRequest = null
+                        val needsLegacyPermission = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+                            PackageManager.PERMISSION_GRANTED
+                        if (needsLegacyPermission) {
+                            permissionImageRequest = request
+                            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        } else {
+                            saveImage(request)
+                        }
+                    },
+                    enabled = !isSavingImage,
+                    modifier = Modifier.testTag("forum-image-save-confirm"),
+                ) { Text("保存到相册") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingImageRequest = null }) { Text("取消") }
+            },
+        )
     }
 }
 
