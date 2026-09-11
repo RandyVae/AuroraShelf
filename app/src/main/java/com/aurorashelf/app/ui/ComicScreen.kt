@@ -7,8 +7,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,8 +45,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -58,7 +56,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -104,7 +101,6 @@ import com.aurorashelf.app.model.ComicSummary
 @Composable
 internal fun ComicScreen(
     state: ComicUiState,
-    onSource: (String) -> Unit,
     onCategory: (String) -> Unit,
     onQuery: (String) -> Unit,
     onSearch: () -> Unit,
@@ -152,7 +148,6 @@ internal fun ComicScreen(
             }
             else -> ComicLibrary(
                 state = state,
-                onSource = onSource,
                 onCategory = onCategory,
                 onQuery = onQuery,
                 onSearch = onSearch,
@@ -177,11 +172,10 @@ internal fun ComicScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ComicLibrary(
     state: ComicUiState,
-    onSource: (String) -> Unit,
     onCategory: (String) -> Unit,
     onQuery: (String) -> Unit,
     onSearch: () -> Unit,
@@ -192,7 +186,6 @@ private fun ComicLibrary(
     onSignOut: () -> Unit,
 ) {
     val gridState = rememberLazyGridState()
-    var showSourcePicker by remember { mutableStateOf(false) }
     val selectedSource = state.sources.find { it.id == state.selectedSourceId }
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -211,7 +204,7 @@ private fun ComicLibrary(
         contentPadding = PaddingValues(start = 18.dp, top = 20.dp, end = 18.dp, bottom = 126.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
-        modifier = Modifier.fillMaxSize().statusBarsPadding(),
+        modifier = Modifier.fillMaxSize().statusBarsPadding().testTag("comic-library-grid"),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -236,48 +229,6 @@ private fun ComicLibrary(
                 }
             }
         }
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            Surface(
-                onClick = { showSourcePicker = true },
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                shape = RoundedCornerShape(22.dp),
-                modifier = Modifier.fillMaxWidth().testTag("comic-source-selector"),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                ) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.size(44.dp),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null)
-                        }
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-                        Text("漫画源", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text(
-                            selectedSource?.name.orEmpty(),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
-                    if (selectedSource?.requiresAuthentication == true) {
-                        Text(
-                            if (state.isSourceAuthenticated) "已登录" else "需登录",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                    }
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = "选择漫画源")
-                }
-            }
-        }
         if (selectedSource?.requiresAuthentication == true && !state.isSourceAuthenticated) {
             item(span = { GridItemSpan(maxLineSpan) }) {
                 ComicSourceAuthCard(
@@ -287,18 +238,27 @@ private fun ComicLibrary(
                 )
             }
         } else {
-        item(span = { GridItemSpan(maxLineSpan) }) {
+        stickyHeader(key = "comic-pinned-categories") {
             val categories = selectedSource?.categories.orEmpty()
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            Surface(
+                color = MaterialTheme.colorScheme.background,
+                shadowElevation = 2.dp,
+                modifier = Modifier.fillMaxWidth().testTag("comic-category-bar"),
             ) {
-                categories.forEach { category ->
-                    FilterChip(
-                        selected = category.id == state.selectedCategoryId,
-                        onClick = { onCategory(category.id) },
-                        label = { Text(category.label) },
-                    )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(vertical = 8.dp),
+                ) {
+                    categories.forEach { category ->
+                        FilterChip(
+                            selected = category.id == state.selectedCategoryId,
+                            onClick = { onCategory(category.id) },
+                            label = { Text(category.label) },
+                        )
+                    }
                 }
             }
         }
@@ -359,83 +319,6 @@ private fun ComicLibrary(
         }
     }
 
-    if (showSourcePicker) {
-        ModalBottomSheet(
-            onDismissRequest = { showSourcePicker = false },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ) {
-            ComicSourcePicker(
-                sources = state.sources,
-                selectedSourceId = state.selectedSourceId,
-                onSource = { sourceId ->
-                    showSourcePicker = false
-                    onSource(sourceId)
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun ComicSourcePicker(
-    sources: List<com.aurorashelf.app.model.ComicSourceInfo>,
-    selectedSourceId: String,
-    onSource: (String) -> Unit,
-) {
-    val haptic = LocalHapticFeedback.current
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 620.dp)
-            .verticalScroll(rememberScrollState())
-            .padding(start = 20.dp, end = 20.dp, bottom = 32.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(bottom = 8.dp)) {
-            Text("选择漫画源", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(
-                "每个来源拥有独立分类、搜索和阅读线路",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        sources.forEach { source ->
-            val selected = source.id == selectedSourceId
-            Surface(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onSource(source.id)
-                },
-                color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-                contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                            if (source.requiresAuthentication) {
-                                Text("需登录", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                        Text(
-                            source.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    if (selected) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = "当前漫画源")
-                    }
-                }
-            }
-        }
-    }
 }
 
 @Composable

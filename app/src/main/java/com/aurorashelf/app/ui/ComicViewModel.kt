@@ -3,6 +3,7 @@ package com.aurorashelf.app.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aurorashelf.app.data.AppPreferences
 import com.aurorashelf.app.data.comic.EncryptedComicAuthStore
 import com.aurorashelf.app.data.comic.ComicRepository
 import com.aurorashelf.app.model.ComicDetails
@@ -31,7 +32,7 @@ data class ComicReaderSession(
 
 data class ComicUiState(
     val sources: List<ComicSourceInfo> = emptyList(),
-    val selectedSourceId: String = "komiic",
+    val selectedSourceId: String = AppPreferences.DEFAULT_COMIC_SOURCE_ID,
     val selectedCategoryId: String = "0",
     val comics: List<ComicSummary> = emptyList(),
     val query: String = "",
@@ -53,8 +54,19 @@ data class ComicUiState(
 
 class ComicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ComicRepository(EncryptedComicAuthStore(application))
+    private val preferences = AppPreferences(application)
+    private val initialSourceId = preferences.comicSourceId.takeIf { savedId ->
+        repository.availableSources.any { it.id == savedId }
+    } ?: AppPreferences.DEFAULT_COMIC_SOURCE_ID
+    private val initialCategoryId = repository.availableSources.find { it.id == initialSourceId }
+        ?.categories?.firstOrNull()?.id.orEmpty()
     private val mutableUiState = MutableStateFlow(
-        ComicUiState(sources = repository.availableSources),
+        ComicUiState(
+            sources = repository.availableSources,
+            selectedSourceId = initialSourceId,
+            selectedCategoryId = initialCategoryId,
+            isSourceAuthenticated = repository.isAuthenticated(initialSourceId),
+        ),
     )
     val uiState: StateFlow<ComicUiState> = mutableUiState.asStateFlow()
 
@@ -68,6 +80,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectSource(sourceId: String) {
         if (sourceId == mutableUiState.value.selectedSourceId) return
+        if (repository.availableSources.none { it.id == sourceId }) return
         listJob?.cancel()
         detailsJob?.cancel()
         readerJob?.cancel()
@@ -89,6 +102,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                 authError = null,
             )
         }
+        preferences.comicSourceId = sourceId
         refresh()
     }
 

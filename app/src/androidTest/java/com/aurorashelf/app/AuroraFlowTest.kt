@@ -84,13 +84,27 @@ class AuroraFlowTest {
         compose.onNodeWithTag("personal-settings-entry").assertExists()
     }
 
-    @Test fun comicsDestinationShowsSourcesAndCategories() {
+    @Test fun comicSourceLivesInSettingsAndDefaultsToJm() {
         compose.onNodeWithContentDescription("漫画").performClick()
         compose.onNodeWithTag("comic-library-title").assertExists()
-        compose.onNodeWithContentDescription("选择漫画源").performClick()
-        compose.onNodeWithText("包子漫画").assertExists().performClick()
+        compose.onNodeWithContentDescription("选择漫画源").assertDoesNotExist()
         compose.onNodeWithText("全部").assertExists()
+        compose.onNodeWithText("同人").assertExists()
+        compose.onNodeWithText("单本").assertExists()
+        compose.onNodeWithText("短篇").assertExists()
+        compose.onNodeWithText("韩漫").assertExists()
         compose.onNodeWithText("搜索漫画").assertExists()
+
+        compose.onNodeWithContentDescription("我的").performClick()
+        compose.onNodeWithTag("personal-settings-entry").performClick()
+        compose.onNodeWithTag("settings-comic-sources").performClick()
+        compose.onNodeWithTag("comic-sources-page").assertExists()
+        compose.onNodeWithText("禁漫天堂").assertExists()
+        compose.onNodeWithText("使用中").assertExists()
+        compose.onNodeWithText("包子漫画").performClick()
+
+        compose.onNodeWithContentDescription("漫画").performClick()
+        compose.onNodeWithText("恋爱").assertExists()
     }
 
     @Test fun remoteLibrarySurvivesRepositoryRecreation() {
