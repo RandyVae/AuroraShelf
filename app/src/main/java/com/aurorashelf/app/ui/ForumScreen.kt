@@ -2,12 +2,15 @@ package com.aurorashelf.app.ui
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.webkit.CookieManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +37,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,7 +52,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +63,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.aurorashelf.app.model.ForumPost
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -70,12 +77,13 @@ internal fun ForumScreen(
     onPost: (ForumPost) -> Unit,
     onClosePost: () -> Unit,
 ) {
+    // Keep the list state in composition while the reader is open.
+    val listState = rememberLazyListState()
     state.selectedPost?.let { post ->
         ForumReader(post = post, onClose = onClosePost)
         return
     }
 
-    val listState = rememberLazyListState()
     LaunchedEffect(Unit) { onEnsureLoaded() }
     LaunchedEffect(listState, state.posts.size, state.canLoadMore) {
         snapshotFlow {
@@ -219,9 +227,11 @@ private fun ForumError(message: String, onRetry: () -> Unit) {
 @Composable
 private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     val context = LocalContext.current
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     var isLoading by remember(post.url) { mutableStateOf(true) }
     var error by remember(post.url) { mutableStateOf<String?>(null) }
     var canGoBack by remember(post.url) { mutableStateOf(false) }
+    var loadGeneration by remember(post.url) { mutableStateOf(0) }
     val webView = remember(post.url) {
         WebView(context).apply {
             settings.apply {
@@ -238,14 +248,18 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
             }
             webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                    loadGeneration += 1
                     isLoading = true
                     error = null
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     canGoBack = view?.canGoBack() == true
-                    view?.applyMobileForumLayout {
+                    val finishedGeneration = loadGeneration
+                    view?.applyMobileForumLayout(isDarkTheme) { wasApplied ->
+                        if (finishedGeneration != loadGeneration) return@applyMobileForumLayout
                         isLoading = false
+                        error = if (wasApplied) null else "帖子排版失败，请重新加载"
                     } ?: run { isLoading = false }
                 }
 
@@ -259,7 +273,16 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean =
                     request?.url?.scheme != "https"
             }
-            loadUrl(post.url)
+            loadForumPost(post.url)
+        }
+    }
+    LaunchedEffect(loadGeneration) {
+        val observedGeneration = loadGeneration
+        delay(READER_LOAD_TIMEOUT_MS)
+        if (isLoading && observedGeneration == loadGeneration) {
+            webView.stopLoading()
+            isLoading = false
+            error = "帖子加载超时，请检查网络后重试"
         }
     }
     BackHandler {
@@ -290,8 +313,37 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
         }
         HorizontalDivider()
         Box(Modifier.fillMaxSize()) {
-            AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
-            if (isLoading) CircularProgressIndicator(Modifier.align(Alignment.Center))
+            val contentAlpha by animateFloatAsState(
+                targetValue = if (!isLoading && error == null) 1f else 0f,
+                animationSpec = tween(durationMillis = 180),
+                label = "forum reader content",
+            )
+            AndroidView(
+                factory = { webView },
+                modifier = Modifier.fillMaxSize().alpha(contentAlpha).testTag("forum-reader-content"),
+            )
+            if (isLoading) {
+                LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.align(Alignment.Center).testTag("forum-reader-loading"),
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
+                    ) {
+                        CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp)
+                        Text("正在整理帖子排版", style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "内容准备好后会一次显示",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
             error?.let { message ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -307,17 +359,40 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun WebView.applyMobileForumLayout(onComplete: () -> Unit) {
+private fun WebView.applyMobileForumLayout(isDarkTheme: Boolean, onComplete: (Boolean) -> Unit) {
     settings.javaScriptEnabled = true
-    evaluateJavascript(MOBILE_FORUM_SCRIPT) {
+    evaluateJavascript(mobileForumScript(isDarkTheme)) { result ->
         settings.javaScriptEnabled = false
-        onComplete()
+        onComplete(result == "true")
     }
 }
 
-private val MOBILE_FORUM_SCRIPT =
+private fun WebView.loadForumPost(url: String) {
+    if (!url.contains("t66y.com", ignoreCase = true)) {
+        loadUrl(url)
+        return
+    }
+
+    // The reference 1024 client asks the server for its mobile layout before
+    // navigation. Waiting for the cookie callback avoids loading one desktop
+    // frame before the mobile preference reaches WebView.
+    CookieManager.getInstance().setCookie(url, "ismob=1; Path=/; Secure") {
+        loadUrl(url)
+    }
+}
+
+private const val READER_LOAD_TIMEOUT_MS = 15_000L
+
+internal fun mobileForumScript(isDarkTheme: Boolean): String = MOBILE_FORUM_SCRIPT.replace(
+    "const auroraDark = false;",
+    "const auroraDark = $isDarkTheme;",
+)
+
+internal val MOBILE_FORUM_SCRIPT =
     """
     (() => {
+      try {
+      const auroraDark = false;
       let viewport = document.querySelector('meta[name="viewport"]');
       if (!viewport) {
         viewport = document.createElement('meta');
@@ -325,6 +400,18 @@ private val MOBILE_FORUM_SCRIPT =
         document.head.appendChild(viewport);
       }
       viewport.content = 'width=device-width, initial-scale=1, maximum-scale=3, user-scalable=yes';
+
+      const host = location.hostname;
+      document.body.classList.toggle('aurora-dark', auroraDark);
+      if (host.includes('t66y.com')) document.body.classList.add('aurora-t66y');
+      if (host.includes('t906.') || host.includes('91selfie')) {
+        document.body.classList.add('aurora-t906');
+        const wrap = document.querySelector('#wrap');
+        // The legacy page contains unclosed ad markup, so WebView may nest #wrap
+        // under that ad container. Move the forum wrapper to the body before
+        // applying direct-child cleanup selectors.
+        if (wrap) document.body.replaceChildren(wrap);
+      }
 
       const style = document.createElement('style');
       style.textContent = `
@@ -341,14 +428,78 @@ private val MOBILE_FORUM_SCRIPT =
           max-width: 100% !important;
           height: auto !important;
         }
+        body {
+          background: #faf8ff !important;
+          color: #1d1b20 !important;
+          font-family: sans-serif !important;
+          font-size: 16px !important;
+          line-height: 1.6 !important;
+        }
         #main, #wrap, #postlist, .mainbox {
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
           margin-left: 0 !important;
           margin-right: 0 !important;
+          background: transparent !important;
         }
-        #main { padding: 0 12px !important; }
+        #main, #wrap { padding: 8px 12px !important; }
+        body.aurora-t66y > :not(#main),
+        body.aurora-t66y #main > :not(.t2):not(.t3):not(.pages):not(.aurora-pages),
+        body.aurora-t906 > :not(#wrap),
+        body.aurora-t906 #wrap > :not(#postlist):not(.pages):not(.aurora-pages) {
+          display: none !important;
+        }
+        body.aurora-t66y .t2,
+        body.aurora-t906 #postlist > div {
+          margin: 0 0 12px !important;
+          border: 1px solid rgba(73, 69, 79, 0.16) !important;
+          border-radius: 18px !important;
+          background: #ffffff !important;
+          overflow: hidden !important;
+        }
+        body.aurora-t66y #main > .t3 { display: none !important; }
+        .aurora-pages {
+          display: flex !important;
+          align-items: center !important;
+          gap: 6px !important;
+          margin: 0 0 12px !important;
+          padding: 8px 10px !important;
+          border: 1px solid rgba(73, 69, 79, 0.14) !important;
+          border-radius: 16px !important;
+          background: #ffffff !important;
+          overflow-x: auto !important;
+          white-space: nowrap !important;
+          font-size: 14px !important;
+          line-height: 1.35 !important;
+        }
+        .aurora-pages .pages {
+          display: flex !important;
+          align-items: center !important;
+          gap: 4px !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          font-size: inherit !important;
+        }
+        .aurora-pages a {
+          display: inline-flex !important;
+          align-items: center !important;
+          min-height: 48px !important;
+          padding: 4px 9px !important;
+          border-radius: 10px !important;
+          color: #2f5d9e !important;
+          text-decoration: none !important;
+        }
+        .aurora-pages input, .aurora-pages select {
+          width: auto !important;
+          max-width: 72px !important;
+          height: 44px !important;
+          margin: 0 2px !important;
+          padding: 2px 6px !important;
+          border: 1px solid rgba(73, 69, 79, 0.25) !important;
+          border-radius: 9px !important;
+          font-size: 14px !important;
+        }
         .t > table > tbody > tr.tr1 > th[rowspan="2"],
         td.postauthor { display: none !important; }
         .t > table, .t > table > tbody,
@@ -358,17 +509,95 @@ private val MOBILE_FORUM_SCRIPT =
           max-width: 100% !important;
         }
         .t > table > tbody > tr.tr1 > th:not([rowspan]),
-        td.postcontent { padding: 10px !important; }
+        td.postcontent { padding: 12px !important; }
         .tpc_content, .postmessage, .t_msgfont {
           font-size: 17px !important;
           line-height: 1.65 !important;
           overflow-wrap: anywhere !important;
           word-break: break-word !important;
         }
-        .tiptop, .tipad, .postinfo { font-size: 12px !important; }
+        body.aurora-t66y .tiptop,
+        body.aurora-t66y .tipad,
+        body.aurora-t66y .tips,
+        body.aurora-t66y h4.f16,
+        body.aurora-t906 [id^="ad_thread"],
+        body.aurora-t906 .forumcontrol,
+        body.aurora-t906 .postbtn,
+        body.aurora-t906 .postbottom,
+        body.aurora-t906 .threadad {
+          display: none !important;
+        }
+        .aurora-post-meta, .postinfo {
+          display: block !important;
+          margin: 0 0 12px !important;
+          padding: 0 0 8px !important;
+          border-bottom: 1px solid rgba(127, 127, 127, 0.22) !important;
+          font-size: 13px !important;
+          line-height: 1.4 !important;
+          color: #666 !important;
+        }
+        body.aurora-t906 .postinfo .pagecontrol,
+        body.aurora-t906 .postinfo .new_tr,
+        body.aurora-t906 .postinfo > strong,
+        body.aurora-t906 .postinfo .authicon,
+        body.aurora-t906 .postinfo .authorinfo > a:not(.posterlink) {
+          display: none !important;
+        }
+        body.aurora-t906 #threadtitle { display: none !important; }
+        .tpc_content > img,
+        .postmessage img {
+          display: block !important;
+          margin: 0 auto 8px !important;
+        }
         input, textarea, select { max-width: 100% !important; }
+        body.aurora-dark { background: #141218 !important; color: #e6e0e9 !important; }
+        body.aurora-dark.aurora-t66y .t2,
+        body.aurora-dark.aurora-t906 #postlist > div,
+        body.aurora-dark .aurora-pages {
+          border-color: rgba(202, 196, 208, 0.18) !important;
+          background: #211f26 !important;
+        }
+        body.aurora-dark .aurora-post-meta,
+        body.aurora-dark .postinfo {
+          border-color: rgba(202, 196, 208, 0.18) !important;
+          color: #cac4d0 !important;
+        }
+        body.aurora-dark .aurora-pages a { color: #aac7ff !important; }
       `;
       document.head.appendChild(style);
+
+      const preparePageBars = (container, firstContent) => {
+        const pageBars = Array.from(container?.querySelectorAll('.pages') || []);
+        pageBars.forEach((pages, index) => {
+          const navigation = document.createElement('nav');
+          navigation.className = 'aurora-pages';
+          navigation.setAttribute('aria-label', index === 0 ? '帖子翻页' : '帖子底部翻页');
+          navigation.appendChild(pages);
+          if (index === 0 && firstContent) container.insertBefore(navigation, firstContent);
+          else container?.appendChild(navigation);
+        });
+      };
+
+      if (document.body.classList.contains('aurora-t66y')) {
+        const main = document.querySelector('#main');
+        const firstPost = main?.querySelector(':scope > .t2');
+        preparePageBars(main, firstPost);
+        document.querySelectorAll('#main > .t2').forEach((post) => {
+          const content = post.querySelector('tr.tr1 > th:not([rowspan])');
+          const author = post.querySelector('tr.tr1 > th[rowspan="2"] > b')?.textContent?.trim();
+          const time = post.querySelector('.tipad [data-timestamp]')?.textContent?.trim();
+          if (content && (author || time)) {
+            const meta = document.createElement('div');
+            meta.className = 'aurora-post-meta';
+            meta.textContent = [author, time].filter(Boolean).join(' · ');
+            content.prepend(meta);
+          }
+        });
+      }
+      if (document.body.classList.contains('aurora-t906')) {
+        const wrap = document.querySelector('#wrap');
+        preparePageBars(wrap, wrap?.querySelector(':scope > #postlist'));
+      }
 
       document.querySelectorAll('img[ess-data]').forEach((image) => {
         const source = image.getAttribute('ess-data');
@@ -379,5 +608,8 @@ private val MOBILE_FORUM_SCRIPT =
         if (source && source.startsWith('https://')) image.src = source;
       });
       return true;
+      } catch (error) {
+        return false;
+      }
     })();
     """.trimIndent()
