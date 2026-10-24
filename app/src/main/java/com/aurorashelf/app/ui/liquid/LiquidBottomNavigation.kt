@@ -45,10 +45,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.lerp
+import com.aurorashelf.app.ui.theme.AuroraGlassContainerAlpha
+import com.aurorashelf.app.ui.theme.AuroraGlassContainerDark
+import com.aurorashelf.app.ui.theme.AuroraGlassContainerLight
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
@@ -75,6 +79,9 @@ internal fun LiquidBottomNavigation(
     backdrop: Backdrop,
     tabSlots: List<Int>,
     visualItemCount: Int,
+    // Growable heights so a 200% system font can still render icon + label inside the glass.
+    contentHeight: Dp = 64.dp,
+    lensHeight: Dp = 56.dp,
     modifier: Modifier = Modifier,
     content: @Composable RowScope.() -> Unit,
 ) {
@@ -83,9 +90,9 @@ internal fun LiquidBottomNavigation(
     val isLightTheme = !isSystemInDarkTheme()
     val accentColor = MaterialTheme.colorScheme.primary
     val containerColor = if (isLightTheme) {
-        Color(0xFFFAFAFA).copy(alpha = 0.4f)
+        AuroraGlassContainerLight.copy(alpha = AuroraGlassContainerAlpha)
     } else {
-        Color(0xFF121212).copy(alpha = 0.4f)
+        AuroraGlassContainerDark.copy(alpha = AuroraGlassContainerAlpha)
     }
     val tabsBackdrop = rememberLayerBackdrop()
 
@@ -189,7 +196,7 @@ internal fun LiquidBottomNavigation(
                     onDrawSurface = { drawRect(containerColor) },
                 )
                 .then(interactiveHighlight.modifier)
-                .height(64.dp)
+                .height(contentHeight)
                 .fillMaxWidth()
                 .padding(4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -222,7 +229,7 @@ internal fun LiquidBottomNavigation(
                         onDrawSurface = { drawRect(containerColor) },
                     )
                     .then(interactiveHighlight.modifier)
-                    .height(56.dp)
+                    .height(lensHeight)
                     .fillMaxWidth()
                     .padding(horizontal = 4.dp)
                     .graphicsLayer(colorFilter = ColorFilter.tint(accentColor)),
@@ -282,7 +289,7 @@ internal fun LiquidBottomNavigation(
                         drawRect(Color.Black.copy(alpha = 0.03f * progress))
                     },
                 )
-                .height(56.dp)
+                .height(lensHeight)
                 .fillMaxWidth(1f / visualItemCount),
         )
     }

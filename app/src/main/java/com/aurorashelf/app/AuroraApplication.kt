@@ -13,8 +13,17 @@ import okhttp3.OkHttpClient
 class AuroraApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
-        // Recreate Media3's persistent download manager as soon as the app process starts.
-        OfflineCacheManager.get(this)
+        // Recreate Media3's persistent download manager as soon as the app process starts, but
+        // off the main thread: constructing it opens the download database and the disk cache.
+        // Media3 resolves its application handler with createHandlerForCurrentOrMainLooper, so a
+        // Looper-less warm-up thread keeps listener callbacks on the main looper exactly as before.
+        Thread(
+            { runCatching { OfflineCacheManager.get(this) } },
+            "offline-cache-warmup",
+        ).apply {
+            isDaemon = true
+            start()
+        }
     }
 
     override fun newImageLoader(context: Context): ImageLoader {

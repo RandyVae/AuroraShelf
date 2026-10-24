@@ -30,6 +30,8 @@ data class AuroraUiState(
     val searchResults: List<VideoItem> = emptyList(),
     val isSearching: Boolean = false,
     val searchMessage: String? = null,
+    /** True when [searchResults] came from a site-wide network search instead of local matching. */
+    val isRemoteSearch: Boolean = false,
     val selectedVideo: VideoItem? = null,
     val isSearchOpen: Boolean = false,
     val isLoading: Boolean = false,
@@ -87,13 +89,11 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         val snapshot = _uiState.value
         if (snapshot.query.isBlank() || snapshot.isSearching) return
         if (!ContentSourceCatalog.isPipePipe(snapshot.sourceUrl)) {
-            val results = snapshot.allKnownVideos.filter {
-                it.title.contains(snapshot.query, ignoreCase = true) ||
-                    it.author.contains(snapshot.query, ignoreCase = true)
-            }
+            val results = localSearchMatches(snapshot.query, snapshot.allKnownVideos)
             _uiState.update {
                 it.copy(
                     searchResults = results,
+                    isRemoteSearch = false,
                     searchMessage = if (results.isEmpty()) "已加载内容中没有匹配结果" else null,
                 )
             }
@@ -103,12 +103,15 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
             _uiState.update { it.copy(isSearching = true, searchMessage = null) }
             runCatching { repository.search(snapshot.sourceUrl, snapshot.query) }
                 .onSuccess { results ->
+                    // Site search can return the same item twice; LazyColumn keys must stay unique.
+                    val distinctResults = results.distinctBy(VideoItem::id)
                     _uiState.update {
                         it.copy(
-                            searchResults = results,
-                            allKnownVideos = (results + it.allKnownVideos).distinctBy(VideoItem::id),
+                            searchResults = distinctResults,
+                            isRemoteSearch = true,
+                            allKnownVideos = (distinctResults + it.allKnownVideos).distinctBy(VideoItem::id),
                             isSearching = false,
-                            searchMessage = if (results.isEmpty()) "没有找到相关视频" else null,
+                            searchMessage = if (distinctResults.isEmpty()) "没有找到相关视频" else null,
                         )
                     }
                 }
@@ -150,6 +153,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                 destination = AppDestination.HOME,
                 videos = emptyList(),
                 searchResults = emptyList(),
+                isRemoteSearch = false,
                 canLoadMore = true,
             )
         }
@@ -226,6 +230,15 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     companion object {
+        /** Local search only: network results are already matched by the site search endpoint. */
+        internal fun localSearchMatches(query: String, videos: List<VideoItem>): List<VideoItem> =
+            videos.asSequence()
+                .filter {
+                    it.title.contains(query, ignoreCase = true) || it.author.contains(query, ignoreCase = true)
+                }
+                .distinctBy(VideoItem::id)
+                .toList()
+
         internal fun distinctNewVideos(
             existing: List<VideoItem>,
             incoming: List<VideoItem>,

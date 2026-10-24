@@ -74,8 +74,10 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     private var detailsJob: Job? = null
     private var readerJob: Job? = null
 
-    init {
-        refresh()
+    /** Loads the comic feed once the comics tab is actually shown; safe to call repeatedly. */
+    fun ensureLoaded() {
+        val state = mutableUiState.value
+        if (state.page == 0 && !state.isLoading) refresh()
     }
 
     fun selectSource(sourceId: String) {

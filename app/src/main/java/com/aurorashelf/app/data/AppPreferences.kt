@@ -11,16 +11,7 @@ class AppPreferences(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
     fun savedVideos(): List<VideoItem> = runCatching {
-        val array = JSONArray(preferences.getString("saved_videos", "[]"))
-        (0 until array.length()).map { index ->
-            val item = array.getJSONObject(index)
-            VideoItem(
-                id = item.getString("id"), title = item.getString("title"),
-                author = item.getString("author"), duration = item.getString("duration"),
-                views = item.getString("views"), pageUrl = item.getString("pageUrl"),
-                thumbnailUrl = item.optString("thumbnailUrl").takeIf(String::isNotBlank),
-            )
-        }.filter { !it.id.startsWith("demo-") && SourceAddress.resolve(it.pageUrl, it.pageUrl) != null }
+        decodeSavedVideos(preferences.getString("saved_videos", "[]").orEmpty())
     }.getOrElse {
         android.util.Log.w("AppPreferences", "Saved library could not be decoded", it)
         emptyList()
@@ -93,4 +84,24 @@ class AppPreferences(context: Context) {
 
         fun normalizeBaseUrl(value: String): String = value.trim().trimEnd('/')
     }
+}
+
+/**
+ * Decodes the saved-video JSON blob one entry at a time, so a single corrupt record is
+ * skipped instead of erasing the whole local library. Pure function, testable without
+ * Android APIs; keeps the previous demo- and address-validation filtering rules.
+ */
+internal fun decodeSavedVideos(json: String): List<VideoItem> {
+    val array = runCatching { JSONArray(json) }.getOrNull() ?: return emptyList()
+    return (0 until array.length()).mapNotNull { index ->
+        runCatching {
+            val item = array.getJSONObject(index)
+            VideoItem(
+                id = item.getString("id"), title = item.getString("title"),
+                author = item.getString("author"), duration = item.getString("duration"),
+                views = item.getString("views"), pageUrl = item.getString("pageUrl"),
+                thumbnailUrl = item.optString("thumbnailUrl").takeIf(String::isNotBlank),
+            )
+        }.getOrNull()
+    }.filter { !it.id.startsWith("demo-") && SourceAddress.resolve(it.pageUrl, it.pageUrl) != null }
 }

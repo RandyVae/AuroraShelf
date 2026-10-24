@@ -19,11 +19,14 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -67,6 +70,42 @@ data class OfflineVideo(
     )
 }
 
+/** Metadata persisted inside the Media3 [DownloadRequest] payload, decoupled from Android types. */
+internal data class OfflineMetadata(
+    val videoId: String,
+    val title: String,
+    val episodeLabel: String?,
+    val pageUrl: String,
+    val thumbnailUrl: String?,
+)
+
+/**
+ * Pure JSON codec for [OfflineMetadata]. Decoding returns null instead of throwing so a
+ * corrupted or truncated payload can only affect its own entry.
+ */
+internal object OfflineMetadataCodec {
+    internal const val DEFAULT_TITLE = "已缓存视频"
+
+    fun encode(metadata: OfflineMetadata): ByteArray = JSONObject().apply {
+        put("videoId", metadata.videoId)
+        put("title", metadata.title)
+        put("episodeLabel", metadata.episodeLabel.orEmpty())
+        put("pageUrl", metadata.pageUrl)
+        put("thumbnailUrl", metadata.thumbnailUrl.orEmpty())
+    }.toString().toByteArray(Charsets.UTF_8)
+
+    fun decode(bytes: ByteArray): OfflineMetadata? = runCatching {
+        val json = JSONObject(bytes.toString(Charsets.UTF_8))
+        OfflineMetadata(
+            videoId = json.optString("videoId"),
+            title = json.optString("title", DEFAULT_TITLE),
+            episodeLabel = json.optString("episodeLabel").takeIf(String::isNotBlank),
+            pageUrl = json.optString("pageUrl"),
+            thumbnailUrl = json.optString("thumbnailUrl").takeIf(String::isNotBlank),
+        )
+    }.getOrNull()
+}
+
 /** Application-scoped Media3 download store shared by downloads and playback. */
 @OptIn(UnstableApi::class)
 class OfflineCacheManager private constructor(context: Context) {
@@ -85,6 +124,7 @@ class OfflineCacheManager private constructor(context: Context) {
     private val downloadExecutor = Executors.newFixedThreadPool(2)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val transientEntries = ConcurrentHashMap<String, OfflineVideo>()
+    private val resolveJobs = ConcurrentHashMap<String, Job>()
     private var refreshJob: Job? = null
 
     val downloadManager = DownloadManager(
@@ -131,6 +171,8 @@ class OfflineCacheManager private constructor(context: Context) {
 
     fun enqueue(video: VideoItem, pageUrl: String, episodeLabel: String?) {
         val id = idFor(pageUrl)
+        // A retried entry replaces its previous resolver; never let both add a download.
+        resolveJobs.remove(id)?.cancel()
         val pending = OfflineVideo(
             id = id,
             videoId = video.id,
@@ -143,36 +185,55 @@ class OfflineCacheManager private constructor(context: Context) {
         )
         transientEntries[id] = pending
         publishWithTransient()
-        scope.launch {
-            runCatching { withContext(Dispatchers.IO) { PlaybackResolver().resolve(pageUrl) } }
-                .onSuccess { source ->
-                    val metadata = OfflineMetadata(
-                        videoId = video.id,
-                        title = video.title,
-                        episodeLabel = episodeLabel,
-                        pageUrl = pageUrl,
-                        thumbnailUrl = video.thumbnailUrl,
-                    )
-                    val request = DownloadRequest.Builder(id, Uri.parse(source.url))
-                        .setMimeType(mimeType(source.url))
-                        .setData(metadata.encode())
-                        .apply {
-                            if (mimeType(source.url) != MimeTypes.APPLICATION_M3U8) {
-                                setCustomCacheKey(id)
+        val resolveJob = scope.launch(start = CoroutineStart.LAZY) {
+            val self = coroutineContext[Job]
+            try {
+                runCatching { withContext(Dispatchers.IO) { PlaybackResolver().resolve(pageUrl) } }
+                    .onSuccess { source ->
+                        // remove(id)/clearAll() may have run while this coroutine was suspended.
+                        // Re-check cancellation and the pending entry before scheduling the
+                        // download, so a deleted task can never come back as a download item.
+                        coroutineContext.ensureActive()
+                        if (!shouldAcceptResolvedDownload(id, transientEntries.keys)) return@onSuccess
+                        val metadata = OfflineMetadata(
+                            videoId = video.id,
+                            title = video.title,
+                            episodeLabel = episodeLabel,
+                            pageUrl = pageUrl,
+                            thumbnailUrl = video.thumbnailUrl,
+                        )
+                        val request = DownloadRequest.Builder(id, Uri.parse(source.url))
+                            .setMimeType(mimeType(source.url))
+                            .setData(OfflineMetadataCodec.encode(metadata))
+                            .apply {
+                                if (mimeType(source.url) != MimeTypes.APPLICATION_M3U8) {
+                                    setCustomCacheKey(id)
+                                }
                             }
-                        }
-                        .build()
-                    downloadManager.addDownload(request)
-                    downloadManager.resumeDownloads()
-                }
-                .onFailure {
-                    transientEntries[id] = pending.copy(state = OfflineCacheState.FAILED)
-                    publishWithTransient()
-                }
+                            .build()
+                        downloadManager.addDownload(request)
+                        downloadManager.resumeDownloads()
+                    }
+                    .onFailure { failure ->
+                        // Cancellation is expected when the user deletes or clears the entry.
+                        if (failure is CancellationException) return@onFailure
+                        // A newer enqueue for the same id owns the transient entry now.
+                        if (transientEntries[id] !== pending) return@onFailure
+                        transientEntries[id] = pending.copy(state = OfflineCacheState.FAILED)
+                        publishWithTransient()
+                    }
+            } finally {
+                // Remove only our own entry: a retry may already have registered a new job.
+                if (self != null) resolveJobs.remove(id, self)
+            }
         }
+        resolveJobs[id] = resolveJob
+        resolveJob.start()
     }
 
     fun remove(id: String) {
+        // Cancel the resolver first; a completed resolve must not resurrect this download.
+        resolveJobs.remove(id)?.cancel()
         transientEntries.remove(id)
         downloadManager.removeDownload(id)
         requestRefresh()
@@ -195,6 +256,9 @@ class OfflineCacheManager private constructor(context: Context) {
     }
 
     fun clearAll() {
+        // Cancel every pending resolver so none of them can add a download afterwards.
+        resolveJobs.values.forEach { it.cancel() }
+        resolveJobs.clear()
         transientEntries.clear()
         downloadManager.removeAllDownloads()
         requestRefresh()
@@ -229,21 +293,27 @@ class OfflineCacheManager private constructor(context: Context) {
         return runCatching {
             buildList {
                 downloadManager.downloadIndex.getDownloads().use { cursor ->
-                    while (cursor.moveToNext()) add(cursor.download.toOfflineVideo())
+                    while (cursor.moveToNext()) {
+                        // Corrupt metadata must drop only its own entry, not the whole index.
+                        runCatching { cursor.download.toOfflineVideo() }
+                            .getOrNull()
+                            ?.let { entry -> add(entry) }
+                    }
                 }
             }
         }.getOrDefault(emptyList())
     }
 
     private fun Download.toOfflineVideo(): OfflineVideo {
-        val metadata = OfflineMetadata.decode(request.data)
+        // Corrupt metadata must only lose the descriptive fields, never the whole entry.
+        val metadata = OfflineMetadataCodec.decode(request.data)
         return OfflineVideo(
             id = request.id,
-            videoId = metadata.videoId,
-            title = metadata.title,
-            episodeLabel = metadata.episodeLabel,
-            pageUrl = metadata.pageUrl,
-            thumbnailUrl = metadata.thumbnailUrl,
+            videoId = metadata?.videoId?.takeIf(String::isNotBlank) ?: request.id,
+            title = metadata?.title?.takeIf(String::isNotBlank) ?: OfflineMetadataCodec.DEFAULT_TITLE,
+            episodeLabel = metadata?.episodeLabel,
+            pageUrl = metadata?.pageUrl.orEmpty(),
+            thumbnailUrl = metadata?.thumbnailUrl,
             mediaUrl = request.uri.toString(),
             state = when (state) {
                 Download.STATE_QUEUED, Download.STATE_STOPPED -> OfflineCacheState.QUEUED
@@ -259,35 +329,6 @@ class OfflineCacheManager private constructor(context: Context) {
         )
     }
 
-    private data class OfflineMetadata(
-        val videoId: String,
-        val title: String,
-        val episodeLabel: String?,
-        val pageUrl: String,
-        val thumbnailUrl: String?,
-    ) {
-        fun encode(): ByteArray = JSONObject().apply {
-            put("videoId", videoId)
-            put("title", title)
-            put("episodeLabel", episodeLabel.orEmpty())
-            put("pageUrl", pageUrl)
-            put("thumbnailUrl", thumbnailUrl.orEmpty())
-        }.toString().toByteArray(Charsets.UTF_8)
-
-        companion object {
-            fun decode(bytes: ByteArray): OfflineMetadata {
-                val json = JSONObject(bytes.toString(Charsets.UTF_8))
-                return OfflineMetadata(
-                    videoId = json.optString("videoId"),
-                    title = json.optString("title", "已缓存视频"),
-                    episodeLabel = json.optString("episodeLabel").takeIf(String::isNotBlank),
-                    pageUrl = json.optString("pageUrl"),
-                    thumbnailUrl = json.optString("thumbnailUrl").takeIf(String::isNotBlank),
-                )
-            }
-        }
-    }
-
     companion object {
         private const val CACHE_DIRECTORY = "offline_media"
         private const val PROGRESS_REFRESH_MS = 750L
@@ -301,6 +342,13 @@ class OfflineCacheManager private constructor(context: Context) {
             val digest = MessageDigest.getInstance("SHA-256").digest(pageUrl.toByteArray(Charsets.UTF_8))
             return "offline-" + digest.take(16).joinToString("") { "%02x".format(it) }
         }
+
+        /**
+         * A resolved download is scheduled only while its transient entry is still pending.
+         * Extracted as a pure predicate so the remove/clearAll semantics stay unit-testable.
+         */
+        internal fun shouldAcceptResolvedDownload(id: String, pendingIds: Set<String>): Boolean =
+            id in pendingIds
 
         private fun mimeType(url: String): String? = when {
             url.substringBefore('?').lowercase().endsWith(".m3u8") -> MimeTypes.APPLICATION_M3U8
