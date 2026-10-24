@@ -109,3 +109,12 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - 截图采集：AVD `missavtest`（Android 14 / 1080×2340 / 440 dpi），浅色/深色/200% 字体/横屏；证据截图见 `docs/screenshots/hig-2026-10-24/`。
 - 注意：该 AVD 上还有其它应用（Unity 游戏等）会抢占前台，自动化截图需在每次截图前用 `dumpsys activity activities` 确认前台包名。
 - 注意：`PreReleaseSourceAuditTest sourceAudit=true` 两次在 host 侧被 `adb` SIGKILL（60–90 s 后），不是应用 crash；完整来源巡检需在更稳定的 host 环境重跑。
+
+## 2026-10-24 137 verification (loading + HIG round 2)
+
+- Build: `testDebugUnitTest assembleDebug assembleDebugAndroidTest` PASS; `assembleRelease` PASS (R8, 1m46s); lint not re-run after the final edit set (last run: 0 errors / 21 warnings / 3 hints on the 136 code); treat lint as needing a fresh run.
+- JVM: 125 tests / 0 failures / 1 skipped.
+- Device (stable `missavtest` 5554): `HigAccessibilityTest` 3/3 PASS; `AuroraFlowTest#favoriteAppearsInFavorites` PASS after fixing the favorites regression; full connected suite on 137 is blocked (host had 3 emulators running; 1 network-timeout failure + 1 real regression that is now fixed).
+- Windowed `test` AVD (5556) became unstable under the 3-emulator load after reboot (`activity` service unavailable); final install verification was done on 5554. The windowed AVD was restarted but should be re-checked before demoing.
+- Release 137: SHA-256 722fbe9789986b5f657abef8a7b8ad2dc21f3e481164db315d303bf751dd565d; `dist/SHA256SUMS.txt` covers 9 APKs.
+- Loading measurement harness: `am start -W` then uiautomator dump every ~0.2 s until hero (`content-desc` starts with 播放) and ≥2 grid cards (`收藏视频`); sampling adds ~0.5–1 s per dump.

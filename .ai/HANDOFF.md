@@ -1,5 +1,22 @@
 # Latest Handoff
 
+## 2026-10-24 15:00 HKT — 加载优化 + HIG 第二轮（137）
+
+**本轮完成**
+- 加载：首页首屏本地快照（source+category，24h TTL，先渲染后刷新）；封面 24MB 内存 + 96MB 磁盘 LRU（`cacheDir/cover_cache`，SHA-256 文件名、原子写、后台淘汰）、同 URL 单航班、60s 失败负缓存、共享 OkHttp 连接池；播放解析缓存 2min（地址）/10min（选集）；首屏预热 8 张封面。
+- 首屏实测（同一模拟器、含 uiautomator 采样开销）：优化前 4.79/5.80 s → 冷缓存 4.50 s、热缓存 3.22/4.04 s。
+- HIG 第二轮：高对比三态色板 + API ≥36 官方检测/低版本 Settings 探测 + 动态色对比度守卫；深色封面压暗 11%；200% 字体降列 + hero 重叠修复；15 处 heading；字幕轨优选；新增 3 项无障碍设备断言。
+- 回归修复：回退“收藏库异步加载”（导致启动瞬间收藏为空）；首页标题被并发品牌改名影响的一处文案按并发改动恢复；无障碍测试不再硬编码品牌文案。
+- 验证：JVM **125/0/1**（新增 26 项）；定向设备测试 **HigAccessibilityTest 3/3 PASS**、**AuroraFlowTest#favoriteAppearsInFavorites PASS**；Release **137**（v2 签名、16KB zipalign、SHA-256 `722fbe9789986b5f657abef8a7b8ad2dc21f3e481164db315d303bf751dd565d`）安装并冷启动通过。
+- 提交：本轮 3 个本地提交（perf / a11y / docs）；**工作树中并发的品牌改名与启动图标替换（app_name→网灰、adaptive icon 资源替换）已原样保留、未纳入本轮提交**。
+
+**已知问题 / Next**
+1. 137 全量 connected 套件未在空闲 host 重跑（本轮 3 台模拟器并行 + 网络超时）；干净环境全量基线仍为 136 的 26/26。需重跑全量后更新本记录。
+2. 带窗口的 `test` AVD 在高负载下重启后系统服务不稳定，最终验证在 `missavtest` 完成；演示前需确认窗口模拟器状态。
+3. HIG 仍未关闭：TalkBack 人工逐屏、OEM 高对比开关检测、字幕 UI 切换器、真机 E4 证据、200% 搜索框标签截断（P3）。
+4. 并发品牌改名未提交：`values/strings.xml`、`mipmap-anydpi/ic_launcher.xml`、新增 `drawable-*dpi`、删除旧 launcher foreground 资源，需要该工作的负责人自行验证/提交。
+
+
 ## Previous Agent
 
 DSH (DeepSeek Harness) Lead — 代码优化 + Apple HIG 整改 + 候选包重建与提交

@@ -234,3 +234,34 @@ Decision: Record xHamster as the single deliberate exception to "never guess pag
 Reason: Removing the guess without a working alternative would break a previously working source; no fresh full-source evidence was obtained in this pass.
 
 Affected Components: `third_party/.../XHamsterService.java`, `CHANGELOG.md`, `docs/pre-release-uat-2026-09-10.md`.
+
+## Loading pipeline (first paint, covers, playback resolution)
+
+Date: 2026-10-24
+
+Status: Implemented; JVM tests + emulator before/after measurement.
+
+Decision:
+- Home first page is persisted per source+category (`feed_cache`, 24 h TTL) and painted before the network refresh; refresh always overwrites it. Favorites/history stay synchronous because screens must be complete on their first frame (an async variant caused an empty favorites regression caught by `favoriteAppearsInAll` test).
+- Covers are cached in a 24 MiB memory LRU + 96 MiB disk LRU (`cacheDir/cover_cache`, SHA-256 filenames, atomic tmp+rename, background prune), with single-flight de-duplication, a 60 s failure negative cache, and a shared OkHttp client for connection reuse. Disk hits/downloads are validated with `looksLikeImage` so error pages are never cached.
+- Playback resolution is cached in memory: 2 min for signed media URLs, 10 min for episode lists; failures are not cached.
+- First 8 above-the-fold covers are prefetched off the main thread after the feed loads; dedupe makes this free relative to composable requests.
+
+Reason: repeated downloads dominated scroll/jank and cold-start perceived loading; measured time-to-hero dropped from 4.79/5.80 s (pre-change) to 4.50 s cold / 3.22–4.04 s warm on the same emulator (uiautomator sampling cost included).
+
+Boundary: cache directory may be evicted by the OS; feed cache is only for perceived latency, never the source of truth.
+
+## HIG round 2 closure
+
+Date: 2026-10-24
+
+Status: Implemented; device screenshots for dark dim, 200% columns, high contrast; 3 accessibility device tests pass.
+
+Decision:
+- Increase Contrast: full light/dark/high-contrast token set; detection uses the official `AccessibilityManager.isHighContrastTextEnabled()` on API ≥36 and falls back to `Settings.Secure/Global.high_text_contrast_enabled` on older/OEM devices; settings changes are observed live. Dynamic color is replaced by a tuned palette when any audited pair falls below 4.5:1 (text) / 3:1 (outline).
+- A7: 11% black scrim over network artwork only in dark appearance (never intercepts touches); comic reader and forum WebView images are documented exceptions.
+- C3/C7: adaptive grid width scales with fontScale ≥1.3 (capped 1.6) collapsing live/comic grids to one column; home grid switches to one column at ≥1.5; hero reserves end space so metadata never sits under the favorite button at 200% font.
+- G3: 15 headings added across pages; cache action stateDescription; new `HigAccessibilityTest` covers 48 dp tabs, headings and labels.
+- G5: ExoPlayer prefers zh-Hans/zh/en text tracks and selects undetermined-language tracks; only applies when the source provides subtitles.
+
+Boundary: OEM-specific high-contrast switches that do not write the AOSP key are not detected; TalkBack traversal still needs a manual pass; API ≥36 official change listener is not registered (relaunch/settings observer only).

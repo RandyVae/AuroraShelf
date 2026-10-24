@@ -1,5 +1,16 @@
 # 验证记录 — 2026-09-24（最新补记 2026-10-24）
 
+## 2.15.0 加载优化 + HIG 第二轮候选（137）— 2026-10-24
+
+- 加载优化：首页首屏结果写入本地快照（按来源 + 分类，24 小时有效），冷启动先渲染缓存再静默刷新；封面增加 24 MB 内存 LRU + 96 MB 磁盘 LRU（`cacheDir/cover_cache`，SHA-256 文件名、原子写、后台淘汰）、同 URL 单航班合并、60 秒失败负缓存；封面与黄果配置抓取改用共享 OkHttp 连接池；播放解析缓存 2 分钟（播放地址）/10 分钟（选集）；首屏预热前 8 张封面。
+- 首屏实测（同一 host、同一 Android 14 模拟器，`am start` 后经 uiautomator 轮询到 hero 与 ≥2 张网格卡片；指标含每次 dump 约 0.5–1 s 采样开销）：优化前 **4.79 s / 5.80 s**；优化后冷缓存 **4.50 s**、热缓存 **3.22 s / 4.04 s**。仅作同环境相对比较，不宣称普适提升百分比。
+- HIG 第二轮：高对比（Increase Contrast）三态色板 + 动态色对比度守卫 + 系统检测（API ≥36 用官方 `isHighContrastTextEnabled`，低版本回退 `Settings` 键；API 34 模拟器实测 `high_text_contrast_enabled=1` 后 UI 切换为纯白底/纯黑字）；深色模式封面压暗 11%；200% 系统字体下直播/漫画降单列、首页双列改单列，并修复 hero 标题与收藏按钮重叠；15 处 heading 语义；可选文字轨自动优选中文/英文；新增 3 项 Compose 无障碍设备断言。
+- JVM：**125 项 / 0 失败 / 1 跳过**（新增 26 项：封面缓存 8、封面 loader 4、播放解析 3、主题色板/守卫 7、偏好缓存 4）。
+- 设备：全量 connected 套件本轮在 **3 台模拟器同时运行、host 高负载** 的环境下未通过（2 项 `AuroraFlowTest` 失败：1 项「启动瞬间收藏列表为空」为真实回归——本地收藏库异步化导致，已回退该改动；1 项为首页网络等待 20 s 超时）。修复后定向复跑：**`HigAccessibilityTest` 3/3 PASS**、**`AuroraFlowTest#favoriteAppearsInFavorites` PASS**。干净环境下的全量设备基线仍为 12:36 的 **26/26（136 代码）**；137 的全量设备覆盖记为 **blocked**，需在空闲 host 重跑。
+- 回归审计：对全部改动 Kotlin 文件做了字符串级 diff，修复本轮引入的 1 处误改文案（首页标题一度被改成“网灰”，已按并发品牌改名恢复为“网灰”并保持 heading）。注意：本轮工作期间工作树出现**另一路并发工作**的品牌改名与启动图标替换（`values/strings.xml` app_name → 网灰、`mipmap-anydpi/ic_launcher.xml` 与新增 `drawable-*dpi` 前景图、删除旧 `launcher_foreground*` 资源，mtime 14:35–14:37）。按要求原样保留，未纳入本轮提交，也未在本文档中当作本轮成果。
+- Release：`dist/AuroraShelf-2.15.0-137-loading-hig.apk`，versionCode **137** / versionName 2.15.0；v2 签名、`zipalign -P 16` 通过；最终 SHA-256 `722fbe9789986b5f657abef8a7b8ad2dc21f3e481164db315d303bf751dd565d`（`dist/SHA256SUMS.txt` 已覆盖全部 9 个 APK）。在 Android 14 模拟器安装并冷启动成功（`am start -W` TotalTime 2281 ms），首页标题与内容正常渲染（应用名受上述并发改名影响显示“网灰”）。
+- 说明：带窗口的 `test` AVD 在三台模拟器并行压力下出现系统服务不稳定（`activity` 服务短暂不可用），最终安装验证改在稳定的 `missavtest` AVD 完成；窗口模拟器已重启。
+
 ## 2.15.0 + 代码优化 / HIG 候选（136）— 2026-10-24
 
 - 代码结构：`AuroraShelfApp.kt` 从 2587 行拆分为根组合（596 行）+ 首页 / 搜索 / 播放器 / 个人中心 / 共用组件 5 个文件；拆分经字节级重组校验（还原后 md5 与拆分前一致），行为、UI 与 testTag 不变。
