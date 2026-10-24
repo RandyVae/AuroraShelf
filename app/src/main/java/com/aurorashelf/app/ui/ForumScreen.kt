@@ -105,7 +105,7 @@ internal fun ForumScreen(
     val listState = rememberLazyListState()
     LaunchedEffect(state.posts.size) {
         if (state.posts.isNotEmpty()) {
-            state.posts.take(POST_PREFETCH_LIMIT).forEach { post -> ForumPostCache.prefetch(post.url) }
+            ForumPostCache.prefetchAll(state.posts.map { it.url }, limit = POST_PREFETCH_LIMIT)
         }
     }
     state.selectedPost?.let { post ->
@@ -577,7 +577,7 @@ private fun WebView.loadForumPost(url: String) {
 }
 
 private const val READER_LOAD_TIMEOUT_MS = 15_000L
-private const val POST_PREFETCH_LIMIT = 4
+private const val POST_PREFETCH_LIMIT = 20
 private const val TAG = "ForumReader"
 
 internal fun mobileForumScript(isDarkTheme: Boolean): String = MOBILE_FORUM_SCRIPT.replace(

@@ -206,3 +206,9 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - `ForumPostCache`：列表出现后预取前 4 条帖子 HTML（共享 OkHttp、t66y ismob cookie），LruCache 8 条/30 分钟。
 - 打开缓存命中的帖子用 `loadDataWithBaseURL` + 250 ms 早绘；实测正文 **367 ms** 显示（截图 docs/screenshots/forum-post-instant-2026-10-25.png）；冷路径帖子 14 s 未完成。
 - 148 本地包 `dist/AuroraShelf-2.15.0-148-forum-instant-LOCAL.apk`，SHA-256 `b5e8b9d1…`。
+
+## 2026-10-25 149（论坛预取 20 条）
+
+- `ForumPostCache.prefetchAll`：20 条上限、3 并发、去重；缓存 32 条/30 分钟。
+- 实测 `prefetchBatch queued=20 fetched=18 ms=8811`（约 1.5 MB）；缓存命中打开正文路径仍为 148 的 367 ms。
+- 149 本地包 `dist/AuroraShelf-2.15.0-149-forum-prefetch20-LOCAL.apk`，SHA-256 `22379588…`。
