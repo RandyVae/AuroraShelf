@@ -10,6 +10,24 @@ import org.json.JSONObject
 class AppPreferences(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
+    fun cachedFeed(): CachedFeed? = runCatching {
+        decodeFeedCache(preferences.getString(KEY_FEED_CACHE, "").orEmpty())
+    }.getOrNull()
+
+    /**
+     * Persist the last successfully loaded first page so the next cold start can paint
+     * immediately instead of waiting for the network.
+     */
+    fun saveFeedCache(sourceUrl: String, categoryPath: String, videos: List<VideoItem>) {
+        val feed = CachedFeed(
+            sourceUrl = normalizeBaseUrl(sourceUrl),
+            categoryPath = categoryPath,
+            videos = videos.distinctBy(VideoItem::id).take(MAX_FEED_CACHE_ITEMS),
+            savedAtMillis = System.currentTimeMillis(),
+        )
+        preferences.edit { putString(KEY_FEED_CACHE, encodeFeedCache(feed)) }
+    }
+
     fun savedVideos(): List<VideoItem> = runCatching {
         decodeSavedVideos(preferences.getString("saved_videos", "[]").orEmpty())
     }.getOrElse {
@@ -80,11 +98,77 @@ class AppPreferences(context: Context) {
         private const val KEY_COMIC_SOURCE_ID = "comic_source_id"
         private const val KEY_FAVORITES = "favorite_ids"
         private const val KEY_HISTORY = "history_ids"
+        private const val KEY_FEED_CACHE = "feed_cache"
         private const val MAX_HISTORY = 50
+        internal const val MAX_FEED_CACHE_ITEMS = 30
 
         fun normalizeBaseUrl(value: String): String = value.trim().trimEnd('/')
     }
 }
+
+/**
+ * Last successfully loaded first page, kept only for instant first paint. Always followed by a
+ * network refresh, and ignored when the source or category no longer matches.
+ */
+data class CachedFeed(
+    val sourceUrl: String,
+    val categoryPath: String,
+    val videos: List<VideoItem>,
+    val savedAtMillis: Long,
+)
+
+internal fun encodeFeedCache(feed: CachedFeed): String = JSONObject().apply {
+    put("version", 1)
+    put("sourceUrl", feed.sourceUrl)
+    put("categoryPath", feed.categoryPath)
+    put("savedAt", feed.savedAtMillis)
+    put(
+        "videos",
+        JSONArray().apply {
+            feed.videos.forEach { item ->
+                put(JSONObject().apply {
+                    put("id", item.id); put("title", item.title); put("author", item.author)
+                    put("duration", item.duration); put("views", item.views); put("pageUrl", item.pageUrl)
+                    put("thumbnailUrl", item.thumbnailUrl.orEmpty())
+                })
+            }
+        },
+    )
+}.toString()
+
+/**
+ * Decodes a cached feed defensively: a malformed record is skipped, invalid URLs and demo
+ * entries are dropped, and any structurally invalid payload returns null.
+ */
+internal fun decodeFeedCache(json: String): CachedFeed? = runCatching {
+    if (json.isBlank()) return null
+    val payload = JSONObject(json)
+    val sourceUrl = AppPreferences.normalizeBaseUrl(payload.optString("sourceUrl"))
+    val categoryPath = payload.optString("categoryPath").trim()
+    if (sourceUrl.isBlank() || categoryPath.isBlank()) return null
+    val array = payload.optJSONArray("videos") ?: return null
+    val videos = (0 until array.length()).mapNotNull { index ->
+        runCatching {
+            val item = array.getJSONObject(index)
+            VideoItem(
+                id = item.getString("id"), title = item.getString("title"),
+                author = item.getString("author"), duration = item.getString("duration"),
+                views = item.getString("views"), pageUrl = item.getString("pageUrl"),
+                thumbnailUrl = item.optString("thumbnailUrl").takeIf(String::isNotBlank),
+            )
+        }.getOrNull()
+    }
+        .filter { !it.id.startsWith("demo-") && SourceAddress.resolve(it.pageUrl, it.pageUrl) != null }
+        .distinctBy(VideoItem::id)
+        .take(AppPreferences.MAX_FEED_CACHE_ITEMS)
+    if (videos.isEmpty()) return null
+    CachedFeed(
+        sourceUrl = sourceUrl,
+        categoryPath = categoryPath,
+        videos = videos,
+        savedAtMillis = payload.optLong("savedAt", 0L),
+    )
+}.getOrNull()
 
 /**
  * Decodes the saved-video JSON blob one entry at a time, so a single corrupt record is

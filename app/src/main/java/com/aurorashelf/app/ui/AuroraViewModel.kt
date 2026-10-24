@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 
@@ -45,19 +46,66 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     private val repository = VideoRepository()
     private var feedJob: Job? = null
     private var nextPage = 1
+    private val initialSourceUrl = preferences.sourceUrl
+    private val initialCategory = FeedCategory.MONTHLY_HOT
+    private val initialCachedFeed = preferences.cachedFeed()?.takeIf {
+        it.sourceUrl == initialSourceUrl &&
+            it.categoryPath == initialCategory.path &&
+            isFreshFeed(it.savedAtMillis)
+    }
     private val _uiState = MutableStateFlow(
         AuroraUiState(
-            sourceUrl = preferences.sourceUrl,
-            videos = emptyList(),
+            sourceUrl = initialSourceUrl,
+            category = initialCategory,
+            // Paint the last-known first page immediately; refresh() replaces it silently.
+            videos = initialCachedFeed?.videos.orEmpty(),
             favoriteIds = preferences.favoriteIds(),
             historyIds = preferences.historyIds(),
-            allKnownVideos = preferences.savedVideos(),
+            // Kept synchronous: favorites/history screens must be complete on the first frame,
+            // otherwise a freshly started app can briefly show an empty library.
+            allKnownVideos = (initialCachedFeed?.videos.orEmpty() + preferences.savedVideos())
+                .distinctBy(VideoItem::id),
         ),
     )
     val uiState: StateFlow<AuroraUiState> = _uiState.asStateFlow()
 
     init {
+        // Warm the covers of the cached first page before Compose lays them out.
+        prefetchCovers(initialCachedFeed?.videos.orEmpty())
         refresh()
+    }
+
+    /**
+     * Downloads the first few covers off the main thread so the first visible cards can paint
+     * from the cache. CoverImageLoader deduplicates identical in-flight requests, so this never
+     * doubles the network work the composables would do anyway.
+     */
+    private fun prefetchCovers(videos: List<VideoItem>) {
+        val targets = videos.asSequence()
+            .mapNotNull { video -> video.thumbnailUrl?.let { it to video.pageUrl } }
+            .distinctBy { it.first }
+            .take(COVER_PREFETCH_LIMIT)
+            .toList()
+        if (targets.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            targets.forEach { (url, referer) -> CoverImageLoader.load(url, referer) }
+        }
+    }
+
+    private fun isFreshFeed(savedAtMillis: Long): Boolean =
+        savedAtMillis > 0 && System.currentTimeMillis() - savedAtMillis in 0..FEED_CACHE_TTL_MS
+
+    private fun applyCachedFeed(sourceUrl: String, category: FeedCategory) {
+        val cached = preferences.cachedFeed() ?: return
+        if (cached.sourceUrl != sourceUrl || cached.categoryPath != category.path) return
+        if (!isFreshFeed(cached.savedAtMillis)) return
+        _uiState.update {
+            it.copy(
+                videos = cached.videos.distinctBy(VideoItem::id),
+                allKnownVideos = (cached.videos + it.allKnownVideos).distinctBy(VideoItem::id),
+                canLoadMore = true,
+            )
+        }
     }
 
     fun selectDestination(destination: AppDestination) {
@@ -67,6 +115,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     fun selectCategory(category: FeedCategory) {
         if (_uiState.value.category == category) return
         _uiState.update { it.copy(category = category) }
+        applyCachedFeed(_uiState.value.sourceUrl, category)
         refresh()
     }
 
@@ -145,11 +194,13 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     fun saveSourceUrl(value: String) {
         if (SourceAddress.error(value) != null) return
         preferences.sourceUrl = value
+        val nextSource = preferences.sourceUrl
+        val nextCategory = _uiState.value.category.takeIf(FeedCategory.availableFor(nextSource)::contains)
+            ?: FeedCategory.availableFor(nextSource).first()
         _uiState.update {
-            val supportedCategories = FeedCategory.availableFor(preferences.sourceUrl)
             it.copy(
-                sourceUrl = preferences.sourceUrl,
-                category = it.category.takeIf(supportedCategories::contains) ?: supportedCategories.first(),
+                sourceUrl = nextSource,
+                category = nextCategory,
                 destination = AppDestination.HOME,
                 videos = emptyList(),
                 searchResults = emptyList(),
@@ -157,6 +208,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                 canLoadMore = true,
             )
         }
+        applyCachedFeed(nextSource, nextCategory)
         refresh()
     }
 
@@ -171,6 +223,8 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
             runCatching { repository.loadFeed(snapshot.sourceUrl, snapshot.category, page = 1) }
                 .onSuccess { videos ->
                     nextPage = 2
+                    preferences.saveFeedCache(snapshot.sourceUrl, snapshot.category.path, videos)
+                    prefetchCovers(videos)
                     _uiState.update {
                         it.copy(
                             videos = videos,
@@ -203,6 +257,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
             runCatching {
                 repository.loadFeed(snapshot.sourceUrl, snapshot.category, page = requestedPage)
             }.onSuccess { pageVideos ->
+                prefetchCovers(pageVideos)
                 _uiState.update { current ->
                     if (pageVideos.isEmpty()) {
                         return@update current.copy(isLoadingMore = false, canLoadMore = false, message = null)
@@ -230,6 +285,12 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     companion object {
+        /** First-page snapshot older than this is not worth painting. */
+        internal const val FEED_CACHE_TTL_MS = 24 * 60 * 60 * 1000L
+
+        /** How many above-the-fold covers to warm before the first layout pass. */
+        private const val COVER_PREFETCH_LIMIT = 8
+
         /** Local search only: network results are already matched by the site search endpoint. */
         internal fun localSearchMatches(query: String, videos: List<VideoItem>): List<VideoItem> =
             videos.asSequence()

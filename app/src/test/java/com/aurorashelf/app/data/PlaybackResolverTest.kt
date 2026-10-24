@@ -83,4 +83,44 @@ class PlaybackResolverTest {
         )
         assertNull(PlaybackResolver().parse(page))
     }
+
+    @Test fun cachedValueExpiresAfterTtlUsingInjectedClock() {
+        var now = 1_000L
+        val cache = CachedValue<String>(ttlMs = 10_000L, maxEntries = 8, clock = { now })
+        cache.put("key", "value")
+
+        assertEquals("value", cache.get("key"))
+        now += 9_999L
+        assertEquals("value", cache.get("key"))
+        now += 2L
+        assertNull("expired entry must be dropped", cache.get("key"))
+        assertEquals(0, cache.size())
+    }
+
+    @Test fun cachedValueEvictsLeastRecentlyUsedEntries() {
+        val cache = CachedValue<String>(ttlMs = 60_000L, maxEntries = 2, clock = { 0L })
+        cache.put("a", "1")
+        cache.put("b", "2")
+        assertEquals("1", cache.get("a")) // touch A so B is least recently used
+        cache.put("c", "3")
+
+        assertNull(cache.get("b"))
+        assertEquals("1", cache.get("a"))
+        assertEquals("3", cache.get("c"))
+        assertEquals(2, cache.size())
+    }
+
+    @Test fun cachedValueUsesPlaybackCacheParameters() {
+        val cache = CachedValue<List<PlaybackEpisode>>(
+            ttlMs = PlaybackResolver.CACHE_TTL_MS,
+            maxEntries = PlaybackResolver.CACHE_MAX_ENTRIES,
+            clock = { 0L },
+        )
+        val episodes = listOf(PlaybackEpisode(1, "01", "https://example.com/video/1"))
+        cache.put("page", episodes)
+
+        assertEquals(episodes, cache.get("page"))
+        assertNull(cache.get("other"))
+        assertEquals(PlaybackResolver.CACHE_TTL_MS, 10 * 60 * 1000L)
+    }
 }

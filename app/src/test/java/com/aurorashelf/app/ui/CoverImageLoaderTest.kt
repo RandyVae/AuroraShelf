@@ -1,6 +1,10 @@
 package com.aurorashelf.app.ui
 
+import java.nio.file.Files
 import java.util.Random
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -81,6 +85,119 @@ class CoverImageLoaderTest {
         assertFalse("truncated ftyp box is not a complete image", CoverImageLoader.looksLikeImage(isoBmffImage("avif").copyOf(8)))
     }
 
+    @Test
+    fun memoryCacheHitSkipsTheNetworkFetcher() {
+        val calls = AtomicInteger()
+        val loader = newLoader(
+            cache = CoverCache(diskDirectory = null),
+            fetcher = CoverFetcher { _, _ ->
+                calls.incrementAndGet()
+                jpegBytes()
+            },
+        )
+
+        assertArrayEquals(jpegBytes(), requireNotNull(loader.load(COVER_URL, PAGE_URL)))
+        assertArrayEquals(jpegBytes(), requireNotNull(loader.load(COVER_URL, PAGE_URL)))
+        assertEquals(1, calls.get())
+    }
+
+    @Test
+    fun singleFlightCollapsesConcurrentRequestsIntoOneFetch() {
+        val calls = AtomicInteger()
+        val started = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val loader = newLoader(
+            cache = CoverCache(diskDirectory = null),
+            fetcher = CoverFetcher { _, _ ->
+                calls.incrementAndGet()
+                started.countDown()
+                release.await(5, TimeUnit.SECONDS)
+                jpegBytes()
+            },
+        )
+        val results = java.util.Collections.synchronizedList(mutableListOf<ByteArray?>())
+        val threads = (1..4).map {
+            Thread { results.add(loader.load(COVER_URL, PAGE_URL)) }.apply { start() }
+        }
+
+        assertTrue("fetcher should start", started.await(5, TimeUnit.SECONDS))
+        release.countDown()
+        threads.forEach { it.join(5_000) }
+
+        assertEquals("concurrent loads must share one fetch", 1L, calls.get().toLong())
+        assertEquals(4, results.size)
+        results.forEach { assertArrayEquals(jpegBytes(), requireNotNull(it)) }
+    }
+
+    @Test
+    fun failedFetchIsNegativeCachedForSixtySeconds() {
+        var now = 1_000L
+        val calls = AtomicInteger()
+        val loader = CoverLoader(
+            cache = CoverCache(diskDirectory = null),
+            fetcher = CoverFetcher { _, _ ->
+                calls.incrementAndGet()
+                null
+            },
+            imageValidator = { CoverImageLoader.looksLikeImage(it) },
+            clock = { now },
+            negativeTtlMs = 60_000L,
+        )
+
+        assertNull(loader.load(COVER_URL, PAGE_URL))
+        assertEquals(1, calls.get())
+        assertNull(loader.load(COVER_URL, PAGE_URL))
+        assertEquals("failures are negative-cached for 60 s", 1L, calls.get().toLong())
+
+        now += 60_001L
+        assertNull(loader.load(COVER_URL, PAGE_URL))
+        assertEquals("negative cache must expire", 2L, calls.get().toLong())
+    }
+
+    @Test
+    fun corruptedDiskEntryIsRefetched() {
+        val directory = Files.createTempDirectory("cover-loader").toFile()
+        try {
+            val cache = CoverCache(
+                diskDirectory = directory,
+                ioExecutor = { command -> command.run() },
+            )
+            val diskFile = requireNotNull(cache.diskFileFor(COVER_URL))
+            requireNotNull(diskFile.parentFile).mkdirs()
+            diskFile.writeBytes(byteArrayOf(0x00, 0x01, 0x02))
+
+            val calls = AtomicInteger()
+            val loader = newLoader(
+                cache = cache,
+                fetcher = CoverFetcher { _, _ ->
+                    calls.incrementAndGet()
+                    jpegBytes()
+                },
+            )
+
+            assertArrayEquals(jpegBytes(), requireNotNull(loader.load(COVER_URL, PAGE_URL)))
+            assertEquals("corrupted disk entry must be replaced by a fetch", 1L, calls.get().toLong())
+            assertArrayEquals(jpegBytes(), requireNotNull(loader.load(COVER_URL, PAGE_URL)))
+            assertEquals(1L, calls.get().toLong())
+        } finally {
+            directory.deleteRecursively()
+        }
+    }
+
+    private fun newLoader(cache: CoverCache, fetcher: CoverFetcher): CoverLoader = CoverLoader(
+        cache = cache,
+        fetcher = fetcher,
+        imageValidator = { CoverImageLoader.looksLikeImage(it) },
+    )
+
+    private fun jpegBytes(): ByteArray =
+        byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0x10, 0x20, 0x30)
+
     private fun isoBmffImage(majorBrand: String): ByteArray =
         byteArrayOf(0, 0, 0, 0x20) + "ftyp".toByteArray() + majorBrand.toByteArray() + ByteArray(20)
+
+    private companion object {
+        const val COVER_URL = "https://pic.example.com/upload/cover.jpg"
+        const val PAGE_URL = "https://example.com/video/1"
+    }
 }

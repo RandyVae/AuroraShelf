@@ -4,6 +4,7 @@ import java.io.IOException
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.util.LinkedHashMap
 import android.util.Log
 import com.aurorashelf.app.model.ContentSourceCatalog
 import kotlinx.coroutines.Dispatchers
@@ -18,16 +19,23 @@ data class PlaybackEpisode(val number: Int, val label: String, val pageUrl: Stri
 class PlaybackResolver {
     suspend fun resolveEpisodes(detailUrl: String): List<PlaybackEpisode> = withContext(Dispatchers.IO) {
         require(SourceAddress.resolve(detailUrl, detailUrl) != null) { "视频页面地址无效" }
-        parseEpisodes(fetch(detailUrl), detailUrl)
+        val cached = episodeCache.get(detailUrl)
+        if (cached != null) return@withContext cached
+        val episodes = parseEpisodes(fetch(detailUrl), detailUrl)
+        // Failures (empty lists) stay uncached so a transient page error is retried next time.
+        if (episodes.isNotEmpty()) episodeCache.put(detailUrl, episodes)
+        episodes
     }
 
     suspend fun resolve(pageUrl: String): PlaybackSource = withContext(Dispatchers.IO) {
         Log.i(TAG, "resolve start host=${runCatching { java.net.URI(pageUrl).host }.getOrNull()}")
         require(SourceAddress.resolve(pageUrl, pageUrl) != null) { "视频页面地址无效" }
+        val cached = playbackCache.get(pageUrl)
+        if (cached != null) return@withContext cached
         if (PipePipeBridge.supports(pageUrl)) {
             runCatching { PipePipeBridge.resolve(pageUrl) }.onSuccess { source ->
                 Log.i(TAG, "resolve PipePipe source host=${runCatching { URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
-                return@withContext source
+                return@withContext source.rememberFor(pageUrl)
             }.onFailure { error ->
                 if (!ContentSourceCatalog.isMissAv(pageUrl)) throw error
                 Log.w(TAG, "PipePipe resolver failed; using the compatible MissAV page parser", error)
@@ -36,7 +44,7 @@ class PlaybackResolver {
         val page = fetch(pageUrl)
         parse(page)?.let {
             Log.i(TAG, "resolve direct source host=${runCatching { java.net.URI(it.url).host }.getOrNull()} type=${mediaType(it.url)}")
-            return@withContext it
+            return@withContext it.rememberFor(pageUrl)
         }
 
         // 黄果详情页将播放按钮指向 /video/...，媒体地址只在该播放页的数据节点中发布。
@@ -47,10 +55,15 @@ class PlaybackResolver {
             .firstNotNullOfOrNull { playbackUrl -> parse(fetch(playbackUrl))?.let { it to playbackUrl } }
             ?.let { (source, playbackUrl) ->
                 Log.i(TAG, "resolve linked source host=${runCatching { java.net.URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
-                return@withContext source.copy(referer = playbackUrl)
+                return@withContext source.copy(referer = playbackUrl).rememberFor(pageUrl)
             }
 
         throw IOException("页面未提供可识别的视频地址，请重试或检查站点是否要求登录")
+    }
+
+    /** Stores a successful resolution in the shared 10-minute cache (failures throw before this). */
+    private fun PlaybackSource.rememberFor(pageUrl: String): PlaybackSource = also {
+        playbackCache.put(pageUrl, it)
     }
 
     private fun mediaType(url: String): String = when {
@@ -184,6 +197,12 @@ class PlaybackResolver {
 
     companion object {
         private const val TAG = "PlaybackResolver"
+        internal const val CACHE_TTL_MS = 10 * 60 * 1000L
+        internal const val CACHE_MAX_ENTRIES = 64
+        // Media URLs can carry short-lived signatures; refresh them more eagerly than episode lists.
+        private const val PLAYBACK_CACHE_TTL_MS = 2 * 60 * 1000L
+        private val playbackCache = CachedValue<PlaybackSource>(PLAYBACK_CACHE_TTL_MS, CACHE_MAX_ENTRIES)
+        private val episodeCache = CachedValue<List<PlaybackEpisode>>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val ENCODED_SOURCE = Regex("""strencode2\(\s*["']([^"']+)["']\s*\)""")
         private val ESCAPE = Regex("%u([0-9a-fA-F]{4})|%([0-9a-fA-F]{2})")
         private val JSON_STRING = Regex("""\"([^\"]+)\"\s*:\s*\"((?:\\\\.|[^\"\\\\])*)\"""")
@@ -202,4 +221,50 @@ class PlaybackResolver {
             .replace("\\\\\\\"", "\"")
             .replace("\\\\\\\\", "\\\\")
     }
+}
+
+/**
+ * Tiny thread-safe TTL + LRU cache used for playback resolution results.
+ * Failures are never stored by callers, so only successful values live here.
+ */
+internal class CachedValue<V>(
+    private val ttlMs: Long,
+    private val maxEntries: Int,
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
+    private data class Entry<T>(val value: T, val expiresAtMs: Long)
+
+    private val entries = LinkedHashMap<String, Entry<V>>(16, 0.75f, true)
+    private val lock = Any()
+
+    fun get(key: String): V? = synchronized(lock) {
+        val entry = entries[key]
+        when {
+            entry == null -> null
+            entry.expiresAtMs <= clock() -> {
+                entries.remove(key)
+                null
+            }
+            else -> entry.value
+        }
+    }
+
+    fun put(key: String, value: V) = synchronized(lock) {
+        entries[key] = Entry(value, clock() + ttlMs)
+        val iterator = entries.entries.iterator()
+        while (entries.size > maxEntries && iterator.hasNext()) {
+            iterator.next()
+            iterator.remove()
+        }
+    }
+
+    fun remove(key: String) {
+        synchronized(lock) { entries.remove(key) }
+    }
+
+    fun clear() = synchronized(lock) {
+        entries.clear()
+    }
+
+    internal fun size(): Int = synchronized(lock) { entries.size }
 }

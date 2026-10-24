@@ -7,12 +7,15 @@ import coil3.SingletonImageLoader
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.aurorashelf.app.data.OfflineCacheManager
 import com.aurorashelf.app.data.comic.EhentaiDns
+import com.aurorashelf.app.ui.CoverImageLoader
 import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 
 class AuroraApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
+        // Install the process-wide cover memory/disk cache before any cover request can start.
+        CoverImageLoader.initialize(this)
         // Recreate Media3's persistent download manager as soon as the app process starts, but
         // off the main thread: constructing it opens the download database and the disk cache.
         // Media3 resolves its application handler with createHandlerForCurrentOrMainLooper, so a
