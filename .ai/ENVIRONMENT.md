@@ -189,3 +189,8 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - 143 的 VOD 封面 + 页面预热在真实站点上表现为"只播广告"（VOD 快照含 bumpers，且提前隐藏整页使 18+ 确认页不可见）。144 已移除两者，恢复 142 稳定播放器，并改为"检测到视频后才沉浸隐藏页面"。
 - 自动化环境下 Stripchat 访客/年龄状态不稳定，未能取得稳定出画证据；不再宣称即点即播。真机验证前先确认同一房间在系统浏览器可播放。
 - 本地预览包 `dist/AuroraShelf-2.15.0-144-live-restore-LOCAL.apk`（SHA-256 `ab532ab7…`）。
+
+## 2026-10-24 145（直播完全回退）
+
+- 按用户要求将 `LiveScreen.kt` 回退到 `431f594` 的版本：不弹年龄窗、无 VOD 封面、无页面预热；版本 145，本地包 SHA `7a42cc3e…`。
+- 模拟器实测两房间均落在 Stripchat 访客页（无 video 元素），App 显示"播放器暂时不可用"；非新增弹窗，属站点访客/年龄态。真机复测前不要把 143/144 的加速结论当能力。

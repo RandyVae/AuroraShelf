@@ -844,28 +844,29 @@ private fun livePlayerModeScript(roomUrl: String): String {
   const video = document.querySelector('video');
   if (!video) return 'missing';
 
+  const styleId = 'aurora-live-player-style';
+  let style = document.getElementById(styleId);
+  if (!style) {
+    style = document.createElement('style');
+    style.id = styleId;
+    style.textContent = `
+      html, body {
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        overflow: hidden !important;
+        background: #000 !important;
+      }
+      body * { visibility: hidden !important; }
+    `;
+    document.head.appendChild(style);
+  }
+
   const applyPlayerStage = () => {
     const activeVideo = document.querySelector('video');
     if (!activeVideo) return false;
     const player = activeVideo.closest('.player-wrapper') || activeVideo.parentElement;
     if (!player) return false;
-    const styleId = 'aurora-live-player-style';
-    let style = document.getElementById(styleId);
-    if (!style) {
-      style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
-        html, body {
-          width: 100% !important;
-          height: 100% !important;
-          margin: 0 !important;
-          overflow: hidden !important;
-          background: #000 !important;
-        }
-        body * { visibility: hidden !important; }
-      `;
-      document.head.appendChild(style);
-    }
     const viewportWidth = window.visualViewport?.width || window.innerWidth;
     const viewportHeight = window.visualViewport?.height || window.innerHeight;
     const stageWidth = `${'$'}{viewportWidth}px`;
