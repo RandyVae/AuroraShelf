@@ -15,11 +15,36 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.URI
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+
+/**
+ * Whether the forum page's cookies may be forwarded to [imageUrl].
+ *
+ * Forum posts embed images hosted on third-party CDNs, so the page cookie must never leave the
+ * page's own host. Forwarding is allowed only when both URLs are absolute HTTPS URLs and their
+ * hosts match exactly (case-insensitive). Port and path are deliberately ignored because HTTP
+ * cookies are scoped by host rather than port. Embedded `data:` images, plain-HTTP images,
+ * sibling subdomains, relative URLs, and malformed input are all rejected.
+ *
+ * This function intentionally stays free of Android APIs so it can be covered by a plain JVM
+ * unit test.
+ */
+internal fun shouldForwardCookies(pageUrl: String, imageUrl: String): Boolean {
+    val pageHost = httpsHostOrNull(pageUrl) ?: return false
+    val imageHost = httpsHostOrNull(imageUrl) ?: return false
+    return pageHost.equals(imageHost, ignoreCase = true)
+}
+
+private fun httpsHostOrNull(url: String): String? {
+    val uri = runCatching { URI(url) }.getOrNull() ?: return null
+    if (uri.scheme?.equals("https", ignoreCase = true) != true) return null
+    return uri.host?.takeIf { host -> host.isNotBlank() }
+}
 
 internal data class ForumImageRequest(
     val imageUrl: String,

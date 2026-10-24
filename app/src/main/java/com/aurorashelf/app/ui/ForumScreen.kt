@@ -74,8 +74,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aurorashelf.app.data.forum.ForumImageRequest
 import com.aurorashelf.app.data.forum.ForumImageSaver
+import com.aurorashelf.app.data.forum.shouldForwardCookies
 import com.aurorashelf.app.model.ForumPost
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -242,6 +246,7 @@ private fun ForumError(message: String, onRetry: () -> Unit) {
 @Composable
 private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val imageSaver = remember(context) { ForumImageSaver(context) }
@@ -332,7 +337,11 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     imageUrl = imageUrl,
                     pageUrl = currentPageUrl,
                     userAgent = settings.userAgentString,
-                    cookies = CookieManager.getInstance().getCookie(currentPageUrl),
+                    cookies = if (shouldForwardCookies(currentPageUrl, imageUrl)) {
+                        CookieManager.getInstance().getCookie(currentPageUrl)
+                    } else {
+                        null
+                    },
                 )
                 true
             }
@@ -351,8 +360,17 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     BackHandler {
         if (canGoBack && webView.canGoBack()) webView.goBack() else onClose()
     }
-    DisposableEffect(webView) {
+    DisposableEffect(webView, lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> webView.onPause()
+                Lifecycle.Event.ON_RESUME -> webView.onResume()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
         onDispose {
+            lifecycle.removeObserver(observer)
             webView.stopLoading()
             webView.destroy()
         }
