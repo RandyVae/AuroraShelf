@@ -101,9 +101,23 @@ final class XHamsterKiosk extends KioskExtractor<StreamInfoItem> {
         if(page==null)throw new ParsingException("xHamster kiosk page was not fetched");
         StreamInfoItemsCollector out=new StreamInfoItemsCollector(getServiceId());
         for(XHamsterItem i:XHamsterParser.cards(page,40))out.commit(new XHamsterItemExtractor(i));
-        return new InfoItemsPage<>(out,null);
+        Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(page);
+        if (next == null) {
+            final Matcher matcher = Pattern.compile("/newest(?:/(\\d+))?/?$").matcher(page.location());
+            if (matcher.find()) {
+                final int number = matcher.group(1) == null ? 2 : Integer.parseInt(matcher.group(1)) + 1;
+                next = new Page(XHamsterParser.BASE + "/newest/" + number);
+            }
+        }
+        return new InfoItemsPage<>(out, next);
     }
-    @Override public InfoItemsPage<StreamInfoItem> getPage(Page p){return InfoItemsPage.emptyPage();}
+    @Override public InfoItemsPage<StreamInfoItem> getPage(Page p) throws IOException, ExtractionException {
+        if (p == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(page.location(), p.getUrl())) {
+            throw new ParsingException("Invalid next page");
+        }
+        page = XHamsterParser.fetch(p.getUrl());
+        return getInitialPage();
+    }
 }
 final class XHamsterStream extends StreamExtractor {
     private Document page;

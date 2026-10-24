@@ -1,4 +1,7 @@
 allprojects {
+    // Included builds do not inherit AuroraShelf's output-directory configuration.
+    // Keep generated classes away from Documents cloud-sync conflict copies.
+    layout.buildDirectory = rootProject.layout.projectDirectory.dir("build.nosync/${project.name}")
     apply plugin: 'java-library'
     apply plugin: 'maven-publish'
 

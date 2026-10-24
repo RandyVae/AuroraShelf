@@ -154,9 +154,15 @@ final class MrDougaKioskExtractor extends KioskExtractor<StreamInfoItem> {
         if (document == null) throw new ParsingException("MRDOUGA kiosk page was not fetched");
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
         for (final MrDougaItem item : MrDougaParser.cards(document, 40)) collector.commit(new MrDougaItemExtractor(item));
-        return new InfoItemsPage<>(collector, null);
+        return new InfoItemsPage<>(collector, org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document));
     }
-    @Override public InfoItemsPage<StreamInfoItem> getPage(final Page page) { return InfoItemsPage.emptyPage(); }
+    @Override public InfoItemsPage<StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
+        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+            throw new ParsingException("Invalid next page");
+        }
+        document = MrDougaParser.fetch(page.getUrl());
+        return getInitialPage();
+    }
 }
 
 final class MrDougaStreamExtractor extends StreamExtractor {

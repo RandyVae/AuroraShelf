@@ -2,6 +2,7 @@ package org.schabi.newpipe.extractor.services.javsb;
 
 import org.jsoup.nodes.Document;
 import org.schabi.newpipe.extractor.Page;
+import org.schabi.newpipe.extractor.utils.HtmlPagination;
 import org.schabi.newpipe.extractor.StreamingService;
 import org.schabi.newpipe.extractor.downloader.Downloader;
 import org.schabi.newpipe.extractor.exceptions.ExtractionException;
@@ -53,13 +54,16 @@ public final class JavSbKioskExtractor extends KioskExtractor<StreamInfoItem> {
                 : JavSbParsingHelper.extractVideoCards(document, 40)) {
             collector.commit(new JavSbInfoItemExtractor(result));
         }
-        return new InfoItemsPage<>(collector, null);
+        return new InfoItemsPage<>(collector, HtmlPagination.nextPage(document));
     }
 
     @Override
     public InfoItemsPage<StreamInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
-        return InfoItemsPage.emptyPage();
+        if (page == null || !HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+            throw new org.schabi.newpipe.extractor.exceptions.ParsingException("Invalid next page");
+        }
+        document = JavSbParsingHelper.fetchDocument(page.getUrl());
+        return getInitialPage();
     }
 }
-

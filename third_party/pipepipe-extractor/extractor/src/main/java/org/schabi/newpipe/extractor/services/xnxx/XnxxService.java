@@ -154,10 +154,14 @@ final class XnxxKioskExtractor extends KioskExtractor<org.schabi.newpipe.extract
         for (final XnxxItem item : XnxxParser.cards(document, 48)) {
             collector.commit(new XnxxItemExtractor(item));
         }
-        return new InfoItemsPage<>(collector, null);
+        return new InfoItemsPage<>(collector, org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document));
     }
-    @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) {
-        return InfoItemsPage.emptyPage();
+    @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
+        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+            throw new ParsingException("Invalid next page");
+        }
+        document = XnxxParser.fetch(page.getUrl());
+        return getInitialPage();
     }
 }
 

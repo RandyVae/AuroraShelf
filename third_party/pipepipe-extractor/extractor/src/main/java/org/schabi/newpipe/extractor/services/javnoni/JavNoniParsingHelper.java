@@ -95,7 +95,8 @@ public final class JavNoniParsingHelper {
 
         final Response response = NewPipe.getDownloader().get(normalizedUrl,
                 browserHeaders(normalizedReferer));
-        final Document document = Jsoup.parse(response.responseBody(), normalizedUrl);
+        final Document document = Jsoup.parse(response.responseBody(),
+                response.latestUrl() == null ? normalizedUrl : response.latestUrl());
         synchronized (DOCUMENT_CACHE) {
             DOCUMENT_CACHE.put(cacheKey, new CachedDocument(document));
         }
