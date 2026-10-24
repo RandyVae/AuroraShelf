@@ -8,8 +8,6 @@ data class LiveItem(
     val countryCode: String,
     val isHd: Boolean,
     val playerUrl: String,
-    /** Public HLS snapshot playlist (short VOD) used to cover live-page startup; null if absent. */
-    val hlsUrl: String? = null,
 )
 
 enum class LiveCategory(

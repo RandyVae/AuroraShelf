@@ -42,7 +42,6 @@ class StripchatLiveRepository {
                         }.orEmpty(),
                         isHd = model.optBoolean("isHd"),
                         playerUrl = "$SITE_BASE/$username",
-                        hlsUrl = bestHlsUrl(model),
                     ),
                 )
             }
@@ -83,19 +82,6 @@ class StripchatLiveRepository {
         }
     }
 
-    /** Builds the highest available public HLS URL (480p, then 240p) for the VOD cover preview. */
-    internal fun bestHlsUrl(model: JSONObject): String? {
-        val streamName = model.optString("streamName").trim()
-        val presets = model.optJSONArray("presets")?.let { array ->
-            (0 until array.length()).mapNotNull { array.optString(it).takeIf(String::isNotBlank) }
-        }.orEmpty()
-        val quality = HLS_QUALITY_ORDER.firstOrNull { it in presets }
-        if (streamName.isNotBlank() && streamName.all { it.isLetterOrDigit() } && quality != null) {
-            return "$HLS_EDGE/hls/$streamName/master/${streamName}_$quality.m3u8"
-        }
-        return model.optString("hlsPlaylist").takeIf(::isHttpsUrl)
-    }
-
     private fun isHttpsUrl(value: String): Boolean = runCatching {
         val uri = URI(value)
         uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()
@@ -105,8 +91,6 @@ class StripchatLiveRepository {
         const val SITE_BASE = "https://zh.stripchat.com"
         private const val API_BASE = "$SITE_BASE/api/front/models"
         internal const val PAGE_SIZE = 30
-        internal const val HLS_EDGE = "https://edge-hls.doppiocdn.media"
-        internal val HLS_QUALITY_ORDER = listOf("480p", "240p")
         private const val REQUEST_TIMEOUT_MS = 15_000
         private const val PUBLIC_STATUS = "public"
         private val USERNAME_PATTERN = Regex("[A-Za-z0-9_-]{1,80}")
