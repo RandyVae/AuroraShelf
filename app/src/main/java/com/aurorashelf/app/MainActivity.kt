@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import com.aurorashelf.app.data.AppPreferences
 import com.aurorashelf.app.ui.AuroraShelfApp
 import com.aurorashelf.app.ui.AuroraViewModel
@@ -60,9 +61,18 @@ class MainActivity : ComponentActivity() {
             }
             SideEffect {
                 WindowCompat.getInsetsController(window, window.decorView).apply {
-                    // The intro stage is pure black, so keep system bar icons light while it plays.
-                    isAppearanceLightStatusBars = if (introVisible) false else !darkTheme
-                    isAppearanceLightNavigationBars = if (introVisible) false else !darkTheme
+                    // Full-bleed cinema: hide system bars during the film and restore afterwards.
+                    if (introVisible) {
+                        isAppearanceLightStatusBars = false
+                        isAppearanceLightNavigationBars = false
+                        hide(WindowInsetsCompat.Type.systemBars())
+                        systemBarsBehavior =
+                            androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } else {
+                        isAppearanceLightStatusBars = !darkTheme
+                        isAppearanceLightNavigationBars = !darkTheme
+                        show(WindowInsetsCompat.Type.systemBars())
+                    }
                 }
             }
             AuroraTheme(darkTheme = darkTheme) {

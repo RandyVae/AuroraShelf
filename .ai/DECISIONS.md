@@ -323,3 +323,17 @@ Decision:
 - HIG deviations are explicit: audio autoplay (G8) and timed auto-dismiss (G9) are accepted because the owner explicitly requested a cinematic title sequence; skippability (F3) and Reduce Motion (F5/G7) are preserved.
 
 Boundary: Compose Canvas cannot reach Netflix's 3D-ribbon render quality; a真正同级的实现需要专业动效设计与预渲染视频资产。On the loaded emulator the measured wall clock is ~5.9 s vs the nominal 4.2 s due to dropped frames; real-device timing not verified.
+
+## Launch film (142): pre-rendered cinematic asset
+
+Date: 2026-10-24
+
+Status: Implemented; played on device with full-bleed immersive mode; device suite 32/32.
+
+Decision:
+- After three rejected Compose-drawn intros ("cheap, no artistry"), the team changed production method: art-direct a still first, then render an offline film and ship it as an asset. The film is 6.6 s, 1080×2400, 30 fps, H.264+AAC (~3.4 MB), generated with Pillow/numpy per-frame compositing and ffmpeg, with an original synthesized score (drone + D minor add9 pad + reveal whoosh + metallic shimmer + soft sub + convolution reverb).
+- Art direction: a blade of light carves a Didot-sculpted N out of darkness; brushed-platinum metal, thin-film iridescent edge, anamorphic streaks, Didot wordmark in warm silver with wide tracking, a single deep-crimson hairline, film grain/halation/teal-shadow-warm-highlight grade. No Netflix logos, ribbon design or audio are reproduced.
+- Playback: ExoPlayer with `PlayerView` (no controls, ZOOM), system bars hidden during the film and restored afterwards; near-black start poster under the player, finished-lockup poster for Reduce Motion; skip on tap/Back; 9.5 s safety timeout; original audio muted when the user disabled it, the device is silent, or media volume is zero.
+- The app is composed behind the film and its first frame is covered by the existing brand veil; `AuroraViewModel` is warmed in `onCreate` so feed data is ready when the film ends.
+
+Boundary: this is a 2.5D offline render, not a real 3D pipeline; further quality needs professional 3D/motion-design assets. HIG deviations (autoplay audio G8, timed 6.6 s G9) are explicit user decisions; skippability and Reduce Motion remain.

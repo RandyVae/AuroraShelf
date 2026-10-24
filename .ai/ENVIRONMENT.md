@@ -165,3 +165,12 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - Final SHA-256 d549583682531ef372c04b1fa662aa123bcbd60623c56f415766e1328edaa55a (same versionCode 141).
 - Lint 0 errors / 19 warnings / 3 hints; device full suite 32/32 PASS after the visual change.
 - Evidence captured on the windowed 5556 AVD because 5554 has TalkBack enabled by another session (its green accessibility-focus frame is not app UI).
+
+## 2026-10-24 142 verification (pre-rendered launch film)
+
+- Build: unit tests + assembleDebug/DebugAndroidTest/Release PASS; lintDebug PASS (0 errors / 19 warnings / 3 hints); device full suite 32/32 PASS.
+- JVM: 154 tests / 0 failures / 1 skipped.
+- Release 142: SHA-256 460b4e471f3c962468f006081a3bc94aeb16f62dd1434ceed71f072a31273b54; installed on both emulators; full-bleed playback (system bars hidden), skip and Reduce-Motion poster verified.
+- Film asset: res/raw/intro_film.mp4 (3.4 MB) + intro_poster.jpg / intro_film_start.jpg; old intro_sting.m4a removed.
+- Film renderer/score scripts lived in /tmp (not committed); the shipped asset is reproducible from them if archived later.
+- Parallel Netgrey branding remains uncommitted and untouched.
