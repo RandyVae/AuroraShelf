@@ -5,6 +5,7 @@ import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import okhttp3.Dns
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 
 /** Keeps E-Hentai image delivery usable when a device DNS result is slow or unreachable. */
@@ -29,6 +30,9 @@ internal object EhentaiDns : Dns {
 internal object EhentaiHttp {
     private val client = OkHttpClient.Builder()
         .dns(EhentaiDns)
+        // Some E-Hentai edge nodes intermittently abort Android's HTTP/2 TLS session.
+        // HTTP/1.1 keeps full certificate validation and avoids that transport failure.
+        .protocols(listOf(Protocol.HTTP_1_1))
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
         .build()

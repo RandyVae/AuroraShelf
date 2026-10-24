@@ -44,6 +44,8 @@ internal class CopyComicSource : ComicSource {
         ).getJSONObject("results").getJSONArray("list")
         val authors = comicResult.optJSONArray("author").namesFromObjects("name")
         val tags = comicResult.optJSONArray("theme").namesFromObjects("name")
+        // CopyManga selects the chapter API version from comic.reclass, not chapter.type.
+        val chapterApiVersion = if (comicResult.has("reclass") && !comicResult.isNull("reclass")) 1 else 2
         ComicDetails(
             comic = comic.copy(
                 title = comicResult.optString("name").ifBlank { comic.title },
@@ -54,14 +56,17 @@ internal class CopyComicSource : ComicSource {
             description = comicResult.optString("brief"),
             chapters = List(chapterResult.length()) { index ->
                 val chapter = chapterResult.getJSONObject(index)
-                ComicChapter(chapter.getString("uuid"), chapter.optString("name").ifBlank { "第 ${index + 1} 话" })
+                ComicChapter("$chapterApiVersion:${chapter.getString("uuid")}", chapter.optString("name").ifBlank { "第 ${index + 1} 话" })
             },
         )
     }
 
     override suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage> = withContext(Dispatchers.IO) {
+        val version = chapterId.substringBefore(':').toIntOrNull() ?: 2
+        val uuid = chapterId.substringAfter(':')
+        val versionSuffix = version.takeIf { it >= 2 }?.toString().orEmpty()
         val chapter = JSONObject(
-            ComicHttp.get("$API/comic/${comic.id}/chapter2/$chapterId?platform=3", HEADERS),
+            ComicHttp.get("$API/comic/${comic.id}/chapter$versionSuffix/$uuid?platform=3", HEADERS),
         ).getJSONObject("results").getJSONObject("chapter")
         val contents = chapter.getJSONArray("contents")
         val words = chapter.optJSONArray("words")
@@ -71,7 +76,7 @@ internal class CopyComicSource : ComicSource {
             val order = words?.optInt(index, index) ?: index
             if (order in ordered.indices) ordered[order] = image else ordered[index] = image
         }
-        val referer = "https://www.copymanga.site/comic/${comic.id}/chapter/$chapterId"
+        val referer = "https://www.copymanga.site/comic/${comic.id}/chapter/$uuid"
         ordered.mapNotNull { it?.takeIf(String::isNotBlank)?.let { url -> ComicPage(url, referer) } }
     }
 
@@ -98,7 +103,8 @@ internal class CopyComicSource : ComicSource {
     }
 
     private companion object {
-        const val API = "https://api.copymanga.tv/api/v3"
+        // The maintained client uses this API host; the previous host fails TLS.
+        const val API = "https://api.2024manga.com/api/v3"
         const val PAGE_SIZE = 24
         val HEADERS = mapOf(
             "User-Agent" to "COPY/2.2.0",

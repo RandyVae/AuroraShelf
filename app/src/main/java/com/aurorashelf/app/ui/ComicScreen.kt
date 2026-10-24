@@ -52,6 +52,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -62,13 +63,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,6 +98,9 @@ import com.aurorashelf.app.data.comic.ComicPageResolver
 import com.aurorashelf.app.model.ComicDetails
 import com.aurorashelf.app.model.ComicPage
 import com.aurorashelf.app.model.ComicSummary
+import com.aurorashelf.app.ui.theme.AuroraReaderBackground
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 @Composable
 internal fun ComicScreen(
@@ -187,15 +191,17 @@ private fun ComicLibrary(
 ) {
     val gridState = rememberLazyGridState()
     val selectedSource = state.sources.find { it.id == state.selectedSourceId }
-    val shouldLoadMore by remember {
-        derivedStateOf {
+    // snapshotFlow keeps firing when the next page grows the list, unlike a derivedStateOf
+    // boolean that can stay latched at true and never request the following page.
+    LaunchedEffect(gridState, state.selectedSourceId, state.selectedCategoryId, state.activeQuery) {
+        snapshotFlow {
             val info = gridState.layoutInfo
-            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
             info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - 5
         }
-    }
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore) onLoadMore()
+            .distinctUntilChanged()
+            .filter { it }
+            .collect { onLoadMore() }
     }
 
     LazyVerticalGrid(
@@ -240,25 +246,23 @@ private fun ComicLibrary(
         } else {
         stickyHeader(key = "comic-pinned-categories") {
             val categories = selectedSource?.categories.orEmpty()
-            Surface(
-                color = MaterialTheme.colorScheme.background,
-                shadowElevation = 2.dp,
-                modifier = Modifier.fillMaxWidth().testTag("comic-category-bar"),
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 8.dp)
+                    .testTag("comic-category-bar"),
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(vertical = 8.dp),
-                ) {
-                    categories.forEach { category ->
-                        FilterChip(
-                            selected = category.id == state.selectedCategoryId,
-                            onClick = { onCategory(category.id) },
-                            label = { Text(category.label) },
-                        )
-                    }
+                categories.forEach { category ->
+                    FilterChip(
+                        selected = category.id == state.selectedCategoryId,
+                        onClick = { onCategory(category.id) },
+                        label = { Text(category.label) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ),
+                    )
                 }
             }
         }
@@ -671,7 +675,7 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
     }
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.fillMaxWidth().background(Color(0xFF111111)),
+        modifier = Modifier.fillMaxWidth().background(AuroraReaderBackground),
     ) {
         request?.let {
             AsyncImage(
