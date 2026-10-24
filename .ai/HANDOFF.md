@@ -1,5 +1,15 @@
 # Latest Handoff
 
+## 最新交接：2026-10-24 20:15 HKT — 142（电影短片开屏）
+
+完整交接报告见 **`docs/handoff-2026-10-24.md`**（当前状态、交付包、测试基线、待办、并行品牌工作、接手步骤）。
+
+要点：
+- HEAD `431f594`；候选 **142**（`dist/AuroraShelf-2.15.0-142-intro-film.apk`，SHA `460b4e47…`，7.0 MB，含 6.6 s 原创电影短片开屏）。
+- 基线：JVM **154/0/1**、设备全量 **32/32**、Lint **0e/19w/3h**。
+- **P0 未解决**：并行 Netgrey 品牌工作仍未提交（`res/`、`HomeScreen.kt`、`docs/verification.md`、`.ai/PROJECT_STATE.md`、`.ai/TASKS.md`）；142 APK 含这些未提交资源，从 HEAD 干净构建不一致。发布前必须先合并品牌工作并重建 143。
+- HIG 未关闭：TalkBack 人工、OEM 高对比键、字幕有轨验收、E4 真机；论坛刷新失败无错误条等 P2 见报告。
+
 ## 2026-10-24 15:00 HKT — 加载优化 + HIG 第二轮（137）
 
 **本轮完成**
