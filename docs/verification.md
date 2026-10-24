@@ -7,6 +7,7 @@
 - 健壮性与隐私：离线缓存删除竞态、缓存索引与本地保存逐条容错、联网搜索二次过滤、AVIF/HEIC 封面识别、直播分页终止与后台轮询、论坛图片 Cookie 同源转发、封面失败占位与重试。
 - Apple HIG 审计：`docs/ui/hig-audit-2026-10-24.md`。修复 3 个 P1（深色按钮文字对比度 3.15 → 5.45:1；固定黑底直播评论 3.30 → 6.66:1；200% 系统字体下底部浮栏标签溢出）及若干 P2；未达标项（Increase Contrast 变体、深色封面压暗、TalkBack 逐屏实测、外源字幕）在报告第 7 节显式声明。
 - JVM：**99 项 / 0 失败 / 1 跳过**（跳过项为 `ForumSourcesTest` 联网用例，默认需 `RUN_LIVE_FORUM_TESTS=1`）。
+- Lint：最终代码 `lintDebug` **0 errors / 21 warnings / 3 hints**（warnings 以依赖版本与既有资源建议为主）。
 - 设备：`connectedDebugAndroidTest` **26 项 / 0 失败**（2026-10-24 12:36 重跑；首次运行有 1 次 `AuroraFlowTest.feedContinuesBehindFloatingNavigation` 偶发失败，单项与完整重跑均通过）。
 - 联网冒烟：经 adb 直接执行 `LiveFeedTest`（`live=true`，黄果）**1/1 通过**，7.77 s，覆盖列表解析、翻页终止与封面 AES-CBC 解密。
 - 全源巡检：`PreReleaseSourceAuditTest`（`sourceAudit=true`）两次均在巡检中段被 host 侧 `adb` SIGKILL 中止（非应用 crash，无 crash buffer 记录）。已取得部分结果：默认视频源列表/第二页/播放解析、黄果列表/第二页/播放解析、MissAV 列表 56 项/第二页 0/搜索 50 项/播放解析、KissJAV 列表 30 项/第二页 30 项/搜索/播放解析、爱看漫首章 13 页、拷贝漫画首章 20 页。**16 源全量与 11 源第二页证据本轮未完整重建**。
