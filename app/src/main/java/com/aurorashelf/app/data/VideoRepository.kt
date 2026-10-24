@@ -39,12 +39,7 @@ class VideoRepository {
             if (page > 1 && ContentSourceCatalog.isMissAv(baseUrl)) return@withContext emptyList()
             val requestUrl = pageUrl(baseUrl, category, page)
             val document = try {
-                Jsoup.connect(requestUrl)
-                    .userAgent(USER_AGENT)
-                    .header("Accept-Language", if (ContentSourceCatalog.isMissAv(baseUrl)) "ja,en-US;q=0.8,en;q=0.6" else "zh-CN,zh;q=0.9")
-                    .timeout(REQUEST_TIMEOUT_MS)
-                    .followRedirects(true)
-                    .get()
+                fetchDocument(requestUrl, baseUrl)
             } catch (error: HttpStatusException) {
                 // Huangguo ranking pages are fixed TOP 20 lists. Their numbered URL
                 // returns 404, which is a normal end-of-feed signal for pagination.
@@ -127,6 +122,22 @@ class VideoRepository {
             .mapNotNull { anchor -> anchor.toVideoItem(baseUrl) }
             .distinctBy(VideoItem::pageUrl)
             .toList()
+    }
+
+    private fun fetchDocument(requestUrl: String, baseUrl: String): Document {
+        fun request(): Document = Jsoup.connect(requestUrl)
+            .userAgent(USER_AGENT)
+            .header("Accept-Language", if (ContentSourceCatalog.isMissAv(baseUrl)) "ja,en-US;q=0.8,en;q=0.6" else "zh-CN,zh;q=0.9")
+            .timeout(REQUEST_TIMEOUT_MS)
+            .followRedirects(true)
+            .get()
+
+        return try {
+            request()
+        } catch (failure: IOException) {
+            if (!failure.isTransientTransportFailure()) throw failure
+            request()
+        }
     }
 
     private fun Element.toMissAvVideoItem(baseUrl: String): VideoItem? {

@@ -25,10 +25,19 @@ internal class PipePipeDownloader : Downloader() {
         .build()
 
     override fun execute(request: Request): Response {
-        val call = client.newCall(request.toOkHttpRequest())
-        return call.execute().use { response ->
+        val okhttpRequest = request.toOkHttpRequest()
+        return executeWithRetry(okhttpRequest).use { response ->
             Log.i(TAG, "GET ${request.url()} code=${response.code} bytes=${response.body?.contentLength()}")
             response.toExtractorResponse(request.url())
+        }
+    }
+
+    private fun executeWithRetry(request: okhttp3.Request): okhttp3.Response {
+        return try {
+            client.newCall(request).execute()
+        } catch (failure: IOException) {
+            if (request.method !in IDEMPOTENT_METHODS || !failure.isTransientTransportFailure()) throw failure
+            client.newCall(request).execute()
         }
     }
 
@@ -36,9 +45,9 @@ internal class PipePipeDownloader : Downloader() {
         val call = client.newCall(request.toOkHttpRequest())
         val cancellable = CancellableCall(call)
         call.enqueue(object : Callback {
-            override fun onFailure(call: Call, error: IOException) {
+            override fun onFailure(call: Call, e: IOException) {
                 cancellable.setFinished()
-                callback.onError(error)
+                callback.onError(e)
             }
 
             override fun onResponse(call: Call, response: okhttp3.Response) {
@@ -89,6 +98,7 @@ internal class PipePipeDownloader : Downloader() {
     }
 
     companion object {
+        private val IDEMPOTENT_METHODS = setOf("GET", "HEAD")
         private val METHODS_REQUIRING_BODY = setOf("POST", "PUT", "PATCH")
         private const val TAG = "PipePipeDownloader"
     }
