@@ -134,3 +134,10 @@ zipalign -c -P 16 -v 4 .../app-release.apk
 - TalkBack 人工走查、未知 OEM 高对比键、E4 真机证据仍缺。
 - 论坛预取会额外消耗 1 页移动流量，可考虑做成设置开关。
 
+## 2026-10-24 17:45 HKT — 封面全板块提速 + 视频预加载（139）
+
+- 封面：`MediaImage`/`LiveCard` 的 ByteArray 请求补稳定 URL memoryCacheKey（同尺寸滚动复用解码位图）；Coil 显式 25%/64MB 内存 + 128MB 磁盘缓存；`CoverPrefetcher` 预热漫画 10 / 直播 8 / 搜索 8 / 相关推荐 6（4 并发、10 分钟去重、仅 Wi-Fi + 开关）。
+- 视频：首页成功后 1.5s 预热前 2 条详情页（60s 页缓存）；剧集就绪后 2s 预热下一集播放地址（2min 缓存）；设置「体验」新增「视频预加载」Switch（默认开、仅 Wi-Fi，关闭后 `Prefetch: detail skipped`）。
+- 实测：hero 点击后解析 **48ms**（基线 493–3180ms）；直播封面 8 张 **1.98s**；搜索 8 张 **2.08s**；漫画 10 张入队；相关推荐 6 张 4ms；Coil 磁盘缓存已写入（776KB）。
+- 验证：JVM **150/0/1**；设备全量 **32/32**；Lint **0 errors / 19 warnings / 3 hints**；Release **139**（SHA `2209ed23…`）安装并冷启动。
+- 并发 Netgrey 品牌工作仍未提交（res/、HomeScreen、docs/verification.md、.ai/PROJECT_STATE/TASKS），本轮未触碰、未纳入提交；HomeScreen 因此保持未改（首页字节预热在 AuroraViewModel）。

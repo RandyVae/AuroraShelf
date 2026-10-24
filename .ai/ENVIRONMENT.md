@@ -127,3 +127,13 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - Measurements (Release 138, same emulator): forum cold 4.98 s (was 5.83/6.55), warm snapshot 2.04 s, page-2 prefetch 953 ms; video detail-page GET 2→1 (single-flight log), resolve 3.18 s→0.49 s with network variance, tap→READY 7.1 s→4.2 s.
 - Release 138: SHA-256 7f9a9b0c19c46c85e96d4f2e533c876ed0375c1fddd04792e8697187b66f173c, installed and cold-started.
 - Parallel session: Netgrey branding/candidate (137-netgrey) is being built in a separate worktree; its edits (`res/`, `HomeScreen` title, `docs/verification.md` top section, `.ai/PROJECT_STATE.md`, `.ai/TASKS.md`) were preserved untouched and excluded from this round's commits.
+
+## 2026-10-24 139 verification (cover decode cache/preload + video preload)
+
+- Build: `testDebugUnitTest assembleDebug assembleDebugAndroidTest` PASS; `assembleRelease` PASS; `lintDebug` PASS (0 errors / 19 warnings / 3 hints).
+- JVM: 150 tests / 0 failures / 1 skipped.
+- Device full suite (missavtest, single idle device): 32/32 PASS.
+- Measurements (Release 139): home detail prefetch 2 URLs (834/498 ms); hero tap after prefetch `source resolved ms=48` (baseline 493–3180 ms); comics prefetch 10 (ms=0 enqueue); live 8 (1984 ms); search 8 (2081 ms); related 6 (ms=4); Coil disk cache `cache/image_cache` created (776 KB observed).
+- Release 139: SHA-256 2209ed231adef4896990f62334d05740d94b4dfa86495918376c811667c010c0, installed + cold started.
+- Preload switch verified: toggling off persists `video_preload_enabled=false` and suppresses prefetch (`Prefetch: detail skipped`).
+- Parallel Netgrey branding (uncommitted `res/`, `HomeScreen.kt`, `docs/verification.md`, `.ai/PROJECT_STATE.md`, `.ai/TASKS.md`) again preserved and excluded from this round's commit.

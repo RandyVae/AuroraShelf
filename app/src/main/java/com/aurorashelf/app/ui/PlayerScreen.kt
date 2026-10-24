@@ -155,7 +155,9 @@ import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.VideoItem
 import com.aurorashelf.app.data.SourceAddress
 import com.aurorashelf.app.data.PlaybackEpisode
+import com.aurorashelf.app.data.PREFETCH_LOG_TAG
 import com.aurorashelf.app.data.PlaybackResolver
+import com.aurorashelf.app.data.isPrefetchEnabled
 import com.aurorashelf.app.data.OfflineCacheManager
 import com.aurorashelf.app.data.OfflineCacheState
 import com.aurorashelf.app.data.OfflineVideo
@@ -165,8 +167,7 @@ import com.aurorashelf.app.ui.theme.AuroraCoral
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -206,6 +207,23 @@ internal fun PlayerScreen(
     val selectedEpisode = episodes.firstOrNull { it.pageUrl == playbackUrl }?.number ?: 1
     val selectedEpisodeLabel = episodes.firstOrNull { it.pageUrl == playbackUrl }?.label
     val cachedVideo = cachedVideos.firstOrNull { it.id == OfflineCacheManager.idFor(playbackUrl) }
+    val nextEpisode = episodes.firstOrNull { it.number > selectedEpisode }
+    // Warm the next episode once per selection: switching episodes changes the key and re-runs it.
+    LaunchedEffect(video.id, nextEpisode?.pageUrl) {
+        val next = nextEpisode ?: return@LaunchedEffect
+        val appContext = context.applicationContext
+        if (!isPrefetchEnabled(appContext)) return@LaunchedEffect
+        delay(NEXT_EPISODE_PREFETCH_DELAY_MS)
+        // Re-check after the delay: the network may have switched to mobile data meanwhile.
+        if (!isPrefetchEnabled(appContext)) return@LaunchedEffect
+        Log.i(PREFETCH_LOG_TAG, "next episode start")
+        PlaybackResolver().prefetchPlayback(next.pageUrl)
+        Log.i(PREFETCH_LOG_TAG, "next episode done")
+    }
+    // task-17 shared warm-up: dedupes, bounds parallelism and applies the same Wi-Fi policy.
+    LaunchedEffect(relatedVideos) {
+        CoverPrefetcher.prefetchVideos(context, relatedVideos, limit = RECOMMENDATION_COVER_PREFETCH_LIMIT)
+    }
     val haptic = LocalHapticFeedback.current
 
     val onCache = {
@@ -598,3 +616,9 @@ internal fun relatedVideos(current: VideoItem, videos: List<VideoItem>): List<Vi
     videos.distinctBy(VideoItem::id).filterNot { it.id == current.id }
 
 private const val TAG = "PlayerScreen"
+
+/** Wait for playback to settle before spending network on the next episode. */
+private const val NEXT_EPISODE_PREFETCH_DELAY_MS = 2_000L
+
+/** Recommendation covers warmed through the shared task-17 CoverPrefetcher. */
+private const val RECOMMENDATION_COVER_PREFETCH_LIMIT = 6

@@ -279,3 +279,18 @@ Decision:
 - Subtitle track selection now has a player overlay menu (48 dp, hidden when no text track); ExoPlayer calls `setOverrideForType`/`setTrackTypeDisabled`.
 
 Boundary: forum snapshot hides refresh failures behind stale content; forum prefetch costs one extra page of mobile data; unknown OEM high-contrast keys remain undetected.
+
+## Cover decoding cache and preload round 4
+
+Date: 2026-10-24
+
+Status: Implemented, measured on device; JVM 150/0/1, device suite 32/32, lint 0 errors.
+
+Decision:
+- `MediaImage`/`LiveCard` no longer hand a raw `ByteArray` to Coil. They build `ImageRequest.data(bytes).memoryCacheKey(url)` so scrolling back to the same layout size reuses the decoded bitmap instead of decoding again. The implicit Coil default disk cache was replaced with an explicit 128 MB disk cache in `cacheDir/image_cache` and a 25%-of-heap memory cache capped at 64 MB (Coil 3.3 defaults to a shared temp-dir cache and 15–20% memory).
+- `CoverPrefetcher` warms the first screen of every image-bearing section: comics 10, live 8, search 8, player recommendations 6 (home already had byte prefetch). Byte fetches are limited to 4 concurrent, decode is enqueued into Coil, and a 10-minute per-URL dedupe keeps tab switches from repeating work. All warm-ups go through the same user-facing preload switch and non-metered-network check.
+- Video preload: after the first home page loads, two detail pages are fetched into the 60 s page cache (1.5 s delay); once an episode list is ready, the next episode's playback URL is resolved into the 2 min playback cache (2 s delay). A new Settings switch ("视频预加载", default on, Wi-Fi only) controls both; disabling it logs `Prefetch: detail skipped` and performs no requests.
+
+Measured: hero tap resolve 493–3180 ms → 48 ms (page cache hit); live cover warm-up 8 covers in 1.98 s; search 8 in 2.08 s; comics 10 enqueued (ms=0, async decode); Coil disk cache observed at 776 KB after a short session.
+
+Boundary: preload costs Wi-Fi traffic; Coil `Precision.EXACT` means warm-up for other sizes may re-decode (same-size scroll reuse is the guaranteed gain); cached bitmaps are keyed by URL so a changed image may show stale until eviction.

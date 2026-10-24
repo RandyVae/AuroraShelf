@@ -227,6 +227,22 @@ class PlaybackResolverTest {
         assertEquals(6, loads)
     }
 
+    @Test fun pageFetchCacheReportsOnlyFreshEntries() {
+        var now = 1_000L
+        var loads = 0
+        val cache = PageFetchCache(ttlMs = 60_000L, maxEntries = 4, clock = { now })
+
+        assertFalse("nothing cached yet", cache.isFresh("https://example.com/page"))
+        cache.get("https://example.com/page") { loads += 1; Jsoup.parse("<p>1</p>") }
+        assertTrue("cached document is fresh inside the TTL", cache.isFresh("https://example.com/page"))
+        assertEquals(1, loads)
+        assertFalse(cache.isFresh("https://example.com/other"))
+
+        now += 60_000L
+        assertFalse("expired document is not fresh", cache.isFresh("https://example.com/page"))
+        assertEquals(1, loads)
+    }
+
     @Test fun pageFetchCacheUsesSharedPageCacheParameters() {
         assertEquals(60_000L, PlaybackResolver.PAGE_CACHE_TTL_MS)
         assertEquals(16, PlaybackResolver.PAGE_CACHE_MAX_ENTRIES)

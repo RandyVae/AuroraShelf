@@ -154,6 +154,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.aurorashelf.app.model.AppDestination
 import com.aurorashelf.app.model.ContentSource
 import com.aurorashelf.app.model.ContentSourceCatalog
@@ -279,6 +280,7 @@ internal fun VideoListRow(
 
 @Composable
 internal fun MediaImage(video: VideoItem, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     var attempt by remember(video.thumbnailUrl, video.pageUrl) { mutableIntStateOf(0) }
     var isLoading by remember(video.thumbnailUrl, video.pageUrl, attempt) { mutableStateOf(true) }
     val imageBytes by produceState<ByteArray?>(
@@ -292,13 +294,25 @@ internal fun MediaImage(video: VideoItem, modifier: Modifier = Modifier) {
         }
         isLoading = false
     }
+    // A ByteArray model has no stable cache key on its own; using the URL as the memory key lets
+    // Coil reuse the decoded bitmap when the row scrolls back instead of decoding it again.
+    // Empty payloads never produce a request, so they cannot reach the decoder.
+    val coverRequest = remember(imageBytes, video.thumbnailUrl, context) {
+        imageBytes?.takeIf { it.isNotEmpty() }?.let { bytes ->
+            val key = coverMemoryCacheKey(video.thumbnailUrl)
+            ImageRequest.Builder(context)
+                .data(bytes)
+                .apply { if (key != null) memoryCacheKey(key) }
+                .build()
+        }
+    }
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        if (imageBytes != null) {
+        if (coverRequest != null) {
             AsyncImage(
-                model = imageBytes,
+                model = coverRequest,
                 contentDescription = video.title,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

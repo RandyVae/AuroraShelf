@@ -198,6 +198,13 @@ internal fun SearchScreen(
             }
         }
     }
+    val prefetchContext = LocalContext.current
+    // task-17: warm the first screen of results (bytes + decode) after the list settles.
+    LaunchedEffect(matches) {
+        if (matches.isNotEmpty()) {
+            CoverPrefetcher.prefetchVideos(prefetchContext, matches, limit = SEARCH_COVER_PREFETCH_LIMIT)
+        }
+    }
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 36.dp),
@@ -261,3 +268,6 @@ internal fun SearchScreen(
         }
     }
 }
+
+/** First-screen search results warmed through the shared task-17 CoverPrefetcher. */
+private const val SEARCH_COVER_PREFETCH_LIMIT = 8

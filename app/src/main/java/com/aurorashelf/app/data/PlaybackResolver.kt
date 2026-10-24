@@ -9,6 +9,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
 import android.util.Log
 import com.aurorashelf.app.model.ContentSourceCatalog
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -70,6 +71,45 @@ class PlaybackResolver {
             }
 
         throw IOException("页面未提供可识别的视频地址，请重试或检查站点是否要求登录")
+    }
+
+    /**
+     * Warms only the shared 60 s detail-page cache for [pageUrl]. It does not parse a media URL and
+     * never requests media data, so a prefetch cannot start playback on its own. Best effort:
+     * every failure is swallowed (and only timed in logcat) because prefetching is optional.
+     */
+    suspend fun prefetchDetail(pageUrl: String) {
+        if (pageCache.isFresh(pageUrl)) {
+            Log.i(PREFETCH_LOG_TAG, "detail hit=true ms=0")
+            return
+        }
+        val startedAtMs = System.currentTimeMillis()
+        try {
+            withContext(Dispatchers.IO) { fetch(pageUrl) }
+            Log.i(PREFETCH_LOG_TAG, "detail hit=false ms=${System.currentTimeMillis() - startedAtMs}")
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            Log.i(PREFETCH_LOG_TAG, "detail failed ms=${System.currentTimeMillis() - startedAtMs}")
+        }
+    }
+
+    /**
+     * Resolves and caches the playable source of [pageUrl] ahead of time (used for the next
+     * episode) so the real tap hits the shared 2 min playback cache. Best effort: failures are
+     * only timed in logcat and never bubble into playback.
+     */
+    suspend fun prefetchPlayback(pageUrl: String) {
+        val startedAtMs = System.currentTimeMillis()
+        val alreadyCached = playbackCache.get(pageUrl) != null
+        try {
+            resolve(pageUrl)
+            Log.i(PREFETCH_LOG_TAG, "playback hit=$alreadyCached ms=${System.currentTimeMillis() - startedAtMs}")
+        } catch (failure: CancellationException) {
+            throw failure
+        } catch (_: Exception) {
+            Log.i(PREFETCH_LOG_TAG, "playback failed ms=${System.currentTimeMillis() - startedAtMs}")
+        }
     }
 
     /** Stores a successful resolution in the shared 10-minute cache (failures throw before this). */
@@ -359,6 +399,17 @@ internal class PageFetchCache(
                 iterator.next()
                 iterator.remove()
             }
+        }
+    }
+
+    /** True while a non-expired document is cached for [url]; never triggers a fetch. */
+    internal fun isFresh(url: String): Boolean = synchronized(lock) {
+        val entry = entries[url] ?: return@synchronized false
+        if (entry.expiresAtMs > clock()) {
+            true
+        } else {
+            entries.remove(url)
+            false
         }
     }
 

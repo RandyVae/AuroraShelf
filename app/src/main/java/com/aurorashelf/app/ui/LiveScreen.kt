@@ -91,6 +91,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
 import com.aurorashelf.app.data.StripchatLiveRepository
 import com.aurorashelf.app.model.LiveCategory
 import com.aurorashelf.app.model.LiveComment
@@ -148,6 +149,13 @@ private fun LiveFeed(
     // C3: with >=150% system font the artwork columns widen with the font scale (capped),
     // so the adaptive grid collapses to one column instead of clipping card text.
     val gridState = rememberLazyGridState()
+    val prefetchContext = LocalContext.current
+    // task-17: warm the first screen's previews (bytes + decode) without touching card layout.
+    LaunchedEffect(state.items) {
+        if (state.items.isNotEmpty()) {
+            CoverPrefetcher.prefetchLive(prefetchContext, state.items, limit = LIVE_COVER_PREFETCH_LIMIT)
+        }
+    }
     LaunchedEffect(gridState, state.items.size, state.canLoadMore) {
         snapshotFlow {
             val layout = gridState.layoutInfo
@@ -249,9 +257,19 @@ private fun LiveHeader(onRefresh: () -> Unit) {
 @Composable
 private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
     val flag = countryFlag(item.countryCode)
+    val context = LocalContext.current
     val previewBytes by produceState<ByteArray?>(initialValue = null, key1 = item.thumbnailUrl) {
         value = withContext(Dispatchers.IO) {
             CoverImageLoader.load(item.thumbnailUrl, "${StripchatLiveRepository.SITE_BASE}/")
+        }
+    }
+    // URL-keyed memory cache so scrolling back does not decode the same ByteArray again.
+    val previewRequest = remember(previewBytes, item.thumbnailUrl, context) {
+        previewBytes?.takeIf { it.isNotEmpty() }?.let { bytes ->
+            ImageRequest.Builder(context)
+                .data(bytes)
+                .memoryCacheKey(coverMemoryCacheKey(item.thumbnailUrl))
+                .build()
         }
     }
     Surface(
@@ -268,7 +286,7 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
         Column {
             Box {
                 AsyncImage(
-                    model = previewBytes,
+                    model = previewRequest,
                     contentDescription = "${item.username} 直播预览",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f),
@@ -791,6 +809,7 @@ private fun countryFlag(code: String): String {
 }.joinToString("") + " "
 }
 
+private const val LIVE_COVER_PREFETCH_LIMIT = 8
 private const val PLAYER_DISCOVERY_ATTEMPTS = 40
 private const val PLAYER_DISCOVERY_INTERVAL_MS = 500L
 private const val COMMENTS_REFRESH_INTERVAL_MS = 1_500L

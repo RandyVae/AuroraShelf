@@ -19,6 +19,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -98,6 +99,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -152,6 +154,7 @@ import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.ComicSourceInfo
 import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.VideoItem
+import com.aurorashelf.app.data.AppPreferences
 import com.aurorashelf.app.data.SourceAddress
 import com.aurorashelf.app.data.PlaybackEpisode
 import com.aurorashelf.app.data.PlaybackResolver
@@ -406,6 +409,8 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
     val cachedVideos by cacheManager.entries.collectAsStateWithLifecycle()
+    val preferences = remember(context) { AppPreferences(context) }
+    var videoPreloadEnabled by remember { mutableStateOf(preferences.videoPreloadEnabled) }
     var sourceUrl by remember(currentUrl) { mutableStateOf(currentUrl) }
     var showClearConfirmation by remember { mutableStateOf(false) }
     var route by rememberSaveable { mutableStateOf(SettingsRoute.OVERVIEW) }
@@ -452,6 +457,11 @@ private fun SettingsScreen(
                     selectedComicSource = comicSources.find { it.id == selectedComicSourceId },
                     completedCount = completedCount,
                     downloadedBytes = downloadedBytes,
+                    videoPreloadEnabled = videoPreloadEnabled,
+                    onVideoPreloadChange = { enabled ->
+                        videoPreloadEnabled = enabled
+                        preferences.videoPreloadEnabled = enabled
+                    },
                     onBack = onBack,
                     onVideoSources = { route = SettingsRoute.VIDEO_SOURCES },
                     onComicSources = { route = SettingsRoute.COMIC_SOURCES },
@@ -493,6 +503,8 @@ private fun SettingsOverview(
     selectedComicSource: ComicSourceInfo?,
     completedCount: Int,
     downloadedBytes: Long,
+    videoPreloadEnabled: Boolean,
+    onVideoPreloadChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onVideoSources: () -> Unit,
     onComicSources: () -> Unit,
@@ -563,6 +575,47 @@ private fun SettingsOverview(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
+                }
+            }
+        }
+        item {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .toggleable(
+                            value = videoPreloadEnabled,
+                            role = Role.Switch,
+                            onValueChange = onVideoPreloadChange,
+                        )
+                        .padding(horizontal = 18.dp, vertical = 14.dp)
+                        .testTag("settings-video-preload"),
+                ) {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("视频预加载", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "仅 Wi-Fi 下预取首页视频详情与下一集地址",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    // The enclosing row owns the toggle semantics; the switch only reflects state.
+                    Switch(checked = videoPreloadEnabled, onCheckedChange = null)
                 }
             }
         }

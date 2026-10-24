@@ -193,6 +193,13 @@ private fun ComicLibrary(
 ) {
     val gridState = rememberLazyGridState()
     val fontScale = LocalDensity.current.fontScale
+    val prefetchContext = LocalContext.current
+    // task-17: warm the first screen's comic covers with the same requests the grid uses.
+    LaunchedEffect(state.comics) {
+        if (state.comics.isNotEmpty()) {
+            CoverPrefetcher.prefetchComicCovers(prefetchContext, state.comics, limit = COMIC_COVER_PREFETCH_LIMIT)
+        }
+    }
     val selectedSource = state.sources.find { it.id == state.selectedSourceId }
     // snapshotFlow keeps firing when the next page grows the list, unlike a derivedStateOf
     // boolean that can stay latched at true and never request the following page.
@@ -737,25 +744,9 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
 @Composable
 private fun ComicCoverImage(comic: ComicSummary, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    // Shared with CoverPrefetcher so warm-up and the visible list use identical data/cache keys.
     val request = remember(comic.coverUrl, comic.coverReferer, comic.sourceId, context) {
-        comic.coverUrl?.let { url ->
-            ImageRequest.Builder(context)
-                .data(url)
-                .memoryCacheKey(url)
-                .diskCacheKey(url)
-                .apply {
-                    comic.coverReferer?.let { referer ->
-                        httpHeaders(
-                            NetworkHeaders.Builder()
-                                .set("Referer", referer)
-                                .set("User-Agent", VideoRepository.USER_AGENT)
-                                .apply { if (comic.sourceId == "ehentai") set("Cookie", "nw=1") }
-                                .build(),
-                        )
-                    }
-                }
-                .build()
-        }
+        comicCoverRequest(context, comic)
     }
     if (request == null) {
         ComicCoverPlaceholder()
@@ -808,3 +799,6 @@ private fun ComicCoverPlaceholder() {
         )
     }
 }
+
+/** First-screen comic covers warmed through the shared task-17 CoverPrefetcher. */
+private const val COMIC_COVER_PREFETCH_LIMIT = 10

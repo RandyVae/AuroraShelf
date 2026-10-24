@@ -1,9 +1,13 @@
 package com.aurorashelf.app.ui
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aurorashelf.app.data.AppPreferences
+import com.aurorashelf.app.data.PREFETCH_LOG_TAG
+import com.aurorashelf.app.data.PlaybackResolver
+import com.aurorashelf.app.data.isPrefetchEnabled
 import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.data.SourceAddress
 import com.aurorashelf.app.model.AppDestination
@@ -17,7 +21,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.CancellationException
+import java.util.concurrent.ConcurrentHashMap
 
 data class AuroraUiState(
     val destination: AppDestination = AppDestination.HOME,
@@ -89,6 +95,39 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         if (targets.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             targets.forEach { (url, referer) -> CoverImageLoader.load(url, referer) }
+        }
+    }
+
+    /**
+     * Warms the detail pages of the first two feed items shortly after the first page lands, so a
+     * tap has a hot 60 s page cache. Honours the prefetch setting and the metered-network policy,
+     * runs off the main thread, and never repeats the same page within the cache window.
+     */
+    private fun prefetchDetails(videos: List<VideoItem>) {
+        val targets = videos.asSequence()
+            .map(VideoItem::pageUrl)
+            .filter(String::isNotBlank)
+            .distinct()
+            .take(DETAIL_PREFETCH_COUNT)
+            .toList()
+        if (targets.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            delay(DETAIL_PREFETCH_DELAY_MS)
+            val appContext = getApplication<Application>()
+            if (!isPrefetchEnabled(appContext)) {
+                Log.i(PREFETCH_LOG_TAG, "detail skipped")
+                return@launch
+            }
+            val now = System.currentTimeMillis()
+            val freshTargets = targets.filter { pageUrl ->
+                now - (recentDetailPrefetches[pageUrl] ?: 0L) > DETAIL_PREFETCH_DEDUPE_MS
+            }
+            if (freshTargets.isEmpty()) return@launch
+            freshTargets.forEach { pageUrl -> recentDetailPrefetches[pageUrl] = now }
+            Log.i(PREFETCH_LOG_TAG, "detail start count=${freshTargets.size}")
+            val resolver = PlaybackResolver()
+            freshTargets.forEach { pageUrl -> resolver.prefetchDetail(pageUrl) }
+            Log.i(PREFETCH_LOG_TAG, "detail done count=${freshTargets.size}")
         }
     }
 
@@ -225,6 +264,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                     nextPage = 2
                     preferences.saveFeedCache(snapshot.sourceUrl, snapshot.category.path, videos)
                     prefetchCovers(videos)
+                    prefetchDetails(videos)
                     _uiState.update {
                         it.copy(
                             videos = videos,
@@ -290,6 +330,18 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
 
         /** How many above-the-fold covers to warm before the first layout pass. */
         private const val COVER_PREFETCH_LIMIT = 8
+
+        /** How many leading feed items get a detail-page warm-up after the first page loads. */
+        private const val DETAIL_PREFETCH_COUNT = 2
+
+        /** Let the first frame and cover work finish before spending network on prefetch. */
+        private const val DETAIL_PREFETCH_DELAY_MS = 1_500L
+
+        /** One detail prefetch per page per cache window keeps repeated refreshes cheap. */
+        private const val DETAIL_PREFETCH_DEDUPE_MS = 60_000L
+
+        /** Process-wide de-duplication for detail-page prefetches triggered by feed refreshes. */
+        private val recentDetailPrefetches = ConcurrentHashMap<String, Long>()
 
         /** Local search only: network results are already matched by the site search endpoint. */
         internal fun localSearchMatches(query: String, videos: List<VideoItem>): List<VideoItem> =

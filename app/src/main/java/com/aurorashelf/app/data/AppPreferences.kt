@@ -84,6 +84,11 @@ class AppPreferences(context: Context) {
             putString(KEY_COMIC_SOURCE_ID, value.takeIf(String::isNotBlank) ?: DEFAULT_COMIC_SOURCE_ID)
         }
 
+    /** Whether the player may warm detail pages / the next episode address on unmetered networks. */
+    var videoPreloadEnabled: Boolean
+        get() = preferences.getBoolean(KEY_VIDEO_PRELOAD_ENABLED, true)
+        set(value) = preferences.edit { putBoolean(KEY_VIDEO_PRELOAD_ENABLED, value) }
+
     fun favoriteIds(): Set<String> =
         preferences.getStringSet(KEY_FAVORITES, emptySet()).orEmpty().filterNot { it.startsWith("demo-") }.toSet()
 
@@ -120,6 +125,7 @@ class AppPreferences(context: Context) {
         private const val KEY_HISTORY = "history_ids"
         private const val KEY_FEED_CACHE = "feed_cache"
         private const val KEY_FORUM_CACHE = "forum_cache"
+        private const val KEY_VIDEO_PRELOAD_ENABLED = "video_preload_enabled"
         private const val MAX_HISTORY = 50
         internal const val MAX_FEED_CACHE_ITEMS = 30
         internal const val MAX_FORUM_CACHE_ITEMS = 40
