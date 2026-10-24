@@ -1,6 +1,12 @@
 package com.aurorashelf.app.data
 
+import java.io.IOException
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Document
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -122,5 +128,122 @@ class PlaybackResolverTest {
         assertEquals(episodes, cache.get("page"))
         assertNull(cache.get("other"))
         assertEquals(PlaybackResolver.CACHE_TTL_MS, 10 * 60 * 1000L)
+    }
+
+    @Test fun pageFetchCacheReusesDocumentWithinTtlAndExpiresAfterward() {
+        var now = 1_000L
+        var loads = 0
+        val cache = PageFetchCache(ttlMs = 60_000L, maxEntries = 4, clock = { now })
+        val load: () -> Document = {
+            loads += 1
+            Jsoup.parse("<p>load-$loads</p>", "https://example.com/page")
+        }
+
+        val first = cache.get("https://example.com/page") { load() }
+        val second = cache.get("https://example.com/page") { load() }
+        assertSame("same URL within TTL must share the document", first, second)
+        assertEquals(1, loads)
+
+        now += 59_999L
+        assertSame(first, cache.get("https://example.com/page") { load() })
+        assertEquals(1, loads)
+
+        now += 2L
+        assertNotSame(first, cache.get("https://example.com/page") { load() })
+        assertEquals(2, loads)
+        assertEquals(1, cache.size())
+    }
+
+    @Test fun pageFetchCacheDoesNotCacheFailures() {
+        val cache = PageFetchCache(ttlMs = 60_000L, maxEntries = 4, clock = { 0L })
+        var loads = 0
+        val failure = IOException("network down")
+
+        val thrown = assertThrows(IOException::class.java) {
+            cache.get("https://example.com/page") {
+                loads += 1
+                throw failure
+            }
+        }
+        assertSame("cached load must surface the original failure", failure, thrown)
+        assertEquals(1, loads)
+        assertEquals("failed loads must not be cached", 0, cache.size())
+
+        val recovered = cache.get("https://example.com/page") {
+            loads += 1
+            Jsoup.parse("<p>ok</p>")
+        }
+        assertEquals("next caller must retry instead of reusing a failure", 2, loads)
+        assertEquals(1, cache.size())
+        assertEquals("ok", recovered.select("p").text())
+    }
+
+    @Test fun pageFetchCacheCoalescesConcurrentLoadsForSameUrl() {
+        val cache = PageFetchCache(ttlMs = 60_000L, maxEntries = 4, clock = { 0L })
+        val loadStarted = CountDownLatch(1)
+        val releaseLoad = CountDownLatch(1)
+        val loadCount = AtomicInteger(0)
+        val documents = Collections.synchronizedList(mutableListOf<Document>())
+
+        val workers = (1..2).map {
+            Thread {
+                documents += cache.get("https://example.com/slow") {
+                    loadCount.incrementAndGet()
+                    loadStarted.countDown()
+                    releaseLoad.await(5, TimeUnit.SECONDS)
+                    Jsoup.parse("<p>shared</p>")
+                }
+            }
+        }
+        workers.forEach { it.start() }
+        assertTrue("loader must start", loadStarted.await(5, TimeUnit.SECONDS))
+        // Let the second caller join the in-flight fetch before it completes.
+        Thread.sleep(100L)
+        releaseLoad.countDown()
+        workers.forEach { it.join(5_000L) }
+
+        assertEquals("only one fetch may run for a concurrent miss", 1, loadCount.get())
+        assertEquals(2, documents.size)
+        assertSame("both callers must receive the same document", documents[0], documents[1])
+    }
+
+    @Test fun pageFetchCacheEvictsLeastRecentlyUsedEntries() {
+        val cache = PageFetchCache(ttlMs = 60_000L, maxEntries = 2, clock = { 0L })
+        var loads = 0
+        fun load(key: String): Document {
+            loads += 1
+            return Jsoup.parse("<p>$key</p>")
+        }
+
+        cache.get("a") { load("a") }
+        cache.get("b") { load("b") }
+        cache.get("a") { load("a") } // touch A so B becomes least recently used
+        cache.get("c") { load("c") }
+        assertEquals(2, cache.size())
+
+        cache.get("b") { load("b") } // B was evicted and must be reloaded (evicts A)
+        cache.get("a") { load("a") } // A was evicted by B's insert and must be reloaded
+        cache.get("c") { load("c") } // C was evicted by A's insert and must be reloaded
+        assertEquals(6, loads)
+    }
+
+    @Test fun pageFetchCacheUsesSharedPageCacheParameters() {
+        assertEquals(60_000L, PlaybackResolver.PAGE_CACHE_TTL_MS)
+        assertEquals(16, PlaybackResolver.PAGE_CACHE_MAX_ENTRIES)
+
+        var now = 0L
+        val cache = PageFetchCache(
+            ttlMs = PlaybackResolver.PAGE_CACHE_TTL_MS,
+            maxEntries = PlaybackResolver.PAGE_CACHE_MAX_ENTRIES,
+            clock = { now },
+        )
+        var loads = 0
+        cache.get("page") { loads += 1; Jsoup.parse("<p>1</p>") }
+        now += PlaybackResolver.PAGE_CACHE_TTL_MS - 1
+        cache.get("page") { loads += 1; Jsoup.parse("<p>2</p>") }
+        assertEquals(1, loads)
+        now += 1
+        cache.get("page") { loads += 1; Jsoup.parse("<p>3</p>") }
+        assertEquals(2, loads)
     }
 }

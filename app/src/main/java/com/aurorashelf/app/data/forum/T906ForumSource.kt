@@ -1,6 +1,5 @@
 package com.aurorashelf.app.data.forum
 
-import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.model.ForumPost
 import java.io.IOException
 import java.time.LocalDateTime
@@ -8,7 +7,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 
 internal class T906ForumSource : ForumSource {
@@ -18,12 +16,7 @@ internal class T906ForumSource : ForumSource {
     override suspend fun load(page: Int): List<ForumPost> = withContext(Dispatchers.IO) {
         require(page >= 1) { "页码必须从 1 开始" }
         val url = "$BASE_URL/forumdisplay.php?fid=33&page=$page"
-        val document = Jsoup.connect(url)
-            .userAgent(VideoRepository.USER_AGENT)
-            .header("Accept-Language", "zh-CN,zh;q=0.9")
-            .timeout(25_000)
-            .followRedirects(true)
-            .get()
+        val document = ForumHttp.fetchDocument(url)
         val posts = parse(document)
         if (page == 1 && posts.isEmpty()) throw IOException("91自拍论坛页面已打开，但没有识别到帖子")
         posts
@@ -62,7 +55,7 @@ internal class T906ForumSource : ForumSource {
             .toEpochSecond()
     }.getOrDefault(0L)
 
-    private companion object {
-        const val BASE_URL = "https://t906.abc2507.cc"
+    internal companion object {
+        internal const val BASE_URL = "https://t906.abc2507.cc"
     }
 }

@@ -3,6 +3,7 @@ package com.aurorashelf.app.data
 import android.content.Context
 import androidx.core.content.edit
 import com.aurorashelf.app.model.ContentSourceCatalog
+import com.aurorashelf.app.model.ForumPost
 import com.aurorashelf.app.model.VideoItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -26,6 +27,25 @@ class AppPreferences(context: Context) {
             savedAtMillis = System.currentTimeMillis(),
         )
         preferences.edit { putString(KEY_FEED_CACHE, encodeFeedCache(feed)) }
+    }
+
+    /** Forum first-page snapshot for instant first paint; ignored when older than 12 h. */
+    fun cachedForumFirstPage(): CachedForum? = runCatching {
+        decodeForumCache(preferences.getString(KEY_FORUM_CACHE, "").orEmpty())
+    }.getOrNull()?.takeIf { isForumCacheFresh(it.savedAtMillis) }
+
+    /**
+     * Persist the last successfully loaded first forum page. The next visit paints it immediately
+     * and then refreshes from the network; a failed refresh keeps the snapshot on screen.
+     */
+    fun saveForumFirstPage(posts: List<ForumPost>) {
+        val retained = posts
+            .filter { it.sourceId.isNotBlank() && it.id.isNotBlank() }
+            .distinctBy { it.sourceId to it.id }
+            .take(MAX_FORUM_CACHE_ITEMS)
+        if (retained.isEmpty()) return
+        val cache = CachedForum(posts = retained, savedAtMillis = System.currentTimeMillis())
+        preferences.edit { putString(KEY_FORUM_CACHE, encodeForumCache(cache)) }
     }
 
     fun savedVideos(): List<VideoItem> = runCatching {
@@ -99,8 +119,11 @@ class AppPreferences(context: Context) {
         private const val KEY_FAVORITES = "favorite_ids"
         private const val KEY_HISTORY = "history_ids"
         private const val KEY_FEED_CACHE = "feed_cache"
+        private const val KEY_FORUM_CACHE = "forum_cache"
         private const val MAX_HISTORY = 50
         internal const val MAX_FEED_CACHE_ITEMS = 30
+        internal const val MAX_FORUM_CACHE_ITEMS = 40
+        internal const val FORUM_CACHE_TTL_MS = 12 * 60 * 60 * 1000L
 
         fun normalizeBaseUrl(value: String): String = value.trim().trimEnd('/')
     }
@@ -116,6 +139,18 @@ data class CachedFeed(
     val videos: List<VideoItem>,
     val savedAtMillis: Long,
 )
+
+/** Last successfully loaded first forum page (both sources merged), used for instant first paint. */
+data class CachedForum(
+    val posts: List<ForumPost>,
+    val savedAtMillis: Long,
+)
+
+/** True while [savedAtMillis] is a positive timestamp no older than the 12 h forum cache TTL. */
+internal fun isForumCacheFresh(
+    savedAtMillis: Long,
+    nowMillis: Long = System.currentTimeMillis(),
+): Boolean = savedAtMillis > 0 && nowMillis - savedAtMillis in 0L..AppPreferences.FORUM_CACHE_TTL_MS
 
 internal fun encodeFeedCache(feed: CachedFeed): String = JSONObject().apply {
     put("version", 1)
@@ -169,6 +204,62 @@ internal fun decodeFeedCache(json: String): CachedFeed? = runCatching {
         savedAtMillis = payload.optLong("savedAt", 0L),
     )
 }.getOrNull()
+
+internal fun encodeForumCache(cache: CachedForum): String = JSONObject().apply {
+    put("version", 1)
+    put("savedAt", cache.savedAtMillis)
+    put(
+        "posts",
+        JSONArray().apply {
+            cache.posts.forEach { post ->
+                put(JSONObject().apply {
+                    put("sourceId", post.sourceId); put("sourceName", post.sourceName)
+                    put("id", post.id); put("title", post.title); put("author", post.author)
+                    put("replyCount", post.replyCount); put("updatedLabel", post.updatedLabel)
+                    put("updatedEpochSeconds", post.updatedEpochSeconds); put("url", post.url)
+                })
+            }
+        },
+    )
+}.toString()
+
+/**
+ * Decodes a cached forum first page defensively: records missing required fields or with an
+ * unusable URL are skipped, duplicates are dropped, and invalid payloads return null.
+ */
+internal fun decodeForumCache(json: String): CachedForum? = runCatching {
+    if (json.isBlank()) return null
+    val payload = JSONObject(json)
+    val array = payload.optJSONArray("posts") ?: return null
+    val posts = (0 until array.length()).mapNotNull { index ->
+        runCatching { decodeForumPost(array.getJSONObject(index)) }.getOrNull()
+    }
+        .filter { SourceAddress.resolve(it.url, it.url) != null }
+        .distinctBy { it.sourceId to it.id }
+        .take(AppPreferences.MAX_FORUM_CACHE_ITEMS)
+    if (posts.isEmpty()) return null
+    CachedForum(posts = posts, savedAtMillis = payload.optLong("savedAt", 0L))
+}.getOrNull()
+
+/** One forum post record; returns null instead of throwing when required fields are unusable. */
+private fun decodeForumPost(item: JSONObject): ForumPost? {
+    val sourceId = item.optString("sourceId").takeIf(String::isNotBlank) ?: return null
+    val id = item.optString("id").takeIf(String::isNotBlank) ?: return null
+    val title = item.optString("title").takeIf(String::isNotBlank) ?: return null
+    val url = item.optString("url")
+    if (url.isBlank()) return null
+    return ForumPost(
+        sourceId = sourceId,
+        sourceName = item.optString("sourceName").ifBlank { sourceId },
+        id = id,
+        title = title,
+        author = item.optString("author"),
+        replyCount = item.optInt("replyCount"),
+        updatedLabel = item.optString("updatedLabel"),
+        updatedEpochSeconds = item.optLong("updatedEpochSeconds"),
+        url = url,
+    )
+}
 
 /**
  * Decodes the saved-video JSON blob one entry at a time, so a single corrupt record is

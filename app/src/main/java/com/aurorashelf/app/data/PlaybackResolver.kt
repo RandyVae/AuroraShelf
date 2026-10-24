@@ -5,6 +5,8 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.LinkedHashMap
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.FutureTask
 import android.util.Log
 import com.aurorashelf.app.model.ContentSourceCatalog
 import kotlinx.coroutines.Dispatchers
@@ -18,24 +20,33 @@ data class PlaybackEpisode(val number: Int, val label: String, val pageUrl: Stri
 /** Reads the media source published inside the page's video element. Never executes remote scripts. */
 class PlaybackResolver {
     suspend fun resolveEpisodes(detailUrl: String): List<PlaybackEpisode> = withContext(Dispatchers.IO) {
+        val startedAtMs = System.currentTimeMillis()
         require(SourceAddress.resolve(detailUrl, detailUrl) != null) { "视频页面地址无效" }
         val cached = episodeCache.get(detailUrl)
-        if (cached != null) return@withContext cached
-        val episodes = parseEpisodes(fetch(detailUrl), detailUrl)
-        // Failures (empty lists) stay uncached so a transient page error is retried next time.
-        if (episodes.isNotEmpty()) episodeCache.put(detailUrl, episodes)
+        val episodes = cached ?: parseEpisodes(fetch(detailUrl), detailUrl).also { parsed ->
+            // Failures (empty lists) stay uncached so a transient page error is retried next time.
+            if (parsed.isNotEmpty()) episodeCache.put(detailUrl, parsed)
+        }
+        Log.i(
+            TAG,
+            "timing episodes ms=${System.currentTimeMillis() - startedAtMs} count=${episodes.size} cache=${cached != null}",
+        )
         episodes
     }
 
     suspend fun resolve(pageUrl: String): PlaybackSource = withContext(Dispatchers.IO) {
         Log.i(TAG, "resolve start host=${runCatching { java.net.URI(pageUrl).host }.getOrNull()}")
+        val startedAtMs = System.currentTimeMillis()
         require(SourceAddress.resolve(pageUrl, pageUrl) != null) { "视频页面地址无效" }
         val cached = playbackCache.get(pageUrl)
-        if (cached != null) return@withContext cached
+        if (cached != null) {
+            Log.i(TAG, "timing resolve ms=${System.currentTimeMillis() - startedAtMs} cache=hit")
+            return@withContext cached
+        }
         if (PipePipeBridge.supports(pageUrl)) {
             runCatching { PipePipeBridge.resolve(pageUrl) }.onSuccess { source ->
                 Log.i(TAG, "resolve PipePipe source host=${runCatching { URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
-                return@withContext source.rememberFor(pageUrl)
+                return@withContext source.rememberFor(pageUrl, startedAtMs)
             }.onFailure { error ->
                 if (!ContentSourceCatalog.isMissAv(pageUrl)) throw error
                 Log.w(TAG, "PipePipe resolver failed; using the compatible MissAV page parser", error)
@@ -44,7 +55,7 @@ class PlaybackResolver {
         val page = fetch(pageUrl)
         parse(page)?.let {
             Log.i(TAG, "resolve direct source host=${runCatching { java.net.URI(it.url).host }.getOrNull()} type=${mediaType(it.url)}")
-            return@withContext it.rememberFor(pageUrl)
+            return@withContext it.rememberFor(pageUrl, startedAtMs)
         }
 
         // 黄果详情页将播放按钮指向 /video/...，媒体地址只在该播放页的数据节点中发布。
@@ -55,15 +66,16 @@ class PlaybackResolver {
             .firstNotNullOfOrNull { playbackUrl -> parse(fetch(playbackUrl))?.let { it to playbackUrl } }
             ?.let { (source, playbackUrl) ->
                 Log.i(TAG, "resolve linked source host=${runCatching { java.net.URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
-                return@withContext source.copy(referer = playbackUrl).rememberFor(pageUrl)
+                return@withContext source.copy(referer = playbackUrl).rememberFor(pageUrl, startedAtMs)
             }
 
         throw IOException("页面未提供可识别的视频地址，请重试或检查站点是否要求登录")
     }
 
     /** Stores a successful resolution in the shared 10-minute cache (failures throw before this). */
-    private fun PlaybackSource.rememberFor(pageUrl: String): PlaybackSource = also {
+    private fun PlaybackSource.rememberFor(pageUrl: String, startedAtMs: Long): PlaybackSource = also {
         playbackCache.put(pageUrl, it)
+        Log.i(TAG, "timing resolve ms=${System.currentTimeMillis() - startedAtMs} cache=miss")
     }
 
     private fun mediaType(url: String): String = when {
@@ -189,18 +201,35 @@ class PlaybackResolver {
             .toList()
     }
 
-    private fun fetch(url: String): Document = Jsoup.connect(url)
-        .userAgent(VideoRepository.USER_AGENT)
-        .timeout(20_000)
-        .followRedirects(true)
-        .get()
+    private fun fetch(url: String): Document {
+        val startedAtMs = System.currentTimeMillis()
+        var fetched = false
+        val document = pageCache.get(url) {
+            fetched = true
+            Jsoup.connect(url)
+                .userAgent(VideoRepository.USER_AGENT)
+                .timeout(20_000)
+                .followRedirects(true)
+                .get()
+        }
+        Log.i(
+            TAG,
+            "timing page fetch ms=${System.currentTimeMillis() - startedAtMs} host=${runCatching { URI(url).host }.getOrNull()} fetched=$fetched",
+        )
+        return document
+    }
 
     companion object {
         private const val TAG = "PlaybackResolver"
         internal const val CACHE_TTL_MS = 10 * 60 * 1000L
         internal const val CACHE_MAX_ENTRIES = 64
+        internal const val PAGE_CACHE_TTL_MS = 60 * 1000L
+        internal const val PAGE_CACHE_MAX_ENTRIES = 16
         // Media URLs can carry short-lived signatures; refresh them more eagerly than episode lists.
         private const val PLAYBACK_CACHE_TTL_MS = 2 * 60 * 1000L
+        // Detail-page documents are shared by resolve() and resolveEpisodes() across resolver
+        // instances, so one video open fetches the HTML at most once instead of twice.
+        private val pageCache = PageFetchCache(PAGE_CACHE_TTL_MS, PAGE_CACHE_MAX_ENTRIES)
         private val playbackCache = CachedValue<PlaybackSource>(PLAYBACK_CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val episodeCache = CachedValue<List<PlaybackEpisode>>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val ENCODED_SOURCE = Regex("""strencode2\(\s*["']([^"']+)["']\s*\)""")
@@ -264,6 +293,73 @@ internal class CachedValue<V>(
 
     fun clear() = synchronized(lock) {
         entries.clear()
+    }
+
+    internal fun size(): Int = synchronized(lock) { entries.size }
+}
+
+/**
+ * Short-lived, thread-safe cache for detail-page documents shared by
+ * [PlaybackResolver.resolve] and [PlaybackResolver.resolveEpisodes].
+ *
+ * Concurrent misses for the same URL are coalesced into a single fetch (single-flight), and only
+ * successful documents are cached; a failed load is always retried by the next caller. The class
+ * has no Android dependencies and an injectable clock so it can be unit tested on the JVM.
+ */
+internal class PageFetchCache(
+    private val ttlMs: Long,
+    private val maxEntries: Int,
+    private val clock: () -> Long = System::currentTimeMillis,
+) {
+    private data class Entry(val document: Document, val expiresAtMs: Long)
+
+    private val lock = Any()
+    private val entries = LinkedHashMap<String, Entry>(16, 0.75f, true)
+    private val inFlight = HashMap<String, FutureTask<Document>>()
+
+    fun get(url: String, load: () -> Document): Document {
+        var ownsLoad = false
+        val task: FutureTask<Document>
+        synchronized(lock) {
+            val entry = entries[url]
+            if (entry != null) {
+                if (entry.expiresAtMs > clock()) return entry.document
+                entries.remove(url)
+            }
+            val pending = inFlight[url]
+            if (pending != null) {
+                task = pending
+            } else {
+                val created = FutureTask(load)
+                inFlight[url] = created
+                task = created
+                ownsLoad = true
+            }
+        }
+        if (ownsLoad) task.run()
+        return try {
+            val document = task.get()
+            if (ownsLoad) store(url, document)
+            document
+        } catch (failure: ExecutionException) {
+            throw failure.cause ?: failure
+        } catch (interrupted: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw IOException("页面加载被中断", interrupted)
+        } finally {
+            if (ownsLoad) synchronized(lock) { inFlight.remove(url) }
+        }
+    }
+
+    private fun store(url: String, document: Document) {
+        synchronized(lock) {
+            entries[url] = Entry(document, clock() + ttlMs)
+            val iterator = entries.entries.iterator()
+            while (entries.size > maxEntries && iterator.hasNext()) {
+                iterator.next()
+                iterator.remove()
+            }
+        }
     }
 
     internal fun size(): Int = synchronized(lock) { entries.size }

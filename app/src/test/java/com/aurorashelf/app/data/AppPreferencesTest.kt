@@ -1,9 +1,11 @@
 package com.aurorashelf.app.data
 
+import com.aurorashelf.app.model.ForumPost
 import com.aurorashelf.app.model.VideoItem
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -159,5 +161,98 @@ class AppPreferencesTest {
         put("views", "10")
         put("pageUrl", pageUrl)
         put("thumbnailUrl", "")
+    }
+
+    @Test
+    fun forumCacheRoundTripsPostsAndSavedAt() {
+        val cache = CachedForum(
+            posts = listOf(forumPost("t66y", "1", 100), forumPost("t906", "2", 200)),
+            savedAtMillis = 1_700_000_000_000L,
+        )
+
+        val decoded = requireNotNull(decodeForumCache(encodeForumCache(cache)))
+
+        assertEquals(1_700_000_000_000L, decoded.savedAtMillis)
+        assertEquals(cache.posts, decoded.posts)
+    }
+
+    @Test
+    fun forumCacheDropsBrokenRecordsAndKeepsValidOnes() {
+        val payload = JSONObject()
+            .put("savedAt", 42L)
+            .put(
+                "posts",
+                JSONArray()
+                    .put(forumRecord("ok-1", "https://t66y.com/read.php?tid=1"))
+                    .put("not-an-object")
+                    .put(JSONObject.NULL)
+                    .put(JSONObject().put("sourceId", "x").put("id", "missing-title").put("url", "https://example.com/x"))
+                    .put(forumRecord("ok-2", "https://t906.abc2507.cc/viewthread.php?tid=2"))
+                    .put(forumRecord("bad-url", "not a url"))
+                    .put(forumRecord("ok-1", "https://t66y.com/read.php?tid=1")),
+            )
+
+        val decoded = requireNotNull(decodeForumCache(payload.toString()))
+
+        assertEquals(listOf("ok-1", "ok-2"), decoded.posts.map(ForumPost::id))
+        assertEquals(42L, decoded.savedAtMillis)
+    }
+
+    @Test
+    fun forumCacheRejectsInvalidPayloads() {
+        assertNull(decodeForumCache(""))
+        assertNull(decodeForumCache("not json"))
+        assertNull(decodeForumCache(JSONObject().put("savedAt", 1L).toString()))
+        assertNull(decodeForumCache(JSONObject().put("posts", JSONArray()).toString()))
+        assertNull(
+            decodeForumCache(
+                JSONObject().put("posts", JSONArray().put(forumRecord("bad", "not a url"))).toString(),
+            ),
+        )
+    }
+
+    @Test
+    fun forumCacheCapsStoredPostsAtForty() {
+        val posts = (1..AppPreferences.MAX_FORUM_CACHE_ITEMS + 10)
+            .map { forumPost("t66y", "post-$it", it.toLong()) }
+
+        val decoded = requireNotNull(decodeForumCache(encodeForumCache(CachedForum(posts, 1L))))
+
+        assertEquals(AppPreferences.MAX_FORUM_CACHE_ITEMS, decoded.posts.size)
+    }
+
+    @Test
+    fun forumCacheFreshnessHonoursTwelveHourTtl() {
+        val base = 1_700_000_000_000L
+
+        assertTrue(isForumCacheFresh(base, base))
+        assertTrue(isForumCacheFresh(base, base + AppPreferences.FORUM_CACHE_TTL_MS))
+        assertFalse(isForumCacheFresh(base, base + AppPreferences.FORUM_CACHE_TTL_MS + 1))
+        assertFalse(isForumCacheFresh(0L, base))
+        assertFalse("future timestamps are not trusted", isForumCacheFresh(base + 1, base))
+    }
+
+    private fun forumPost(sourceId: String, id: String, updatedEpochSeconds: Long) = ForumPost(
+        sourceId = sourceId,
+        sourceName = sourceId,
+        id = id,
+        title = "标题 $id",
+        author = "作者",
+        replyCount = 3,
+        updatedLabel = "刚刚",
+        updatedEpochSeconds = updatedEpochSeconds,
+        url = "https://example.com/$id",
+    )
+
+    private fun forumRecord(id: String, url: String): JSONObject = JSONObject().apply {
+        put("sourceId", "t66y")
+        put("sourceName", "草榴社区")
+        put("id", id)
+        put("title", "标题 $id")
+        put("author", "作者")
+        put("replyCount", 1)
+        put("updatedLabel", "刚刚")
+        put("updatedEpochSeconds", 100L)
+        put("url", url)
     }
 }

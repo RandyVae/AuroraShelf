@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -195,8 +196,12 @@ internal fun PlayerScreen(
     val cachedVideos by cacheManager.entries.collectAsStateWithLifecycle()
     var playbackUrl by remember(video.id) { mutableStateOf(video.pageUrl) }
     var isEpisodePickerVisible by remember(video.id) { mutableStateOf(false) }
+    // Flow marker for logcat: the gap from this line to "timing ready" is the tap -> READY time.
+    LaunchedEffect(video.id) { Log.i(TAG, "timing player screen opened") }
     val episodes by produceState<List<PlaybackEpisode>>(initialValue = emptyList(), key1 = video.pageUrl) {
+        val startedAtMs = System.currentTimeMillis()
         value = runCatching { PlaybackResolver().resolveEpisodes(video.pageUrl) }.getOrDefault(emptyList())
+        Log.i(TAG, "timing episodes from player screen ms=${System.currentTimeMillis() - startedAtMs} count=${value.size}")
     }
     val selectedEpisode = episodes.firstOrNull { it.pageUrl == playbackUrl }?.number ?: 1
     val selectedEpisodeLabel = episodes.firstOrNull { it.pageUrl == playbackUrl }?.label
@@ -591,3 +596,5 @@ private fun PlayerRecommendationRow(
 
 internal fun relatedVideos(current: VideoItem, videos: List<VideoItem>): List<VideoItem> =
     videos.distinctBy(VideoItem::id).filterNot { it.id == current.id }
+
+private const val TAG = "PlayerScreen"
