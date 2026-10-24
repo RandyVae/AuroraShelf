@@ -19,9 +19,10 @@ import com.aurorashelf.app.model.LiveItem
  * endpoint is a short VOD snapshot (ENDLIST) and cannot be used for live playback.
  *
  * Only one room is kept warm; it is destroyed when leaving the live tab or when a different
- * room is opened.
+ * room is opened. The single static WebView is therefore intentional and released explicitly
+ * (hence the StaticFieldLeak suppression).
  */
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "StaticFieldLeak")
 internal object LiveRoomPrewarm {
     private val handler = Handler(Looper.getMainLooper())
     private var webView: WebView? = null
@@ -51,9 +52,9 @@ internal object LiveRoomPrewarm {
             settings.apply {
                 javaScriptEnabled = true
                 domStorageEnabled = true
-                // Load the page and its JS but do not start its player: the VOD cover plays while
-                // this page finishes booting, then the player screen turns autoplay back on.
-                mediaPlaybackRequiresUserGesture = true
+                // Muted autoplay keeps the room's video pipeline warm; the mute loop below keeps it
+                // silent until the player screen takes over.
+                mediaPlaybackRequiresUserGesture = false
                 allowFileAccess = false
                 allowContentAccess = false
                 mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW

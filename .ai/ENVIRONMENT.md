@@ -179,5 +179,7 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 
 - JVM `testDebugUnitTest` + `lintDebug`：本轮 BUILD SUCCESSFUL（日志见构建输出）。
 - 设备实测（方案 2，`emulator-5556`）：点击直播卡片到播放器就绪 **3.45 s**（`LiveWeb: ready ms=3450 prewarmed=true`），基线 27.7 s。
-- 方案 3（VOD 封面混合）未完成设备验收：测试期间 `emulator-5556` 出现系统级 Pixel Launcher ANR（`Can't find service: activity`、点击被弹窗拦截）；主机并行模拟器负载过高时坐标点击不稳定，验收前建议先重启窗口模拟器并减少并行设备。
+- 方案 3（VOD 封面混合）已设备验收（2026-10-24 22:31–22:37，`emulator-5554`，test AVD）：tap → `cover firstFrame` 0.05–0.1 s，`LiveWeb ready` 0.3–0.5 s（预热 ≥15 s）；预热 8 s 时为 3.45 s。冷加载基线 27.7 s。
+- 最终包 SHA-256 `b1350a56765bba162e7ff3aade67ae260cf42aff11e0a9669121960e877bb5ef`（本地预览基线，含 Netflix 开屏叠加）；JVM 154/0/1；设备全量 32/0（合计 186/0/1）；Lint 0e/19w/2h。
+- 经验：系统级 ANR（Pixel Launcher/System UI）会吞掉 `adb input tap`，验收前先确认前台与弹窗；窗口 AVD 的 uiautomator bounds 偶尔落在 1920 高度坐标系，需按当前 root bounds 缩放坐标。
 - 本地基线：`dist/AuroraShelf-2.15.0-143-live-instant-LOCAL.apk`（本地开屏素材 + 本文改动）；`scripts/local-intro.sh apply|restore`。

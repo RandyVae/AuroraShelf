@@ -6,6 +6,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -50,7 +55,15 @@ internal object LiveVodPreview {
         }.getOrDefault("https://zh.stripchat.com")
         val dataSource = DefaultHttpDataSource.Factory()
             .setUserAgent(VideoRepository.USER_AGENT)
-            .setDefaultRequestProperties(mapOf("Referer" to referer, "Origin" to origin))
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Referer" to referer,
+                    "Origin" to origin,
+                    "Accept" to "*/*",
+                    "Cache-Control" to "no-cache",
+                    "Pragma" to "no-cache",
+                ),
+            )
         runCatching {
             val exo = ExoPlayer.Builder(context.applicationContext).build()
             exo.setVolume(0f)
@@ -61,6 +74,9 @@ internal object LiveVodPreview {
                     .createMediaSource(MediaItem.fromUri(playlist)),
             )
             exo.prepare()
+            // The snapshot starts with a station bumper; start a few seconds in so the cover
+            // shows the room itself rather than an ad.
+            exo.seekTo(COVER_START_MS)
             exo.playWhenReady = true
             player = exo
             url = playlist
@@ -93,13 +109,19 @@ internal object LiveVodPreview {
     }
 
     private const val TAG = "LiveVodPreview"
+    private const val COVER_START_MS = 8_000L
 }
 
 /** Renders the warm cover player full-bleed; controls belong to the live player that replaces it. */
 @OptIn(UnstableApi::class)
 @Composable
-internal fun VodCoverPlayer(player: ExoPlayer, modifier: Modifier = Modifier) {
+internal fun VodCoverPlayer(
+    player: ExoPlayer,
+    modifier: Modifier = Modifier,
+    onUnavailable: () -> Unit = {},
+) {
     val context = LocalContext.current
+    var firstFrame by remember(player) { mutableStateOf(false) }
     Box(modifier = modifier.background(AuroraImmersiveBackground)) {
         AndroidView(
             factory = {
@@ -114,6 +136,29 @@ internal fun VodCoverPlayer(player: ExoPlayer, modifier: Modifier = Modifier) {
         )
     }
     DisposableEffect(player) {
-        onDispose { player.release() }
+        val listener = object : Player.Listener {
+            override fun onRenderedFirstFrame() {
+                firstFrame = true
+                Log.i("LiveVodPreview", "cover firstFrame")
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                Log.w("LiveVodPreview", "cover failed: ${error.errorCodeName}")
+                onUnavailable()
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+    // If the snapshot cannot render quickly, drop the black cover so the live page/poster shows.
+    LaunchedEffect(player) {
+        delay(3_500)
+        if (!firstFrame) {
+            Log.w("LiveVodPreview", "cover timeout, removing")
+            onUnavailable()
+        }
     }
 }

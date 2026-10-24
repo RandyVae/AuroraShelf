@@ -66,6 +66,7 @@ import android.util.Log
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -416,6 +417,7 @@ private fun LivePlayerScreen(
         taken
     }
     var liveReady by remember(item.id) { mutableStateOf(false) }
+    var coverUnavailable by remember(item.id) { mutableStateOf(false) }
     if (prewarmed == null) {
         LaunchedEffect(Unit) { LiveRoomPrewarm.release() }
     }
@@ -462,8 +464,12 @@ private fun LivePlayerScreen(
                 modifier = Modifier.fillMaxSize(),
             )
             // VOD snapshot covers the wait; it disappears the moment the live page reports ready.
-            if (coverPlayer != null && !liveReady) {
-                VodCoverPlayer(player = coverPlayer, modifier = Modifier.fillMaxSize())
+            if (coverPlayer != null && !liveReady && !coverUnavailable) {
+                VodCoverPlayer(
+                    player = coverPlayer,
+                    onUnavailable = { coverUnavailable = true },
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
         if (!isFullscreen) {
@@ -589,14 +595,14 @@ private fun LiveComments(
 @Composable
 private fun EmbeddedLivePlayer(
     url: String,
-    posterUrl: String? = null,
-    prewarmed: WebView? = null,
     isFullscreen: Boolean,
     onFullscreenChange: (Boolean) -> Unit,
     onCommentsChange: (List<LiveComment>) -> Unit,
     onCommentsLoadingChange: (Boolean) -> Unit,
-    onReadyChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
+    posterUrl: String? = null,
+    prewarmed: WebView? = null,
+    onReadyChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -607,7 +613,7 @@ private fun EmbeddedLivePlayer(
     var error by remember(url) { mutableStateOf<String?>(null) }
     var fullscreenView by remember { mutableStateOf<View?>(null) }
     var fullscreenCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
-    var pageLoadToken by remember(url) { mutableStateOf(0) }
+    var pageLoadToken by remember(url) { mutableIntStateOf(0) }
     val composedAt = remember(url) { System.currentTimeMillis() }
     val webView = remember(url) {
         (prewarmed ?: WebView(context)).apply webView@{

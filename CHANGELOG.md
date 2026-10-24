@@ -7,7 +7,8 @@
 - 否决"原生 HLS 当直播播放"：接口返回的播放列表是约 20 s 的 VOD 快照（`#EXT-X-ENDLIST`），播完即停，只能作为封面/预览。
 - 直播预热支持 120 s 空闲暂停、离开直播页立即释放；评论仍走原 WebView 抓取，功能不变。
 - 本地预览基线：`scripts/local-intro.sh apply|restore` 一键套用/还原本地开屏素材（素材不入库、不可分发）；`dist/AuroraShelf-2.15.0-143-live-instant-LOCAL.apk` 为本地基线包。
-- 验证：JVM 单测与 Lint 通过；方案 2 已设备实测，方案 3 设备验收待模拟器恢复后补做（详见 `docs/verification-143-live-instant.md`）。
+- 验证：设备实测 VOD 封面 **0.05–0.1 s** 出画、真实直播 **0.3–0.5 s** 就绪（预热 ≥15 s），冷加载基线 27.7 s；JVM 154/0/1、设备全量 32/0（合计 186/0/1）、Lint 0e/19w/2h（详见 `docs/verification-143-live-instant.md`）。
+- 修复：VOD 快照开头的站点 bumper 用 seek 跳过；CDN 304 用 no-cache 请求头解决；封面失败/超时自动撤罩。
 
 
 ## 未发布 — 上线前问题修复
