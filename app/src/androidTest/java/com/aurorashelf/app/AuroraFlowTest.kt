@@ -71,8 +71,9 @@ class AuroraFlowTest {
 
     @Test fun reorganizedNavigationShowsLiveForumAndPersonalHub() {
         compose.onNodeWithContentDescription("直播").performClick()
-        compose.onNodeWithTag("live-placeholder").assertExists()
-        compose.onNodeWithText("直播内容正在接入").assertExists()
+        compose.onNodeWithTag("live-grid").assertExists()
+        compose.onNodeWithText("Stripchat · 公开直播 · 18+").assertExists()
+        compose.onNodeWithContentDescription("刷新直播列表").assertExists()
 
         compose.onNodeWithContentDescription("论坛").performClick()
         compose.onNodeWithTag("forum-feed").assertExists()
