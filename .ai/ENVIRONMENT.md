@@ -194,3 +194,9 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 
 - 按用户要求将 `LiveScreen.kt` 回退到 `431f594` 的版本：不弹年龄窗、无 VOD 封面、无页面预热；版本 145，本地包 SHA `7a42cc3e…`。
 - 模拟器实测两房间均落在 Stripchat 访客页（无 video 元素），App 显示"播放器暂时不可用"；非新增弹窗，属站点访客/年龄态。真机复测前不要把 143/144 的加速结论当能力。
+
+## 2026-10-25 146（直播 A+B）
+
+- A：播放页加载期显示房间封面大图 + 指示器；已实测（点击后 0.5 s 截图）。
+- B：`LiveSessionCache` 在返回列表时保留可播放房间的 WebView（静音暂停），再进同一房间接管；打开其他房间或离开直播页释放。当前模拟器上 Stripchat 返回访客页，没有可播放房间，B 的端到端计时未取得。
+- 版本 146 本地包 `dist/AuroraShelf-2.15.0-146-live-reentry-LOCAL.apk`，SHA-256 `fec4de28…`。

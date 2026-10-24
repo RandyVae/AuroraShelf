@@ -64,6 +64,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -119,21 +120,33 @@ internal fun LiveScreen(
     onClose: () -> Unit,
 ) {
     BackHandler(enabled = state.selectedItem != null && !isFullscreen) { onClose() }
-    state.selectedItem?.let { item ->
-        LivePlayerScreen(
-            item = item,
-            isFullscreen = isFullscreen,
-            onFullscreenChange = onFullscreenChange,
-            onBack = onClose,
+    Box(Modifier.fillMaxSize()) {
+        state.selectedItem?.let { item ->
+            LivePlayerScreen(
+                item = item,
+                isFullscreen = isFullscreen,
+                onFullscreenChange = onFullscreenChange,
+                onBack = onClose,
+            )
+        } ?: LiveFeed(
+            state = state,
+            bottomPadding = bottomPadding,
+            onCategory = onCategory,
+            onRefresh = onRefresh,
+            onLoadMore = onLoadMore,
+            onOpen = onOpen,
         )
-    } ?: LiveFeed(
-        state = state,
-        bottomPadding = bottomPadding,
-        onCategory = onCategory,
-        onRefresh = onRefresh,
-        onLoadMore = onLoadMore,
-        onOpen = onOpen,
-    )
+        // Keep the last opened room's WebView alive so re-entering it is instant.
+        val retained = LiveSessionCache.retained
+        if (state.selectedItem == null && !isFullscreen && retained != null) {
+            key(retained) {
+                AndroidView(factory = { retained }, modifier = Modifier.size(1.dp))
+            }
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { LiveSessionCache.release() }
+    }
 }
 
 @Composable
@@ -372,6 +385,10 @@ private fun LivePlayerScreen(
 ) {
     var comments by remember(item.id) { mutableStateOf<List<LiveComment>>(emptyList()) }
     var hasCheckedComments by remember(item.id) { mutableStateOf(false) }
+    val cachedSession = remember(item.playerUrl) { LiveSessionCache.take(item.playerUrl) }
+    if (cachedSession == null) {
+        LaunchedEffect(item.playerUrl) { LiveSessionCache.releaseIfNot(item.playerUrl) }
+    }
     Column(modifier = Modifier.fillMaxSize().background(AuroraImmersiveBackground).testTag("live-player")) {
         if (!isFullscreen) {
             Row(
@@ -403,6 +420,8 @@ private fun LivePlayerScreen(
             onCommentsChange = { comments = it },
             onCommentsLoadingChange = { hasCheckedComments = !it },
             modifier = if (isFullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+            posterUrl = item.thumbnailUrl,
+            reused = cachedSession,
         )
         if (!isFullscreen) {
             Column(
@@ -532,11 +551,13 @@ private fun EmbeddedLivePlayer(
     onCommentsChange: (List<LiveComment>) -> Unit,
     onCommentsLoadingChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    posterUrl: String? = null,
+    reused: CachedLiveSession? = null,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var isLoading by remember(url) { mutableStateOf(true) }
-    var isPlayerReady by remember(url) { mutableStateOf(false) }
+    var isLoading by remember(url) { mutableStateOf(reused?.ready != true) }
+    var isPlayerReady by remember(url) { mutableStateOf(reused?.ready == true) }
     var isPaused by remember(url) { mutableStateOf(false) }
     var isMuted by remember(url) { mutableStateOf(false) }
     var error by remember(url) { mutableStateOf<String?>(null) }
@@ -544,7 +565,7 @@ private fun EmbeddedLivePlayer(
     var fullscreenCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
     var pageLoadToken by remember(url) { mutableStateOf(0) }
     val webView = remember(url) {
-        WebView(context).apply webView@{
+        (reused?.webView ?: WebView(context)).apply webView@{
             setBackgroundColor(android.graphics.Color.BLACK)
             settings.apply {
                 javaScriptEnabled = true
@@ -606,7 +627,11 @@ private fun EmbeddedLivePlayer(
                     onFullscreenChange(false)
                 }
             }
-            loadUrl(url)
+            if (reused == null) {
+                loadUrl(url)
+            } else {
+                settings.mediaPlaybackRequiresUserGesture = false
+            }
         }
     }
 
@@ -705,8 +730,22 @@ private fun EmbeddedLivePlayer(
             fullscreenCallback?.onCustomViewHidden()
             onFullscreenChange(false)
             (webView.parent as? ViewGroup)?.removeView(webView)
-            webView.stopLoading()
-            webView.destroy()
+            if (isPlayerReady && error == null) {
+                // Pause + mute and keep it for an instant re-entry; released when leaving the tab.
+                LiveSessionCache.retain(webView, url, isPlayerReady)
+            } else {
+                webView.stopLoading()
+                webView.destroy()
+            }
+        }
+    }
+
+    LaunchedEffect(webView, isPlayerReady) {
+        if (isPlayerReady && !isMuted) {
+            webView.evaluateJavascript(
+                "document.querySelectorAll('video').forEach(v => { v.muted = false; v.play().catch(()=>{}); });",
+                null,
+            )
         }
     }
 
@@ -714,6 +753,15 @@ private fun EmbeddedLivePlayer(
         AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
         if (isLoading || !isPlayerReady) {
             Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground)) {
+                posterUrl?.let { poster ->
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
+                }
                 CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
             }
         }
