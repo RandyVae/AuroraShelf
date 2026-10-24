@@ -137,3 +137,13 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - Release 139: SHA-256 2209ed231adef4896990f62334d05740d94b4dfa86495918376c811667c010c0, installed + cold started.
 - Preload switch verified: toggling off persists `video_preload_enabled=false` and suppresses prefetch (`Prefetch: detail skipped`).
 - Parallel Netgrey branding (uncommitted `res/`, `HomeScreen.kt`, `docs/verification.md`, `.ai/PROJECT_STATE.md`, `.ai/TASKS.md`) again preserved and excluded from this round's commit.
+
+## 2026-10-24 140 verification (launch intro)
+
+- Build: `testDebugUnitTest assembleDebug` PASS; `assembleRelease` PASS; `lintDebug` PASS (0 errors / 19 warnings / 3 hints); device full suite 32/32 PASS.
+- JVM: 156 tests / 0 failures / 1 skipped (IntroAnimationTest 6 added). One earlier run flaked on `CoverImageLoaderTest.singleFlightCollapsesConcurrentRequestsIntoOneFetch`; immediate rerun passed (timing-sensitive test, not intro-related).
+- Release 140: SHA-256 fa63feade1b16eaddc5973001d5db504257b513f7d8c0837b68c52409d5a08e3, installed and cold-started on both emulators.
+- Visual: `docs/screenshots/launch-intro-2026-10-24.png`, `launch-intro-reduced-motion-2026-10-24.png`; local clip `captures/launch-intro-140.mp4` (8 s recording, includes system splash then intro).
+- Reduce Motion verified by setting `animator_duration_scale=0`: static composed mark appears, no drawing animation; restored to 1 afterwards.
+- Skip verified: tap at ~0.35 s → screenshot 0.45 s later shows home.
+- Parallel Netgrey branding files (`res/`, `HomeScreen.kt`, `docs/verification.md`, `.ai/PROJECT_STATE.md`, `.ai/TASKS.md`) still uncommitted and untouched.

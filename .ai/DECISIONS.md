@@ -294,3 +294,18 @@ Decision:
 Measured: hero tap resolve 493–3180 ms → 48 ms (page cache hit); live cover warm-up 8 covers in 1.98 s; search 8 in 2.08 s; comics 10 enqueued (ms=0, async decode); Coil disk cache observed at 776 KB after a short session.
 
 Boundary: preload costs Wi-Fi traffic; Coil `Precision.EXACT` means warm-up for other sizes may re-decode (same-size scroll reuse is the guaranteed gain); cached bitmaps are keyed by URL so a changed image may show stale until eviction.
+
+## Launch brand intro (Netflix-style request, original execution)
+
+Date: 2026-10-24
+
+Status: Implemented and visually verified on an Android 14 emulator; release build only.
+
+Decision:
+- Added an original ~1.9 s launch brand moment: pure black stage, three light strokes drawing a stylized "N", a diagonal highlight sweep, then the wordmark expanding with letter spacing before a 120 ms fade. The app composes and starts loading underneath the overlay, so the intro does not delay first paint. Tap anywhere or Back dismisses it immediately.
+- No audio. Netflix's ident is ~4 s, unskippable and scored; copying that would violate HIG F3 (animations must be cancellable) and G8 (avoid autoplaying audio), so only the *feel* (black stage, light-drawn mark, letter-spacing reveal) was reused with an original mark and no third-party assets.
+- Reduce Motion: when `ValueAnimator.areAnimatorsEnabled()` is false, the complete mark + wordmark are shown statically for 0.7 s, then faded. No movement or drawing animation.
+- Debug builds skip the intro (`BuildConfig.DEBUG`) so instrumented tests are not blocked by a full-screen overlay; the release build shows it once per process start (`rememberSaveable` prevents replay on rotation).
+- System bar icons switch to light while the black stage is visible and restore to the theme afterwards.
+
+Boundary: Android 12+ system splash still precedes the custom intro; TalkBack speech order not manually walked; intro is discretionary brand expression, not informational feedback.
