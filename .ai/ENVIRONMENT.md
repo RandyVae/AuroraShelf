@@ -147,3 +147,21 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - Reduce Motion verified by setting `animator_duration_scale=0`: static composed mark appears, no drawing animation; restored to 1 afterwards.
 - Skip verified: tap at ~0.35 s → screenshot 0.45 s later shows home.
 - Parallel Netgrey branding files (`res/`, `HomeScreen.kt`, `docs/verification.md`, `.ai/PROJECT_STATE.md`, `.ai/TASKS.md`) still uncommitted and untouched.
+
+## 2026-10-24 141 verification (cinematic intro)
+
+- Build: `testDebugUnitTest assembleRelease` PASS; `lintDebug` PASS (0 errors / 19 warnings / 3 hints); device full suite 32/32 PASS.
+- JVM: 156 / 0 failures / 1 skipped.
+- Release 141: SHA-256 8f9beed5f9f5146dd1195d2d3be8e3d0dd0b3f75c94e28d191b4c0de35205920; installed on both emulators.
+- Intro assets: original synthesized sting `app/src/main/res/raw/intro_sting.m4a` (2.9 s, AAC 60 KB), generated from numpy synthesis; no third-party audio.
+- Measured intro logs on heavily loaded emulator: start→finish ~5.9 s (dropped frames from host running multiple AVDs); nominal timeline 4.2 s + 180 ms fade.
+- Skip / Reduce Motion / sound-off paths verified; debug builds skip the intro.
+- Parallel Netgrey branding remains uncommitted and untouched.
+
+## 2026-10-24 141 final polish (flat multicolour "N")
+
+- Replaced the earlier spiral with a flat, multi-colour folded-ribbon "N": three filled planes (cyan → periwinkle → violet → pink), axis-aligned unfold, cast shadow at the weave, foil edge highlights, top sheen, ambient aurora halo, subtle 3D tilt settling to flat.
+- Typography switched to a gradient wordmark; settings/intro/audio architecture unchanged.
+- Final SHA-256 d549583682531ef372c04b1fa662aa123bcbd60623c56f415766e1328edaa55a (same versionCode 141).
+- Lint 0 errors / 19 warnings / 3 hints; device full suite 32/32 PASS after the visual change.
+- Evidence captured on the windowed 5556 AVD because 5554 has TalkBack enabled by another session (its green accessibility-focus frame is not app UI).

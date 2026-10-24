@@ -75,6 +75,8 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -411,6 +413,8 @@ private fun SettingsScreen(
     val cachedVideos by cacheManager.entries.collectAsStateWithLifecycle()
     val preferences = remember(context) { AppPreferences(context) }
     var videoPreloadEnabled by remember { mutableStateOf(preferences.videoPreloadEnabled) }
+    var introAnimationEnabled by remember { mutableStateOf(preferences.introAnimationEnabled) }
+    var introSoundEnabled by remember { mutableStateOf(preferences.introSoundEnabled) }
     var sourceUrl by remember(currentUrl) { mutableStateOf(currentUrl) }
     var showClearConfirmation by remember { mutableStateOf(false) }
     var route by rememberSaveable { mutableStateOf(SettingsRoute.OVERVIEW) }
@@ -462,6 +466,16 @@ private fun SettingsScreen(
                         videoPreloadEnabled = enabled
                         preferences.videoPreloadEnabled = enabled
                     },
+                    introAnimationEnabled = introAnimationEnabled,
+                    onIntroAnimationChange = { enabled ->
+                        introAnimationEnabled = enabled
+                        preferences.introAnimationEnabled = enabled
+                    },
+                    introSoundEnabled = introSoundEnabled,
+                    onIntroSoundChange = { enabled ->
+                        introSoundEnabled = enabled
+                        preferences.introSoundEnabled = enabled
+                    },
                     onBack = onBack,
                     onVideoSources = { route = SettingsRoute.VIDEO_SOURCES },
                     onComicSources = { route = SettingsRoute.COMIC_SOURCES },
@@ -505,6 +519,10 @@ private fun SettingsOverview(
     downloadedBytes: Long,
     videoPreloadEnabled: Boolean,
     onVideoPreloadChange: (Boolean) -> Unit,
+    introAnimationEnabled: Boolean,
+    onIntroAnimationChange: (Boolean) -> Unit,
+    introSoundEnabled: Boolean,
+    onIntroSoundChange: (Boolean) -> Unit,
     onBack: () -> Unit,
     onVideoSources: () -> Unit,
     onComicSources: () -> Unit,
@@ -618,6 +636,64 @@ private fun SettingsOverview(
                     Switch(checked = videoPreloadEnabled, onCheckedChange = null)
                 }
             }
+        }
+        item {
+            IntroPreferenceRow(
+                icon = { Icon(Icons.Filled.Movie, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                title = "开屏动画",
+                supporting = "冷启动时播放电影感品牌开场，点击可跳过",
+                checked = introAnimationEnabled,
+                onCheckedChange = onIntroAnimationChange,
+                testTag = "settings-intro-animation",
+            )
+        }
+        item {
+            IntroPreferenceRow(
+                icon = { Icon(Icons.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                title = "开屏音效",
+                supporting = "播放原创电影感音效；静音或媒体音量为 0 时不播放",
+                checked = introSoundEnabled,
+                onCheckedChange = onIntroSoundChange,
+                testTag = "settings-intro-sound",
+            )
+        }
+    }
+}
+
+@Composable
+private fun IntroPreferenceRow(
+    icon: @Composable () -> Unit,
+    title: String,
+    supporting: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    testTag: String,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+                .padding(horizontal = 18.dp, vertical = 14.dp)
+                .testTag(testTag),
+        ) {
+            icon()
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    supporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Switch(checked = checked, onCheckedChange = null)
         }
     }
 }

@@ -309,3 +309,17 @@ Decision:
 - System bar icons switch to light while the black stage is visible and restore to the theme afterwards.
 
 Boundary: Android 12+ system splash still precedes the custom intro; TalkBack speech order not manually walked; intro is discretionary brand expression, not informational feedback.
+
+## Cinematic launch intro round 2 (141)
+
+Date: 2026-10-24
+
+Status: Implemented; visually verified on emulator; device suite 32/32.
+
+Decision:
+- The product owner asked for a Netflix-near-identical intro. The Netflix ribbon ident and "ta-dum" audio are protected audiovisual trademarks, so they are not recreated. Instead the launch moment was rebuilt at a much higher production tier as an original piece: deep-space stage, a single luminous spiral drawn as a trimmed path with head sparks and trails, shockwave rings, particles, camera push, per-letter wordmark reveal with tracking, hairline finale, and an original synthesized 2.9 s sting (low impact + riser + metallic overtones + minor chord) shipped as a 60 KB AAC asset.
+- The intro owns the first frames: `AuroraShelfApp` composition is deferred until the intro finishes; `AuroraViewModel` is created in `onCreate` so feed/cover warm-up runs during the intro; a black brand veil covers the app's first composition and fades out after the first drawn frame. Debug builds skip the intro for instrumented tests.
+- Settings expose "开屏动画" and "开屏音效" switches (default on). Sound respects silent mode and zero media volume, and is skipped with Reduce Motion.
+- HIG deviations are explicit: audio autoplay (G8) and timed auto-dismiss (G9) are accepted because the owner explicitly requested a cinematic title sequence; skippability (F3) and Reduce Motion (F5/G7) are preserved.
+
+Boundary: Compose Canvas cannot reach Netflix's 3D-ribbon render quality; a真正同级的实现需要专业动效设计与预渲染视频资产。On the loaded emulator the measured wall clock is ~5.9 s vs the nominal 4.2 s due to dropped frames; real-device timing not verified.

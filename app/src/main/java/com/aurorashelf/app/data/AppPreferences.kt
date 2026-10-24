@@ -89,6 +89,16 @@ class AppPreferences(context: Context) {
         get() = preferences.getBoolean(KEY_VIDEO_PRELOAD_ENABLED, true)
         set(value) = preferences.edit { putBoolean(KEY_VIDEO_PRELOAD_ENABLED, value) }
 
+    /** Whether the cinematic launch intro plays on a cold start (release builds only). */
+    var introAnimationEnabled: Boolean
+        get() = preferences.getBoolean(KEY_INTRO_ANIMATION_ENABLED, true)
+        set(value) = preferences.edit { putBoolean(KEY_INTRO_ANIMATION_ENABLED, value) }
+
+    /** Whether the launch intro plays its original synthesized sound design. */
+    var introSoundEnabled: Boolean
+        get() = preferences.getBoolean(KEY_INTRO_SOUND_ENABLED, true)
+        set(value) = preferences.edit { putBoolean(KEY_INTRO_SOUND_ENABLED, value) }
+
     fun favoriteIds(): Set<String> =
         preferences.getStringSet(KEY_FAVORITES, emptySet()).orEmpty().filterNot { it.startsWith("demo-") }.toSet()
 
@@ -126,6 +136,8 @@ class AppPreferences(context: Context) {
         private const val KEY_FEED_CACHE = "feed_cache"
         private const val KEY_FORUM_CACHE = "forum_cache"
         private const val KEY_VIDEO_PRELOAD_ENABLED = "video_preload_enabled"
+        private const val KEY_INTRO_ANIMATION_ENABLED = "intro_animation_enabled"
+        private const val KEY_INTRO_SOUND_ENABLED = "intro_sound_enabled"
         private const val MAX_HISTORY = 50
         internal const val MAX_FEED_CACHE_ITEMS = 30
         internal const val MAX_FORUM_CACHE_ITEMS = 40
