@@ -75,9 +75,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -142,6 +144,9 @@ private fun LiveFeed(
     onLoadMore: () -> Unit,
     onOpen: (LiveItem) -> Unit,
 ) {
+    val fontScale = LocalDensity.current.fontScale
+    // C3: with >=150% system font the artwork columns widen with the font scale (capped),
+    // so the adaptive grid collapses to one column instead of clipping card text.
     val gridState = rememberLazyGridState()
     LaunchedEffect(gridState, state.items.size, state.canLoadMore) {
         snapshotFlow {
@@ -156,7 +161,7 @@ private fun LiveFeed(
     }
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 164.dp),
+        columns = GridCells.Adaptive(minSize = scaledAdaptiveMinSize(164.dp, fontScale)),
         state = gridState,
         contentPadding = PaddingValues(start = 18.dp, top = 20.dp, end = 18.dp, bottom = bottomPadding + 18.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -223,7 +228,12 @@ private fun LiveFeed(
 private fun LiveHeader(onRefresh: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("直播", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            Text(
+                text = "直播",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
             Text(
                 "Stripchat · 公开直播 · 18+",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -263,6 +273,7 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxWidth().aspectRatio(4f / 3f),
                 )
+                DarkModeArtworkScrim()
                 Surface(
                     color = MaterialTheme.colorScheme.error,
                     contentColor = MaterialTheme.colorScheme.onError,
@@ -310,9 +321,11 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
             ) {
                 Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(16.dp))
                 Text(
-                    "${formatViewerCount(item.viewersCount)} 人观看",
+                    text = "${formatViewerCount(item.viewersCount)} 人观看",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -394,13 +407,21 @@ private fun LivePlayerScreen(
                     Spacer(Modifier.weight(1f))
                     Icon(Icons.Default.Visibility, contentDescription = null, tint = Color.LightGray, modifier = Modifier.size(18.dp))
                     Text(
-                        "${formatViewerCount(item.viewersCount)} 人观看",
+                        text = "${formatViewerCount(item.viewersCount)} 人观看",
                         color = Color.LightGray,
                         style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(start = 6.dp),
                     )
                 }
-                Text(item.username, color = Color.White, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(
+                    text = item.username,
+                    color = Color.White,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
+                )
                 Text(
                     "${countryFlag(item.countryCode)}公开直播 · Stripchat${if (item.isHd) " · HD" else ""}",
                     color = Color.LightGray,
@@ -429,7 +450,13 @@ private fun LiveComments(
 ) {
     Column(modifier.background(AuroraImmersiveBackground).padding(horizontal = 20.dp).testTag("live-comments")) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-            Text("实时评论", color = Color.White, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(
+                text = "实时评论",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.semantics { heading() },
+            )
             Spacer(Modifier.weight(1f))
             Text("公开聊天室 · 只读", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
         }

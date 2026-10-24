@@ -131,7 +131,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -256,7 +258,9 @@ internal fun PlayerScreen(
                                 text = "接着观看",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 10.dp),
+                                modifier = Modifier
+                                    .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 10.dp)
+                                    .semantics { heading() },
                             )
                         }
                         items(relatedVideos, key = { "related-${it.id}" }) { related ->
@@ -340,6 +344,15 @@ private fun PlayerDetails(
     onToggleEpisodes: () -> Unit,
     onEpisode: (PlaybackEpisode) -> Unit,
 ) {
+    val cacheStateDescription = when (cachedVideo?.state) {
+        OfflineCacheState.RESOLVING -> "正在解析视频地址"
+        OfflineCacheState.QUEUED -> "已加入缓存队列"
+        OfflineCacheState.DOWNLOADING -> "正在缓存视频"
+        OfflineCacheState.COMPLETED -> "视频已缓存到本地"
+        OfflineCacheState.FAILED -> "缓存失败，可点击重试"
+        OfflineCacheState.REMOVING -> "正在删除离线缓存"
+        null -> null
+    }
     val cacheActionDescription = when (cachedVideo?.state) {
         OfflineCacheState.RESOLVING,
         OfflineCacheState.QUEUED,
@@ -363,6 +376,7 @@ private fun PlayerDetails(
             fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.semantics { heading() },
         )
         Text(
             text = listOf(video.author, video.views).filter { it.isNotBlank() }.joinToString(" · "),
@@ -389,6 +403,7 @@ private fun PlayerDetails(
             }
             PlayerActionButton(
                 label = cacheActionDescription,
+                stateDescriptionText = cacheStateDescription,
                 onClick = onCache,
                 enabled = cachedVideo?.state != OfflineCacheState.REMOVING,
                 modifier = Modifier.weight(1f),
@@ -457,6 +472,7 @@ private fun PlayerActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    stateDescriptionText: String? = null,
     icon: @Composable () -> Unit,
 ) {
     Surface(
@@ -465,7 +481,15 @@ private fun PlayerActionButton(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(18.dp),
-        modifier = modifier.heightIn(min = 64.dp),
+        modifier = modifier
+            .heightIn(min = 64.dp)
+            .then(
+                if (stateDescriptionText != null) {
+                    Modifier.semantics { stateDescription = stateDescriptionText }
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

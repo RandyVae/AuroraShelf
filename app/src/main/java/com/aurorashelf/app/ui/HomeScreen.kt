@@ -131,6 +131,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -187,6 +188,10 @@ internal fun HomeScreen(
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
 ) {
+    val fontScale = LocalDensity.current.fontScale
+    // C7: at 200% (and any >=150%) system font the two-column grid becomes unreadable,
+    // so the feed falls back to a single full-width column. Default type stays untouched.
+    val gridColumns = if (fontScale >= SINGLE_COLUMN_FONT_SCALE) 1 else 2
     val listState = rememberLazyListState()
     LaunchedEffect(listState, state.videos.size, state.canLoadMore) {
         snapshotFlow {
@@ -254,7 +259,11 @@ internal fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                 ) {
-                    Text("为你推荐", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        text = "为你推荐",
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.semantics { heading() },
+                    )
                     Spacer(Modifier.weight(1f))
                     Text("持续更新", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -271,7 +280,7 @@ internal fun HomeScreen(
             }
         }
         items(
-            items = homeGridRows(state.videos),
+            items = homeGridRows(state.videos, gridColumns),
             key = { row -> row.joinToString(separator = "|") { it.id } },
         ) { row ->
             Row(
@@ -286,10 +295,10 @@ internal fun HomeScreen(
                         isFavorite = video.id in state.favoriteIds,
                         onClick = { onVideo(video) },
                         onFavorite = { onFavorite(video) },
-                        modifier = Modifier.weight(1f),
+                        modifier = if (gridColumns == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
                     )
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                if (gridColumns > 1 && row.size == 1) Spacer(Modifier.weight(1f))
             }
         }
         if (state.isLoadingMore) {
@@ -315,8 +324,8 @@ internal fun HomeScreen(
     }
 }
 
-internal fun homeGridRows(videos: List<VideoItem>): List<List<VideoItem>> =
-    videos.drop(1).chunked(2)
+internal fun homeGridRows(videos: List<VideoItem>, columns: Int = 2): List<List<VideoItem>> =
+    videos.drop(1).chunked(columns)
 
 @Composable
 private fun HomeHeader(
@@ -334,7 +343,12 @@ private fun HomeHeader(
             .padding(start = 20.dp, end = 20.dp, top = 14.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text("极光视界", style = MaterialTheme.typography.headlineSmall, maxLines = 1)
+            Text(
+                text = "网灰",
+                style = MaterialTheme.typography.headlineSmall,
+                maxLines = 1,
+                modifier = Modifier.semantics { heading() },
+            )
             SourceMenu(sourceUrl = sourceUrl, onSource = onSource)
         }
         GlassSurface(
@@ -509,6 +523,13 @@ private fun HeroVideoCard(
     onFavorite: () -> Unit,
 ) {
     val usesCompactNavigation = LocalWindowLayout.current.compactDock
+    val fontScale = LocalDensity.current.fontScale
+    // At large font sizes the heart button and the metadata line collide; reserve end space then.
+    val infoEndPadding = when {
+        usesCompactNavigation -> 76.dp
+        fontScale >= 1.5f -> 68.dp
+        else -> 18.dp
+    }
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surface,
@@ -550,7 +571,7 @@ private fun HeroVideoCard(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 18.dp, top = 18.dp, bottom = 18.dp)
-                    .padding(end = if (usesCompactNavigation) 76.dp else 18.dp),
+                    .padding(end = infoEndPadding),
             ) {
                 Text(
                     video.title,
@@ -682,3 +703,6 @@ private fun FavoriteButton(
         )
     }
 }
+
+/** Font scale at which the two-column home feed drops to one column (HIG C7). */
+private const val SINGLE_COLUMN_FONT_SCALE = 1.5f

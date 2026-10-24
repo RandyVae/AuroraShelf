@@ -51,7 +51,17 @@ internal fun NativeSitePlayer(
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
     val offlineEntries by cacheManager.entries.collectAsStateWithLifecycle()
     val offlineVideo = offlineEntries.firstOrNull { it.pageUrl == pageUrl && it.isPlayableOffline }
-    val player = remember(pageUrl) { ExoPlayer.Builder(context.applicationContext).build() }
+    val player = remember(pageUrl) {
+        ExoPlayer.Builder(context.applicationContext).build().apply {
+            // G5: when the (external) media declares text tracks, prefer Chinese then English
+            // subtitles and let ExoPlayer auto-select one. Media without subtitle tracks is
+            // unaffected: preferred languages only steer track selection.
+            trackSelectionParameters = trackSelectionParameters.buildUpon()
+                .setPreferredTextLanguages("zh-Hans", "zh", "en")
+                .setSelectUndeterminedTextLanguage(true)
+                .build()
+        }
+    }
     var position by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
     var shouldResume by rememberSaveable(pageUrl) { mutableStateOf(true) }
     var attempt by remember(pageUrl) { mutableIntStateOf(0) }

@@ -25,8 +25,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -143,6 +145,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -300,6 +303,7 @@ internal fun MediaImage(video: VideoItem, modifier: Modifier = Modifier) {
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
+            DarkModeArtworkScrim()
         } else if (isLoading) {
             CircularProgressIndicator(
                 modifier = Modifier.size(24.dp),
@@ -330,6 +334,37 @@ internal fun MediaImage(video: VideoItem, modifier: Modifier = Modifier) {
         }
     }
 }
+
+/**
+ * HIG A7: network artwork is dimmed slightly in dark mode so covers do not glare at night.
+ * The scrim only paints; it has no pointer input, so taps keep reaching the parent card.
+ */
+@Composable
+internal fun BoxScope.DarkModeArtworkScrim() {
+    if (isSystemInDarkTheme()) {
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(Color.Black.copy(alpha = DARK_MODE_ARTWORK_SCRIM_ALPHA)),
+        )
+    }
+}
+
+/**
+ * C3/C7: scale the adaptive artwork column width with the system font scale (capped at 1.6x)
+ * so a large font naturally collapses the grid to a single column instead of squeezing cards.
+ * Below the large-text threshold the base width is kept untouched, so default layouts are unchanged.
+ */
+internal fun scaledAdaptiveMinSize(base: Dp, fontScale: Float): Dp =
+    if (fontScale < LARGE_FONT_SCALE_THRESHOLD) {
+        base
+    } else {
+        base * fontScale.coerceAtMost(MAX_ARTWORK_FONT_SCALE)
+    }
+
+private const val DARK_MODE_ARTWORK_SCRIM_ALPHA = 0.11f
+private const val MAX_ARTWORK_FONT_SCALE = 1.6f
+private const val LARGE_FONT_SCALE_THRESHOLD = 1.3f
 
 @Composable
 internal fun EmptyState(

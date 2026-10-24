@@ -76,10 +76,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -190,6 +192,7 @@ private fun ComicLibrary(
     onSignOut: () -> Unit,
 ) {
     val gridState = rememberLazyGridState()
+    val fontScale = LocalDensity.current.fontScale
     val selectedSource = state.sources.find { it.id == state.selectedSourceId }
     // snapshotFlow keeps firing when the next page grows the list, unlike a derivedStateOf
     // boolean that can stay latched at true and never request the following page.
@@ -205,7 +208,9 @@ private fun ComicLibrary(
     }
 
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = 154.dp),
+        // C3: widen artwork columns with the system font scale (capped) so >=150% font
+        // collapses the covers to a single column instead of squeezing the text.
+        columns = GridCells.Adaptive(minSize = scaledAdaptiveMinSize(154.dp, fontScale)),
         state = gridState,
         contentPadding = PaddingValues(start = 18.dp, top = 20.dp, end = 18.dp, bottom = 126.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -216,10 +221,10 @@ private fun ComicLibrary(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "漫画",
+                        text = "漫画",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.testTag("comic-library-title"),
+                        modifier = Modifier.testTag("comic-library-title").semantics { heading() },
                     )
                     Text(
                         state.sources.find { it.id == state.selectedSourceId }?.description.orEmpty(),
@@ -450,7 +455,12 @@ private fun ComicDetailsScreen(
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回漫画列表")
                         }
-                        Text("漫画详情", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = "漫画详情",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.semantics { heading() },
+                        )
                     }
                 }
             }
@@ -503,7 +513,12 @@ private fun ComicDetailsScreen(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(18.dp)) {
-                            Text("简介", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = "简介",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.semantics { heading() },
+                            )
                             Text(details.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -511,10 +526,12 @@ private fun ComicDetailsScreen(
             }
             item {
                 Text(
-                    "章节 · ${details.chapters.size}",
+                    text = "章节 · ${details.chapters.size}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(start = 22.dp, end = 20.dp, top = 18.dp, bottom = 4.dp),
+                    modifier = Modifier
+                        .padding(start = 22.dp, end = 20.dp, top = 18.dp, bottom = 4.dp)
+                        .semantics { heading() },
                 )
             }
             if (details.chapters.isEmpty()) {
@@ -632,7 +649,13 @@ private fun ComicReader(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "退出阅读")
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(reader.details.comic.title, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = reader.details.comic.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.semantics { heading() },
+                    )
                     Text(reader.chapter.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.72f))
                 }
             }
@@ -737,12 +760,15 @@ private fun ComicCoverImage(comic: ComicSummary, modifier: Modifier = Modifier) 
     if (request == null) {
         ComicCoverPlaceholder()
     } else {
-        AsyncImage(
-            model = request,
-            contentDescription = "${comic.title}封面",
-            contentScale = ContentScale.Crop,
-            modifier = modifier,
-        )
+        Box(modifier = modifier) {
+            AsyncImage(
+                model = request,
+                contentDescription = "${comic.title}封面",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+            DarkModeArtworkScrim()
+        }
     }
 }
 
