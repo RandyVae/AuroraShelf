@@ -349,3 +349,12 @@ Decision:
 - Live start latency comes from creating the room WebView after the tap and booting the full site; therefore the first grid card's room page is prewarmed in a 1 dp hidden WebView, and the ready WebView is re-parented into the player screen on tap (3.5 s measured).
 - To cover the remaining page/WebRTC boot time, the same public HLS snapshot is prewarmed muted in a looping ExoPlayer and rendered as a VOD cover overlay; it is removed as soon as the live page reports ready. The hidden WebView does not autoplay while warming (bandwidth), and the VOD is paused after 120 s of grid idle.
 - Only the first card is warmed; other cards still load normally but benefit from warm cookies/HTTP cache. Comments keep using the existing WebView DOM scraper.
+
+## Forum post paint (148): prefetch HTML + instant local render
+
+Date: 2026-10-25
+
+Decision:
+- Forum posts are read in a WebView; waiting for the full page (ads/images) made text show after many seconds. The app now prefetches the first four post HTML documents when the list loads (shared OkHttp, t66y mobile cookie), caches them for 30 minutes and renders cached HTML via `loadDataWithBaseURL`.
+- Cached pages are painted early (~250 ms) with the mobile layout script instead of waiting for `onPageFinished`, because remote images can block that event indefinitely. The rendered `outerHTML` is written back to the cache for future opens.
+- Cost: a few small HTML fetches per list load; un-cached posts still use the original network path.

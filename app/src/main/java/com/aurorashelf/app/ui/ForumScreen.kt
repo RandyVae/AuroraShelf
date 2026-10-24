@@ -5,6 +5,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
+import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.webkit.CookieManager
 import android.webkit.WebResourceError
@@ -74,6 +75,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import org.json.JSONArray
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -81,6 +83,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aurorashelf.app.data.forum.ForumImageRequest
 import com.aurorashelf.app.data.forum.ForumImageSaver
+import com.aurorashelf.app.data.forum.ForumPostCache
 import com.aurorashelf.app.data.forum.shouldForwardCookies
 import com.aurorashelf.app.model.ForumPost
 import kotlinx.coroutines.delay
@@ -100,6 +103,11 @@ internal fun ForumScreen(
 ) {
     // Keep the list state in composition while the reader is open.
     val listState = rememberLazyListState()
+    LaunchedEffect(state.posts.size) {
+        if (state.posts.isNotEmpty()) {
+            state.posts.take(POST_PREFETCH_LIMIT).forEach { post -> ForumPostCache.prefetch(post.url) }
+        }
+    }
     state.selectedPost?.let { post ->
         ForumReader(post = post, onClose = onClosePost)
         return
@@ -258,6 +266,9 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     val snackbarHostState = remember { SnackbarHostState() }
     val imageSaver = remember(context) { ForumImageSaver(context) }
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val cachedHtml = remember(post.url) { ForumPostCache.get(post.url) }
+    val startedAt = remember(post.url) { System.currentTimeMillis() }
+    var cachedRendered by remember(post.url) { mutableStateOf(false) }
     var isLoading by remember(post.url) { mutableStateOf(true) }
     var error by remember(post.url) { mutableStateOf<String?>(null) }
     var canGoBack by remember(post.url) { mutableStateOf(false) }
@@ -310,12 +321,18 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     loadGeneration += 1
                     isLoading = true
                     error = null
+                    Log.i(TAG, "pageStarted cacheHit=${cachedHtml != null}")
                 }
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     canGoBack = view?.canGoBack() == true
+                    if (cachedRendered) return
+                    Log.i(TAG, "pageFinished totalMs=${System.currentTimeMillis() - startedAt} cacheHit=${cachedHtml != null}")
                     val finishedGeneration = loadGeneration
-                    view?.applyMobileForumLayout(isDarkTheme) { wasApplied ->
+                    view?.applyMobileForumLayout(
+                        isDarkTheme = isDarkTheme,
+                        onHtml = { html -> ForumPostCache.put(post.url, html) },
+                    ) { wasApplied ->
                         if (finishedGeneration != loadGeneration) return@applyMobileForumLayout
                         isLoading = false
                         error = if (wasApplied) null else "帖子排版失败，请重新加载"
@@ -352,7 +369,32 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 )
                 true
             }
-            loadForumPost(post.url)
+            if (cachedHtml != null) {
+                val baseUrl = post.url
+                if (baseUrl.contains("t66y.com", ignoreCase = true)) {
+                    CookieManager.getInstance().setCookie(baseUrl, "ismob=1; Path=/; Secure") {
+                        loadDataWithBaseURL(baseUrl, cachedHtml, "text/html", "UTF-8", null)
+                    }
+                } else {
+                    loadDataWithBaseURL(baseUrl, cachedHtml, "text/html", "UTF-8", null)
+                }
+            } else {
+                loadForumPost(post.url)
+            }
+        }
+    }
+    LaunchedEffect(webView, cachedHtml) {
+        if (cachedHtml == null) return@LaunchedEffect
+        delay(250)
+        if (isLoading && !cachedRendered) {
+            cachedRendered = true
+            isLoading = false
+            error = null
+            Log.i(TAG, "cachedPaint ms=${System.currentTimeMillis() - startedAt}")
+            webView.applyMobileForumLayout(
+                isDarkTheme = isDarkTheme,
+                onHtml = { html -> ForumPostCache.put(post.url, html) },
+            ) { }
         }
     }
     LaunchedEffect(loadGeneration) {
@@ -498,11 +540,25 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun WebView.applyMobileForumLayout(isDarkTheme: Boolean, onComplete: (Boolean) -> Unit) {
+private fun WebView.applyMobileForumLayout(
+    isDarkTheme: Boolean,
+    onHtml: ((String) -> Unit)? = null,
+    onComplete: (Boolean) -> Unit,
+) {
     settings.javaScriptEnabled = true
     evaluateJavascript(mobileForumScript(isDarkTheme)) { result ->
-        settings.javaScriptEnabled = false
-        onComplete(result == "true")
+        if (result == "true" && onHtml != null) {
+            evaluateJavascript("document.documentElement.outerHTML") { raw ->
+                if (raw != null && raw != "null") {
+                    runCatching { JSONArray("[$raw]").getString(0) }.getOrNull()?.let(onHtml)
+                }
+                settings.javaScriptEnabled = false
+                onComplete(true)
+            }
+        } else {
+            settings.javaScriptEnabled = false
+            onComplete(result == "true")
+        }
     }
 }
 
@@ -521,6 +577,8 @@ private fun WebView.loadForumPost(url: String) {
 }
 
 private const val READER_LOAD_TIMEOUT_MS = 15_000L
+private const val POST_PREFETCH_LIMIT = 4
+private const val TAG = "ForumReader"
 
 internal fun mobileForumScript(isDarkTheme: Boolean): String = MOBILE_FORUM_SCRIPT.replace(
     "const auroraDark = false;",

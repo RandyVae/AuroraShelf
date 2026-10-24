@@ -124,11 +124,17 @@ internal object ForumHttp {
             .build()
     }
 
-    fun fetchDocument(url: String): Document {
+    fun fetchDocument(url: String, mobileLayout: Boolean = false): Document {
         val request = Request.Builder()
             .url(url)
             .header("User-Agent", VideoRepository.USER_AGENT)
             .header("Accept-Language", "zh-CN,zh;q=0.9")
+            .apply {
+                // t66y serves its mobile layout only when the ismob cookie is present.
+                if (mobileLayout && url.contains("t66y.com", ignoreCase = true)) {
+                    header("Cookie", "ismob=1")
+                }
+            }
             .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("论坛返回 HTTP ${response.code}")

@@ -200,3 +200,9 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - A：播放页加载期显示房间封面大图 + 指示器；已实测（点击后 0.5 s 截图）。
 - B：`LiveSessionCache` 在返回列表时保留可播放房间的 WebView（静音暂停），再进同一房间接管；打开其他房间或离开直播页释放。当前模拟器上 Stripchat 返回访客页，没有可播放房间，B 的端到端计时未取得。
 - 版本 146 本地包 `dist/AuroraShelf-2.15.0-146-live-reentry-LOCAL.apk`，SHA-256 `fec4de28…`。
+
+## 2026-10-25 148（论坛帖子加速）
+
+- `ForumPostCache`：列表出现后预取前 4 条帖子 HTML（共享 OkHttp、t66y ismob cookie），LruCache 8 条/30 分钟。
+- 打开缓存命中的帖子用 `loadDataWithBaseURL` + 250 ms 早绘；实测正文 **367 ms** 显示（截图 docs/screenshots/forum-post-instant-2026-10-25.png）；冷路径帖子 14 s 未完成。
+- 148 本地包 `dist/AuroraShelf-2.15.0-148-forum-instant-LOCAL.apk`，SHA-256 `b5e8b9d1…`。
