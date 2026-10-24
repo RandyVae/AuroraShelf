@@ -45,6 +45,8 @@ ExHentai cookies or bypass access controls.
 
 Project: <https://github.com/jiangtian616/JHenTai>
 
+> Verification note (2026-10-24): the repository owner/path and license above were recorded offline and have **not been verified against the upstream repository**. Confirm the canonical URL and license online before release; do not treat this entry as final until checked.
+
 ## JMComic protocol reference
 
 The JMComic adapter was independently implemented from the public protocol and

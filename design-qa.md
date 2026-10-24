@@ -1,5 +1,7 @@
 # Material 3 Expressive 最终设计审计
 
+> **历史文档（2026-09-06，对应 2.3.0 阶段）**：以下审计结论只对该阶段快照有效，**不再作为当前 UI 门禁**，也不代表 2.8–2.15 的玻璃导航、漫画、直播、论坛与主题界面已验收。当前 UI 门禁为 [docs/ui/design-system.md](docs/ui/design-system.md)（Apple HIG 设计基线）与 [docs/ui/visual-qa.md](docs/ui/visual-qa.md)（验收流程）；版本化验收结果以 `docs/verification.md` 与 `CHANGELOG.md` 为准。历史内容按原样保留。
+
 日期：2026-09-06  
 范围：首页真实列表、连续滚动、搜索、发现、收藏空态、设置、横屏和启动图标。目标设备条件为三星 S26 Ultra 默认字体与显示缩放；截图来自 1080 × 2340、density 440 的 Android 14 模拟器，不冒充 One UI 真机验收。
 
