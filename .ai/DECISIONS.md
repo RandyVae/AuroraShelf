@@ -337,3 +337,15 @@ Decision:
 - The app is composed behind the film and its first frame is covered by the existing brand veil; `AuroraViewModel` is warmed in `onCreate` so feed data is ready when the film ends.
 
 Boundary: this is a 2.5D offline render, not a real 3D pipeline; further quality needs professional 3D/motion-design assets. HIG deviations (autoplay audio G8, timed 6.6 s G9) are explicit user decisions; skippability and Reduce Motion remain.
+
+## Live instant playback (143): room prewarm + VOD cover
+
+Date: 2026-10-24
+
+Status: Implemented; room-prewarm path device-verified (27.7 s → ~3.5 s); VOD-cover hybrid pending device verification.
+
+Decision:
+- The public HLS playlist returned by the Stripchat list API is a ~20 s VOD snapshot (`PLAYLIST-TYPE:VOD`, `#EXT-X-ENDLIST`), not a live feed, so it must never be the live playback engine.
+- Live start latency comes from creating the room WebView after the tap and booting the full site; therefore the first grid card's room page is prewarmed in a 1 dp hidden WebView, and the ready WebView is re-parented into the player screen on tap (3.5 s measured).
+- To cover the remaining page/WebRTC boot time, the same public HLS snapshot is prewarmed muted in a looping ExoPlayer and rendered as a VOD cover overlay; it is removed as soon as the live page reports ready. The hidden WebView does not autoplay while warming (bandwidth), and the VOD is paused after 120 s of grid idle.
+- Only the first card is warmed; other cards still load normally but benefit from warm cookies/HTTP cache. Comments keep using the existing WebView DOM scraper.

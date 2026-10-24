@@ -61,6 +61,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
+import android.util.Log
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -119,21 +121,56 @@ internal fun LiveScreen(
     onClose: () -> Unit,
 ) {
     BackHandler(enabled = state.selectedItem != null && !isFullscreen) { onClose() }
-    state.selectedItem?.let { item ->
-        LivePlayerScreen(
-            item = item,
-            isFullscreen = isFullscreen,
-            onFullscreenChange = onFullscreenChange,
-            onBack = onClose,
+    Box(Modifier.fillMaxSize()) {
+        state.selectedItem?.let { item ->
+            LivePlayerScreen(
+                item = item,
+                isFullscreen = isFullscreen,
+                onFullscreenChange = onFullscreenChange,
+                onBack = onClose,
+            )
+        } ?: LiveFeed(
+            state = state,
+            bottomPadding = bottomPadding,
+            onCategory = onCategory,
+            onRefresh = onRefresh,
+            onLoadMore = onLoadMore,
+            onOpen = onOpen,
         )
-    } ?: LiveFeed(
-        state = state,
-        bottomPadding = bottomPadding,
-        onCategory = onCategory,
-        onRefresh = onRefresh,
-        onLoadMore = onLoadMore,
-        onOpen = onOpen,
-    )
+        // Warm the most likely room in the background while the grid is visible.
+        if (state.selectedItem == null && !isFullscreen) {
+            LivePrewarmHost(item = state.items.firstOrNull())
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            LiveRoomPrewarm.release()
+            LiveVodPreview.release()
+        }
+    }
+}
+
+/**
+ * Hidden 1 dp host keeping the prewarmed room WebView attached to the window so its video/WebRTC
+ * pipeline can connect before the user taps the card.
+ */
+@Composable
+private fun LivePrewarmHost(item: LiveItem?) {
+    val context = LocalContext.current
+    var warmView by remember(item?.playerUrl) { mutableStateOf<WebView?>(null) }
+    LaunchedEffect(item?.playerUrl) {
+        if (item == null) {
+            warmView = null
+        } else {
+            warmView = LiveRoomPrewarm.ensure(context, item)
+            LiveVodPreview.ensure(context, item)
+        }
+    }
+    warmView?.let { view ->
+        key(view) {
+            AndroidView(factory = { view }, modifier = Modifier.size(1.dp))
+        }
+    }
 }
 
 @Composable
@@ -372,6 +409,16 @@ private fun LivePlayerScreen(
 ) {
     var comments by remember(item.id) { mutableStateOf<List<LiveComment>>(emptyList()) }
     var hasCheckedComments by remember(item.id) { mutableStateOf(false) }
+    val prewarmed = remember(item.playerUrl) { LiveRoomPrewarm.take(item.playerUrl) }
+    val coverPlayer = remember(item.hlsUrl) {
+        val taken = LiveVodPreview.take(item.hlsUrl)
+        Log.i("LiveVodPreview", "cover taken=${taken != null}")
+        taken
+    }
+    var liveReady by remember(item.id) { mutableStateOf(false) }
+    if (prewarmed == null) {
+        LaunchedEffect(Unit) { LiveRoomPrewarm.release() }
+    }
     Column(modifier = Modifier.fillMaxSize().background(AuroraImmersiveBackground).testTag("live-player")) {
         if (!isFullscreen) {
             Row(
@@ -396,14 +443,29 @@ private fun LivePlayerScreen(
                 Text("Stripchat", color = Color.LightGray, style = MaterialTheme.typography.labelMedium)
             }
         }
-        EmbeddedLivePlayer(
-            url = item.playerUrl,
-            isFullscreen = isFullscreen,
-            onFullscreenChange = onFullscreenChange,
-            onCommentsChange = { comments = it },
-            onCommentsLoadingChange = { hasCheckedComments = !it },
-            modifier = if (isFullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f),
-        )
+        Box(
+            modifier = if (isFullscreen) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier.fillMaxWidth().aspectRatio(16f / 9f)
+            },
+        ) {
+            EmbeddedLivePlayer(
+                url = item.playerUrl,
+                posterUrl = item.thumbnailUrl,
+                prewarmed = prewarmed,
+                isFullscreen = isFullscreen,
+                onFullscreenChange = onFullscreenChange,
+                onCommentsChange = { comments = it },
+                onCommentsLoadingChange = { hasCheckedComments = !it },
+                onReadyChange = { ready -> liveReady = ready },
+                modifier = Modifier.fillMaxSize(),
+            )
+            // VOD snapshot covers the wait; it disappears the moment the live page reports ready.
+            if (coverPlayer != null && !liveReady) {
+                VodCoverPlayer(player = coverPlayer, modifier = Modifier.fillMaxSize())
+            }
+        }
         if (!isFullscreen) {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -527,10 +589,13 @@ private fun LiveComments(
 @Composable
 private fun EmbeddedLivePlayer(
     url: String,
+    posterUrl: String? = null,
+    prewarmed: WebView? = null,
     isFullscreen: Boolean,
     onFullscreenChange: (Boolean) -> Unit,
     onCommentsChange: (List<LiveComment>) -> Unit,
     onCommentsLoadingChange: (Boolean) -> Unit,
+    onReadyChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -543,8 +608,9 @@ private fun EmbeddedLivePlayer(
     var fullscreenView by remember { mutableStateOf<View?>(null) }
     var fullscreenCallback by remember { mutableStateOf<WebChromeClient.CustomViewCallback?>(null) }
     var pageLoadToken by remember(url) { mutableStateOf(0) }
+    val composedAt = remember(url) { System.currentTimeMillis() }
     val webView = remember(url) {
-        WebView(context).apply webView@{
+        (prewarmed ?: WebView(context)).apply webView@{
             setBackgroundColor(android.graphics.Color.BLACK)
             settings.apply {
                 javaScriptEnabled = true
@@ -561,6 +627,7 @@ private fun EmbeddedLivePlayer(
             }
             webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView?, location: String?, favicon: Bitmap?) {
+                    Log.i("LiveWeb", "pageStarted ms=${System.currentTimeMillis() - composedAt}")
                     pageLoadToken += 1
                     isLoading = true
                     isPlayerReady = false
@@ -570,6 +637,7 @@ private fun EmbeddedLivePlayer(
                 }
 
                 override fun onPageFinished(view: WebView?, location: String?) {
+                    Log.i("LiveWeb", "pageFinished ms=${System.currentTimeMillis() - composedAt}")
                     isLoading = false
                 }
 
@@ -606,7 +674,12 @@ private fun EmbeddedLivePlayer(
                     onFullscreenChange(false)
                 }
             }
-            loadUrl(url)
+            if (prewarmed == null) {
+                loadUrl(url)
+            } else {
+                settings.mediaPlaybackRequiresUserGesture = false
+                Log.i("LiveWeb", "reused prewarmed page")
+            }
         }
     }
 
@@ -627,6 +700,7 @@ private fun EmbeddedLivePlayer(
                             isPlayerReady = true
                             isLoading = false
                             discoveryFinished = true
+                            Log.i("LiveWeb", "ready ms=${System.currentTimeMillis() - composedAt} prewarmed=${prewarmed != null}")
                         }
 
                         "\"mismatch\"" -> {
@@ -648,6 +722,18 @@ private fun EmbeddedLivePlayer(
                     }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(isPlayerReady) { onReadyChange(isPlayerReady) }
+
+    // The hidden prewarm page starts muted; unmute once the player is actually visible.
+    LaunchedEffect(webView, isPlayerReady) {
+        if (isPlayerReady && !isMuted) {
+            webView.evaluateJavascript(
+                "document.querySelectorAll('video').forEach(v => { v.muted = false; v.play().catch(()=>{}); });",
+                null,
+            )
         }
     }
 
@@ -714,6 +800,15 @@ private fun EmbeddedLivePlayer(
         AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
         if (isLoading || !isPlayerReady) {
             Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground)) {
+                posterUrl?.let { poster ->
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
+                }
                 CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
             }
         }
@@ -811,7 +906,7 @@ private fun countryFlag(code: String): String {
 
 private const val LIVE_COVER_PREFETCH_LIMIT = 8
 private const val PLAYER_DISCOVERY_ATTEMPTS = 40
-private const val PLAYER_DISCOVERY_INTERVAL_MS = 500L
+private const val PLAYER_DISCOVERY_INTERVAL_MS = 250L
 private const val COMMENTS_REFRESH_INTERVAL_MS = 1_500L
 private const val MAX_VISIBLE_COMMENTS = 40
 

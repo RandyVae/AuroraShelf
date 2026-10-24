@@ -174,3 +174,10 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - Film asset: res/raw/intro_film.mp4 (3.4 MB) + intro_poster.jpg / intro_film_start.jpg; old intro_sting.m4a removed.
 - Film renderer/score scripts lived in /tmp (not committed); the shipped asset is reproducible from them if archived later.
 - Parallel Netgrey branding remains uncommitted and untouched.
+
+## 2026-10-24 143（直播即点即播）
+
+- JVM `testDebugUnitTest` + `lintDebug`：本轮 BUILD SUCCESSFUL（日志见构建输出）。
+- 设备实测（方案 2，`emulator-5556`）：点击直播卡片到播放器就绪 **3.45 s**（`LiveWeb: ready ms=3450 prewarmed=true`），基线 27.7 s。
+- 方案 3（VOD 封面混合）未完成设备验收：测试期间 `emulator-5556` 出现系统级 Pixel Launcher ANR（`Can't find service: activity`、点击被弹窗拦截）；主机并行模拟器负载过高时坐标点击不稳定，验收前建议先重启窗口模拟器并减少并行设备。
+- 本地基线：`dist/AuroraShelf-2.15.0-143-live-instant-LOCAL.apk`（本地开屏素材 + 本文改动）；`scripts/local-intro.sh apply|restore`。
