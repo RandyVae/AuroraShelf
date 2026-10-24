@@ -229,7 +229,11 @@ internal fun SearchScreen(
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                         shape = RoundedCornerShape(28.dp),
-                        modifier = Modifier.weight(1f),
+                        // HIG G3: expose the existing field label as an accessible name so
+                        // screen readers announce this editable node as the search input.
+                        modifier = Modifier
+                            .weight(1f)
+                            .semantics { contentDescription = "搜索当前视频源" },
                     )
                 }
             }

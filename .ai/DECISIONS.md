@@ -265,3 +265,17 @@ Decision:
 - G5: ExoPlayer prefers zh-Hans/zh/en text tracks and selects undetermined-language tracks; only applies when the source provides subtitles.
 
 Boundary: OEM-specific high-contrast switches that do not write the AOSP key are not detected; TalkBack traversal still needs a manual pass; API ≥36 official change listener is not registered (relaunch/settings observer only).
+
+## Forum and video loading round 3
+
+Date: 2026-10-24
+
+Status: Implemented and measured on a single idle emulator; full device suite 32/32 PASS.
+
+Decision:
+- Forum loading is progressive: `ForumRepository.loadProgressively` emits a merged page as soon as each source finishes, so the fastest source paints first. Page 1 is snapshotted in preferences (`forum_cache`, 12 h, 40 posts, tolerant decoding) and painted before the refresh. Page N+1 is prefetched after page N succeeds (single-slot, 2 min TTL) so scrolling usually needs no network.
+- Both forum sources now share one OkHttp connection pool instead of per-page `Jsoup.connect`; HTML is parsed with `Jsoup.parse(stream, null, url)` so charset is sniffed from the document. The startup HEAD warm-up was implemented, measured as an unquantified trade-off that sends requests to adult sites even when the user never opens the forum tab, and therefore removed.
+- Video: detail-page fetches are cached at companion level for 60 s with single-flight, shared by `resolve()` and `resolveEpisodes()`; opening one video now performs one detail-page GET instead of two. ExoPlayer uses `DefaultLoadControl(15s, 30s, 800ms, 1500ms)` for faster start/rebuffer recovery; HLS start remains network-bound, so measured READY improvements are partly network variance and must not be attributed to the buffer change.
+- Subtitle track selection now has a player overlay menu (48 dp, hidden when no text track); ExoPlayer calls `setOverrideForType`/`setTrackTypeDisabled`.
+
+Boundary: forum snapshot hides refresh failures behind stale content; forum prefetch costs one extra page of mobile data; unknown OEM high-contrast keys remain undetected.

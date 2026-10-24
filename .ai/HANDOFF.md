@@ -117,3 +117,20 @@ zipalign -c -P 16 -v 4 .../app-release.apk
 ## Takeover Instructions
 
 先读 `AGENTS.md` 与 `.ai/` 全部文件，执行 `git status` 与 `git log -12`；按 `ENVIRONMENT.md` 的 JDK 21 命令复跑 `testDebugUnitTest` 确认基线；HIG 相关改动先读 `docs/ui/hig-audit-2026-10-24.md` 的未达标项与残余风险，再动 UI。
+
+## 2026-10-24 16:30 HKT — 论坛/视频加载第三轮 + HIG 收尾（138）
+
+**本轮完成**
+- 论坛：源级渐进首屏、首页 12h 快照、第 N+1 页后台预取、两源共享 OkHttp 连接池；启动期 HEAD 预热按取舍移除（不再为未打开的论坛发请求）。
+- 视频：`resolve`/`resolveEpisodes` 共用 60s 单航班详情页缓存（打开视频详情页 GET 2→1）；ExoPlayer LoadControl 15s/30s/800ms/1500ms；原生播放器字幕按钮 + 轨道选择/关闭。
+- HIG 收尾：200% 搜索入口图标化（消除截断）、OEM 高对比候选键扩展、搜索/离线缓存语义、无障碍设备断言 3→6 项。
+- 实测（Release 138，同一模拟器）：论坛冷首屏 5.83/6.55 → **4.98 s**，有快照 **2.04 s**，第 2 页预取 953 ms；视频 tap→READY 7.1 → **4.2 s**（网络波动需谨慎归因），详情页 GET **2→1**。
+- 验证：JVM **140/0/1**；设备全量 **32/32 PASS**（含 AuroraFlow 10、无障碍 6、来源审计 5）；Lint **0 errors / 19 warnings / 3 hints**；Release **138**（SHA `7f9a9b0c…`）安装并冷启动成功。
+- **并发 Netgrey 品牌工作**：另一会话用独立 worktree 构建 137-netgrey，并改了主工作树的 `res/`、HomeScreen 标题、`docs/verification.md` 顶部、`.ai/PROJECT_STATE.md`、`.ai/TASKS.md`。这些改动原样保留、**未纳入本轮提交**；HomeScreen 的 HIG 改动（搜索图标/heading）与品牌标题同文件，也暂未提交。品牌完成后需与 138 代码合并出包并重跑设备套件。
+
+**仍开放**
+- 字幕菜单未取得真实有轨视频截图（抽样 4 条均无文本轨，按钮按设计隐藏）。
+- 论坛快照+刷新失败时 UI 无错误提示（仅空列表才显示 error）。
+- TalkBack 人工走查、未知 OEM 高对比键、E4 真机证据仍缺。
+- 论坛预取会额外消耗 1 页移动流量，可考虑做成设置开关。
+

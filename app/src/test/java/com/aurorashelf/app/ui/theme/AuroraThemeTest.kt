@@ -114,6 +114,19 @@ class AuroraThemeTest {
         assertTrue(AuroraHighContrastDarkColors.primary != auroraFallbackColorScheme(darkTheme = true).primary)
     }
 
+    @Test
+    fun parseHighContrastValueAcceptsOnlyKnownTruthySettings() {
+        assertTrue(parseHighContrastValue("1"))
+        assertTrue(parseHighContrastValue("true"))
+        assertTrue(parseHighContrastValue("TRUE"))
+        assertTrue(parseHighContrastValue(" true "))
+        assertFalse(parseHighContrastValue(null))
+        assertFalse(parseHighContrastValue(""))
+        assertFalse(parseHighContrastValue("0"))
+        assertFalse(parseHighContrastValue("false"))
+        assertFalse(parseHighContrastValue("2"))
+    }
+
     private fun assertTextPairsAtLeast(scheme: ColorScheme, minimum: Double) {
         for ((label, foreground, background) in criticalPairs(scheme)) {
             val ratio = contrastRatio(foreground, background)

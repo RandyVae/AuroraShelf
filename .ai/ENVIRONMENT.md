@@ -118,3 +118,12 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - Windowed `test` AVD (5556) became unstable under the 3-emulator load after reboot (`activity` service unavailable); final install verification was done on 5554. The windowed AVD was restarted but should be re-checked before demoing.
 - Release 137: SHA-256 722fbe9789986b5f657abef8a7b8ad2dc21f3e481164db315d303bf751dd565d; `dist/SHA256SUMS.txt` covers 9 APKs.
 - Loading measurement harness: `am start -W` then uiautomator dump every ~0.2 s until hero (`content-desc` starts with 播放) and ≥2 grid cards (`收藏视频`); sampling adds ~0.5–1 s per dump.
+
+## 2026-10-24 138 verification (forum/video loading + HIG close-out)
+
+- Build: `testDebugUnitTest assembleDebug assembleDebugAndroidTest` PASS; `assembleRelease` PASS; `lintDebug` PASS (0 errors / 19 warnings / 3 hints).
+- JVM: 140 tests / 0 failures / 1 skipped.
+- Device full suite (single `missavtest` AVD, idle host): 32 tests / 0 failures / 0 skipped, including AuroraFlowTest 10, HigAccessibilityTest 6, PreReleaseSourceAuditTest 5, live/playback/forum/comic regressions 11. This clears the previous "full suite blocked" item.
+- Measurements (Release 138, same emulator): forum cold 4.98 s (was 5.83/6.55), warm snapshot 2.04 s, page-2 prefetch 953 ms; video detail-page GET 2→1 (single-flight log), resolve 3.18 s→0.49 s with network variance, tap→READY 7.1 s→4.2 s.
+- Release 138: SHA-256 7f9a9b0c19c46c85e96d4f2e533c876ed0375c1fddd04792e8697187b66f173c, installed and cold-started.
+- Parallel session: Netgrey branding/candidate (137-netgrey) is being built in a separate worktree; its edits (`res/`, `HomeScreen` title, `docs/verification.md` top section, `.ai/PROJECT_STATE.md`, `.ai/TASKS.md`) were preserved untouched and excluded from this round's commits.

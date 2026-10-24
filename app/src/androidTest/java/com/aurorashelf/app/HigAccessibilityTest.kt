@@ -92,4 +92,38 @@ class HigAccessibilityTest {
             )
         }
     }
+
+    @Test
+    fun homeSearchEntryExposesStableSearchDescription() {
+        // Default font scale keeps the glass search entry; the same description is used by
+        // the icon-only fallback when the system font scale reaches 150%.
+        compose.onNodeWithContentDescription("搜索视频").assertExists()
+    }
+
+    @Test
+    fun searchScreenInputExposesReadableSemantics() {
+        compose.onNodeWithContentDescription("搜索视频").performClick()
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()
+        }
+        // HIG G3: the editable node has an accessible name and a set-text action.
+        compose.onNodeWithContentDescription("搜索当前视频源").assertExists()
+        compose.onNode(hasSetTextAction()).assertExists()
+    }
+
+    @Test
+    fun settingsPageExposesHeadingSemantics() {
+        compose.onNodeWithContentDescription("我的").performClick()
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodes(hasTestTag("personal-overview")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("personal-overview")
+            .performScrollToNode(hasTestTag("personal-settings-entry"))
+        compose.onNodeWithTag("personal-settings-entry").performClick()
+        compose.waitUntil(timeoutMillis = 5_000) {
+            compose.onAllNodes(hasText("设置") and isHeading()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(hasText("设置") and isHeading()).assertExists()
+        compose.onNodeWithTag("settings-list").assertExists()
+    }
 }

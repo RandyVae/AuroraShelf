@@ -178,8 +178,18 @@ private const val MIN_TEXT_CONTRAST = 4.5
 /** WCAG 2.1 non-text contrast threshold for icons and boundaries. */
 private const val MIN_NON_TEXT_CONTRAST = 3.0
 
-/** AOSP high-contrast-text flag; no public `Settings.Secure`/`Settings.Global` constant exists. */
-private const val HIGH_TEXT_CONTRAST_SETTING = "high_text_contrast_enabled"
+/**
+ * Known keys that persist Android's high-contrast-text ("高对比度文字/字体") switch.
+ *
+ * AOSP uses `high_text_contrast_enabled`; some OEM skins persist their own variant under
+ * `Settings.Secure`/`Settings.Global`. No public `Settings` constant exists for any of
+ * these keys, so they are kept as literals. Unknown vendor keys remain undetected.
+ */
+private val HIGH_TEXT_CONTRAST_SETTING_KEYS = listOf(
+    "high_text_contrast_enabled",
+    "accessibility_high_text_contrast_enabled",
+    "high_contrast_text",
+)
 
 /**
  * Coerces one sRGB channel to linear light, per WCAG 2.1 relative luminance.
@@ -231,17 +241,34 @@ internal fun schemeNeedsFallback(scheme: ColorScheme): Boolean {
 }
 
 /**
- * Reads the AOSP high-contrast-text flag from [Settings.Secure], falling back to
- * [Settings.Global] when the secure provider has no value for the key.
+ * Parses a persisted high-contrast flag. Only `"1"` and `"true"` (case-insensitive,
+ * surrounding whitespace ignored) count as enabled; `null`, `"0"`, `"false"` and every
+ * other value keep the normal palette.
  *
- * AOSP stores the feature as the string `"1"`; some builds store `"true"`. Any read
- * failure (missing provider, `SecurityException` on locked-down OEM images) is treated
- * as `false` so the app simply keeps the standard palette.
+ * Internal and free of Android APIs so the accepted value shapes can be unit-tested.
+ */
+internal fun parseHighContrastValue(raw: String?): Boolean {
+    val value = raw?.trim().orEmpty()
+    return value == "1" || value.equals("true", ignoreCase = true)
+}
+
+/**
+ * Reads Android's high-contrast-text flag, probing every key in
+ * `HIGH_TEXT_CONTRAST_SETTING_KEYS` through [Settings.Secure] first and [Settings.Global]
+ * second.
+ *
+ * Any single key reading `1`/`true` enables the high-contrast palette. Read failures
+ * (missing provider, `SecurityException` on locked-down OEM images) are treated as `false`.
+ *
+ * Boundary: this covers the AOSP key plus the known OEM aliases only; a vendor switch
+ * that persists an unknown key remains undetected and the app keeps the normal palette.
  */
 internal fun readHighTextContrastSetting(contentResolver: ContentResolver): Boolean = runCatching {
-    val value = Settings.Secure.getString(contentResolver, HIGH_TEXT_CONTRAST_SETTING)
-        ?: Settings.Global.getString(contentResolver, HIGH_TEXT_CONTRAST_SETTING)
-    value == "1" || value.equals("true", ignoreCase = true)
+    HIGH_TEXT_CONTRAST_SETTING_KEYS.any { key ->
+        val secureValue = Settings.Secure.getString(contentResolver, key)
+        val raw = secureValue ?: Settings.Global.getString(contentResolver, key)
+        parseHighContrastValue(raw)
+    }
 }.getOrDefault(false)
 
 /**
@@ -249,13 +276,13 @@ internal fun readHighTextContrastSetting(contentResolver: ContentResolver): Bool
  *
  * Android 16 (API 36, [Build.VERSION_CODES.BAKLAVA]) exposes the authoritative public
  * query `AccessibilityManager.isHighContrastTextEnabled()`, so it is used when available.
- * Every release additionally probes the AOSP setting key because:
+ * Every release additionally probes the known setting keys because:
  * - devices below API 36 have no public query API;
  * - some OEM skins expose their own "high contrast fonts/text" switch that does not
  *   reach this API, and a stale/false negative must not disable the legibility upgrade.
  *
- * Known boundary: OEM toggles that never write `high_text_contrast_enabled` remain
- * invisible here, and the app keeps the normal palette on those skins.
+ * Known boundary: a vendor switch that persists an unknown key remains invisible here,
+ * and the app keeps the normal palette on that skin.
  */
 internal fun isSystemHighContrastTextEnabled(context: Context): Boolean {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
@@ -272,9 +299,9 @@ internal fun isSystemHighContrastTextEnabled(context: Context): Boolean {
  * Tracks the system high-contrast flag for the lifetime of the composition.
  *
  * The initial value is read synchronously (a provider query is cheap and avoids a
- * palette flash). A [ContentObserver] on both settings URIs refreshes the state when the
- * user toggles the system setting while the app is running; failures to register or
- * unregister are ignored because this is a non-essential enhancement.
+ * palette flash). A [ContentObserver] on every known Secure/Global key URI refreshes the
+ * state when the user toggles the system setting while the app is running; failures to
+ * register or unregister are ignored because this is a non-essential enhancement.
  */
 @Composable
 private fun rememberSystemHighContrastText(context: Context): Boolean {
@@ -288,16 +315,10 @@ private fun rememberSystemHighContrastText(context: Context): Boolean {
             }
         }
         runCatching {
-            contentResolver.registerContentObserver(
-                Settings.Secure.getUriFor(HIGH_TEXT_CONTRAST_SETTING),
-                false,
-                observer,
-            )
-            contentResolver.registerContentObserver(
-                Settings.Global.getUriFor(HIGH_TEXT_CONTRAST_SETTING),
-                false,
-                observer,
-            )
+            HIGH_TEXT_CONTRAST_SETTING_KEYS.forEach { key ->
+                contentResolver.registerContentObserver(Settings.Secure.getUriFor(key), false, observer)
+                contentResolver.registerContentObserver(Settings.Global.getUriFor(key), false, observer)
+            }
         }
         onDispose { runCatching { contentResolver.unregisterContentObserver(observer) } }
     }

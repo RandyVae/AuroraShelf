@@ -133,6 +133,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
@@ -902,12 +903,24 @@ private fun OfflineCacheRow(
     onRetry: () -> Unit,
     onRemove: () -> Unit,
 ) {
+    // HIG G3: expose the download state (and progress when downloading) as a readable
+    // description so screen readers do not have to infer it from the small detail line.
+    val cacheStatusDescription = when (cached.state) {
+        OfflineCacheState.RESOLVING -> "正在解析缓存地址"
+        OfflineCacheState.QUEUED -> "等待缓存"
+        OfflineCacheState.DOWNLOADING -> "正在缓存，已完成 ${cached.percentDownloaded.toInt()}%"
+        OfflineCacheState.COMPLETED -> "缓存已完成，可离线观看"
+        OfflineCacheState.FAILED -> "缓存失败，可重试"
+        OfflineCacheState.REMOVING -> "正在删除缓存"
+    }
     Surface(
         onClick = onOpen,
         enabled = cached.isPlayableOffline,
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .semantics { stateDescription = cacheStatusDescription },
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
