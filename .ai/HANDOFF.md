@@ -1,5 +1,41 @@
 # Latest Handoff
 
+## 最新交接：2026-10-27 18:15 HKT — 173（华视影视极速加载优化、直播源设置迁移与 2.16.0 单主干固化）
+
+- **版本目標**：`2.16.0`（`versionCode = 173`，`versionName = "2.16.0"`）。前一版本 2.15.0 打 tag `v2.15.0` 歸檔。
+- **正式本地產物**：`dist/AuroraShelf-2.16.0-173-huavod-speedup-live-settings-LOCAL.apk`
+- **產物體積**：**4,420,833 bytes**；**SHA-256**：`66cf34968acaa9f86f0415ecefe93f78cad59046fee90bc1f584de4e7836d402`
+- **Git 產品線統一與清理（已驗證）**：
+  - 本地與遠端 GitHub 全局僅保留唯一主產品線 `main`；
+  - 徹底刪除所有過期及臨時分支（`origin/codex/feat-comic-source-settings`、`origin/codex/feat-forum-image-save`、`origin/codex/fix-forum-reader-loading`、`origin/feature/backdrop-liquid-tabs` 等）；
+  - `git branch -a` 實測確認僅剩 `* main` 與 `remotes/origin/main`。
+- **華視影視（Huavod）極速加載與 20s 廣告倒計時消化機制（已驗證）**：
+  1. **源站 Redis 倒計時逆向**：深度逆向 `huavod.com/player/js/art/EcPlayer6.js`，證實服務端強制 20 秒廣告倒計時；提前調用 `/Player/resolveUrl` 會返回 `too early` 並銷毀 token。
+  2. **前瞻預熱與協程單航班合併**：在 `PlaybackResolver` 中新增 `prewarmHuavod(pageUrl)` 與單航班合併；在 `AuroraViewModel` 中在 Feed 加載時後台靜默啟動前 4 部影片解析，在用戶瀏覽信息流時異步消化 20s 倒計時。實測用戶點擊已預熱影片時，**解析耗時 0ms（`cache=hit`），ExoPlayer 秒級出畫**！
+  3. **非防盜鏈 CDN 秒級直出**：快看/ikun 等非防盜鏈 CDN 片源直接放行播放，無需等待倒計時，200ms 秒出；
+  4. **零網絡開銷集數推導**：通過正則直接推導 `{vodId}-1-1`，省去詳情頁 1.5s~2s 往返；
+  5. **播放快取延長至 2 小時**：利用 BunnyCDN HMAC 簽名 24 小時有效特性，快取延長至 2 小時，切集重播秒開。
+- **直播源選擇移入「我的設置」與直播頁精簡（已驗證）**：
+  1. **直播頁吸頂欄精簡**：徹底移除 `LiveScreen.kt` 中的 Stripchat / HornyStudents 雙源切換膠囊條，僅保留單排分類篩選（全部、女主播、情侶、男主播、跨性別）；
+  2. **「我的設置」新增「直播源」**：在「設置」->「內容」中與視頻源、漫畫源並列，展示 Apple HIG 卡片及「使用中」微章；
+  3. **即時聯動**：在設置中切換（Stripchat / HornyStudents）後即時持久化至 `liveSourceId` 並即時刷新直播流列表。
+- **全量測試與構建（已驗證）**：
+  - JVM 206 項單元測試全通（`testDebugUnitTest` PASS in 2s）；
+  - Release APK 編譯成功（`assembleRelease` PASS in 1m 30s，versionCode 173）；
+  - `apksigner verify --verbose`：v2 簽名通過；`zipalign -c -v 4`：16 KB 頁面對齊通過；
+  - Android 模擬器 `emulator-5554` 實機安裝驗收通過。
+- **截圖存檔**：
+  - `screen_v173_live_clean.png`：直播頁徹底移除源選擇條，純淨單排分類；
+  - `screen_settings_menu.png`：設置中並列展示視頻源、漫畫源、直播源；
+  - `screen_live_sources_page.png`：直播源獨立設置頁（Stripchat / HornyStudents）；
+  - `screen_stripchat_selected_in_settings.png`：切換 Stripchat 後展示「使用中」微章；
+  - `screen_live_stripchat_active.png`：直播頁即時切換出畫 Stripchat 房間；
+  - `screen_video_sources.png`：切換視頻源為華視影院；
+  - `screen_huavod_feed.png`：華视影院首頁電影、電視劇、動漫 Feed 加載；
+  - `screen_huavod_playing.png`：華視影院影片 0ms 快取命中秒播。
+
+---
+
 ## 最新交接：2026-10-27 17:15 HKT — 172（HornyStudents 直播畫面裁切、視口黑屏與誤判私密秀深度根治）
 
 - **版本目標**：`2.15.0`（`versionCode = 172`）。

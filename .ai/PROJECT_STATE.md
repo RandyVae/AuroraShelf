@@ -1,17 +1,23 @@
 # Project State
 
-Last Updated: 2026-10-27 17:31 HKT
+Last Updated: 2026-10-27 18:15 HKT
 
 ## Project
 
-Netgrey · Android 2.16.0-dev（开发版本号已正式更新为 versionCode 173，versionName 2.16.0；2.15.0 versionCode 172 已正式打 tag 发布并在主干固化）
+Netgrey · Android 2.16.0（开发版本号已正式更新为 versionCode 173，versionName 2.16.0；2.15.0 versionCode 172 已正式打 tag 发布并在主干固化）
 
 ## Current Stage
 
-**2.16.0-dev（Candidate 173 开发阶段开启，单主线 main 分支已统一，所有过时分支全部清理）**：
+**2.16.0（Candidate 173）华视影视极速加载优化、直播源移至「我的设置」、单主线 main 收归与 2.16.0 正式里程碑**：
+- 本地交付包：`dist/AuroraShelf-2.16.0-173-huavod-speedup-live-settings-LOCAL.apk`
+- 产物体积：**4,420,833 bytes**；**SHA-256**：`66cf34968acaa9f86f0415ecefe93f78cad59046fee90bc1f584de4e7836d402`
 - 开发版本号：`versionCode = 173`，`versionName = "2.16.0"`
-- 单一产品线：`main`（已合入全部 172 项交付功能，其他临时与历史分支已全部移除，杜绝多 Agent 协作误解）
-- 2.15.0 正式发布基线：`v2.15.0` 对应 `versionCode = 172`，产物 `dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`（SHA-256 `ee4e955aaa283e53214c32804064d044d76605eae284389ee7fc5aedd07b7dfe`）。
+- 单一产品线：`main`（已合入全部交付功能，其他临时与历史分支已全部移除，杜绝多 Agent 协作误解）
+- 2.15.0 正式发布基线：`v2.15.0` 对应 `versionCode = 172`，产物 `dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`。
+- 核心功能与优化（已验证）：
+  1. **华视影视（Huavod）极速加载**：攻克源站 20 秒 Redis 广告倒计时门禁；实现首屏前瞻预热与倒计时后台消化，用户点播实测 **0ms 缓存命中秒开**；非防盗链 CDN 片源直出秒开；零网络集数推导；播放缓存由 2 分钟提升至 2 小时；
+  2. **直播源管理彻底移入「我的设置」**：直播页面吸顶栏精简为纯净单排分类，彻底移除源切换胶囊条；在「我的」->「设置」中新增「直播源」，与「视频源」、「漫画源」并列，支持 Stripchat / HornyStudents 自由切换并即时生效；
+  3. **JVM 单元测试 206 项全量通过**；Release APK 编译与签名通过；模拟器实机端到端走查全部通过。
 
 **172 版本（Candidate 172）HornyStudents 直播畫面裁切、視口黑屏與誤判私密秀深度根治已完成**（`versionCode = 172`，`versionName = 2.15.0`）：
 - 本地交付包：`dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`

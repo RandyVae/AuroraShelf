@@ -268,6 +268,20 @@ internal fun PlayerScreen(
         }
     }
     val nextEpisode = episodes.firstOrNull { it.number > selectedEpisode }
+    // Immediate pre-warm for next Huavod episode without waiting for full episode list parsing
+    LaunchedEffect(playbackUrl) {
+        if (ContentSourceCatalog.isHuavod(playbackUrl)) {
+            val epParam = PlaybackResolver().extractHuavodEpisodeParam(playbackUrl)
+            if (epParam != null) {
+                val parts = epParam.split('-')
+                if (parts.size >= 3) {
+                    val nextNid = (parts[2].toIntOrNull() ?: 1) + 1
+                    val nextEpUrl = "https://huavod.com/vodplay/${parts[0]}-${parts[1]}-$nextNid.html"
+                    PlaybackResolver().prewarmHuavod(nextEpUrl)
+                }
+            }
+        }
+    }
     // Warm the next episode once per selection: switching episodes changes the key and re-runs it.
     LaunchedEffect(video.id, nextEpisode?.pageUrl) {
         val next = nextEpisode ?: return@LaunchedEffect

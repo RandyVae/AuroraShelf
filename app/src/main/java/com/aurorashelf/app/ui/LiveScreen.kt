@@ -256,27 +256,13 @@ private fun LiveFeed(
             LiveHeader(onRefresh = onRefresh, onSettings = onSettings)
         }
         stickyHeader(key = "live-pinned-categories") {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().background(AuroraImmersiveBackground),
-            ) {
-                CategoryStrip(testTag = "live-source-bar") {
-                    LiveSourceCatalog.sources.forEach { source ->
-                        NetflixCategoryChip(
-                            selected = state.selectedSourceId == source.id,
-                            onClick = { onSelectSource(source.id) },
-                            label = source.name,
-                        )
-                    }
-                }
-                CategoryStrip(testTag = "live-category-bar") {
-                    LiveCategory.entries.forEach { category ->
-                        NetflixCategoryChip(
-                            selected = state.selectedCategory == category,
-                            onClick = { onCategory(category) },
-                            label = category.label,
-                        )
-                    }
+            CategoryStrip(testTag = "live-category-bar") {
+                LiveCategory.entries.forEach { category ->
+                    NetflixCategoryChip(
+                        selected = state.selectedCategory == category,
+                        onClick = { onCategory(category) },
+                        label = category.label,
+                    )
                 }
             }
         }

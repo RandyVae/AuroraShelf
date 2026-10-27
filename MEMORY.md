@@ -9,7 +9,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `126b425`（2026-10-27），未提交 0 个文件
+- Git：`main` @ `01596ab`（2026-10-27），未提交 11 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-10-27（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-10-27（今天）
@@ -18,22 +18,26 @@
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（2 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-10-27（今天）
 - Codex 全局记忆：该项目 cwd 暂无条目（`~/.codex/memories/` 仅覆盖少数目录）
-- 最后同步：2026-10-27 17:33 by `sync.py`
+- 最后同步：2026-10-27 18:14 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：极光视界（Netgrey）Android 客户端：Kotlin + Compose + Material 3，保留真实视频源，以液态玻璃与 Netflix 风格信息层级重构，不是网页套壳。
-- 当前阶段：**2.16.0-dev（Candidate 173 开发周期开启，统一收归 main 单主线，清理全部历史分支）**（`versionCode = 173`，`versionName = 2.16.0`）：
-  - 正式发布里程碑：`2.15.0`（`versionCode = 172`）已正式打 Tag `v2.15.0`，交付包 `dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`（SHA-256 `ee4e955aaa283e53214c32804064d044d76605eae284389ee7fc5aedd07b7dfe`）实测通过。
+- 当前阶段：**2.16.0（Candidate 173 华视影视极速加载优化、直播源移至「我的设置」、单主线 main 收归与 2.16.0 正式里程碑）**（`versionCode = 173`，`versionName = 2.16.0`）：
+  - 正式发布里程碑：`2.15.0`（`versionCode = 172`）已打 Tag `v2.15.0` 归档。交付包 `dist/AuroraShelf-2.16.0-173-huavod-speedup-live-settings-LOCAL.apk`（SHA-256 `66cf34968acaa9f86f0415ecefe93f78cad59046fee90bc1f584de4e7836d402`）实测通过。
   - 单一产品线固化：全局唯一保留 `main` 分支作为产品线，所有临时与过期分支（`origin/codex/feat-comic-source-settings`、`origin/codex/feat-forum-image-save`、`origin/codex/fix-forum-reader-loading`、`origin/feature/backdrop-liquid-tabs` 等）全部彻底砍掉，彻底消除后续其他 Agent 接手时的分支误解。
-  - 实测状态：JVM 205 tests 全通（201 passed, 0 failed, 4 skipped），Release 构建通过。
+  - 核心功能与优化：攻克华视影视 20 秒广告倒计时门禁，实现 Feed 前瞻预热与倒计时后台消化，点播实测 0ms 缓存命中秒开；直播页面移除切换条恢复纯净单排分类，直播源选择完整移入「我的设置」中独立管理。
+  - 实测状态：JVM 206 tests 全通（202 passed, 0 failed, 4 skipped），Release 构建通过，Android 模拟器实机端到端走查通过。
 - 进行中：开启 2.16.0 开发周期。
-- 下一步：按需接入新特性或执行下一阶段任务。
+- 下一步：按需接入新特性或执行下一阶段任务；审计报告 `docs/audit-2026-10-27.md` 的 P0 项（debug 签名、本地代理 token、SSDP 认证、论坛缓存计量、离线上限）尚未修复。
+- 审计：2026-10-27 完成只读项目审计，报告 `docs/audit-2026-10-27.md`（103 条：Critical 0 / High 22 / Medium 55 / Low 26），未修改任何业务代码；实测 JVM 206 tests / 0 failed / 4 skipped，lint 0 errors / 23 warnings。
 - 阻塞：无代码层阻断。
-- 最近一次更新：2026-10-27 17:32 HKT by Antigravity (gemini-3-flash)
+- 最近一次更新：2026-10-27 18:15 HKT by Antigravity (gemini-2.5-pro)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-10-27：华视影视极速加载优化、直播源设置迁移与 2.16.0 单主干固化（Candidate 173）。深度逆向华视影视 `EcPlayer6.js`，证实服务端通过 Redis TTL 实施 20 秒广告倒计时门禁且提前请求会烧毁 token 报 `too early`；在 `PlaybackResolver` 中实现 `prewarmHuavod` 与协程单航班合并，在 `AuroraViewModel` 中在首页 Feed 加载时后台静默启动前 4 部影片解析并后台消化 20s 倒计时，结合正则推导 `{vodId}-1-1` 消除详情页往返，用户在信息流选片后点击直接命中完成态缓存，达到 **0ms 即点即播**（实测 `cache=hit, resolve ms=0`）；针对快看等非防盗链 CDN 片源直接 200ms 放行播放；利用 BunnyCDN 签名 24 小时有效性将播放缓存延至 2 小时；在 `LiveScreen.kt` 中彻底移除 Stripchat / HornyStudents 切换胶囊条，仅保留单排分类；将直播源切换完整移至「我的设置」中与漫画源、视频源并列管理，支持即时生效与状态联动；清理删除所有本地与远端历史分支，全局仅保留单一主干 `main`；JVM 206 项单测全通，Release APK 4,420,833 bytes，SHA-256 `66cf34968acaa9f86f0415ecefe93f78cad59046fee90bc1f584de4e7836d402`。
 
 - 2026-10-27：HornyStudents 直播畫面裁切、視口高度塌陷黑屏與誤判私密秀深度根治（Candidate 172）。定位並根治五大缺陷：Chaturbate 底層播放器腳本動態注入 `clip-path: inset(0px 199.5px)` 削切左右兩側 200px，透過 CSS `!important` 規則覆蓋並在 JS 調度中強制 `clip-path: none !important; -webkit-clip-path: none !important;` 恢復完整相機原生畫面；Compose WebView 缺少 UA 全屏基準導致 `100vh` 容器高度塌陷為 `0px`（黑屏），改用 `window.visualViewport` 或 `window.innerWidth/innerHeight` 換算精確物理像素 `${viewportWidth}px` 與 `${viewportHeight}px` 覆蓋播放器及中間父層鏈；收緊私密秀選擇器排除常規導航 `<a data-testid="private-shows-tab">` 並引入 3 秒保護寬限期避免初始誤判阻斷；將播放器主節點從 `#mobile-room-root` 拔出至 `document.body` 頂層消除頂部 40px 偏移與底部截斷；在 `LiveCard` 與非全屏播放器默認適配 4:3 比例並動態跟隨相機分辨率消除黑條，橫屏全屏完美鋪滿 2340×1080；JVM 205 項單測 100% 通過，Release APK 4,418,209 bytes，SHA-256 `ee4e955aaa283e53214c32804064d044d76605eae284389ee7fc5aedd07b7dfe`。
 

@@ -1,13 +1,29 @@
 # 更新记录
 
-## 173 (2.16.0-dev) — 开启 2.16.0 开发周期与单主线收归
+## 173 (2.16.0) — 华视影视极速加载、直播源移至「我的设置」、Git 单主线收归与 2.16.0 正式里程碑
 
-- **版本周期升级**：
-  - 开发版本号正式更新为 `versionCode = 173`，`versionName = "2.16.0"`；
-  - 2.15.0（versionCode 172）正式打 tag `v2.15.0` 归档并在主干固化。
+- **华视影视（huavod.com）加载极速优化与广告倒计时消化机制（`PlaybackResolver.kt` / `AuroraViewModel.kt` / `PlayerScreen.kt`）**：
+  - **瓶颈逆向与突破**：深度逆向华视源站 `EcPlayer6.js`，证实源站对解析接口实施严格的 20 秒 Redis 广告倒计时门禁；提前请求会触发 `too early` 并销毁令牌；
+  - **前瞻预热与倒计时消化**：在 `PlaybackResolver` 中新增 `prewarmHuavod(pageUrl)` 与协程单航班合并；在 `AuroraViewModel` 中在首页 Feed 加载时后台静默启动前 4 部影片的 `Player/next` 并后台消化 20s 倒计时。当用户选片浏览后点击卡片，直接命中完成态缓存，达到 **0ms 即点即播**；
+  - **直出 CDN 穿透放行**：对快看/ikun 等非防盗链 CDN 片源直接放行播放，无需等待倒计时，200ms 秒出；
+  - **零网络开销集数推导**：通过正则匹配直接推导第一集播放地址（`{vodId}-1-1`），彻底省去 1.5s~2s 的详情页网络往返；
+  - **长效播放缓存延长至 2 小时**：利用 BunnyCDN HMAC 签名 24 小时有效的特性，将播放解析缓存从 2 分钟提升至 2 小时，大幅优化会话内重播与二次进入体验；
+  - **下一集静默预取与播放器状态感知**：播放详情页自动在后台预取下一集（`1-2`）；播放器针对华视影视展示专属「正在准备超清视频流...」友好提示，彻底消除黑屏卡死感。
+- **直播源切换彻底移入「我的设置」（`LiveScreen.kt` / `PersonalScreen.kt` / `LiveViewModel.kt`）**：
+  - **直播页吸顶条彻底精简**：从 `LiveScreen.kt` 的吸顶标题栏中彻底移除 Stripchat 与 HornyStudents 切换胶囊条，仅保留单排分类筛选（全部、女主播、情侣、男主播、跨性别），界面更纯净高阶；
+  - **「我的设置」中独立管理**：在「我的」->「设置」中新增「直播源」选项，与「视频源」、「漫画源」并列，采用 Apple HIG 质感卡片并标明「使用中」徽章；
+  - **即时响应与状态联动**：在设置中切换直播源（Stripchat / HornyStudents）后立即持久化至 Preferences 并即时刷新直播流列表。
 - **Git 产品线统一与多余分支清理**：
-  - 仅保留全局唯一主产品线 `main`；
-  - 清理砍掉所有历史与临时分支（`codex/feat-comic-source-settings`、`codex/feat-forum-image-save`、`codex/fix-forum-reader-loading`、`feature/backdrop-liquid-tabs` 等），杜绝多 Agent 协作时对开发主线产生误会。
+  - 开发版本号正式更新为 `versionCode = 173`，`versionName = "2.16.0"`；
+  - 2.15.0（versionCode 172）打 tag `v2.15.0` 归档并在主干固化；
+  - 本地与远端仅保留全局唯一主产品线 `main`；
+  - 彻底清理砍掉所有历史与临时分支（`origin/codex/feat-comic-source-settings`、`origin/codex/feat-forum-image-save`、`origin/codex/fix-forum-reader-loading`、`origin/feature/backdrop-liquid-tabs` 等），杜绝多 Agent 协作时对开发主线产生误会。
+- **测试与交付验证**：
+  - JVM 单元测试 206 项全量通过（`testDebugUnitTest` PASS in 2s）；
+  - Release APK 构建通过（`assembleRelease` PASS in 1m 30s，versionCode 173）；
+  - 交付包：`dist/AuroraShelf-2.16.0-173-huavod-speedup-live-settings-LOCAL.apk`（4,420,833 bytes）；
+  - SHA-256：`66cf34968acaa9f86f0415ecefe93f78cad59046fee90bc1f584de4e7836d402`；
+  - Android 模拟器实机走查：华视影视 0ms 命中即播验证通过；直播页面切换条移除、设置中直播源自由切换验证通过。
 
 ## 172 — HornyStudents 直播畫面裁切、視口黑屏與誤判私密秀深度根治
 

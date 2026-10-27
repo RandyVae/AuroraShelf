@@ -5,13 +5,19 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.LinkedHashMap
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
 import android.util.Log
 import com.aurorashelf.app.model.ContentSourceCatalog
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
@@ -19,6 +25,12 @@ import org.jsoup.parser.Parser
 
 data class PlaybackSource(val url: String, val referer: String)
 data class PlaybackEpisode(val number: Int, val label: String, val pageUrl: String)
+data class HuavodTokenEntry(
+    val token: String,
+    val adDurationMs: Long,
+    val issuedAtMs: Long,
+    val channelKey: String?,
+)
 
 /** Reads the media source published inside the page's video element. Never executes remote scripts. */
 class PlaybackResolver {
@@ -49,7 +61,7 @@ class PlaybackResolver {
         Log.i(TAG, "resolve start host=${runCatching { java.net.URI(pageUrl).host }.getOrNull()}")
         val startedAtMs = System.currentTimeMillis()
         require(SourceAddress.resolve(pageUrl, pageUrl) != null) { "视频页面地址无效" }
-        val cached = playbackCache.get(pageUrl)
+        val cached = huavodPlaybackCache.get(pageUrl) ?: playbackCache.get(pageUrl)
         if (cached != null) {
             Log.i(TAG, "timing resolve ms=${System.currentTimeMillis() - startedAtMs} cache=hit")
             return@withContext cached
@@ -324,26 +336,59 @@ class PlaybackResolver {
         PlaybackSource(masterUrl, referer = "https://beeg.com/").rememberFor(pageUrl, startedAtMs)
     }
 
-    internal suspend fun resolveHuavod(pageUrl: String, startedAtMs: Long): PlaybackSource = withContext(Dispatchers.IO) {
-        val playUrl = if (pageUrl.contains("/voddetail/")) {
-            val detailDoc = fetch(pageUrl)
-            parseHuavodEpisodes(detailDoc, pageUrl).firstOrNull()?.pageUrl
-                ?: detailDoc.selectFirst("a[href*=/vodplay/]")?.attr("href")?.let {
-                    SourceAddress.resolve(pageUrl, it)
-                } ?: throw IOException("未找到该影片的播放集数")
-        } else {
-            pageUrl
-        }
+    internal fun extractHuavodEpisodeParam(pageUrl: String): String? {
+        val vodPlayMatch = Regex("""/vodplay/(\d+-\d+-\d+)""").find(pageUrl)
+        if (vodPlayMatch != null) return vodPlayMatch.groupValues[1]
+        val vodDetailMatch = Regex("""/voddetail/(\d+)""").find(pageUrl)
+        if (vodDetailMatch != null) return "${vodDetailMatch.groupValues[1]}-1-1"
+        val path = runCatching { URI(pageUrl).path }.getOrNull() ?: pageUrl
+        val parts = path.substringAfterLast('/').substringBefore(".html").split('-')
+        return if (parts.size >= 3) "${parts[0]}-${parts[1]}-${parts[2]}" else null
+    }
 
-        val episodeMatch = Regex("""/vodplay/(\d+-\d+-\d+)""").find(playUrl)
-        val episodeParam = episodeMatch?.groupValues?.get(1)
+    internal suspend fun resolveHuavod(pageUrl: String, startedAtMs: Long): PlaybackSource = withContext(Dispatchers.IO) {
+        val episodeParam = extractHuavodEpisodeParam(pageUrl)
             ?: runCatching {
-                val parts = URI(playUrl).path.substringAfterLast('/').substringBefore(".html").split('-')
-                if (parts.size >= 3) "${parts[0]}-${parts[1]}-${parts[2]}" else null
+                val detailDoc = fetch(pageUrl)
+                parseHuavodEpisodes(detailDoc, pageUrl).firstOrNull()?.pageUrl?.let { extractHuavodEpisodeParam(it) }
             }.getOrNull() ?: throw IOException("无法识别影片集数编号")
 
-        val cachedNext = huavodTokenCache.get(episodeParam)
-        val (token, adDurationMs, issuedAtMs) = cachedNext ?: run {
+        val canonicalPlayUrl = "https://huavod.com/vodplay/$episodeParam.html"
+        val cached = huavodPlaybackCache.get(pageUrl)
+            ?: huavodPlaybackCache.get(canonicalPlayUrl)
+            ?: playbackCache.get(pageUrl)
+            ?: playbackCache.get(canonicalPlayUrl)
+        if (cached != null) {
+            Log.i(TAG, "huavod cache hit for $pageUrl in ${System.currentTimeMillis() - startedAtMs}ms")
+            return@withContext cached
+        }
+
+        // Single-flight deduplication: if already in-flight (e.g. from prewarm), join and await it
+        val inFlight = huavodInFlight[episodeParam]
+        if (inFlight != null && inFlight.isActive) {
+            Log.i(TAG, "huavod joining in-flight resolution for $episodeParam")
+            return@withContext inFlight.await().rememberHuavod(pageUrl, canonicalPlayUrl, startedAtMs)
+        }
+
+        val deferred = huavodScope.async(Dispatchers.IO) {
+            executeHuavodResolution(pageUrl, canonicalPlayUrl, episodeParam, startedAtMs)
+        }
+        huavodInFlight[episodeParam] = deferred
+        try {
+            deferred.await().rememberHuavod(pageUrl, canonicalPlayUrl, startedAtMs)
+        } finally {
+            huavodInFlight.remove(episodeParam)
+        }
+    }
+
+    private suspend fun executeHuavodResolution(
+        pageUrl: String,
+        canonicalPlayUrl: String,
+        episodeParam: String,
+        startedAtMs: Long,
+    ): PlaybackSource {
+        val cachedToken = huavodTokenCache.get(episodeParam)
+        val (token, adDurationMs, issuedAtMs, channelKey) = cachedToken ?: run {
             val nextUrl = "https://huavod.com/Player/next?episode=$episodeParam"
             val responseText = Jsoup.connect(nextUrl)
                 .userAgent(VideoRepository.USER_AGENT)
@@ -356,16 +401,23 @@ class PlaybackResolver {
             val mt = Regex(""""mt"\s*:\s*"([^"]+)"""").find(responseText)?.groupValues?.get(1)
                 ?: throw IOException("未能获取播放令牌")
             val adMs = Regex(""""ad_duration_ms"\s*:\s*(\d+)""").find(responseText)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
-            val entry = Triple(mt, adMs, System.currentTimeMillis())
+            val ck = Regex(""""channel_key"\s*:\s*"([^"]+)"""").find(responseText)?.groupValues?.get(1)?.replace("\\/", "/")
+            val entry = HuavodTokenEntry(mt, adMs, System.currentTimeMillis(), ck)
             huavodTokenCache.put(episodeParam, entry)
             entry
+        }
+
+        // Direct fast path: if channelKey is not BunnyCDN, play immediately without waiting!
+        if (!channelKey.isNullOrBlank() && !channelKey.contains("b-cdn.net") && (channelKey.endsWith(".m3u8") || channelKey.contains(".m3u8"))) {
+            Log.i(TAG, "huavod direct channel_key fast path: $channelKey")
+            return PlaybackSource(channelKey, "https://huavod.com/")
         }
 
         val elapsedMs = System.currentTimeMillis() - issuedAtMs
         val targetWaitMs = (adDurationMs - 2000L).coerceAtLeast(0L)
         val remainingWaitMs = (targetWaitMs - elapsedMs).coerceAtLeast(0L)
         if (remainingWaitMs > 0L) {
-            Log.i(TAG, "huavod waiting ad duration ms=$remainingWaitMs")
+            Log.i(TAG, "huavod waiting countdown: ${remainingWaitMs}ms (total ${adDurationMs}ms)")
             delay(remainingWaitMs)
         }
 
@@ -384,7 +436,32 @@ class PlaybackResolver {
         val directUrl = Regex(""""url"\s*:\s*"([^"]+)"""").find(resolveResp)?.groupValues?.get(1)?.replace("\\/", "/")
             ?: throw IOException("未能解析到播放直链")
 
-        PlaybackSource(directUrl, "https://huavod.com/").rememberFor(pageUrl, startedAtMs)
+        return PlaybackSource(directUrl, "https://huavod.com/")
+    }
+
+    private fun PlaybackSource.rememberHuavod(pageUrl: String, canonicalPlayUrl: String, startedAtMs: Long): PlaybackSource = also {
+        huavodPlaybackCache.put(pageUrl, it)
+        huavodPlaybackCache.put(canonicalPlayUrl, it)
+        playbackCache.put(pageUrl, it)
+        playbackCache.put(canonicalPlayUrl, it)
+        Log.i(TAG, "huavod resolved & cached for $pageUrl ($canonicalPlayUrl) in ${System.currentTimeMillis() - startedAtMs}ms")
+    }
+
+    fun prewarmHuavod(pageUrl: String) {
+        val episodeParam = extractHuavodEpisodeParam(pageUrl) ?: return
+        val canonicalPlayUrl = "https://huavod.com/vodplay/$episodeParam.html"
+        if (huavodPlaybackCache.get(pageUrl) != null || huavodPlaybackCache.get(canonicalPlayUrl) != null) return
+        if (huavodInFlight.containsKey(episodeParam)) return
+
+        huavodScope.launch(Dispatchers.IO) {
+            runCatching {
+                resolveHuavod(pageUrl, System.currentTimeMillis())
+            }.onSuccess { source ->
+                Log.i(TAG, "huavod prewarm ready for $episodeParam -> ${source.url.take(50)}")
+            }.onFailure { e ->
+                Log.w(TAG, "huavod prewarm failed for $episodeParam: ${e.message}")
+            }
+        }
     }
 
     private fun fetch(url: String): Document {
@@ -413,12 +490,16 @@ class PlaybackResolver {
         internal const val PAGE_CACHE_MAX_ENTRIES = 16
         // Media URLs can carry short-lived signatures; refresh them more eagerly than episode lists.
         private const val PLAYBACK_CACHE_TTL_MS = 2 * 60 * 1000L
+        internal const val HUAVOD_PLAYBACK_CACHE_TTL_MS = 2 * 60 * 60 * 1000L // 2 hours for Huavod signed URLs
         // Detail-page documents are shared by resolve() and resolveEpisodes() across resolver
         // instances, so one video open fetches the HTML at most once instead of twice.
         private val pageCache = PageFetchCache(PAGE_CACHE_TTL_MS, PAGE_CACHE_MAX_ENTRIES)
         private val playbackCache = CachedValue<PlaybackSource>(PLAYBACK_CACHE_TTL_MS, CACHE_MAX_ENTRIES)
+        private val huavodPlaybackCache = CachedValue<PlaybackSource>(HUAVOD_PLAYBACK_CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val episodeCache = CachedValue<List<PlaybackEpisode>>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
-        private val huavodTokenCache = CachedValue<Triple<String, Long, Long>>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
+        private val huavodTokenCache = CachedValue<HuavodTokenEntry>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
+        private val huavodInFlight = ConcurrentHashMap<String, Deferred<PlaybackSource>>()
+        private val huavodScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         private val ENCODED_SOURCE = Regex("""strencode2\(\s*["']([^"']+)["']\s*\)""")
         private val ESCAPE = Regex("%u([0-9a-fA-F]{4})|%([0-9a-fA-F]{2})")
         private val JSON_STRING = Regex("""\"([^\"]+)\"\s*:\s*\"((?:\\\\.|[^\"\\\\])*)\"""")

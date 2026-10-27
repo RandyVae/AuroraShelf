@@ -82,6 +82,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         // Warm the covers of the cached first page before Compose lays them out.
         prefetchCovers(initialCachedFeed?.videos.orEmpty())
         prefetchLeadingStream(initialCachedFeed?.videos.orEmpty())
+        prefetchHuavodStreams(initialCachedFeed?.videos.orEmpty())
         refresh()
     }
 
@@ -149,6 +150,27 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                 PlaybackResolver().resolve(lead)
             }.onSuccess { source ->
                 Log.i(PREFETCH_LOG_TAG, "leading stream prefetch ready host=${runCatching { java.net.URI(source.url).host }.getOrNull()}")
+            }
+        }
+    }
+
+    /**
+     * Proactively pre-warms playback streams for the top Huavod videos in the background.
+     * Starts the countdown early so tapping any prominent Huavod video starts with zero or near-zero wait.
+     */
+    private fun prefetchHuavodStreams(videos: List<VideoItem>) {
+        val targets = videos.asSequence()
+            .filter { ContentSourceCatalog.isHuavod(it.pageUrl) }
+            .take(4)
+            .toList()
+        if (targets.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            delay(DETAIL_PREFETCH_DELAY_MS)
+            val appContext = getApplication<Application>()
+            if (!isPrefetchEnabled(appContext)) return@launch
+            val resolver = PlaybackResolver()
+            targets.forEach { video ->
+                resolver.prewarmHuavod(video.pageUrl)
             }
         }
     }
@@ -280,6 +302,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                     prefetchCovers(videos)
                     prefetchDetails(videos)
                     prefetchLeadingStream(videos)
+                    prefetchHuavodStreams(videos)
                     _uiState.update {
                         it.copy(
                             videos = videos,

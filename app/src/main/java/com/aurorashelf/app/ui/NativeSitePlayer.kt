@@ -38,6 +38,7 @@ import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import com.aurorashelf.app.model.ContentSourceCatalog
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -310,7 +311,22 @@ internal fun NativeSitePlayer(
             },
             modifier = Modifier.fillMaxSize(),
         )
-        if (isLoading) CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
+        if (isLoading) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.align(Alignment.Center),
+            ) {
+                CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.size(36.dp))
+                if (ContentSourceCatalog.isHuavod(pageUrl)) {
+                    Text(
+                        text = "正在准备超清视频流...",
+                        color = Color.White.copy(alpha = 0.85f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
         error?.let { message ->
             Column(Modifier.align(Alignment.Center).background(Color.Black).padding(24.dp)) {
                 Text(message, color = Color.White)

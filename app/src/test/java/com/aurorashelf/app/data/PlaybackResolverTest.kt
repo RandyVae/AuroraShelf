@@ -89,6 +89,18 @@ class PlaybackResolverTest {
         assertEquals("https://huavod.com/vodplay/196089-1-2.html", episodes[1].pageUrl)
     }
 
+    @Test fun extractsHuavodEpisodeParamDirectlyWithoutNetworkFetch() {
+        val resolver = PlaybackResolver()
+        // Detail page maps to first episode 1-1
+        assertEquals("204156-1-1", resolver.extractHuavodEpisodeParam("https://huavod.com/voddetail/204156.html"))
+        assertEquals("204156-1-1", resolver.extractHuavodEpisodeParam("https://huavod.com/voddetail/204156/"))
+        // Explicit play page preserves exact line and episode numbers
+        assertEquals("204156-1-2", resolver.extractHuavodEpisodeParam("https://huavod.com/vodplay/204156-1-2.html"))
+        assertEquals("35642-2-10", resolver.extractHuavodEpisodeParam("https://huavod.com/vodplay/35642-2-10.html"))
+        // Fallback for path split
+        assertEquals("100-1-1", resolver.extractHuavodEpisodeParam("/vodplay/100-1-1.html"))
+    }
+
     @Test fun resolvesMissAvEscapedHlsMetadata() {
         val page = Jsoup.parse(
             "<script>const source='https:\\/\\/media.example\\/abc\\/playlist.m3u8?token=123';</script>",
