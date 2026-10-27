@@ -15,11 +15,17 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import com.aurorashelf.app.data.HornyStudentsLiveRepository
+import com.aurorashelf.app.data.StripchatLiveRepository
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -165,6 +171,8 @@ import com.aurorashelf.app.data.OfflineVideo
 import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
 import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
 import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
+import com.aurorashelf.app.ui.theme.AuroraInkContent
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -197,9 +205,41 @@ fun AuroraShelfApp(
     val activity = remember(context) { context.findActivity() }
     val hazeState = rememberHazeState()
     val liquidBackdrop = rememberLayerBackdrop()
+    val castManager = remember(context) { com.aurorashelf.app.cast.CastManager.getInstance(context) }
+    val castState by castManager.castState.collectAsStateWithLifecycle()
+    val selectedCastDevice by castManager.selectedDevice.collectAsStateWithLifecycle()
+    var isCastSheetVisible by rememberSaveable { mutableStateOf(false) }
+    val castController = remember(castState, selectedCastDevice) {
+        CastController(
+            onOpenCastSheet = { isCastSheetVisible = true },
+            isCasting = castState is com.aurorashelf.app.cast.CastState.Connected || selectedCastDevice != null,
+        )
+    }
+    val videosById = remember(state.allKnownVideos) {
+        state.allKnownVideos.associateBy(VideoItem::id)
+    }
+    val favoriteVideos = remember(state.allKnownVideos, state.favoriteIds) {
+        state.allKnownVideos.filter { it.id in state.favoriteIds }
+    }
+    val historyVideos = remember(videosById, state.historyIds) {
+        state.historyIds.mapNotNull { id -> videosById[id] }
+    }
+
+    // Staggered background pre-warming across all tabs so switching to any section is instantaneous
+    LaunchedEffect(Unit) {
+        // Step 1: Pre-warm forum feed and live stream DNS immediately off the main thread
+        forumViewModel.ensureLoaded()
+        StripchatLiveRepository.prefetchDns()
+        HornyStudentsLiveRepository.prefetchDns()
+        // Step 2: After Home's initial layout pass settles, warm comic and live streams
+        kotlinx.coroutines.delay(600)
+        comicViewModel.ensureLoaded()
+        liveViewModel.ensureLoaded()
+    }
     var isPlayerFullscreen by rememberSaveable(state.selectedVideo?.id) { mutableStateOf(false) }
     var isLiveFullscreen by rememberSaveable { mutableStateOf(false) }
     var isCurrentVideoPortrait by remember(state.selectedVideo?.id) { mutableStateOf<Boolean?>(null) }
+    var isCurrentLivePortrait by remember(liveState.selectedItem?.id) { mutableStateOf<Boolean?>(null) }
     var personalRoute by rememberSaveable { mutableStateOf(PersonalRoute.OVERVIEW) }
     val originalOrientation = remember(activity) { activity?.requestedOrientation }
     val isAnyFullscreen = isPlayerFullscreen || isLiveFullscreen
@@ -210,6 +250,7 @@ fun AuroraShelfApp(
         isPlayerFullscreen,
         isLiveFullscreen,
         isCurrentVideoPortrait,
+        isCurrentLivePortrait,
         state.selectedVideo,
         state.destination,
         liveState.selectedItem,
@@ -217,11 +258,11 @@ fun AuroraShelfApp(
     ) {
         activity ?: return@LaunchedEffect
         val insetsController = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
-        // The live player draws a fixed black scrim edge-to-edge; dark status/navigation icons
-        // would become invisible in the light theme, so force light icons while it is open.
-        val darkScrimVisible = state.destination == AppDestination.LIVE && liveState.selectedItem != null
-        insetsController.isAppearanceLightStatusBars = !systemInDarkTheme && !darkScrimVisible
-        insetsController.isAppearanceLightNavigationBars = !systemInDarkTheme && !darkScrimVisible
+        // All top-level screens (Home, Comics, Live, Forum, Me) and playback canvases are immersive
+        // dark surfaces. Keep status bar and navigation bar icons consistently light (white) so they
+        // remain crisp, legible, and never collide into the dark backgrounds in light mode.
+        insetsController.isAppearanceLightStatusBars = false
+        insetsController.isAppearanceLightNavigationBars = false
         if (isPlayerFullscreen && state.selectedVideo != null) {
             activity.requestedOrientation = when (isCurrentVideoPortrait) {
                 true -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
@@ -232,7 +273,10 @@ fun AuroraShelfApp(
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             insetsController.hide(WindowInsetsCompat.Type.systemBars())
         } else if (isLiveFullscreen) {
-            activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            activity.requestedOrientation = when (isCurrentLivePortrait) {
+                true -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                false, null -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            }
             insetsController.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             insetsController.hide(WindowInsetsCompat.Type.systemBars())
@@ -275,8 +319,8 @@ fun AuroraShelfApp(
     }
 
     Surface(
-        color = if (isAnyFullscreen) Color.Black else MaterialTheme.colorScheme.background,
-        contentColor = MaterialTheme.colorScheme.onBackground,
+        color = AuroraImmersiveBackground,
+        contentColor = AuroraInkContent,
         modifier = Modifier.fillMaxSize(),
     ) {
       BoxWithConstraints(
@@ -298,6 +342,8 @@ fun AuroraShelfApp(
             LocalWindowLayout provides windowLayout,
             LocalDockHeight provides dockHeight,
             LocalHazeState provides hazeState,
+            LocalBackdrop provides liquidBackdrop,
+            LocalCastController provides castController,
         ) {
         AnimatedContent(
             modifier = Modifier
@@ -313,7 +359,16 @@ fun AuroraShelfApp(
             } else Modifier),
             targetState = state.destination,
             transitionSpec = {
-                fadeIn(spring(stiffness = 520f)) togetherWith fadeOut()
+                val direction = targetState.ordinal.compareTo(initialState.ordinal)
+                val slideDistance = if (direction > 0) 36 else if (direction < 0) -36 else 0
+                (
+                    fadeIn(AppleSpring.Gentle) +
+                    scaleIn(initialScale = 0.96f, animationSpec = AppleSpring.Gentle) +
+                    slideInHorizontally(AppleSpring.GentleOffset) { slideDistance }
+                ) togetherWith (
+                    fadeOut(tween(140)) +
+                    scaleOut(targetScale = 0.98f, animationSpec = tween(140))
+                )
             },
             label = "destination",
         ) { destination ->
@@ -352,24 +407,35 @@ fun AuroraShelfApp(
                         onRetryChapter = comicViewModel::retryChapter,
                         onAuthenticate = comicViewModel::authenticate,
                         onSignOut = comicViewModel::signOut,
+                        onSettings = {
+                            personalRoute = PersonalRoute.SETTINGS
+                            viewModel.selectDestination(AppDestination.ME)
+                        },
                     )
                 }
 
                 AppDestination.LIVE -> {
-                    // Stripchat is only contacted once the live tab is opened.
+                    // Live stream sources are only contacted once the live tab is opened.
                     LaunchedEffect(Unit) { liveViewModel.ensureLoaded() }
                     LiveScreen(
                         state = liveState,
                         bottomPadding = LocalDockHeight.current,
                         isFullscreen = isLiveFullscreen,
                         onFullscreenChange = { isLiveFullscreen = it },
+                        onVideoOrientationChange = { isCurrentLivePortrait = it },
                         onCategory = liveViewModel::selectCategory,
+                        onSelectSource = liveViewModel::selectSource,
                         onRefresh = liveViewModel::refresh,
                         onLoadMore = liveViewModel::loadMore,
                         onOpen = liveViewModel::open,
                         onClose = {
                             isLiveFullscreen = false
+                            isCurrentLivePortrait = null
                             liveViewModel.close()
+                        },
+                        onSettings = {
+                            personalRoute = PersonalRoute.SETTINGS
+                            viewModel.selectDestination(AppDestination.ME)
                         },
                     )
                 }
@@ -382,22 +448,29 @@ fun AuroraShelfApp(
                     onLoadMore = forumViewModel::loadMore,
                     onPost = forumViewModel::open,
                     onClosePost = forumViewModel::closePost,
+                    onSelectSource = forumViewModel::selectSource,
+                    onSettings = {
+                        personalRoute = PersonalRoute.SETTINGS
+                        viewModel.selectDestination(AppDestination.ME)
+                    },
                 )
 
                 AppDestination.ME -> PersonalScreen(
                     route = personalRoute,
                     onRoute = { personalRoute = it },
-                    favorites = state.allKnownVideos.filter { it.id in state.favoriteIds },
-                    history = state.historyIds.mapNotNull { id -> state.allKnownVideos.find { it.id == id } },
+                    favorites = favoriteVideos,
+                    history = historyVideos,
                     favoriteIds = state.favoriteIds,
                     currentUrl = state.sourceUrl,
                     comicSources = comicState.sources,
                     selectedComicSourceId = comicState.selectedSourceId,
+                    selectedLiveSourceId = liveState.selectedSourceId,
                     onVideo = viewModel::openVideo,
                     onFavorite = viewModel::toggleFavorite,
                     onBrowseHome = { viewModel.selectDestination(AppDestination.HOME) },
                     onSave = viewModel::saveSourceUrl,
                     onComicSource = comicViewModel::selectSource,
+                    onLiveSource = liveViewModel::selectSource,
                     onOpenCached = viewModel::openVideo,
                 )
             }
@@ -472,19 +545,47 @@ fun AuroraShelfApp(
             )
         }
 
-        state.selectedVideo?.let { video ->
-            PlayerScreen(
-                video = video,
-                isFavorite = video.id in state.favoriteIds,
-                isFullscreen = isPlayerFullscreen,
-                relatedVideos = relatedVideos(video, state.videos),
-                favoriteIds = state.favoriteIds,
-                onBack = viewModel::closeVideo,
-                onFavorite = { viewModel.toggleFavorite(video) },
-                onFullscreenChange = { isPlayerFullscreen = it },
-                onVideoOrientationChange = { isCurrentVideoPortrait = it },
-                onVideo = viewModel::openVideo,
-                onRelatedFavorite = viewModel::toggleFavorite,
+        AnimatedVisibility(
+            visible = state.selectedVideo != null,
+            enter = slideInVertically(
+                animationSpec = spring(stiffness = 280f, dampingRatio = 0.86f),
+                initialOffsetY = { it / 4 },
+            ) + scaleIn(
+                animationSpec = spring(stiffness = 280f, dampingRatio = 0.86f),
+                initialScale = 0.93f,
+            ) + fadeIn(spring(stiffness = 280f, dampingRatio = 0.86f)),
+            exit = slideOutVertically(
+                animationSpec = spring(stiffness = 300f, dampingRatio = 0.88f),
+                targetOffsetY = { it / 3 },
+            ) + scaleOut(
+                animationSpec = spring(stiffness = 300f, dampingRatio = 0.88f),
+                targetScale = 0.95f,
+            ) + fadeOut(tween(160)),
+        ) {
+            state.selectedVideo?.let { video ->
+                val currentRelatedVideos = remember(video.id, state.videos) {
+                    relatedVideos(video, state.videos)
+                }
+                PlayerScreen(
+                    video = video,
+                    isFavorite = video.id in state.favoriteIds,
+                    isFullscreen = isPlayerFullscreen,
+                    relatedVideos = currentRelatedVideos,
+                    favoriteIds = state.favoriteIds,
+                    onBack = viewModel::closeVideo,
+                    onFavorite = { viewModel.toggleFavorite(video) },
+                    onFullscreenChange = { isPlayerFullscreen = it },
+                    onVideoOrientationChange = { isCurrentVideoPortrait = it },
+                    onVideo = viewModel::openVideo,
+                    onRelatedFavorite = viewModel::toggleFavorite,
+                )
+            }
+        }
+
+        if (isCastSheetVisible) {
+            CastDeviceSheet(
+                castManager = castManager,
+                onDismissRequest = { isCastSheetVisible = false },
             )
         }
         }
@@ -545,18 +646,20 @@ private fun ExpressiveBottomBar(
                     onSelect(destination)
                 },
             ) {
+                val isTabSelected = selected == destination
                 Icon(
                     imageVector = icon,
                     contentDescription = destination.label,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(21.dp),
+                    tint = if (isTabSelected) Color.White else Color(0xFFA0AAB8),
+                    modifier = Modifier.size(22.dp),
                 )
                 Text(
                     text = destination.label,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = if (isTabSelected) Color.White else Color(0xFFA0AAB8),
                     style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 12.sp,
-                        lineHeight = 12.sp,
+                        fontSize = 11.sp,
+                        lineHeight = 11.sp,
+                        fontWeight = if (isTabSelected) FontWeight.Bold else FontWeight.Medium,
                     ),
                     maxLines = 1,
                 )

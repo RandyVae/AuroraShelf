@@ -9,9 +9,9 @@ class ComicRepositoryTest {
     private val sources = ComicRepository().availableSources
 
     @Test
-    fun defaultCatalogContainsSevenDistinctNativeSources() {
+    fun defaultCatalogContainsTenDistinctNativeSources() {
         assertEquals(
-            listOf("komiic", "baozi", "copy", "ikmmh", "picacg", "ehentai", "jm"),
+            listOf("komiic", "baozi", "copy", "ikmmh", "picacg", "ehentai", "jm", "8muses", "gedecomix", "91dongman"),
             sources.map { it.id },
         )
         assertEquals(sources.size, sources.map { it.id }.distinct().size)

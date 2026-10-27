@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Netgrey / AuroraShelf launcher foreground:
+     Cinematic 3D folded ribbon N referencing Netflix iconic design.
+     Canvas: 108 x 108 dp adaptive icon grid. Safe zone: inner 66 dp circle.
+     Features:
+       - Multi-layer ribbon hierarchy: rear pillars, folded sash drop shadow, and front diagonal sash.
+       - Cinema arc: upward curved base evoking the classic curved cinema screen.
+       - Rich lighting: vertical shading on rear pillars and diagonal crimson gradient on the front ribbon.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Rear Pillars (Left & Right) with vertical shading -->
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M58.286,26.930 L58.265,38.911 L58.244,50.891 L57.258,48.110 C57.258,48.109 57.257,48.105 57.256,48.104 L55.983,74.776 C57.235,78.313 57.906,80.200 57.913,80.208 C57.923,80.218 58.637,80.261 59.499,80.304 C62.112,80.433 65.350,80.711 67.806,81.016 C68.375,81.087 68.864,81.123 68.894,81.097 C68.923,81.070 68.939,68.872 68.930,53.989 L68.912,26.930 L58.286,26.930 Z M39.068,26.895 L39.068,53.981 C39.068,68.879 39.082,81.083 39.100,81.100 C39.118,81.118 40.040,81.031 41.150,80.907 C42.260,80.783 43.794,80.628 44.559,80.563 C45.732,80.464 49.234,80.239 49.639,80.237 C49.757,80.236 49.765,79.627 49.782,68.764 L49.800,57.292 L50.647,59.690 C50.778,60.060 50.819,60.176 50.947,60.537 L52.220,33.872 C51.951,33.109 52.092,33.509 51.783,32.635 C50.742,29.694 49.860,27.199 49.821,27.091 L49.750,26.895 L39.068,26.895 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="54"
+                android:startY="26"
+                android:endX="54"
+                android:endY="82">
+                <item android:offset="0.0" android:color="#C11119" />
+                <item android:offset="1.0" android:color="#830A10" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Ribbon Drop Shadow onto Left Pillar -->
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M39.068,26.895 L39.068,42.099 L49.778,70.511 C49.779,69.860 49.781,69.508 49.782,68.764 L49.800,57.292 L50.647,59.690 C55.364,73.037 57.898,80.193 57.913,80.208 C57.923,80.218 58.637,80.261 59.499,80.304 C62.112,80.433 65.350,80.711 67.806,81.016 C68.375,81.087 68.864,81.123 68.894,81.097 C68.914,81.079 68.927,75.098 68.931,66.660 L58.270,36.010 L58.265,38.911 L58.244,50.891 L57.258,48.110 C56.295,45.392 55.652,43.575 51.783,32.635 C50.742,29.694 49.860,27.199 49.821,27.091 L49.750,26.895 L39.068,26.895 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="41"
+                android:startY="26"
+                android:endX="52"
+                android:endY="60">
+                <item android:offset="0.0" android:color="#C7000000" />
+                <item android:offset="0.5" android:color="#59000000" />
+                <item android:offset="1.0" android:color="#00000000" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Front Diagonal Sash Ribbon -->
+    <path
+        android:fillType="evenOdd"
+        android:pathData="M39.068,26.895 L49.800,57.306 L49.800,57.292 L50.647,59.690 C55.364,73.037 57.898,80.193 57.913,80.208 C57.923,80.218 58.637,80.261 59.499,80.304 C62.112,80.433 65.350,80.711 67.806,81.016 C68.372,81.087 68.859,81.123 68.893,81.097 L58.244,50.886 L58.244,50.891 L57.258,48.110 C56.295,45.392 55.652,43.575 51.783,32.635 C50.742,29.694 49.860,27.199 49.821,27.091 L49.750,26.895 L39.068,26.895 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="39"
+                android:startY="26"
+                android:endX="69"
+                android:endY="82">
+                <item android:offset="0.0" android:color="#FF1E27" />
+                <item android:offset="0.4" android:color="#E50914" />
+                <item android:offset="1.0" android:color="#B80711" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

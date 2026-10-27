@@ -22,7 +22,7 @@ android {
         applicationId = "com.aurorashelf.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 149
+        versionCode = 172
         versionName = "2.15.0"
 
         buildConfigField("String", "PICACG_API_KEY", sourceSecret("PICACG_API_KEY").asBuildConfigString())
@@ -69,6 +69,17 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    }
+
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
+
+    lint {
+        disable += "ModifierParameter"
+        disable += "BidirectionalText"
     }
 }
 

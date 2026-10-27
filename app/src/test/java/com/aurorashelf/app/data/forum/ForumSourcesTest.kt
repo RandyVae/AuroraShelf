@@ -71,6 +71,54 @@ class ForumSourcesTest {
     }
 
     @Test
+    fun t906ExtractsForumBaseUrlFromPortalHtml() {
+        val portalHtml = """
+            <ul class="nav navbar-nav navbar-right">
+              <li><a href="upload.php">上传</a></li>
+              <li><a href="v.php">视频</a></li>
+              <li><a target=blank href="https://t924.sol140.com" >自拍论坛</a></li>
+              <li><a target=blank href="webcam.php">美女视频</a></li>
+            </ul>
+        """.trimIndent()
+
+        val extracted = T906ForumSource.extractForumBaseUrl(portalHtml)
+        assertEquals("https://t924.sol140.com", extracted)
+    }
+
+    @Test
+    fun t906FallsBackWhenInitialDomainFails() = runBlocking {
+        assumeTrue(System.getenv("RUN_LIVE_FORUM_TESTS") == "1")
+        val source = T906ForumSource(initialBaseUrl = "https://t906.abc2507.cc")
+        val posts = source.load(1)
+        assertTrue(posts.isNotEmpty())
+        assertEquals("https://t924.sol140.com", source.activeBaseUrl)
+    }
+
+    @Test
+    fun t906ParserReadsActiveDomainPosts() {
+        val document = Jsoup.parse(
+            """
+            <table><tbody id="normalthread_856978"><tr>
+              <th class="subject new"><span id="thread_856978"><a href="viewthread.php?tid=856978&amp;extra=page%3D1">自拍帖子测试</a></span></th>
+              <td class="author"><cite><a href="space.php?uid=756473">测试作者</a></cite><em>2026-10-26</em></td>
+              <td class="nums"><strong>12</strong></td>
+              <td class="lastpost"><em><a><span title="2026-10-26 15:21">11 分钟前</span></a></em></td>
+            </tr></tbody></table>
+            """.trimIndent(),
+            "https://t924.sol140.com/forumdisplay.php?fid=33",
+        )
+
+        val post = T906ForumSource().parse(document).single()
+
+        assertEquals("856978", post.id)
+        assertEquals("自拍帖子测试", post.title)
+        assertEquals("测试作者", post.author)
+        assertEquals(12, post.replyCount)
+        assertTrue(post.updatedEpochSeconds > 0)
+        assertEquals("https://t924.sol140.com/viewthread.php?tid=856978&extra=page%3D1", post.url)
+    }
+
+    @Test
     fun repositoryMergesSourcesAndKeepsPartialResult() = runBlocking {
         val working = FakeSource("one", "来源一", listOf(post("one", "1", 100)))
         val failing = FakeSource("two", "来源二", failure = IOException("offline"))

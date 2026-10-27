@@ -19,6 +19,9 @@ class ComicRepository internal constructor(
             PicacgComicSource(authStore),
             EhentaiComicSource(),
             JmComicSource(),
+            EightMusesComicSource(),
+            GedeComixComicSource(),
+            Dongman91ComicSource(),
         ),
     )
 

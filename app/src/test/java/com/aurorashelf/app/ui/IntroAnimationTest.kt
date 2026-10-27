@@ -8,8 +8,8 @@ import org.junit.Test
 class IntroAnimationTest {
     @Test
     fun filmLengthMatchesShippedAsset() {
-        // The shipped 6.6 s original film; keep this in sync with res/raw/intro_film.mp4.
-        assertEquals(6_600L, IntroTiming.FILM_DURATION_MS)
+        // The shipped 5.7 s original film; keep this in sync with res/raw/intro_film.mp4.
+        assertEquals(5_700L, IntroTiming.FILM_DURATION_MS)
     }
 
     @Test

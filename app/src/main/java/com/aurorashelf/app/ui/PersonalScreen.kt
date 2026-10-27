@@ -51,7 +51,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.ScrollableDefaults
@@ -155,6 +157,8 @@ import com.aurorashelf.app.model.ContentSource
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.ComicSourceInfo
 import com.aurorashelf.app.model.FeedCategory
+import com.aurorashelf.app.model.LiveSourceCatalog
+import com.aurorashelf.app.model.LiveSourceInfo
 import com.aurorashelf.app.model.VideoItem
 import com.aurorashelf.app.data.AppPreferences
 import com.aurorashelf.app.data.SourceAddress
@@ -166,6 +170,12 @@ import com.aurorashelf.app.data.OfflineVideo
 import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
 import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
 import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
+import com.aurorashelf.app.ui.theme.AuroraMediaLabel
+import com.aurorashelf.app.ui.theme.AuroraMediaMuted
+import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
+import com.aurorashelf.app.ui.theme.AuroraMediaSurface
+import com.aurorashelf.app.ui.theme.AuroraProfileAccent
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -181,7 +191,7 @@ import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
-private enum class SettingsRoute { OVERVIEW, VIDEO_SOURCES, COMIC_SOURCES, OFFLINE_CACHE }
+private enum class SettingsRoute { OVERVIEW, VIDEO_SOURCES, COMIC_SOURCES, LIVE_SOURCES, OFFLINE_CACHE }
 
 @Composable
 internal fun PersonalScreen(
@@ -193,64 +203,73 @@ internal fun PersonalScreen(
     currentUrl: String,
     comicSources: List<ComicSourceInfo>,
     selectedComicSourceId: String,
+    selectedLiveSourceId: String = LiveSourceCatalog.STRIPCHAT.id,
     onVideo: (VideoItem) -> Unit,
     onFavorite: (VideoItem) -> Unit,
     onBrowseHome: () -> Unit,
     onSave: (String) -> Unit,
     onComicSource: (String) -> Unit,
+    onLiveSource: (String) -> Unit = {},
     onOpenCached: (VideoItem) -> Unit,
 ) {
     BackHandler(enabled = route != PersonalRoute.OVERVIEW) { onRoute(PersonalRoute.OVERVIEW) }
-    AnimatedContent(
-        targetState = route,
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
-        label = "personal-route",
-    ) { currentRoute ->
-        when (currentRoute) {
-            PersonalRoute.OVERVIEW -> PersonalOverview(
-                favoriteCount = favorites.size,
-                historyCount = history.size,
-                currentSource = ContentSourceCatalog.find(currentUrl)?.name ?: "自定义视频源",
-                onFavorites = { onRoute(PersonalRoute.FAVORITES) },
-                onHistory = { onRoute(PersonalRoute.HISTORY) },
-                onSettings = { onRoute(PersonalRoute.SETTINGS) },
-            )
-            PersonalRoute.FAVORITES -> LibraryScreen(
-                title = "我的收藏",
-                emptyMessage = "收藏的视频会出现在这里",
-                emptyActionLabel = "去首页看看",
-                onEmptyAction = onBrowseHome,
-                videos = favorites,
-                onVideo = onVideo,
-                onFavorite = onFavorite,
-                favoriteIds = favoriteIds,
-                onBack = { onRoute(PersonalRoute.OVERVIEW) },
-                testTag = "personal-favorites",
-                emptyIcon = Icons.Outlined.FavoriteBorder,
-            )
-            PersonalRoute.HISTORY -> LibraryScreen(
-                title = "观看历史",
-                emptyMessage = "播放过的视频会保留在这里",
-                emptyActionLabel = "去首页看看",
-                onEmptyAction = onBrowseHome,
-                videos = history,
-                onVideo = onVideo,
-                onFavorite = onFavorite,
-                favoriteIds = favoriteIds,
-                onBack = { onRoute(PersonalRoute.OVERVIEW) },
-                testTag = "personal-history",
-                emptyIcon = Icons.Default.History,
-            )
-            PersonalRoute.SETTINGS -> SettingsScreen(
-                currentUrl = currentUrl,
-                comicSources = comicSources,
-                selectedComicSourceId = selectedComicSourceId,
-                onSave = onSave,
-                onComicSource = onComicSource,
-                onOpenCached = onOpenCached,
-                onBrowseHome = onBrowseHome,
-                onBack = { onRoute(PersonalRoute.OVERVIEW) },
-            )
+    Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
+        AnimatedContent(
+            targetState = route,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "personal-route",
+        ) { currentRoute ->
+            when (currentRoute) {
+                PersonalRoute.OVERVIEW -> PersonalOverview(
+                    favoriteCount = favorites.size,
+                    historyCount = history.size,
+                    currentSource = ContentSourceCatalog.find(currentUrl)?.name ?: "自定义视频源",
+                    favorites = favorites,
+                    history = history,
+                    onVideo = onVideo,
+                    onFavorites = { onRoute(PersonalRoute.FAVORITES) },
+                    onHistory = { onRoute(PersonalRoute.HISTORY) },
+                    onSettings = { onRoute(PersonalRoute.SETTINGS) },
+                )
+                PersonalRoute.FAVORITES -> LibraryScreen(
+                    title = "我的收藏",
+                    emptyMessage = "收藏的视频会出现在这里",
+                    emptyActionLabel = "去首页看看",
+                    onEmptyAction = onBrowseHome,
+                    videos = favorites,
+                    onVideo = onVideo,
+                    onFavorite = onFavorite,
+                    favoriteIds = favoriteIds,
+                    onBack = { onRoute(PersonalRoute.OVERVIEW) },
+                    testTag = "personal-favorites",
+                    emptyIcon = Icons.Outlined.FavoriteBorder,
+                )
+                PersonalRoute.HISTORY -> LibraryScreen(
+                    title = "观看历史",
+                    emptyMessage = "播放过的视频会保留在这里",
+                    emptyActionLabel = "去首页看看",
+                    onEmptyAction = onBrowseHome,
+                    videos = history,
+                    onVideo = onVideo,
+                    onFavorite = onFavorite,
+                    favoriteIds = favoriteIds,
+                    onBack = { onRoute(PersonalRoute.OVERVIEW) },
+                    testTag = "personal-history",
+                    emptyIcon = Icons.Default.History,
+                )
+                PersonalRoute.SETTINGS -> SettingsScreen(
+                    currentUrl = currentUrl,
+                    comicSources = comicSources,
+                    selectedComicSourceId = selectedComicSourceId,
+                    selectedLiveSourceId = selectedLiveSourceId,
+                    onSave = onSave,
+                    onComicSource = onComicSource,
+                    onLiveSource = onLiveSource,
+                    onOpenCached = onOpenCached,
+                    onBrowseHome = onBrowseHome,
+                    onBack = { onRoute(PersonalRoute.OVERVIEW) },
+                )
+            }
         }
     }
 }
@@ -260,14 +279,17 @@ private fun PersonalOverview(
     favoriteCount: Int,
     historyCount: Int,
     currentSource: String,
+    favorites: List<VideoItem> = emptyList(),
+    history: List<VideoItem> = emptyList(),
+    onVideo: (VideoItem) -> Unit = {},
     onFavorites: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
 ) {
     LazyColumn(
         contentPadding = PaddingValues(
-            start = 24.dp,
-            end = 24.dp,
+            start = 20.dp,
+            end = 20.dp,
             top = 22.dp,
             bottom = LocalDockHeight.current + 24.dp,
         ),
@@ -281,47 +303,94 @@ private fun PersonalOverview(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    shape = CircleShape,
-                    modifier = Modifier.size(64.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(32.dp))
-                    }
-                }
+                NetflixProfileAvatar(
+                    sizeDp = 56.dp,
+                    contentDescription = "站点设置",
+                    onClick = onSettings,
+                )
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
                     Text(
                         "我的",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                        ),
+                        color = Color.White,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        "收藏、历史与应用设置",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        "片单、历史与应用设置",
+                        color = AuroraMediaMuted,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
             }
         }
+
+        if (favorites.isNotEmpty()) {
+            item {
+                NetflixSectionHeader(
+                    title = "我的片单",
+                    actionText = "全部 ($favoriteCount)",
+                    onAction = onFavorites,
+                )
+            }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    items(favorites.take(10)) { video ->
+                        NetflixPosterShelfCard(
+                            video = video,
+                            onClick = { onVideo(video) },
+                        )
+                    }
+                }
+            }
+        }
+
+        if (history.isNotEmpty()) {
+            item {
+                NetflixSectionHeader(
+                    title = "继续观看",
+                    actionText = "全部 ($historyCount)",
+                    onAction = onHistory,
+                )
+            }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    items(history.take(10)) { video ->
+                        NetflixPosterShelfCard(
+                            video = video,
+                            onClick = { onVideo(video) },
+                        )
+                    }
+                }
+            }
+        }
+
         item { SettingsSectionLabel("你的内容") }
         item {
             SettingsNavigationCard {
                 SettingsNavigationRow(
-                    icon = { Icon(Icons.Default.Favorite, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Favorite, contentDescription = null, tint = AuroraCoral) },
                     title = "收藏",
                     supporting = "稍后继续观看已保存的内容",
                     value = "$favoriteCount 个",
                     onClick = onFavorites,
                     modifier = Modifier.testTag("personal-favorites-entry"),
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = Color(0xFF262626))
                 SettingsNavigationRow(
-                    icon = { Icon(Icons.Default.History, contentDescription = null) },
+                    icon = { Icon(Icons.Default.History, contentDescription = null, tint = Color.White) },
                     title = "历史",
                     supporting = "查看最近播放过的视频",
                     value = "$historyCount 条",
@@ -334,7 +403,7 @@ private fun PersonalOverview(
         item {
             SettingsNavigationCard {
                 SettingsNavigationRow(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White) },
                     title = "设置",
                     supporting = "视频源、漫画源与离线缓存",
                     value = currentSource,
@@ -402,8 +471,10 @@ private fun SettingsScreen(
     currentUrl: String,
     comicSources: List<ComicSourceInfo>,
     selectedComicSourceId: String,
+    selectedLiveSourceId: String,
     onSave: (String) -> Unit,
     onComicSource: (String) -> Unit,
+    onLiveSource: (String) -> Unit,
     onOpenCached: (VideoItem) -> Unit,
     onBrowseHome: () -> Unit,
     onBack: () -> Unit,
@@ -447,7 +518,7 @@ private fun SettingsScreen(
         )
     }
     Surface(
-        color = MaterialTheme.colorScheme.background,
+        color = AuroraImmersiveBackground,
         modifier = Modifier.fillMaxSize(),
     ) {
         AnimatedContent(
@@ -459,6 +530,7 @@ private fun SettingsScreen(
                 SettingsRoute.OVERVIEW -> SettingsOverview(
                     selectedSource = ContentSourceCatalog.find(currentUrl),
                     selectedComicSource = comicSources.find { it.id == selectedComicSourceId },
+                    selectedLiveSource = LiveSourceCatalog.find(selectedLiveSourceId),
                     completedCount = completedCount,
                     downloadedBytes = downloadedBytes,
                     videoPreloadEnabled = videoPreloadEnabled,
@@ -479,6 +551,7 @@ private fun SettingsScreen(
                     onBack = onBack,
                     onVideoSources = { route = SettingsRoute.VIDEO_SOURCES },
                     onComicSources = { route = SettingsRoute.COMIC_SOURCES },
+                    onLiveSources = { route = SettingsRoute.LIVE_SOURCES },
                     onOfflineCache = { route = SettingsRoute.OFFLINE_CACHE },
                 )
                 SettingsRoute.VIDEO_SOURCES -> VideoSourcesPage(
@@ -493,6 +566,12 @@ private fun SettingsScreen(
                     sources = comicSources,
                     selectedSourceId = selectedComicSourceId,
                     onSource = onComicSource,
+                    onBack = { route = SettingsRoute.OVERVIEW },
+                )
+                SettingsRoute.LIVE_SOURCES -> LiveSourcesPage(
+                    sources = LiveSourceCatalog.sources,
+                    selectedSourceId = selectedLiveSourceId,
+                    onSource = onLiveSource,
                     onBack = { route = SettingsRoute.OVERVIEW },
                 )
                 SettingsRoute.OFFLINE_CACHE -> OfflineCachePage(
@@ -515,6 +594,7 @@ private fun SettingsScreen(
 private fun SettingsOverview(
     selectedSource: ContentSource?,
     selectedComicSource: ComicSourceInfo?,
+    selectedLiveSource: LiveSourceInfo?,
     completedCount: Int,
     downloadedBytes: Long,
     videoPreloadEnabled: Boolean,
@@ -526,6 +606,7 @@ private fun SettingsOverview(
     onBack: () -> Unit,
     onVideoSources: () -> Unit,
     onComicSources: () -> Unit,
+    onLiveSources: () -> Unit,
     onOfflineCache: () -> Unit,
 ) {
     LazyColumn(
@@ -564,6 +645,15 @@ private fun SettingsOverview(
                 )
                 HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
                 SettingsNavigationRow(
+                    icon = { Icon(Icons.Default.LiveTv, contentDescription = null) },
+                    title = "直播源",
+                    supporting = "管理全球真人与校园风情直播",
+                    value = selectedLiveSource?.name ?: "Stripchat",
+                    onClick = onLiveSources,
+                    modifier = Modifier.testTag("settings-live-sources"),
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
+                SettingsNavigationRow(
                     icon = { Icon(Icons.Default.Download, contentDescription = null) },
                     title = "离线缓存",
                     supporting = "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
@@ -574,68 +664,21 @@ private fun SettingsOverview(
         }
         item { SettingsSectionLabel("体验") }
         item {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(18.dp),
-                ) {
-                    Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("跟随系统外观", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "自动使用 Material You 动态色、日间或夜间主题",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-            }
+            SettingsInfoCard(
+                icon = { Icon(Icons.Outlined.Info, contentDescription = null) },
+                title = "跟随系统外观",
+                supporting = "自动使用 Material You 动态色、日间或夜间主题",
+            )
         }
         item {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                shape = RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                        .toggleable(
-                            value = videoPreloadEnabled,
-                            role = Role.Switch,
-                            onValueChange = onVideoPreloadChange,
-                        )
-                        .padding(horizontal = 18.dp, vertical = 14.dp)
-                        .testTag("settings-video-preload"),
-                ) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text("视频预加载", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            "仅 Wi-Fi 下预取首页视频详情与下一集地址",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                    // The enclosing row owns the toggle semantics; the switch only reflects state.
-                    Switch(checked = videoPreloadEnabled, onCheckedChange = null)
-                }
-            }
+            SettingsSwitchRow(
+                icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                title = "视频预加载",
+                supporting = "仅 Wi-Fi 下预取首页视频详情与下一集地址",
+                checked = videoPreloadEnabled,
+                onCheckedChange = onVideoPreloadChange,
+                testTag = "settings-video-preload",
+            )
         }
         item {
             IntroPreferenceRow(
@@ -661,7 +704,34 @@ private fun SettingsOverview(
 }
 
 @Composable
-private fun IntroPreferenceRow(
+private fun SettingsInfoCard(
+    icon: @Composable () -> Unit,
+    title: String,
+    supporting: String,
+) {
+    SettingsCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(18.dp),
+        ) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+                icon()
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    supporting,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSwitchRow(
     icon: @Composable () -> Unit,
     title: String,
     supporting: String,
@@ -669,11 +739,7 @@ private fun IntroPreferenceRow(
     onCheckedChange: (Boolean) -> Unit,
     testTag: String,
 ) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    SettingsCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -684,8 +750,13 @@ private fun IntroPreferenceRow(
                 .padding(horizontal = 18.dp, vertical = 14.dp)
                 .testTag(testTag),
         ) {
-            icon()
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+                icon()
+            }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                modifier = Modifier.weight(1f),
+            ) {
                 Text(title, style = MaterialTheme.typography.titleMedium)
                 Text(
                     supporting,
@@ -693,28 +764,55 @@ private fun IntroPreferenceRow(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+            // The row owns the switch semantics; this visual switch mirrors its state.
             Switch(checked = checked, onCheckedChange = null)
         }
     }
 }
 
 @Composable
+private fun IntroPreferenceRow(
+    icon: @Composable () -> Unit,
+    title: String,
+    supporting: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    testTag: String,
+) {
+    SettingsSwitchRow(
+        icon = icon,
+        title = title,
+        supporting = supporting,
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        testTag = testTag,
+    )
+}
+
+@Composable
+private fun SettingsCard(content: @Composable () -> Unit) {
+    Surface(
+        color = AuroraMediaSurface,
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, Color(0xFF262626)),
+        modifier = Modifier.fillMaxWidth(),
+        content = content,
+    )
+}
+
+@Composable
 private fun SettingsSectionLabel(label: String) {
     Text(
-        label,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 6.dp, top = 12.dp, bottom = 2.dp),
+        text = label,
+        style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+        color = AuroraCoral,
+        modifier = Modifier.padding(start = 6.dp, top = 14.dp, bottom = 4.dp),
     )
 }
 
 @Composable
 private fun SettingsNavigationCard(content: @Composable () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
+    SettingsCard {
         Column { content() }
     }
 }
@@ -741,26 +839,26 @@ private fun SettingsNavigationRow(
             .padding(horizontal = 18.dp, vertical = 16.dp),
     ) {
         Surface(
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shape = RoundedCornerShape(10.dp),
+            color = Color(0xFF262626),
+            contentColor = Color.White,
             modifier = Modifier.size(44.dp),
         ) {
             Box(contentAlignment = Alignment.Center, content = { icon() })
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
             Text(
                 supporting,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AuroraMediaMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
         value?.let {
             Text(
                 it,
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.labelLarge,
+                color = AuroraCoral,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.widthIn(max = 126.dp),
@@ -769,7 +867,7 @@ private fun SettingsNavigationRow(
         Icon(
             Icons.AutoMirrored.Filled.ArrowForward,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = AuroraMediaMuted,
         )
     }
 }
@@ -786,16 +884,16 @@ private fun SettingsPageHeader(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = backDescription)
+            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = backDescription, tint = Color.White)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                color = Color.White,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = AuroraMediaMuted)
         }
     }
 }
@@ -816,6 +914,8 @@ private fun VideoSourcesPage(
                 it.description.contains(filter, ignoreCase = true)
         }
     }
+    val directSources = remember(filteredSources) { filteredSources.filter { it.isDirectDomestic } }
+    val overseasSources = remember(filteredSources) { filteredSources.filter { !it.isDirectDomestic } }
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = LocalDockHeight.current + 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -823,14 +923,12 @@ private fun VideoSourcesPage(
     ) {
         item { SettingsPageHeader("视频源", "选择后立即刷新首页内容", onBack) }
         item {
-            OutlinedTextField(
-                value = filter,
-                onValueChange = { filter = it },
-                placeholder = { Text("搜索视频源") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth(),
+            CenteredSearchBar(
+                query = filter,
+                onQueryChange = { filter = it },
+                placeholder = "搜索视频源",
+                onSearch = {},
+                onClear = { filter = "" },
             )
         }
         if (filteredSources.isEmpty()) {
@@ -842,25 +940,44 @@ private fun VideoSourcesPage(
                 )
             }
         } else {
-            items(filteredSources, key = ContentSource::id) { source ->
-                SourceOption(
-                    source = source,
-                    selected = selectedSourceId == source.id,
-                    onClick = { onSave(source.baseUrl) },
-                )
+            if (directSources.isNotEmpty()) {
+                item(key = "section-direct-heading") {
+                    SettingsSectionLabel("精选推荐（大陆直连稳定）")
+                }
+                items(directSources, key = ContentSource::id) { source ->
+                    SourceOption(
+                        source = source,
+                        selected = selectedSourceId == source.id,
+                        onClick = { onSave(source.baseUrl) },
+                    )
+                }
+            }
+            if (overseasSources.isNotEmpty()) {
+                item(key = "section-overseas-heading") {
+                    SettingsSectionLabel("扩展视频源（海外/国际线路）")
+                }
+                items(overseasSources, key = ContentSource::id) { source ->
+                    SourceOption(
+                        source = source,
+                        selected = selectedSourceId == source.id,
+                        onClick = { onSave(source.baseUrl) },
+                    )
+                }
             }
         }
         item { SettingsSectionLabel("自定义站点") }
         item {
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                color = AuroraMediaSurface,
+                contentColor = Color.White,
                 shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, Color(0xFF262626)),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(18.dp)) {
                     Text(
                         "仅适用于与默认站点结构兼容的地址。不会在地址中保存账号信息。",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = AuroraMediaMuted,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedTextField(
@@ -919,14 +1036,12 @@ private fun ComicSourcesPage(
     ) {
         item { SettingsPageHeader("漫画源", "选择后立即刷新漫画内容", onBack) }
         item {
-            OutlinedTextField(
-                value = filter,
-                onValueChange = { filter = it },
-                placeholder = { Text("搜索漫画源") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier.fillMaxWidth(),
+            CenteredSearchBar(
+                query = filter,
+                onQueryChange = { filter = it },
+                placeholder = "搜索漫画源",
+                onSearch = {},
+                onClear = { filter = "" },
             )
         }
         if (filteredSources.isEmpty()) {
@@ -976,8 +1091,10 @@ private fun OfflineCachePage(
         if (cachedVideos.isEmpty()) {
             item {
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = AuroraMediaSurface,
+                    contentColor = Color.White,
                     shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, Color(0xFF262626)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
@@ -988,16 +1105,19 @@ private fun OfflineCachePage(
                         Icon(
                             Icons.Default.Download,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
+                            tint = AuroraCoral,
                             modifier = Modifier.size(36.dp),
                         )
-                        Text("暂无离线内容", style = MaterialTheme.typography.titleMedium)
+                        Text("暂无离线内容", style = MaterialTheme.typography.titleMedium, color = Color.White)
                         Text(
                             "播放视频时点击缓存按钮，任务和已下载内容会显示在这里。",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = AuroraMediaMuted,
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        Button(onClick = onBrowseHome) { Text("去首页缓存视频") }
+                        Button(
+                            onClick = onBrowseHome,
+                            colors = ButtonDefaults.buttonColors(containerColor = AuroraCoral, contentColor = Color.White),
+                        ) { Text("去首页缓存视频") }
                     }
                 }
             }
@@ -1045,7 +1165,9 @@ private fun OfflineCacheRow(
     Surface(
         onClick = onOpen,
         enabled = cached.isPlayableOffline,
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        color = AuroraMediaSurface,
+        contentColor = Color.White,
+        border = BorderStroke(1.dp, Color(0xFF262626)),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -1062,6 +1184,7 @@ private fun OfflineCacheRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
                 )
                 val detail = buildList {
                     cached.episodeLabel?.let(::add)
@@ -1076,7 +1199,7 @@ private fun OfflineCacheRow(
                         },
                     )
                 }.joinToString(" · ")
-                Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                Text(detail, color = AuroraMediaMuted, style = MaterialTheme.typography.bodySmall)
                 if (cached.state == OfflineCacheState.DOWNLOADING) {
                     LinearProgressIndicator(
                         progress = { (cached.percentDownloaded / 100f).coerceIn(0f, 1f) },
@@ -1104,13 +1227,12 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             if (!selected) onClick()
         },
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        color = if (selected) Color(0xFF1E2838) else AuroraMediaSurface,
+        contentColor = if (selected) AuroraProfileAccent else Color.White,
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.36f)
-            else Color.Transparent,
+            if (selected) AuroraProfileAccent.copy(alpha = 0.55f) else Color(0xFF262626),
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1122,14 +1244,39 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.Default.PlayArrow,
                 contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                tint = if (selected) AuroraProfileAccent else Color.White,
             )
             Column(Modifier.weight(1f)) {
-                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(source.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    val badgeBg = if (source.isDirectDomestic) Color(0x1F34C759) else Color(0x1F0A84FF)
+                    val badgeBorder = if (source.isDirectDomestic) Color(0x4034C759) else Color(0x400A84FF)
+                    val badgeText = if (source.isDirectDomestic) Color(0xFF34C759) else Color(0xFF64D2FF)
+                    val badgeLabel = if (source.isDirectDomestic) "直连" else "海外"
+                    Surface(
+                        color = badgeBg,
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(0.5.dp, badgeBorder),
+                    ) {
+                        Text(
+                            text = badgeLabel,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                            ),
+                            color = badgeText,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Text(source.description, style = MaterialTheme.typography.bodySmall, color = AuroraMediaMuted)
             }
             if (selected) {
-                Text("使用中", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                Text("使用中", style = MaterialTheme.typography.labelMedium, color = AuroraProfileAccent)
             }
         }
     }
@@ -1143,12 +1290,12 @@ private fun ComicSourceOption(source: ComicSourceInfo, selected: Boolean, onClic
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             if (!selected) onClick()
         },
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-        contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        color = if (selected) Color(0xFF1E2838) else AuroraMediaSurface,
+        contentColor = if (selected) AuroraProfileAccent else Color.White,
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(
             1.dp,
-            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.36f) else Color.Transparent,
+            if (selected) AuroraProfileAccent.copy(alpha = 0.55f) else Color(0xFF262626),
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1160,14 +1307,14 @@ private fun ComicSourceOption(source: ComicSourceInfo, selected: Boolean, onClic
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.AutoMirrored.Filled.MenuBook,
                 contentDescription = null,
-                tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                tint = if (selected) AuroraProfileAccent else Color.White,
             )
             Column(Modifier.weight(1f)) {
-                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
                 Text(
                     source.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = AuroraMediaMuted,
                 )
             }
             Text(
@@ -1177,8 +1324,111 @@ private fun ComicSourceOption(source: ComicSourceInfo, selected: Boolean, onClic
                     else -> ""
                 },
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
+                color = if (selected) AuroraProfileAccent else AuroraCoral,
             )
+        }
+    }
+}
+
+@Composable
+private fun LiveSourcesPage(
+    sources: List<LiveSourceInfo>,
+    selectedSourceId: String,
+    onSource: (String) -> Unit,
+    onBack: () -> Unit,
+) {
+    var filter by rememberSaveable { mutableStateOf("") }
+    val filteredSources = remember(filter, sources) {
+        sources.filter { source ->
+            filter.isBlank() || source.name.contains(filter, ignoreCase = true) ||
+                source.description.contains(filter, ignoreCase = true)
+        }
+    }
+    LazyColumn(
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            end = 20.dp,
+            top = 14.dp,
+            bottom = LocalDockHeight.current + 24.dp,
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .testTag("live-sources-page"),
+    ) {
+        item { SettingsPageHeader("直播源", "选择后立即刷新直播内容", onBack) }
+        item {
+            CenteredSearchBar(
+                query = filter,
+                onQueryChange = { filter = it },
+                placeholder = "搜索直播源",
+                onSearch = {},
+                onClear = { filter = "" },
+            )
+        }
+        if (filteredSources.isEmpty()) {
+            item {
+                Text(
+                    "没有匹配的直播源",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                )
+            }
+        } else {
+            items(filteredSources, key = LiveSourceInfo::id) { source ->
+                LiveSourceOption(
+                    source = source,
+                    selected = selectedSourceId == source.id,
+                    onClick = { onSource(source.id) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveSourceOption(
+    source: LiveSourceInfo,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(
+            1.dp,
+            if (selected) AuroraProfileAccent.copy(alpha = 0.85f)
+            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            Icon(
+                if (selected) Icons.Default.CheckCircle else Icons.Default.LiveTv,
+                contentDescription = null,
+                tint = if (selected) AuroraProfileAccent else Color.White,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text(
+                    source.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AuroraMediaMuted,
+                )
+            }
+            if (selected) {
+                Text(
+                    "使用中",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = AuroraProfileAccent,
+                )
+            }
         }
     }
 }

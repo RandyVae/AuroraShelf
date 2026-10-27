@@ -60,11 +60,14 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     } ?: AppPreferences.DEFAULT_COMIC_SOURCE_ID
     private val initialCategoryId = repository.availableSources.find { it.id == initialSourceId }
         ?.categories?.firstOrNull()?.id.orEmpty()
+    private val initialCached = preferences.cachedComicFeed(initialSourceId, initialCategoryId)
     private val mutableUiState = MutableStateFlow(
         ComicUiState(
             sources = repository.availableSources,
             selectedSourceId = initialSourceId,
             selectedCategoryId = initialCategoryId,
+            comics = initialCached?.comics.orEmpty(),
+            page = if (initialCached != null) 1 else 0,
             isSourceAuthenticated = repository.isAuthenticated(initialSourceId),
         ),
     )
@@ -143,7 +146,17 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectCategory(categoryId: String) {
         if (categoryId == mutableUiState.value.selectedCategoryId) return
-        mutableUiState.update { it.copy(selectedCategoryId = categoryId, query = "", activeQuery = "") }
+        val sourceId = mutableUiState.value.selectedSourceId
+        val cached = preferences.cachedComicFeed(sourceId, categoryId)
+        mutableUiState.update {
+            it.copy(
+                selectedCategoryId = categoryId,
+                query = "",
+                activeQuery = "",
+                comics = cached?.comics ?: it.comics,
+                page = if (cached != null) 1 else 0,
+            )
+        }
         loadFirstPage("")
     }
 
@@ -250,12 +263,19 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         listJob?.cancel()
         val sourceId = mutableUiState.value.selectedSourceId
         val categoryId = mutableUiState.value.selectedCategoryId
+        val cached = if (query.isBlank()) preferences.cachedComicFeed(sourceId, categoryId) else null
         listJob = viewModelScope.launch {
-            mutableUiState.update {
-                it.copy(
-                    comics = emptyList(),
+            mutableUiState.update { current ->
+                val fallbackComics = when {
+                    query.isNotBlank() -> emptyList()
+                    current.selectedSourceId == sourceId && current.selectedCategoryId == categoryId && current.comics.isNotEmpty() -> current.comics
+                    cached != null -> cached.comics
+                    else -> emptyList()
+                }
+                current.copy(
+                    comics = fallbackComics,
                     activeQuery = query,
-                    page = 0,
+                    page = if (fallbackComics.isNotEmpty()) 1 else 0,
                     canLoadMore = true,
                     isLoading = true,
                     isLoadingMore = false,
@@ -264,6 +284,9 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
             }
             runCatching { load(sourceId, categoryId, query, 1) }
                 .onSuccess { result ->
+                    if (query.isBlank() && result.isNotEmpty()) {
+                        preferences.saveComicFeed(sourceId, categoryId, result)
+                    }
                     mutableUiState.update {
                         if (
                             it.selectedSourceId != sourceId ||

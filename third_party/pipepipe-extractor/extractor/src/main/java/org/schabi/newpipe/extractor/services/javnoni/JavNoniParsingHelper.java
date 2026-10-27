@@ -27,7 +27,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class JavNoniParsingHelper {
-    public static final String BASE_URL = "https://jav-noni.vip";
+    public static final String BASE_URL = "https://javnoni.com";
     private static final String MARKER = "#javnoni=1";
     private static final Pattern QUALITY_LABEL_PATTERN =
             Pattern.compile("(\\d{3,4}p)", Pattern.CASE_INSENSITIVE);
@@ -111,7 +111,7 @@ public final class JavNoniParsingHelper {
         if (normalized.startsWith("//")) {
             normalized = "https:" + normalized;
         }
-        normalized = normalized.replaceFirst("^https?://(?:www\\.)?jav-noni\\.[^/]+", BASE_URL);
+        normalized = normalized.replaceFirst("^https?://(?:www\\.)?jav-?noni\\.[^/]+", BASE_URL);
         if (normalized.startsWith("/")) {
             normalized = BASE_URL + normalized;
         }
@@ -327,25 +327,108 @@ public final class JavNoniParsingHelper {
 
     private static List<String> unpackPackedScripts(final String html) {
         final List<String> unpackedScripts = new ArrayList<>();
-        final Matcher matcher = PACKED_SCRIPT_PATTERN.matcher(html);
-        while (matcher.find()) {
-            final String payload = unescapeJsString(matcher.group(1));
-            final int radix = parsePositiveInt(matcher.group(2));
-            final int count = parsePositiveInt(matcher.group(3));
-            final String[] words = unescapeJsString(matcher.group(4)).split("\\|", -1);
+        if (html == null || html.isEmpty()) {
+            return unpackedScripts;
+        }
+        final Pattern startPattern = Pattern.compile(
+                "eval\\s*\\(\\s*function\\s*\\(\\s*p\\s*,\\s*a\\s*,\\s*c\\s*,\\s*k\\s*,\\s*e\\s*,\\s*d\\s*\\).*?\\}\\s*\\(\\s*",
+                Pattern.DOTALL);
+        final Matcher startMatcher = startPattern.matcher(html);
+        int searchFrom = 0;
+        while (startMatcher.find(searchFrom)) {
+            int pos = startMatcher.end();
+            while (pos < html.length() && Character.isWhitespace(html.charAt(pos))) {
+                pos++;
+            }
+            if (pos >= html.length()) break;
+            char quote = html.charAt(pos++);
+            if (quote != '\'' && quote != '"') {
+                searchFrom = pos;
+                continue;
+            }
+
+            // Read payload
+            final StringBuilder payloadBuilder = new StringBuilder();
+            boolean escaped = false;
+            while (pos < html.length()) {
+                char ch = html.charAt(pos++);
+                if (escaped) {
+                    payloadBuilder.append(ch);
+                    escaped = false;
+                } else if (ch == '\\') {
+                    escaped = true;
+                } else if (ch == quote) {
+                    break;
+                } else {
+                    payloadBuilder.append(ch);
+                }
+            }
+            final String payload = payloadBuilder.toString();
+
+            // Next: comma, radix, comma, count, comma
+            int comma1 = html.indexOf(',', pos);
+            if (comma1 == -1) { searchFrom = pos; continue; }
+            int comma2 = html.indexOf(',', comma1 + 1);
+            if (comma2 == -1) { searchFrom = pos; continue; }
+            int comma3 = html.indexOf(',', comma2 + 1);
+            if (comma3 == -1) { searchFrom = pos; continue; }
+
+            int radix = parsePositiveInt(html.substring(comma1 + 1, comma2).trim());
+            int count = parsePositiveInt(html.substring(comma2 + 1, comma3).trim());
+
+            pos = comma3 + 1;
+            while (pos < html.length() && Character.isWhitespace(html.charAt(pos))) {
+                pos++;
+            }
+            if (pos >= html.length()) break;
+            char wordsQuote = html.charAt(pos++);
+            if (wordsQuote != '\'' && wordsQuote != '"') {
+                searchFrom = pos;
+                continue;
+            }
+
+            // Read words
+            final StringBuilder wordsBuilder = new StringBuilder();
+            escaped = false;
+            while (pos < html.length()) {
+                char ch = html.charAt(pos++);
+                if (escaped) {
+                    wordsBuilder.append(ch);
+                    escaped = false;
+                } else if (ch == '\\') {
+                    escaped = true;
+                } else if (ch == wordsQuote) {
+                    break;
+                } else {
+                    wordsBuilder.append(ch);
+                }
+            }
+            searchFrom = pos;
+            final String wordsStr = wordsBuilder.toString();
+            final String[] words = wordsStr.split("\\|", -1);
+
             if (payload.isEmpty() || radix < 2 || radix > 36 || count <= 0) {
                 continue;
             }
-            String unpacked = payload;
-            for (int index = count - 1; index >= 0; index--) {
-                if (index >= words.length || words[index] == null || words[index].isEmpty()) {
-                    continue;
+
+            // Fast single-pass token replacement
+            final Matcher tokenMatcher = Pattern.compile("\\b[0-9a-zA-Z]+\\b").matcher(payload);
+            final StringBuilder unpackedSb = new StringBuilder(payload.length() * 2);
+            while (tokenMatcher.find()) {
+                final String token = tokenMatcher.group();
+                try {
+                    final int index = Integer.parseInt(token, radix);
+                    if (index >= 0 && index < words.length && !words[index].isEmpty()) {
+                        tokenMatcher.appendReplacement(unpackedSb, Matcher.quoteReplacement(words[index]));
+                    } else {
+                        tokenMatcher.appendReplacement(unpackedSb, Matcher.quoteReplacement(token));
+                    }
+                } catch (final NumberFormatException e) {
+                    tokenMatcher.appendReplacement(unpackedSb, Matcher.quoteReplacement(token));
                 }
-                final String token = Integer.toString(index, radix);
-                unpacked = unpacked.replaceAll("\\b" + Pattern.quote(token) + "\\b",
-                        Matcher.quoteReplacement(words[index]));
             }
-            unpackedScripts.add(unescapeUrl(unpacked));
+            tokenMatcher.appendTail(unpackedSb);
+            unpackedScripts.add(unescapeUrl(unpackedSb.toString()));
         }
         return unpackedScripts;
     }
@@ -674,10 +757,21 @@ public final class JavNoniParsingHelper {
 
     private static List<String> extractEmbedUrls(final Document document) {
         final LinkedHashSet<String> urls = new LinkedHashSet<>();
+        addEmbedUrl(urls, attr(document.selectFirst("meta[property=og:video]"), "content"));
+        addEmbedUrl(urls, attr(document.selectFirst("meta[property=og:video:url]"), "content"));
+        addEmbedUrl(urls, attr(document.selectFirst("meta[property='og:video:secure_url']"), "content"));
         addEmbedUrl(urls, attr(document.selectFirst("meta[itemprop=embedURL]"), "content"));
+        addEmbedUrl(urls, attr(document.selectFirst("meta[itemprop=embedUrl]"), "content"));
+        for (final Element script : document.select("script[type=application/ld+json]")) {
+            final String json = script.data();
+            final Matcher matcher = Pattern.compile("\"embedUrl\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
+            if (matcher.find()) {
+                addEmbedUrl(urls, matcher.group(1));
+            }
+        }
         for (final Element element : document.select(
                 "iframe[src], iframe[data-src], a#tracking-url[href], "
-                        + "a[href*=luluvdo.com/e/], a[href*=lulustream.com/e/], "
+                        + "a[href*=luluvdo.com/e/], a[href*=luluvido.com/e/], a[href*=lulustream.com/e/], "
                         + "a[href*=playmogo.com/e/]")) {
             addEmbedUrl(urls, firstNonEmpty(attr(element, "src"), attr(element, "data-src"),
                     attr(element, "href")));
@@ -694,6 +788,7 @@ public final class JavNoniParsingHelper {
             final URI uri = new URI(url);
             final String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
             if ((host.equals("luluvdo.com") || host.endsWith(".luluvdo.com")
+                    || host.equals("luluvido.com") || host.endsWith(".luluvido.com")
                     || host.equals("lulustream.com") || host.endsWith(".lulustream.com")
                     || host.equals("playmogo.com") || host.endsWith(".playmogo.com"))
                     && uri.getPath() != null && uri.getPath().startsWith("/e/")) {

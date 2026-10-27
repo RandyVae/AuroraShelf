@@ -70,6 +70,25 @@ class PlaybackResolverTest {
         assertEquals("https://huangguoai.com/video/117/ep-2/", episodes[1].pageUrl)
     }
 
+    @Test fun parsesHuavodEpisodeLinksFromDetailPage() {
+        val page = Jsoup.parse(
+            """
+            <div class="anthology-list-play">
+              <a href="/vodplay/196089-1-1.html">20260404(第1期上)</a>
+              <a href="/vodplay/196089-1-2.html">20260405(第1期下)</a>
+              <a href="/vodplay/196089-1-3.html">20260406(第1期加更)</a>
+            </div>
+            """.trimIndent(),
+            "https://huavod.com/voddetail/196089.html",
+        )
+
+        val episodes = PlaybackResolver().parseHuavodEpisodes(page, "https://huavod.com/voddetail/196089.html")
+
+        assertEquals(listOf(1, 2, 3), episodes.map { it.number })
+        assertEquals("20260404(第1期上)", episodes[0].label)
+        assertEquals("https://huavod.com/vodplay/196089-1-2.html", episodes[1].pageUrl)
+    }
+
     @Test fun resolvesMissAvEscapedHlsMetadata() {
         val page = Jsoup.parse(
             "<script>const source='https:\\/\\/media.example\\/abc\\/playlist.m3u8?token=123';</script>",
@@ -261,5 +280,12 @@ class PlaybackResolverTest {
         now += 1
         cache.get("page") { loads += 1; Jsoup.parse("<p>3</p>") }
         assertEquals(2, loads)
+    }
+
+    @Test fun resolvesBeegEpisodeAsSingleEpisode() = kotlinx.coroutines.runBlocking {
+        val episodes = PlaybackResolver().resolveEpisodes("https://beeg.com/-0714126256274840")
+        assertEquals(1, episodes.size)
+        assertEquals("正片", episodes.single().label)
+        assertEquals("https://beeg.com/-0714126256274840", episodes.single().pageUrl)
     }
 }

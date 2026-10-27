@@ -1,10 +1,14 @@
 package com.aurorashelf.app.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.aurorashelf.app.data.AppPreferences
+import com.aurorashelf.app.data.HornyStudentsLiveRepository
 import com.aurorashelf.app.data.StripchatLiveRepository
 import com.aurorashelf.app.model.LiveCategory
 import com.aurorashelf.app.model.LiveItem
+import com.aurorashelf.app.model.LiveSourceCatalog
 import java.io.IOException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class LiveUiState(
+    val selectedSourceId: String = LiveSourceCatalog.STRIPCHAT.id,
     val selectedCategory: LiveCategory = LiveCategory.WOMEN,
     val items: List<LiveItem> = emptyList(),
     val page: Int = 0,
@@ -34,9 +39,26 @@ internal data class LivePageUpdate(
 )
 
 class LiveViewModel(
-    private val repository: StripchatLiveRepository = StripchatLiveRepository(),
-) : ViewModel() {
-    private val mutableUiState = MutableStateFlow(LiveUiState())
+    application: Application,
+    private val stripchatRepository: StripchatLiveRepository,
+    private val hornyStudentsRepository: HornyStudentsLiveRepository,
+) : AndroidViewModel(application) {
+    constructor(application: Application) : this(
+        application,
+        StripchatLiveRepository(),
+        HornyStudentsLiveRepository(),
+    )
+
+    private val preferences = AppPreferences(application)
+    private val initialSourceId = preferences.liveSourceId
+    private val initialCached = preferences.cachedLiveFeed(initialSourceId, LiveCategory.WOMEN.name)
+    private val mutableUiState = MutableStateFlow(
+        LiveUiState(
+            selectedSourceId = initialSourceId,
+            items = initialCached?.items.orEmpty(),
+            page = if (initialCached != null) 1 else 0,
+        ),
+    )
     val uiState: StateFlow<LiveUiState> = mutableUiState.asStateFlow()
     private var loadJob: Job? = null
     private var initialLoadRequested = false
@@ -48,9 +70,32 @@ class LiveViewModel(
         refresh()
     }
 
+    fun selectSource(sourceId: String) {
+        if (sourceId == mutableUiState.value.selectedSourceId) return
+        preferences.liveSourceId = sourceId
+        mutableUiState.update {
+            it.copy(
+                selectedSourceId = sourceId,
+                items = emptyList(),
+                page = 0,
+                isLoading = true,
+                error = null,
+            )
+        }
+        load(1, replace = true)
+    }
+
     fun selectCategory(category: LiveCategory) {
         if (category == mutableUiState.value.selectedCategory) return
-        mutableUiState.update { LiveUiState(selectedCategory = category, isLoading = true) }
+        val cached = preferences.cachedLiveFeed(mutableUiState.value.selectedSourceId, category.name)
+        mutableUiState.update {
+            it.copy(
+                selectedCategory = category,
+                items = cached?.items ?: it.items,
+                isLoading = true,
+                error = null,
+            )
+        }
         load(1, replace = true)
     }
 
@@ -72,33 +117,52 @@ class LiveViewModel(
 
     private fun load(page: Int, replace: Boolean) {
         loadJob?.cancel()
+        val sourceId = mutableUiState.value.selectedSourceId
         val category = mutableUiState.value.selectedCategory
         loadJob = viewModelScope.launch {
-            runCatching { repository.load(category, page) }
-                .onSuccess { result ->
-                    mutableUiState.update { current ->
-                        val update = nextLivePage(
-                            currentItems = current.items,
-                            incomingItems = result.items,
-                            totalCount = result.totalCount,
-                            replace = replace,
-                        )
-                        current.copy(
-                            items = update.items,
-                            page = page,
-                            canLoadMore = update.canLoadMore,
-                            isLoading = false,
-                            isLoadingMore = false,
-                            error = null,
-                        )
-                    }
+            val result = runCatching {
+                if (sourceId == LiveSourceCatalog.HORNYSTUDENTS.id) {
+                    hornyStudentsRepository.load(category, page)
+                } else {
+                    stripchatRepository.load(category, page)
                 }
-                .onFailure { failure ->
-                    if (failure is CancellationException) return@onFailure
-                    mutableUiState.update {
-                        it.copy(isLoading = false, isLoadingMore = false, error = failure.userMessage())
-                    }
+            }
+            result.onSuccess { res ->
+                if (page == 1 && res.items.isNotEmpty()) {
+                    preferences.saveLiveFeed(sourceId, category.name, res.items)
                 }
+                mutableUiState.update { current ->
+                    val update = nextLivePage(
+                        currentItems = current.items,
+                        incomingItems = res.items,
+                        totalCount = res.totalCount,
+                        replace = replace,
+                    )
+                    current.copy(
+                        items = update.items,
+                        page = page,
+                        canLoadMore = update.canLoadMore,
+                        isLoading = false,
+                        isLoadingMore = false,
+                        error = null,
+                    )
+                }
+            }.onFailure { failure ->
+                if (failure is CancellationException) return@onFailure
+                mutableUiState.update { current ->
+                    current.copy(
+                        isLoading = false,
+                        isLoadingMore = false,
+                        error = when (failure) {
+                            is UnknownHostException -> "无法连接直播服务器，请检查网络连接"
+                            is SocketTimeoutException -> "连接直播服务器超时，请稍后重试"
+                            is SSLHandshakeException -> "直播连接加密失败，请稍后重试"
+                            is IOException -> failure.message ?: "网络连接异常"
+                            else -> "加载直播失败：${failure.message ?: "未知异常"}"
+                        },
+                    )
+                }
+            }
         }
     }
 

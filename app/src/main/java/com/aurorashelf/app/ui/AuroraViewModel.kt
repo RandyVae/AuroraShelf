@@ -53,7 +53,10 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     private var feedJob: Job? = null
     private var nextPage = 1
     private val initialSourceUrl = preferences.sourceUrl
-    private val initialCategory = FeedCategory.MONTHLY_HOT
+    private val initialCategory = FeedCategory.availableFor(initialSourceUrl).let { available ->
+        if (available.contains(FeedCategory.MONTHLY_HOT)) FeedCategory.MONTHLY_HOT
+        else available.firstOrNull() ?: FeedCategory.RECENT
+    }
     private val initialCachedFeed = preferences.cachedFeed()?.takeIf {
         it.sourceUrl == initialSourceUrl &&
             it.categoryPath == initialCategory.path &&
@@ -78,6 +81,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     init {
         // Warm the covers of the cached first page before Compose lays them out.
         prefetchCovers(initialCachedFeed?.videos.orEmpty())
+        prefetchLeadingStream(initialCachedFeed?.videos.orEmpty())
         refresh()
     }
 
@@ -131,6 +135,24 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /**
+     * Pre-resolves the media stream URL for the leading Hero video into [PlaybackResolver]'s cache,
+     * so that tapping the prominent banner starts playback with zero resolution delay.
+     */
+    private fun prefetchLeadingStream(videos: List<VideoItem>) {
+        val lead = videos.firstOrNull()?.pageUrl?.takeIf(String::isNotBlank) ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            delay(DETAIL_PREFETCH_DELAY_MS + 200L)
+            val appContext = getApplication<Application>()
+            if (!isPrefetchEnabled(appContext)) return@launch
+            runCatching {
+                PlaybackResolver().resolve(lead)
+            }.onSuccess { source ->
+                Log.i(PREFETCH_LOG_TAG, "leading stream prefetch ready host=${runCatching { java.net.URI(source.url).host }.getOrNull()}")
+            }
+        }
+    }
+
     private fun isFreshFeed(savedAtMillis: Long): Boolean =
         savedAtMillis > 0 && System.currentTimeMillis() - savedAtMillis in 0..FEED_CACHE_TTL_MS
 
@@ -176,20 +198,9 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     fun search() {
         val snapshot = _uiState.value
         if (snapshot.query.isBlank() || snapshot.isSearching) return
-        if (!ContentSourceCatalog.isPipePipe(snapshot.sourceUrl)) {
-            val results = localSearchMatches(snapshot.query, snapshot.allKnownVideos)
-            _uiState.update {
-                it.copy(
-                    searchResults = results,
-                    isRemoteSearch = false,
-                    searchMessage = if (results.isEmpty()) "已加载内容中没有匹配结果" else null,
-                )
-            }
-            return
-        }
         viewModelScope.launch {
             _uiState.update { it.copy(isSearching = true, searchMessage = null) }
-            runCatching { repository.search(snapshot.sourceUrl, snapshot.query) }
+            runCatching { repository.searchAll(snapshot.query) }
                 .onSuccess { results ->
                     // Site search can return the same item twice; LazyColumn keys must stay unique.
                     val distinctResults = results.distinctBy(VideoItem::id)
@@ -199,14 +210,17 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                             isRemoteSearch = true,
                             allKnownVideos = (distinctResults + it.allKnownVideos).distinctBy(VideoItem::id),
                             isSearching = false,
-                            searchMessage = if (distinctResults.isEmpty()) "没有找到相关视频" else null,
+                            searchMessage = if (distinctResults.isEmpty()) "全网视频源未找到相关视频" else null,
                         )
                     }
                 }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
                     _uiState.update {
-                        it.copy(isSearching = false, searchMessage = error.message ?: "搜索失败，请稍后重试")
+                        it.copy(
+                            isSearching = false,
+                            searchMessage = "搜索失败：${error.message ?: "网络异常"}",
+                        )
                     }
                 }
         }
@@ -265,6 +279,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                     preferences.saveFeedCache(snapshot.sourceUrl, snapshot.category.path, videos)
                     prefetchCovers(videos)
                     prefetchDetails(videos)
+                    prefetchLeadingStream(videos)
                     _uiState.update {
                         it.copy(
                             videos = videos,

@@ -33,7 +33,7 @@ public final class EightyFivePoParsingHelper {
             "(?:https?:)?//[^\"'\\s<>]+/(?:ja/)?get_file/[^\"'\\s<>]+|/(?:ja/)?get_file/[^\"'\\s<>]+",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern VIDEO_PAGE_URL_PATTERN = Pattern.compile(
-            "https?://[^\"'\\s<>]+/(?:[a-z]{2}/)?v/\\d+(?:/[^\"'\\s<>]*)?",
+            "https?://[^\"'\\s<>]+/(?:[a-z]{2}/)?v/\\d+(?:(?:/|\\.html)[^\"'\\s<>]*)?",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern QUALITY_LABEL_PATTERN = Pattern.compile(
             "(\\d{3,4}p)", Pattern.CASE_INSENSITIVE);
@@ -138,7 +138,7 @@ public final class EightyFivePoParsingHelper {
     }
 
     public static String videoUrlFromId(final String id) {
-        return BASE_URL + LANG_PREFIX + "/v/" + id + "/";
+        return BASE_URL + LANG_PREFIX + "/v/" + id + ".html";
     }
 
     public static List<EightyFivePoSearchResult> listVideos(final String url, final int count)
@@ -335,7 +335,9 @@ public final class EightyFivePoParsingHelper {
         final List<String> candidates = new ArrayList<>();
         addCandidate(candidates, pageUrl);
         addCandidate(candidates, extractCanonicalVideoUrl(document, id));
+        addCandidate(candidates, BASE_URL + LANG_PREFIX + "/v/" + id + ".html");
         addCandidate(candidates, BASE_URL + LANG_PREFIX + "/v/" + id + "/");
+        addCandidate(candidates, BASE_URL + "/v/" + id + ".html");
         addCandidate(candidates, BASE_URL + "/v/" + id + "/");
         addCandidate(candidates, extractEmbedUrl(document, id));
         addCandidate(candidates, BASE_URL + LANG_PREFIX + "/embed/" + id);
@@ -671,7 +673,7 @@ public final class EightyFivePoParsingHelper {
     }
 
     private static String extractIdOrEmpty(final String url) {
-        final Matcher matcher = Pattern.compile("/(?:[a-z]{2}/)?(?:v|embed)/(\\d+)(?:/|$)")
+        final Matcher matcher = Pattern.compile("/(?:[a-z]{2}/)?(?:v|embed)/(\\d+)(?:/|\\.html|$)")
                 .matcher(url);
         return matcher.find() ? matcher.group(1) : "";
     }

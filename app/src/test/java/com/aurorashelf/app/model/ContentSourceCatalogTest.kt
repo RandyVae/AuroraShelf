@@ -23,9 +23,19 @@ class ContentSourceCatalogTest {
         ContentSourceCatalog.sources.filter { it.extractorServiceName != null }.forEach { source ->
             val categories = FeedCategory.availableFor(source.baseUrl)
 
-            assertEquals(source.kioskIds.size.coerceAtMost(FeedCategory.entries.size), categories.size)
-            categories.forEachIndexed { index, category ->
-                assertEquals(source.kioskIds[index], ContentSourceCatalog.kioskId(source.baseUrl, category))
+            if (ContentSourceCatalog.isXVideos(source.baseUrl)) {
+                // XVideos exposes the full official category list (41 entries)
+                assertEquals(FeedCategory.XVIDEOS_CATEGORIES.size, categories.size)
+                assertEquals(41, categories.size)
+                assertEquals(41, categories.mapNotNull { it.xvideosKioskId }.distinct().size)
+                FeedCategory.XVIDEOS_CATEGORIES.forEach { category ->
+                    assertEquals(category.xvideosKioskId, ContentSourceCatalog.kioskId(source.baseUrl, category))
+                }
+            } else {
+                assertEquals(source.kioskIds.size.coerceAtMost(FeedCategory.DEFAULT_5.size), categories.size)
+                categories.forEachIndexed { index, category ->
+                    assertEquals(source.kioskIds[index], ContentSourceCatalog.kioskId(source.baseUrl, category))
+                }
             }
         }
     }

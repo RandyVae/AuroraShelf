@@ -20,7 +20,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import kotlinx.coroutines.delay
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import com.aurorashelf.app.data.AppPreferences
@@ -37,6 +36,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Touch the lazy delegate immediately so AuroraViewModel.init warms the feed/covers
+        // while the 5.7 s brand intro film plays.
+        warmUpViewModel.uiState
         enableEdgeToEdge()
         setContent {
             val preferences = remember { AppPreferences(applicationContext) }
@@ -69,8 +71,8 @@ class MainActivity : ComponentActivity() {
                         systemBarsBehavior =
                             androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                     } else {
-                        isAppearanceLightStatusBars = !darkTheme
-                        isAppearanceLightNavigationBars = !darkTheme
+                        isAppearanceLightStatusBars = false
+                        isAppearanceLightNavigationBars = false
                         show(WindowInsetsCompat.Type.systemBars())
                     }
                 }
@@ -80,7 +82,7 @@ class MainActivity : ComponentActivity() {
                     // The app composes and starts loading underneath the intro, so the brand
                     // moment never delays first paint.
                     if (appVisible) {
-                        AuroraShelfApp()
+                        AuroraShelfApp(viewModel = warmUpViewModel)
                         OnFirstFrame { appDrawn = true }
                     }
                     if (introVisible) {

@@ -97,6 +97,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -159,6 +160,9 @@ import com.aurorashelf.app.data.OfflineVideo
 import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
 import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
 import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
+import com.aurorashelf.app.ui.theme.AuroraMediaLabel
+import com.aurorashelf.app.ui.theme.AuroraMediaMuted
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -205,7 +209,7 @@ internal fun SearchScreen(
             CoverPrefetcher.prefetchVideos(prefetchContext, matches, limit = SEARCH_COVER_PREFETCH_LIMIT)
         }
     }
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 36.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -213,34 +217,21 @@ internal fun SearchScreen(
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.statusBars),
         ) {
-            item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
-                    }
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = onQuery,
-                        singleLine = true,
-                        label = { Text("搜索当前视频源") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (isSearching) {
-                                CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                            } else {
-                                IconButton(onClick = onSearch, enabled = query.isNotBlank()) {
-                                    Icon(Icons.Default.Search, contentDescription = "开始搜索")
-                                }
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-                        shape = RoundedCornerShape(28.dp),
-                        // HIG G3: expose the existing field label as an accessible name so
-                        // screen readers announce this editable node as the search input.
-                        modifier = Modifier
-                            .weight(1f)
-                            .semantics { contentDescription = "搜索当前视频源" },
+            stickyHeader(key = "search-header") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 6.dp),
+                ) {
+                    CenteredSearchBar(
+                        query = query,
+                        onQueryChange = onQuery,
+                        placeholder = "全局搜索所有视频源",
+                        onSearch = onSearch,
+                        onBack = onClose,
+                        onClear = { onQuery("") },
+                        isSearching = isSearching,
+                        testTag = "search-input-field",
                     )
                 }
             }
@@ -248,7 +239,7 @@ internal fun SearchScreen(
             if (matches.isEmpty() && !isSearching && message == null) {
                 item {
                     EmptyState(
-                        message = if (query.isBlank()) "输入关键词搜索当前视频源" else "点击搜索按钮开始查找",
+                        message = if (query.isBlank()) "输入关键词全局搜索所有视频源" else "点击搜索按钮开始查找",
                         icon = Icons.Outlined.Search,
                         actionLabel = if (query.isNotBlank() && !isSearching) "开始搜索" else null,
                         onAction = onSearch,

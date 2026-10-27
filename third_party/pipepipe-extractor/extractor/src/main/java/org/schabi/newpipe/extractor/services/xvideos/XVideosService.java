@@ -87,9 +87,21 @@ public final class XVideosService extends StreamingService {
     @Override public KioskList getKioskList() throws ExtractionException {
         final KioskList kiosks = new KioskList(this);
         try {
-            kiosks.addKioskEntry((service, url, kioskId) -> new XVideosKioskExtractor(
-                            service, XVideosKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
-                    XVideosKioskLinkHandlerFactory.INSTANCE, "latest");
+            final String[] kioskIds = new String[] {
+                "latest", "best", "chinese", "amateur", "asian", "verified",
+                "ai", "milf", "teen", "big-tits", "big-ass", "big-cock",
+                "blowjob", "anal", "squirting", "creampie", "cumshot",
+                "stockings", "lingerie", "blonde", "brunette", "redhead",
+                "black", "latina", "indian", "arab", "interracial",
+                "lesbian", "bi", "femdom", "gangbang", "family",
+                "cuckold", "bbw", "mature", "solo", "oiled",
+                "fisting", "gapes", "cam", "asmr"
+            };
+            for (final String kioskId : kioskIds) {
+                kiosks.addKioskEntry((service, url, id) -> new XVideosKioskExtractor(
+                                service, XVideosKioskLinkHandlerFactory.INSTANCE.fromId(id), id),
+                        XVideosKioskLinkHandlerFactory.INSTANCE, kioskId);
+            }
             kiosks.setDefaultKiosk("latest");
             return kiosks;
         } catch (final Exception e) {
@@ -161,9 +173,94 @@ final class XVideosSearchExtractor extends SearchExtractor {
 
 final class XVideosKioskLinkHandlerFactory extends ListLinkHandlerFactory {
     static final XVideosKioskLinkHandlerFactory INSTANCE = new XVideosKioskLinkHandlerFactory();
-    @Override public String getId(final String url) { return "latest"; }
+    @Override public String getId(final String url) {
+        if (url == null) return "latest";
+        if (url.contains("/best")) return "best";
+        if (url.contains("/tags/chinese")) return "chinese";
+        if (url.contains("/c/Amateur-65")) return "amateur";
+        if (url.contains("/c/Asian_Woman-32")) return "asian";
+        if (url.contains("/tags/verified") || url.contains("/verified")) return "verified";
+        if (url.contains("/c/AI-239")) return "ai";
+        if (url.contains("/c/Milf-19")) return "milf";
+        if (url.contains("/c/Teen-13")) return "teen";
+        if (url.contains("/c/Big_Tits-23")) return "big-tits";
+        if (url.contains("/c/Big_Ass-24")) return "big-ass";
+        if (url.contains("/c/Big_Cock-34")) return "big-cock";
+        if (url.contains("/c/Blowjob-15")) return "blowjob";
+        if (url.contains("/c/Anal-12")) return "anal";
+        if (url.contains("/c/Squirting-56")) return "squirting";
+        if (url.contains("/c/Creampie-40")) return "creampie";
+        if (url.contains("/c/Cumshot-18")) return "cumshot";
+        if (url.contains("/c/Stockings-28")) return "stockings";
+        if (url.contains("/c/Lingerie-83")) return "lingerie";
+        if (url.contains("/c/Blonde-20")) return "blonde";
+        if (url.contains("/c/Brunette-25")) return "brunette";
+        if (url.contains("/c/Redhead-31")) return "redhead";
+        if (url.contains("/c/Black_Woman-30")) return "black";
+        if (url.contains("/c/Latina-16")) return "latina";
+        if (url.contains("/c/Indian-89")) return "indian";
+        if (url.contains("/c/Arab-159")) return "arab";
+        if (url.contains("/c/Interracial-27")) return "interracial";
+        if (url.contains("/c/Lesbian-26")) return "lesbian";
+        if (url.contains("/c/Bi_Sexual-62")) return "bi";
+        if (url.contains("/c/Femdom-235")) return "femdom";
+        if (url.contains("/c/Gangbang-69")) return "gangbang";
+        if (url.contains("/c/Fucked_Up_Family-81")) return "family";
+        if (url.contains("/c/Cuckold-237")) return "cuckold";
+        if (url.contains("/c/bbw-51")) return "bbw";
+        if (url.contains("/c/Mature-38")) return "mature";
+        if (url.contains("/c/Solo_and_Masturbation-33")) return "solo";
+        if (url.contains("/c/Oiled-22")) return "oiled";
+        if (url.contains("/c/Fisting-165")) return "fisting";
+        if (url.contains("/c/Gapes-167")) return "gapes";
+        if (url.contains("/c/Cam_Porn-58")) return "cam";
+        if (url.contains("/c/ASMR-229")) return "asmr";
+        return "latest";
+    }
     @Override public String getUrl(final String id, final List<FilterItem> content,
-                                   final List<FilterItem> sort) { return XVideosParser.BASE + "/"; }
+                                   final List<FilterItem> sort) {
+        if ("best".equals(id)) return XVideosParser.BASE + "/best";
+        if ("chinese".equals(id)) return XVideosParser.BASE + "/tags/chinese";
+        if ("amateur".equals(id)) return XVideosParser.BASE + "/c/Amateur-65";
+        if ("asian".equals(id)) return XVideosParser.BASE + "/c/Asian_Woman-32";
+        if ("verified".equals(id)) return XVideosParser.BASE + "/tags/verified";
+        if ("ai".equals(id)) return XVideosParser.BASE + "/c/AI-239";
+        if ("milf".equals(id)) return XVideosParser.BASE + "/c/Milf-19";
+        if ("teen".equals(id)) return XVideosParser.BASE + "/c/Teen-13";
+        if ("big-tits".equals(id)) return XVideosParser.BASE + "/c/Big_Tits-23";
+        if ("big-ass".equals(id)) return XVideosParser.BASE + "/c/Big_Ass-24";
+        if ("big-cock".equals(id)) return XVideosParser.BASE + "/c/Big_Cock-34";
+        if ("blowjob".equals(id)) return XVideosParser.BASE + "/c/Blowjob-15";
+        if ("anal".equals(id)) return XVideosParser.BASE + "/c/Anal-12";
+        if ("squirting".equals(id)) return XVideosParser.BASE + "/c/Squirting-56";
+        if ("creampie".equals(id)) return XVideosParser.BASE + "/c/Creampie-40";
+        if ("cumshot".equals(id)) return XVideosParser.BASE + "/c/Cumshot-18";
+        if ("stockings".equals(id)) return XVideosParser.BASE + "/c/Stockings-28";
+        if ("lingerie".equals(id)) return XVideosParser.BASE + "/c/Lingerie-83";
+        if ("blonde".equals(id)) return XVideosParser.BASE + "/c/Blonde-20";
+        if ("brunette".equals(id)) return XVideosParser.BASE + "/c/Brunette-25";
+        if ("redhead".equals(id)) return XVideosParser.BASE + "/c/Redhead-31";
+        if ("black".equals(id)) return XVideosParser.BASE + "/c/Black_Woman-30";
+        if ("latina".equals(id)) return XVideosParser.BASE + "/c/Latina-16";
+        if ("indian".equals(id)) return XVideosParser.BASE + "/c/Indian-89";
+        if ("arab".equals(id)) return XVideosParser.BASE + "/c/Arab-159";
+        if ("interracial".equals(id)) return XVideosParser.BASE + "/c/Interracial-27";
+        if ("lesbian".equals(id)) return XVideosParser.BASE + "/c/Lesbian-26";
+        if ("bi".equals(id)) return XVideosParser.BASE + "/c/Bi_Sexual-62";
+        if ("femdom".equals(id)) return XVideosParser.BASE + "/c/Femdom-235";
+        if ("gangbang".equals(id)) return XVideosParser.BASE + "/c/Gangbang-69";
+        if ("family".equals(id)) return XVideosParser.BASE + "/c/Fucked_Up_Family-81";
+        if ("cuckold".equals(id)) return XVideosParser.BASE + "/c/Cuckold-237";
+        if ("bbw".equals(id)) return XVideosParser.BASE + "/c/bbw-51";
+        if ("mature".equals(id)) return XVideosParser.BASE + "/c/Mature-38";
+        if ("solo".equals(id)) return XVideosParser.BASE + "/c/Solo_and_Masturbation-33";
+        if ("oiled".equals(id)) return XVideosParser.BASE + "/c/Oiled-22";
+        if ("fisting".equals(id)) return XVideosParser.BASE + "/c/Fisting-165";
+        if ("gapes".equals(id)) return XVideosParser.BASE + "/c/Gapes-167";
+        if ("cam".equals(id)) return XVideosParser.BASE + "/c/Cam_Porn-58";
+        if ("asmr".equals(id)) return XVideosParser.BASE + "/c/ASMR-229";
+        return XVideosParser.BASE + "/";
+    }
     @Override public boolean onAcceptUrl(final String url) {
         return url != null && url.startsWith(XVideosParser.BASE);
     }
@@ -175,7 +272,9 @@ final class XVideosKioskExtractor extends KioskExtractor<org.schabi.newpipe.extr
                           final String kioskId) { super(service, handler, kioskId); }
     @Override public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException { document = XVideosParser.fetch(getUrl()); }
-    @Nonnull @Override public String getName() { return "Latest"; }
+    @Nonnull @Override public String getName() {
+        return getId();
+    }
     @Nonnull @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getInitialPage()
             throws ExtractionException {
         if (document == null) throw new ParsingException("XVideos kiosk page was not fetched");
@@ -420,14 +519,14 @@ final class XVideosParser {
 
     static List<XVideosItem> cards(final Element root, final int maximum) {
         final LinkedHashMap<String, XVideosItem> items = new LinkedHashMap<>();
-        for (final Element card : root.select("div.frame-block")) {
+        for (final Element card : root.select("div.frame-block, div.thumb-block")) {
             final Element link = card.selectFirst("a[href*=/video.]");
             if (link == null) continue;
             final String url = link.absUrl("href");
             final String id = idOrEmpty(url);
             final Element image = card.selectFirst("img[data-src], img[data-original], img[data-lazy-src], img");
-            final Element metadata = card.selectFirst("div.thumb-under");
-            final Element titleLink = metadata == null ? null : metadata.selectFirst("a[href*=/video.]");
+            final Element metadata = card.selectFirst("div.thumb-under, div.video-metadata");
+            final Element titleLink = card.selectFirst(".title a[href*=/video.], div.thumb-under a[href*=/video.], a[href*=/video.]");
             final String title = firstNonEmpty(titleLink == null ? "" : titleLink.text(),
                     titleLink == null ? "" : titleLink.attr("title"), image == null ? "" : image.attr("alt"));
             if (id.isEmpty() || title.isEmpty()) continue;
@@ -435,9 +534,9 @@ final class XVideosParser {
                     image.absUrl("data-src"), image.absUrl("data-original"),
                     image.absUrl("data-lazy-src"), firstSrc(image.attr("data-srcset")),
                     firstSrc(image.attr("srcset")), image.absUrl("src"));
-            final Element duration = metadata == null ? null : metadata.selectFirst("span.duration");
+            final Element duration = metadata == null ? null : metadata.selectFirst("span.duration, .duration");
             final Element uploader = card.selectFirst("a[href^=/profiles/], a[href^=/channels/], "
-                    + "a[href^=/model/], a[href^=/pornstar/]");
+                    + "a[href^=/model/], a[href^=/pornstar/], a.name");
             items.putIfAbsent(id, new XVideosItem(id, url, title, thumbnail,
                     duration(duration == null ? "" : duration.text()),
                     uploader == null ? "" : uploader.text(),

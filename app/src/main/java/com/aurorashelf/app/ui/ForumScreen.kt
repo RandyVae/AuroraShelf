@@ -18,6 +18,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -41,7 +42,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -66,6 +69,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -75,6 +79,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
+import com.aurorashelf.app.ui.theme.AuroraMediaLabel
+import com.aurorashelf.app.ui.theme.AuroraMediaMuted
+import com.aurorashelf.app.ui.theme.AuroraMediaSurface
 import org.json.JSONArray
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -100,6 +110,8 @@ internal fun ForumScreen(
     onLoadMore: () -> Unit,
     onPost: (ForumPost) -> Unit,
     onClosePost: () -> Unit,
+    onSelectSource: (String?) -> Unit = {},
+    onSettings: () -> Unit = {},
 ) {
     // Keep the list state in composition while the reader is open.
     val listState = rememberLazyListState()
@@ -113,47 +125,76 @@ internal fun ForumScreen(
         return
     }
 
+    val visiblePosts = remember(state.posts, state.selectedSourceId) {
+        if (state.selectedSourceId == null) state.posts
+        else state.posts.filter { it.sourceId == state.selectedSourceId }
+    }
+
     LaunchedEffect(Unit) { onEnsureLoaded() }
-    LaunchedEffect(listState, state.posts.size, state.canLoadMore) {
+    LaunchedEffect(listState, visiblePosts.size, state.canLoadMore) {
         snapshotFlow {
             val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            state.posts.isNotEmpty() && lastVisible >= state.posts.lastIndex - 4
+            visiblePosts.isNotEmpty() && lastVisible >= visiblePosts.lastIndex - 4
         }.distinctUntilChanged().filter { it }.collect { onLoadMore() }
     }
 
-    LazyColumn(
-        state = listState,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 18.dp, bottom = bottomPadding + 20.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = Modifier.fillMaxSize().statusBarsPadding().testTag("forum-feed"),
-    ) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "论坛",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.semantics { heading() },
+    Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 18.dp, bottom = bottomPadding + 20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxSize().statusBarsPadding().testTag("forum-feed"),
+        ) {
+            item {
+                NetflixTopBar() {
+                    IconButton(
+                        onClick = onRefresh,
+                        enabled = !state.isLoading,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .testTag("forum-refresh"),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "刷新论坛",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    NetflixProfileAvatar(
+                        onClick = onSettings,
+                        modifier = Modifier.padding(start = 2.dp),
                     )
-                    Text(
-                        "两个社区 · 合并更新",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = onRefresh, enabled = !state.isLoading, modifier = Modifier.testTag("forum-refresh")) {
-                    Icon(Icons.Default.Refresh, contentDescription = "刷新论坛")
                 }
             }
-        }
+
+            item(key = "forum-pinned-sources") {
+                CategoryStrip(testTag = "forum-category-bar") {
+                    NetflixCategoryChip(
+                        selected = state.selectedSourceId == null,
+                        onClick = { onSelectSource(null) },
+                        label = "全部",
+                    )
+                    NetflixCategoryChip(
+                        selected = state.selectedSourceId == "t66y",
+                        onClick = { onSelectSource("t66y") },
+                        label = "草榴社区",
+                    )
+                    NetflixCategoryChip(
+                        selected = state.selectedSourceId == "t906",
+                        onClick = { onSelectSource("t906") },
+                        label = "91自拍论坛",
+                    )
+                }
+            }
 
         if (state.unavailableSources.isNotEmpty()) {
             item {
                 Surface(
-                    color = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFF1E222B),
+                    contentColor = Color(0xFFD6DCE5),
+                    border = BorderStroke(1.dp, Color(0xFF333A48)),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
@@ -161,6 +202,44 @@ internal fun ForumScreen(
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                     )
+                }
+            }
+        }
+
+        if (state.error != null && state.posts.isNotEmpty()) {
+            item {
+                Surface(
+                    color = Color(0xFF2B1417),
+                    contentColor = Color(0xFFFFB4AB),
+                    border = BorderStroke(1.dp, Color(0xFF5C2026)),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("forum-refresh-error-banner"),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Text(
+                            text = "刷新失败: ${state.error}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(
+                            onClick = onRefresh,
+                            colors = ButtonDefaults.textButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error,
+                            ),
+                        ) {
+                            Text("重试")
+                        }
+                    }
                 }
             }
         }
@@ -175,8 +254,23 @@ internal fun ForumScreen(
             item {
                 ForumError(message = state.error, onRetry = onRefresh)
             }
+        } else if (visiblePosts.isEmpty() && state.posts.isNotEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = "该板块暂未抓取到更多帖子，请下拉刷新或浏览【全部】",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AuroraMediaMuted,
+                    )
+                }
+            }
         } else {
-            items(state.posts, key = { "${it.sourceId}:${it.id}" }) { post ->
+            items(visiblePosts, key = { "${it.sourceId}:${it.id}" }) { post ->
                 ForumPostCard(post = post, onClick = { onPost(post) })
             }
         }
@@ -187,55 +281,92 @@ internal fun ForumScreen(
                     CircularProgressIndicator(modifier = Modifier.size(28.dp))
                 }
             }
-        } else if (state.error != null && state.posts.isNotEmpty()) {
+        } else if (state.loadMoreError != null && state.posts.isNotEmpty()) {
             item {
-                TextButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
-                    Text("加载失败，点击重试")
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text = state.loadMoreError,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    TextButton(onClick = onLoadMore) {
+                        Text("加载失败，点击重试")
+                    }
                 }
             }
         }
+    }
     }
 }
 
 @Composable
 private fun ForumPostCard(post: ForumPost, onClick: () -> Unit) {
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(22.dp),
+        color = AuroraMediaSurface,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, Color(0xFF262626)),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(12.dp))
+            .applePressEffect(onClick = onClick)
             .testTag("forum-post"),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(16.dp)) {
             Text(
-                post.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
+                text = post.title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 20.sp,
+                ),
+                color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                val badgeColor = when (post.sourceId) {
+                    "t906" -> Color(0xFFE50914) // Netflix Red / 91
+                    "t66y" -> Color(0xFF2E7D32) // Forest Green / 1024
+                    "sis" -> AuroraCoral
+                    else -> Color(0xFFE65100)
+                }
                 Surface(
-                    color = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    shape = CircleShape,
+                    color = badgeColor,
+                    shape = RoundedCornerShape(3.dp),
                 ) {
-                    Text(post.sourceName, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp))
+                    Text(
+                        text = post.sourceName,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White,
+                        ),
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
                 }
                 Text(
-                    post.author,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = post.author,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    color = AuroraMediaMuted,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(15.dp))
-                Text(post.replyCount.toString(), style = MaterialTheme.typography.labelMedium)
+                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = AuroraMediaMuted, modifier = Modifier.size(14.dp))
+                Text(
+                    text = post.replyCount.toString(),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                    color = AuroraMediaLabel,
+                )
                 if (post.updatedLabel.isNotBlank()) {
-                    Text(post.updatedLabel, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = post.updatedLabel,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                        color = AuroraMediaMuted,
+                    )
                 }
             }
         }
@@ -265,7 +396,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val imageSaver = remember(context) { ForumImageSaver(context) }
-    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val isDarkTheme = true
     val cachedHtml = remember(post.url) { ForumPostCache.get(post.url) }
     val startedAt = remember(post.url) { System.currentTimeMillis() }
     var cachedRendered by remember(post.url) { mutableStateOf(false) }
@@ -425,23 +556,23 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().testTag("forum-reader")) {
+    Column(Modifier.fillMaxSize().background(Color(0xFF141218)).statusBarsPadding().testTag("forum-reader")) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp),
         ) {
             IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回论坛")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回论坛", tint = Color.White)
             }
             Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                Text(post.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(post.sourceName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(post.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White)
+                Text(post.sourceName, style = MaterialTheme.typography.labelMedium, color = AuroraMediaMuted)
             }
             IconButton(onClick = { webView.reload() }) {
-                Icon(Icons.Default.Refresh, contentDescription = "刷新帖子")
+                Icon(Icons.Default.Refresh, contentDescription = "刷新帖子", tint = Color.White)
             }
         }
-        HorizontalDivider()
+        HorizontalDivider(color = Color(0xFF262626))
         Box(Modifier.fillMaxSize()) {
             val contentAlpha by animateFloatAsState(
                 targetValue = if (!isLoading && error == null) 1f else 0f,
@@ -453,10 +584,12 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 modifier = Modifier.fillMaxSize().alpha(contentAlpha).testTag("forum-reader-content"),
             )
             if (isLoading) {
-                LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
+                LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = AuroraCoral)
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = Color(0xFF211F26),
+                    contentColor = Color.White,
                     shape = RoundedCornerShape(24.dp),
+                    border = BorderStroke(1.dp, Color(0xFF33303A)),
                     modifier = Modifier.align(Alignment.Center).testTag("forum-reader-loading"),
                 ) {
                     Column(
@@ -464,12 +597,12 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(14.dp),
                         modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
                     ) {
-                        CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp)
-                        Text("正在整理帖子排版", style = MaterialTheme.typography.titleSmall)
+                        CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp, color = AuroraCoral)
+                        Text("正在整理帖子排版", style = MaterialTheme.typography.titleSmall, color = Color.White)
                         Text(
                             "内容准备好后会一次显示",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = AuroraMediaMuted,
                         )
                     }
                 }
@@ -478,10 +611,10 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.align(Alignment.Center).background(MaterialTheme.colorScheme.background).padding(24.dp),
+                    modifier = Modifier.align(Alignment.Center).background(Color(0xFF141218)).padding(24.dp),
                 ) {
-                    Text(message)
-                    TextButton(onClick = { webView.reload() }) { Text("重新加载") }
+                    Text(message, color = Color.White)
+                    TextButton(onClick = { webView.reload() }) { Text("重新加载", color = AuroraCoral) }
                 }
             }
             if (isSavingImage) {
@@ -601,7 +734,7 @@ internal val MOBILE_FORUM_SCRIPT =
       const host = location.hostname;
       document.body.classList.toggle('aurora-dark', auroraDark);
       if (host.includes('t66y.com')) document.body.classList.add('aurora-t66y');
-      if (host.includes('t906.') || host.includes('91selfie')) {
+      if (host.includes('t906.') || host.includes('t924.') || /^t9\d{2}\./.test(host) || host.includes('91selfie') || document.querySelector('#wrap') !== null) {
         document.body.classList.add('aurora-t906');
         const wrap = document.querySelector('#wrap');
         // The legacy page contains unclosed ad markup, so WebView may nest #wrap

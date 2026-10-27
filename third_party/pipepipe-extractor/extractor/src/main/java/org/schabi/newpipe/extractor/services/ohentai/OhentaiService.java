@@ -190,7 +190,44 @@ final class OhentaiParser {
     private static final Pattern SOURCE = Pattern.compile("[\\\"']file[\\\"']\\s*:\\s*[\\\"']([^\\\"']+)[\\\"']", Pattern.CASE_INSENSITIVE);
     private OhentaiParser() { }
     static Document fetch(final String url) throws IOException, ExtractionException { final Response response = NewPipe.getDownloader().get(normalize(url), headers()); if (response.responseCode() != 200) throw new ParsingException("OHentai page request returned HTTP " + response.responseCode()); return Jsoup.parse(response.responseBody(), response.latestUrl()); }
-    static List<OhentaiItem> cards(final Element scope, final int maximum) { if (scope == null) return Collections.emptyList(); final LinkedHashMap<String, OhentaiItem> items = new LinkedHashMap<>(); for (final Element link : scope.select("a[href*=detail.php][href*=vid]")) { final String url = normalize(link.absUrl("href")); final String id = idOrEmpty(url); if (id.isEmpty() || items.containsKey(id)) continue; final Element card = link.parent(); final Element image = link.selectFirst("img"); final String title = first(link.attr("title"), image == null ? "" : image.attr("alt"), card.text()); if (title.isEmpty()) continue; final String thumbnail = image == null ? "" : normalize(image.absUrl("src")); items.put(id, new OhentaiItem(id, url, title, thumbnail)); if (items.size() >= maximum) break; } return new ArrayList<>(items.values()); }
+    static List<OhentaiItem> cards(final Element scope, final int maximum) {
+        if (scope == null) return Collections.emptyList();
+        final LinkedHashMap<String, OhentaiItem> items = new LinkedHashMap<>();
+        for (final Element brick : scope.select(".videobrick")) {
+            final Element link = brick.selectFirst("a[href*=detail.php][href*=vid]");
+            if (link == null) continue;
+            final String url = normalize(link.absUrl("href"));
+            final String id = idOrEmpty(url);
+            if (id.isEmpty() || items.containsKey(id)) continue;
+            final Element titleElem = brick.selectFirst(".videotitle");
+            final Element image = brick.selectFirst("img");
+            final String title = first(
+                    titleElem == null ? "" : titleElem.attr("title"),
+                    titleElem == null ? "" : titleElem.text(),
+                    image == null ? "" : image.attr("alt"),
+                    link.attr("title"));
+            if (title.isEmpty()) continue;
+            final String thumbnail = image == null ? "" : normalize(image.absUrl("src"));
+            items.put(id, new OhentaiItem(id, url, title, thumbnail));
+            if (items.size() >= maximum) break;
+        }
+        if (items.isEmpty()) {
+            for (final Element link : scope.select("a[href*=detail.php][href*=vid]")) {
+                if (link.parents().select(".navbar, header, nav, #header").size() > 0) continue;
+                final String url = normalize(link.absUrl("href"));
+                final String id = idOrEmpty(url);
+                if (id.isEmpty() || items.containsKey(id)) continue;
+                final Element card = link.parent();
+                final Element image = link.selectFirst("img");
+                final String title = first(link.attr("title"), image == null ? "" : image.attr("alt"), card == null ? "" : card.text());
+                if (title.isEmpty()) continue;
+                final String thumbnail = image == null ? "" : normalize(image.absUrl("src"));
+                items.put(id, new OhentaiItem(id, url, title, thumbnail));
+                if (items.size() >= maximum) break;
+            }
+        }
+        return new ArrayList<>(items.values());
+    }
     static String source(final Document document) { final Matcher matcher = SOURCE.matcher(document.html()); while (matcher.find()) { final String value = normalize(matcher.group(1)); if (value.contains(".mp4") || value.contains(".m3u8")) return value; } return ""; }
     static String title(final Document document, final String fallback) { return first(meta(document, "meta[property=og:title]"), document.title(), fallback).replaceFirst("\\s*Hentai Video Stream.*$", "").trim(); }
     static String meta(final Document document, final String selector) { final Element element = document.selectFirst(selector); return element == null ? "" : element.attr("content").trim(); }

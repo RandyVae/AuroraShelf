@@ -30,9 +30,33 @@ class AuroraFlowTest {
                 views = "1",
                 pageUrl = "https://example.com/video/test-saved-favorite",
             )
+            val feedVideos = listOf(
+                savedVideo,
+                VideoItem(
+                    id = "test-saved-favorite-2",
+                    title = "本地双列测试 2",
+                    author = "test2",
+                    duration = "02:00",
+                    views = "2",
+                    pageUrl = "https://example.com/video/test-saved-favorite-2",
+                ),
+                VideoItem(
+                    id = "test-saved-favorite-3",
+                    title = "本地双列测试 3",
+                    author = "test3",
+                    duration = "03:00",
+                    views = "3",
+                    pageUrl = "https://example.com/video/test-saved-favorite-3",
+                ),
+            )
             AppPreferences(context).apply {
                 toggleFavorite(savedVideo.id)
                 saveVideo(savedVideo)
+                saveFeedCache(
+                    AppPreferences.DEFAULT_SOURCE,
+                    com.aurorashelf.app.model.FeedCategory.MONTHLY_HOT.path,
+                    feedVideos,
+                )
             }
         }
     }).around(compose)
@@ -72,12 +96,11 @@ class AuroraFlowTest {
     @Test fun reorganizedNavigationShowsLiveForumAndPersonalHub() {
         compose.onNodeWithContentDescription("直播").performClick()
         compose.onNodeWithTag("live-grid").assertExists()
-        compose.onNodeWithText("Stripchat · 公开直播 · 18+").assertExists()
         compose.onNodeWithContentDescription("刷新直播列表").assertExists()
 
         compose.onNodeWithContentDescription("论坛").performClick()
         compose.onNodeWithTag("forum-feed").assertExists()
-        compose.onNodeWithText("两个社区 · 合并更新").assertExists()
+        compose.onNodeWithTag("forum-refresh").assertExists()
 
         compose.onNodeWithContentDescription("我的").performClick()
         compose.onNodeWithTag("personal-overview").assertExists()
@@ -147,7 +170,7 @@ class AuroraFlowTest {
         compose.waitUntil(timeoutMillis = 20_000) {
             compose.onAllNodesWithTag("home-grid-card").fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onAllNodesWithTag("home-grid-card")[0].performClick()
+        compose.onNodeWithText("播放").performClick()
         compose.onNodeWithContentDescription("全屏播放").assertIsDisplayed().performClick()
         compose.onNodeWithTag("player-details").assertDoesNotExist()
         compose.activity.onBackPressedDispatcher.onBackPressed()

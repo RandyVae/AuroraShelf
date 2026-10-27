@@ -47,7 +47,6 @@ private val AuroraDarkColors = darkColorScheme(
     onSurface = AuroraDarkText,
     surfaceVariant = Color(0xFF1B2330),
     onSurfaceVariant = AuroraDarkMuted,
-    // Raised from #4E596A (2.53:1) so control outlines reach the 3:1 non-text threshold.
     outline = Color(0xFF5C6879),
     outlineVariant = Color(0xFF303946),
     error = Color(0xFFFFB4AB),
@@ -163,6 +162,35 @@ internal val AuroraInkContent = Color.White
 
 /** Reading surface for the comic reader; immersive media chrome stays dark by design. */
 internal val AuroraReaderBackground = Color(0xFF111111)
+
+/**
+ * Semantic tokens for artwork overlays and immersive media chrome.
+ * These fixed dark values are intentionally limited to image/video surfaces; normal page
+ * backgrounds and text continue to come from [MaterialTheme.colorScheme].
+ */
+internal val AuroraMediaScrim = Color.Black
+internal val AuroraMediaOnImage = Color.White
+internal val AuroraMediaInk = Color.Black
+internal val AuroraMediaSurface = Color(0xFF141414)
+internal val AuroraMediaSurfaceVariant = Color(0xFF1F1F1F)
+internal val AuroraMediaMuted = Color(0xFFA3A3A3)
+internal val AuroraMediaOutline = Color(0xFF404040)
+internal val AuroraMediaLabel = Color(0xFFD6D6D6)
+internal val AuroraMediaPlaceholder = Color(0xFF1A1A1A)
+internal val AuroraMediaMeta = Color(0xFF888888)
+internal val AuroraMediaRankOutline = Color(0xFF757575)
+internal val AuroraMediaRankFill = Color(0xFF121212)
+internal val AuroraProfileAccent = Color(0xFF0071EB)
+internal val AuroraBrandAccentDeep = Color(0xFFB81D24)
+
+/** Shared dimensions for interactive controls and recurring layout primitives. */
+internal object AuroraDimens {
+    val minTouchTarget = 48.dp
+    val chipHeight = 48.dp
+    val contentPadding = 16.dp
+    val compactGap = 8.dp
+    val settingsCardPadding = 18.dp
+}
 
 private val AuroraShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),

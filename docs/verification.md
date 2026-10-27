@@ -1,4 +1,27 @@
-# 验证记录 — 2026-09-24（最新补记 2026-10-24）
+# 验证记录 — 2026-09-24（最新补记 2026-10-27）
+
+## 169 — XVideos 完整分类与 HornyStudents 直播修复 — 2026-10-27
+
+- 构建命令：`./gradlew assembleRelease --console=plain --no-daemon`（JDK 21）；结果 `BUILD SUCCESSFUL`，耗时 1 分 46 秒。
+- APK：`dist/AuroraShelf-2.15.0-169-xvideos-live-fix-LOCAL.apk`，4,418,213 bytes；AAPT2 `versionCode='169' versionName='2.15.0'`；SHA-256 `6f24aa433dffa405f25db1a1d0605547e2331c374f47157d9add87b06d1ba3c7`。
+- JVM：`testDebugUnitTest` 实测 205 tests，201 passed，0 failed，0 errors，4 skipped；定向直播/缓存/XVideos 测试先行通过。
+- 模拟器配置：`missavtest`，Android 14 / arm64，1080×2340，density 440；按规则卸载旧 168 后全新安装 169，`dumpsys package` 确认 versionCode 169。
+- XVideos 运行时（E3）：首页 UI 树显示当前源 `XVideos`，分类顺序含「最新 / 热门 / 中文 / 自拍 / 亚洲 / 认证」，右侧继续存在「AI」；不再是旧 168 的五分类。截图：`captures/169_xvideos_41_categories_home.png`。
+- HornyStudents 运行时（E3）：切换至 `HornyStudents` 后加载 `czamabech`、`kriskras__` 等真实主播；`kriskras__` 房间日志在约 1.76 秒返回 `ready:landscape`，UI 显示「暂停直播」、主播信息、HD、观看人数及公开聊天；截图：`captures/169_hornystudents_public_player_ready.png`。
+- 旧问题复现对照：`czamabech` 本轮状态被站点判定为 `private_show`，应用显示「公开直播流暂未开放」，属于源站状态而非客户端误判；未把该房间计作播放失败。
+- 代码防护：直播房间 slug 兼容尾部 `/` 与 query；`about:blank`/loading 阶段返回 `pending`；实际 `videoWidth/videoHeight` 与 `readyState >= 2` 才进入 READY；跨直播源缓存按 `sourceId + category` 隔离；XVideos kiosk 显式按语义 ID 映射，过期五 kiosk extractor 不再静默回退到 `latest`。
+- 截图与 UI 流程仅覆盖上述 Android 14 仿真器配置；TalkBack、真实硬件真机、200% 字体与所有 41 个分类逐项联网加载仍未在本轮完成，不能据此宣称 E4 或全分类网络可用。
+
+
+## Netgrey 品牌候选（137-netgrey）— 2026-10-24
+
+- 品牌：应用名与首页标题改为 **Netgrey**（英文名，不使用中文名）；启动图标从旧拟物素材重绘为扁平矢量 N（冷灰 `#9AA3AE`，纯黑底），自适应图标前景/单色层改为 `drawable/ic_launcher_foreground.xml` + `drawable/ic_launcher_monochrome.xml`，删除旧 `launcher_foreground*` 资源与 PNG 中间产物。
+- 图标规格：108 dp 画布，N 高 60.48 dp（56%），宽 33.246 dp，竖笔/斜笔等重 11.715 dp；冷灰对黑底对比度 8.22:1。
+- 构建：`assembleDebug` PASS（16:03，增量 18 s）。最终 release 在独立 `git worktree`（`HEAD b8b36da` + 仅品牌改动）中构建：`assembleRelease` PASS（16:16，1m46s，R8 + shrinkResources），避免混入并行会话在工作树中的未提交改动；16:12 于工作树直接构建的首个产物已丢弃。
+- Release：`dist/AuroraShelf-2.15.0-137-netgrey.apk`，3,407,533 bytes，versionCode **137** / versionName 2.15.0，label `Netgrey`；v2 签名（Android Debug 证书）通过，`zipalign -c -P 16` 通过；SHA-256 `eae016cfa75308a1df3577ad12e40898e6ec594a47629a875409a76e5f761f4a`；`dist/SHA256SUMS.txt` 已覆盖全部 10 个 APK 且全量校验通过。
+- 安装：Android 14 / 1080×2340 模拟器 `adb install -r` 覆盖安装成功；冷启动 `am start -W` **TotalTime 1811–2226 ms**（3 次：2014 / 2226 / 1811，含首屏网络请求，环境同机），crash buffer 为空；启动器抽屉显示 Netgrey + 冷灰 N，首页标题 Netgrey 单行不截断。
+- Lint：最终代码 **0 errors / 19 warnings / 3 hints**，无图标相关告警。
+- 未覆盖：主题图标（monochrome）未在设备开启实测；JVM/设备测试未在本轮重跑；TalkBack 与真机走查沿用上一轮结论。
 
 ## 2.15.0 加载优化 + HIG 第二轮候选（137）— 2026-10-24
 

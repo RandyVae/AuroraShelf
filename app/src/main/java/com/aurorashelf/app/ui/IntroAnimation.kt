@@ -56,7 +56,7 @@ import kotlinx.coroutines.delay
  */
 internal object IntroTiming {
     /** Length of the shipped film; used for the safety timeout and skip fade. */
-    const val FILM_DURATION_MS = 6_600L
+    const val FILM_DURATION_MS = 5_700L
 
     /** Reduce Motion: hold the poster lockup instead of playing motion. */
     const val REDUCED_HOLD_MS = 1_500L
@@ -65,7 +65,7 @@ internal object IntroTiming {
     const val SKIP_FADE_MS = 220L
 
     /** Hard safety stop in case the player never reports ENDED. */
-    const val SAFETY_MS = 9_500L
+    const val SAFETY_MS = 8_500L
 
     fun shouldAnimate(animatorsEnabled: Boolean): Boolean = animatorsEnabled
 }

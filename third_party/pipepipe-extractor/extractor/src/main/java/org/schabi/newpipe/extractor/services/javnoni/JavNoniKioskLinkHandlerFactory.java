@@ -45,6 +45,8 @@ public final class JavNoniKioskLinkHandlerFactory extends ListLinkHandlerFactory
 
     @Override
     public boolean onAcceptUrl(final String url) {
-        return url != null && JavNoniParsingHelper.normalizeUrl(url).contains("jav-noni.vip/");
+        if (url == null) return false;
+        final String normalized = JavNoniParsingHelper.normalizeUrl(url);
+        return normalized.contains("javnoni.com/") || normalized.contains("jav-noni.vip/");
     }
 }

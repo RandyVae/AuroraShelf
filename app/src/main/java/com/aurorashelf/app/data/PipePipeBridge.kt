@@ -23,8 +23,8 @@ internal object PipePipeBridge {
         initialize()
         val source = ContentSourceCatalog.find(baseUrl) ?: throw IOException("未找到所选视频源")
         Log.i(TAG, "loadFeed service=${source.extractorServiceName} category=${category.name} page=$page")
-        val kioskId = source.kioskIds.getOrNull(category.ordinal) ?: source.kioskIds.firstOrNull()
-            ?: throw IOException("该视频源没有可用分类")
+        val kioskId = ContentSourceCatalog.kioskId(baseUrl, category)
+            ?: throw IOException("该视频源不支持分类：${category.displayLabel(baseUrl)}")
         val extractor = service(source.extractorServiceName).kioskList.getExtractorById(kioskId, null)
         extractor.fetchPage()
         var result = extractor.initialPage

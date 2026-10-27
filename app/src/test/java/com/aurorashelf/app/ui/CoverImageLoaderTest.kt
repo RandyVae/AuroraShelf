@@ -106,6 +106,7 @@ class CoverImageLoaderTest {
         val calls = AtomicInteger()
         val started = CountDownLatch(1)
         val release = CountDownLatch(1)
+        val ready = CountDownLatch(4)
         val loader = newLoader(
             cache = CoverCache(diskDirectory = null),
             fetcher = CoverFetcher { _, _ ->
@@ -117,10 +118,15 @@ class CoverImageLoaderTest {
         )
         val results = java.util.Collections.synchronizedList(mutableListOf<ByteArray?>())
         val threads = (1..4).map {
-            Thread { results.add(loader.load(COVER_URL, PAGE_URL)) }.apply { start() }
+            Thread {
+                ready.countDown()
+                ready.await(5, TimeUnit.SECONDS)
+                results.add(loader.load(COVER_URL, PAGE_URL))
+            }.apply { start() }
         }
 
         assertTrue("fetcher should start", started.await(5, TimeUnit.SECONDS))
+        Thread.sleep(100)
         release.countDown()
         threads.forEach { it.join(5_000) }
 

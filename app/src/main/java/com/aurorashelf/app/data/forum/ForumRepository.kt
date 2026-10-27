@@ -64,7 +64,12 @@ class ForumRepository internal constructor(
         val result = runCatching { source.load(page) }
         val elapsedMs = System.currentTimeMillis() - startedAt
         logSafely {
-            Log.i(TAG, "source=${source.id} page=$page ms=$elapsedMs posts=${result.getOrNull()?.size ?: 0}")
+            val err = result.exceptionOrNull()
+            if (err != null) {
+                Log.e(TAG, "source=${source.id} page=$page ms=$elapsedMs FAILED: ${err.javaClass.simpleName}: ${err.message}", err)
+            } else {
+                Log.i(TAG, "source=${source.id} page=$page ms=$elapsedMs posts=${result.getOrNull()?.size ?: 0}")
+            }
         }
         return result
     }
@@ -115,7 +120,7 @@ class ForumRepository internal constructor(
  * `Jsoup.connect` connections, so paging/refresh reuse DNS and TLS sessions.
  */
 internal object ForumHttp {
-    private val client: OkHttpClient by lazy {
+    internal val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)

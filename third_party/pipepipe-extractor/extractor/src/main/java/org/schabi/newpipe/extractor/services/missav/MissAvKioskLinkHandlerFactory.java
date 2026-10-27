@@ -34,7 +34,7 @@ public final class MissAvKioskLinkHandlerFactory extends ListLinkHandlerFactory 
         switch (id) {
             case "popular":
                 return MissAvParsingHelper.BASE_URL + "/" + MissAvParsingHelper.DEFAULT_LANGUAGE
-                        + "/popular";
+                        + "/release";
             case "recommended":
                 return MissAvParsingHelper.BASE_URL + "/" + MissAvParsingHelper.DEFAULT_LANGUAGE;
             case "latest":

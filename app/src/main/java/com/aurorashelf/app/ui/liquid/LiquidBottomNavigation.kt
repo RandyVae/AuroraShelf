@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.lerp
+import com.aurorashelf.app.ui.theme.AuroraCoral
 import com.aurorashelf.app.ui.theme.AuroraGlassContainerAlpha
 import com.aurorashelf.app.ui.theme.AuroraGlassContainerDark
 import com.aurorashelf.app.ui.theme.AuroraGlassContainerLight
@@ -87,13 +88,8 @@ internal fun LiquidBottomNavigation(
 ) {
     require(tabSlots.isNotEmpty())
     require(tabSlots.all { it in 0 until visualItemCount })
-    val isLightTheme = !isSystemInDarkTheme()
-    val accentColor = MaterialTheme.colorScheme.primary
-    val containerColor = if (isLightTheme) {
-        AuroraGlassContainerLight.copy(alpha = AuroraGlassContainerAlpha)
-    } else {
-        AuroraGlassContainerDark.copy(alpha = AuroraGlassContainerAlpha)
-    }
+    val accentColor = AuroraCoral
+    val containerColor = AuroraGlassContainerDark.copy(alpha = 0.85f)
     val tabsBackdrop = rememberLayerBackdrop()
 
     BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.CenterStart) {
@@ -279,11 +275,7 @@ internal fun LiquidBottomNavigation(
                     onDrawSurface = {
                         val progress = dragAnimation.pressProgress
                         drawRect(
-                            color = if (isLightTheme) {
-                                Color.Black.copy(alpha = 0.1f)
-                            } else {
-                                Color.White.copy(alpha = 0.1f)
-                            },
+                            color = Color.White.copy(alpha = 0.1f),
                             alpha = 1f - progress,
                         )
                         drawRect(Color.Black.copy(alpha = 0.03f * progress))

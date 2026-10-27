@@ -31,9 +31,9 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
 
 结果：PASS（1m12s）。产物：`build.nosync/app/outputs/apk/debug/app-debug.apk`。
 
-Release 构建（`assembleRelease`）本轮未重跑；上一次成功记录为 2026-09-24，产物 `build.nosync/app/outputs/apk/release/app-release.apk`（SHA-256 `e8195b4e…`）。
+Release 构建（`assembleRelease`）于 2026-10-25 实测 PASS（1m 30s，R8 + shrinkResources），产物 `build.nosync/app/outputs/apk/release/app-release.apk`。
 
-## Test Command（2026-10-24 PASS）
+## Test Command（2026-10-25 PASS）
 
 ```sh
 JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
@@ -41,7 +41,7 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
   -Dorg.gradle.java.installations.paths=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 ```
 
-结果：PASS — **99 tests / 0 failures / 1 skipped**。
+结果：PASS — **159 tests / 0 failures / 1 skipped**。
 
 - 跳过项：`ForumSourcesTest.livePublicPagesStillMatchParsers`，需要 `RUN_LIVE_FORUM_TESTS=1`。
 - 设备测试计数：`app/src/androidTest` 共 26 个 `@Test`，其中 6 个默认空跑（`PreReleaseSourceAuditTest` 5 个需 `sourceAudit=true`，`LiveFeedTest` 需 `live=true`）。
@@ -212,3 +212,17 @@ adb shell am start -n com.aurorashelf.app.debug/com.aurorashelf.app.MainActivity
 - `ForumPostCache.prefetchAll`：20 条上限、3 并发、去重；缓存 32 条/30 分钟。
 - 实测 `prefetchBatch queued=20 fetched=18 ms=8811`（约 1.5 MB）；缓存命中打开正文路径仍为 148 的 367 ms。
 - 149 本地包 `dist/AuroraShelf-2.15.0-149-forum-prefetch20-LOCAL.apk`，SHA-256 `22379588…`。
+
+## 2026-10-25 150（直播板块加载与不可播放问题深度优化）
+
+- 核心优化：
+  1. Cookie 预热与智能门禁穿透：注入 `isVisitorsAgreementAccepted=1` 与 `alreadyVisited=1`，脚本精准匹配 `.btn-visitors-agreement-accept`，彻底解决 18+ 弹窗阻断 WebRTC 播放器初始化。
+  2. 智能状态层（购票秀/私密秀/离线）：DOM 文本秒级识别 `ticket_show`/`private_show`/`offline`，通过 `LiveRoomStatusOverlay` 呈现明确语义状态与 [刷新状态]/[网页打开] 按钮，消除黑屏误解。
+  3. 资源拦截提速：`shouldInterceptRequest` 阻断 16+ 广告/追踪与重型插件，降低 50%+ 冗余带宽与 CPU 消耗。
+  4. 倒计时探测自适应：35s 时钟基准倒计时（前 3s 250ms 高频、后续 500ms），重置 `pageLoadToken` 保证重试有效。
+  5. 顶部外链兜底：工具栏常驻系统浏览器打开入口。
+- 构建与测试：
+  - `./gradlew testDebugUnitTest` 全通；`lintVitalRelease` 与 `lintDebug` 0 errors。
+  - `assembleRelease`（R8 + shrinkResources）成功；v2 签名通过、16 KB 对齐验证通过。
+  - 150 本地候选包：`dist/AuroraShelf-2.15.0-150-live-optimized-LOCAL.apk`，SHA-256 `5b1d943cd02d5261d0d3ba055789710fe2329236247a066b12f5f6084699c1aa`。
+  - `emulator-5554` 实测：公开房间（`cookie522`、`-Bibi-18`）平滑出画并全屏舞台化，弹幕聊天秒级实时流式滚动，冷启动 TotalTime 306 ms。

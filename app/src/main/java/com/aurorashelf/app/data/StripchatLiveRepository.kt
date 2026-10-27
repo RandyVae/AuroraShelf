@@ -94,5 +94,14 @@ class StripchatLiveRepository {
         private const val REQUEST_TIMEOUT_MS = 15_000
         private const val PUBLIC_STATUS = "public"
         private val USERNAME_PATTERN = Regex("[A-Za-z0-9_-]{1,80}")
+
+        /** Asynchronously warms DNS resolution for the live stream host to eliminate TLS handshake delay. */
+        fun prefetchDns() {
+            java.util.concurrent.Executors.newSingleThreadExecutor().execute {
+                runCatching {
+                    java.net.InetAddress.getAllByName("zh.stripchat.com")
+                }
+            }
+        }
     }
 }

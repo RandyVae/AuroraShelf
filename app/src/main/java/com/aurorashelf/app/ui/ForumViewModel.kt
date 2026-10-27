@@ -28,7 +28,9 @@ data class ForumUiState(
     val isLoadingMore: Boolean = false,
     val unavailableSources: List<String> = emptyList(),
     val error: String? = null,
+    val loadMoreError: String? = null,
     val selectedPost: ForumPost? = null,
+    val selectedSourceId: String? = null,
 )
 
 class ForumViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,7 +55,7 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
         val cached = preferences.cachedForumFirstPage()
         if (cached != null && cached.posts.isNotEmpty() && state.posts.isEmpty()) {
             mutableUiState.update {
-                it.copy(posts = cached.posts, canLoadMore = false, error = null)
+                it.copy(posts = cached.posts, canLoadMore = false, error = null, loadMoreError = null)
             }
             logSafely { Log.i(TAG, "first-screen cache posts=${cached.posts.size}") }
         }
@@ -68,7 +70,7 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
             val startedAt = System.currentTimeMillis()
             var loggedFirstResult = false
             mutableUiState.update {
-                it.copy(isLoading = true, isLoadingMore = false, error = null, unavailableSources = emptyList())
+                it.copy(isLoading = true, isLoadingMore = false, error = null, loadMoreError = null, unavailableSources = emptyList())
             }
             runCatching {
                 repository.loadProgressively(1) { posts, unavailable, canLoadMore ->
@@ -84,6 +86,8 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                             posts = posts,
                             page = 1,
                             canLoadMore = canLoadMore,
+                            error = null,
+                            loadMoreError = null,
                             unavailableSources = unavailable,
                         )
                     }
@@ -95,6 +99,8 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                         page = 1,
                         canLoadMore = page.canLoadMore,
                         isLoading = false,
+                        error = null,
+                        loadMoreError = null,
                         unavailableSources = page.unavailableSources,
                     )
                 }
@@ -109,7 +115,7 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
         if (state.isLoading || state.isLoadingMore || !state.canLoadMore || state.page < 1) return
         val targetPage = state.page + 1
         loadJob = viewModelScope.launch {
-            mutableUiState.update { it.copy(isLoadingMore = true, error = null) }
+            mutableUiState.update { it.copy(isLoadingMore = true, loadMoreError = null) }
             // Wait for an in-flight prefetch instead of issuing a duplicate network request.
             prefetchJob?.join()
             val prefetched = takeFreshPrefetched(targetPage)
@@ -126,6 +132,7 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                         page = targetPage,
                         canLoadMore = page.canLoadMore && page.posts.isNotEmpty(),
                         isLoadingMore = false,
+                        loadMoreError = null,
                         unavailableSources = page.unavailableSources,
                     )
                 }
@@ -135,13 +142,14 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }.onFailure { failure ->
                 if (failure is CancellationException) return@onFailure
-                mutableUiState.update { it.copy(isLoadingMore = false, error = failure.userMessage()) }
+                mutableUiState.update { it.copy(isLoadingMore = false, loadMoreError = failure.userMessage()) }
             }
         }
     }
 
     fun open(post: ForumPost) = mutableUiState.update { it.copy(selectedPost = post) }
     fun closePost() = mutableUiState.update { it.copy(selectedPost = null) }
+    fun selectSource(sourceId: String?) = mutableUiState.update { it.copy(selectedSourceId = sourceId) }
 
     /**
      * Prefetch exactly one next page in the background (2 min in-memory TTL). The slot is

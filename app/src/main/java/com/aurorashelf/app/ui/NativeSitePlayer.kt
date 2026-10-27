@@ -1,9 +1,13 @@
 package com.aurorashelf.app.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Subtitles
@@ -13,8 +17,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -56,6 +62,8 @@ internal fun NativeSitePlayer(
     onFullscreenChange: (Boolean) -> Unit,
     onVideoOrientationChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onVideoAspectRatioChange: (Float) -> Unit = {},
+    onPositionChange: (Long) -> Unit = {},
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -83,6 +91,10 @@ internal fun NativeSitePlayer(
             }
     }
     var position by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
+    var currentPositionMs by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
+    var bufferedPositionMs by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
+    var durationMs by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
+    var isControllerVisible by remember(pageUrl) { mutableStateOf(false) }
     var shouldResume by rememberSaveable(pageUrl) { mutableStateOf(true) }
     var attempt by remember(pageUrl) { mutableIntStateOf(0) }
     var error by remember(pageUrl) { mutableStateOf<String?>(null) }
@@ -95,6 +107,18 @@ internal fun NativeSitePlayer(
     val timingFirstFrameLogged = remember(pageUrl) { mutableStateOf(false) }
     val fullscreenChange by rememberUpdatedState(onFullscreenChange)
     val videoOrientationChange by rememberUpdatedState(onVideoOrientationChange)
+    val videoAspectRatioChange by rememberUpdatedState(onVideoAspectRatioChange)
+    val positionChange by rememberUpdatedState(onPositionChange)
+
+    val castManager = remember(context) { com.aurorashelf.app.cast.CastManager.getInstance(context) }
+    val castState by castManager.castState.collectAsStateWithLifecycle()
+    val currentCastState by rememberUpdatedState(castState)
+
+    LaunchedEffect(castState) {
+        if (castState is com.aurorashelf.app.cast.CastState.Connected) {
+            player.pause()
+        }
+    }
 
     LaunchedEffect(pageUrl, attempt, offlineVideo?.mediaUrl) {
         loadStartedAtMs.longValue = android.os.SystemClock.elapsedRealtime()
@@ -134,8 +158,9 @@ internal fun NativeSitePlayer(
             }
             player.setMediaSource(media, position)
             player.prepare()
-            player.playWhenReady = shouldResume
-            Log.i(TAG, "player prepared playWhenReady=$shouldResume")
+            val isCurrentlyCasting = currentCastState is com.aurorashelf.app.cast.CastState.Connected
+            player.playWhenReady = shouldResume && !isCurrentlyCasting
+            Log.i(TAG, "player prepared playWhenReady=${player.playWhenReady}")
             Log.i(TAG, "timing prepared ms=${android.os.SystemClock.elapsedRealtime() - loadStartedAtMs.longValue}")
         } catch (failure: Exception) {
             if (failure is CancellationException) throw failure
@@ -145,15 +170,36 @@ internal fun NativeSitePlayer(
         }
     }
     LaunchedEffect(player) {
-        while (true) { delay(500); position = player.currentPosition }
+        while (true) {
+            val current = player.currentPosition.coerceAtLeast(0L)
+            val dur = player.duration.coerceAtLeast(0L)
+            val buf = player.bufferedPosition.coerceAtLeast(0L)
+            currentPositionMs = current
+            durationMs = dur
+            bufferedPositionMs = buf
+            position = current
+            positionChange(current)
+            delay(200)
+        }
     }
     DisposableEffect(player, lifecycle) {
         val listener = object : Player.Listener {
+            @Suppress("DEPRECATION")
             override fun onPlaybackStateChanged(state: Int) {
                 Log.i(TAG, "playback state=$state position=${player.currentPosition} duration=${player.duration}")
                 if (state == Player.STATE_READY && !timingReadyLogged.value) {
                     timingReadyLogged.value = true
                     Log.i(TAG, "timing ready ms=${android.os.SystemClock.elapsedRealtime() - loadStartedAtMs.longValue}")
+                    val currentSize = player.videoSize
+                    val ratio = calculateVideoAspectRatio(
+                        width = currentSize.width,
+                        height = currentSize.height,
+                        pixelWidthHeightRatio = currentSize.pixelWidthHeightRatio,
+                        unappliedRotationDegrees = currentSize.unappliedRotationDegrees,
+                    )
+                    if (ratio != null) {
+                        videoAspectRatioChange(ratio)
+                    }
                 }
                 isLoading = state == Player.STATE_BUFFERING
             }
@@ -169,6 +215,15 @@ internal fun NativeSitePlayer(
             }
             @Suppress("DEPRECATION")
             override fun onVideoSizeChanged(videoSize: VideoSize) {
+                val ratio = calculateVideoAspectRatio(
+                    width = videoSize.width,
+                    height = videoSize.height,
+                    pixelWidthHeightRatio = videoSize.pixelWidthHeightRatio,
+                    unappliedRotationDegrees = videoSize.unappliedRotationDegrees,
+                )
+                if (ratio != null) {
+                    videoAspectRatioChange(ratio)
+                }
                 val isPortrait = isPortraitVideo(
                     width = videoSize.width,
                     height = videoSize.height,
@@ -193,11 +248,17 @@ internal fun NativeSitePlayer(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
-                    position = player.currentPosition
+                    val current = player.currentPosition.coerceAtLeast(0L)
+                    position = current
+                    positionChange(current)
                     shouldResume = player.playWhenReady
                     player.pause()
                 }
-                Lifecycle.Event.ON_RESUME -> if (shouldResume) player.play()
+                Lifecycle.Event.ON_RESUME -> {
+                    if (shouldResume && currentCastState !is com.aurorashelf.app.cast.CastState.Connected) {
+                        player.play()
+                    }
+                }
                 else -> Unit
             }
         }
@@ -237,6 +298,9 @@ internal fun NativeSitePlayer(
                 setShowNextButton(false)
                 setShowPreviousButton(false)
                 setFullscreenButtonClickListener { fullscreenChange(it) }
+                setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+                    isControllerVisible = (visibility == android.view.View.VISIBLE)
+                })
             } },
             update = { playerView ->
                 // AndroidView is retained when an episode changes. Rebind its surface
@@ -310,10 +374,102 @@ internal fun NativeSitePlayer(
                 }
             }
         }
+        PlayerBottomProgressBar(
+            currentPositionMs = currentPositionMs,
+            bufferedPositionMs = bufferedPositionMs,
+            durationMs = durationMs,
+            isControllerVisible = isControllerVisible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
+@Composable
+internal fun PlayerBottomProgressBar(
+    currentPositionMs: Long,
+    bufferedPositionMs: Long,
+    durationMs: Long,
+    isControllerVisible: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val progressFraction = calculateVideoProgressFraction(currentPositionMs, durationMs)
+    val bufferedFraction = calculateVideoBufferedFraction(bufferedPositionMs, durationMs)
+
+    val targetHeight = if (isControllerVisible) 1.5.dp else 2.5.dp
+    val barHeight by animateDpAsState(
+        targetValue = targetHeight,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        label = "bottom-progress-height",
+    )
+
+    val progressAlpha by animateFloatAsState(
+        targetValue = if (isControllerVisible) 0.5f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        label = "bottom-progress-alpha",
+    )
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(barHeight)
+            // Permanent Apple HIG hairline divider line separating player viewport from content below
+            .background(Color.White.copy(alpha = 0.15f))
+            .testTag("player-bottom-progress-divider"),
+    ) {
+        // Buffered progress track (network cache ahead)
+        if (bufferedFraction > 0.001f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(bufferedFraction)
+                    .background(Color.White.copy(alpha = 0.32f * progressAlpha)),
+            )
+        }
+        // Played progress track (Netgrey signature coral gradient)
+        if (progressFraction > 0.001f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progressFraction)
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            listOf(
+                                AuroraCoral.copy(alpha = progressAlpha),
+                                Color(0xFFFF5277).copy(alpha = progressAlpha),
+                            )
+                        ),
+                        shape = RoundedCornerShape(topEnd = 1.dp, bottomEnd = 1.dp),
+                    ),
+            )
+        }
+    }
+}
+
+internal fun calculateVideoProgressFraction(positionMs: Long, durationMs: Long): Float {
+    if (durationMs <= 0L || positionMs <= 0L) return 0f
+    return (positionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+}
+
+internal fun calculateVideoBufferedFraction(bufferedMs: Long, durationMs: Long): Float {
+    if (durationMs <= 0L || bufferedMs <= 0L) return 0f
+    return (bufferedMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f)
+}
+
 private const val TAG = "NativeSitePlayer"
+
+internal fun calculateVideoAspectRatio(
+    width: Int,
+    height: Int,
+    pixelWidthHeightRatio: Float = 1f,
+    unappliedRotationDegrees: Int = 0,
+): Float? {
+    if (width <= 0 || height <= 0 || pixelWidthHeightRatio <= 0f) return null
+    val isQuarterTurn = Math.floorMod(unappliedRotationDegrees, 180) == 90
+    val displayWidth = if (isQuarterTurn) height.toFloat() else width * pixelWidthHeightRatio
+    val displayHeight = if (isQuarterTurn) width * pixelWidthHeightRatio else height.toFloat()
+    if (displayWidth <= 0f || displayHeight <= 0f) return null
+    return displayWidth / displayHeight
+}
 
 internal fun isPortraitVideo(
     width: Int,

@@ -3,10 +3,29 @@ package com.aurorashelf.app.ui
 import com.aurorashelf.app.model.LiveItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LiveViewModelTest {
+    @Test
+    fun allViewModelsHaveSingleApplicationConstructorForViewModelProvider() {
+        assertNotNull(LiveViewModel::class.java.getConstructor(android.app.Application::class.java))
+        assertNotNull(AuroraViewModel::class.java.getConstructor(android.app.Application::class.java))
+        assertNotNull(ComicViewModel::class.java.getConstructor(android.app.Application::class.java))
+        assertNotNull(ForumViewModel::class.java.getConstructor(android.app.Application::class.java))
+    }
+
+    @Test
+    fun liveSourceCatalogProvidesStripchatAndHornyStudents() {
+        val sources = com.aurorashelf.app.model.LiveSourceCatalog.sources
+        assertEquals(2, sources.size)
+        assertEquals("stripchat", sources[0].id)
+        assertEquals("Stripchat", sources[0].name)
+        assertEquals("hornystudents", sources[1].id)
+        assertEquals("HornyStudents", sources[1].name)
+    }
+
     @Test
     fun emptyIncomingPageStopsPagination() {
         val existing = items("1", "2", "3")

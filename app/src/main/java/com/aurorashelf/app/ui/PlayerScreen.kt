@@ -9,12 +9,15 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -62,7 +65,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.CastConnected
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
@@ -76,11 +81,13 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Search
@@ -106,9 +113,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -117,10 +126,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -139,6 +152,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -157,13 +172,23 @@ import com.aurorashelf.app.data.SourceAddress
 import com.aurorashelf.app.data.PlaybackEpisode
 import com.aurorashelf.app.data.PREFETCH_LOG_TAG
 import com.aurorashelf.app.data.PlaybackResolver
+import com.aurorashelf.app.data.PlaybackSource
 import com.aurorashelf.app.data.isPrefetchEnabled
 import com.aurorashelf.app.data.OfflineCacheManager
 import com.aurorashelf.app.data.OfflineCacheState
 import com.aurorashelf.app.data.OfflineVideo
+import com.aurorashelf.app.cast.CastDevice
+import com.aurorashelf.app.cast.CastManager
+import com.aurorashelf.app.cast.CastState
 import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
 import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
 import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
+import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
+import com.aurorashelf.app.ui.theme.AuroraMediaLabel
+import com.aurorashelf.app.ui.theme.AuroraMediaMuted
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -195,7 +220,15 @@ internal fun PlayerScreen(
     val context = LocalContext.current
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
     val cachedVideos by cacheManager.entries.collectAsStateWithLifecycle()
+    val castManager = remember(context) { CastManager.getInstance(context) }
+    val castState by castManager.castState.collectAsStateWithLifecycle()
+    var isCastSheetVisible by rememberSaveable { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val isCasting = castState is CastState.Connected
+
     var playbackUrl by remember(video.id) { mutableStateOf(video.pageUrl) }
+    var videoAspectRatio by remember(playbackUrl) { mutableStateOf<Float?>(null) }
+    var currentPositionMs by rememberSaveable(playbackUrl) { mutableStateOf(0L) }
     var isEpisodePickerVisible by remember(video.id) { mutableStateOf(false) }
     // Flow marker for logcat: the gap from this line to "timing ready" is the tap -> READY time.
     LaunchedEffect(video.id) { Log.i(TAG, "timing player screen opened") }
@@ -207,6 +240,33 @@ internal fun PlayerScreen(
     val selectedEpisode = episodes.firstOrNull { it.pageUrl == playbackUrl }?.number ?: 1
     val selectedEpisodeLabel = episodes.firstOrNull { it.pageUrl == playbackUrl }?.label
     val cachedVideo = cachedVideos.firstOrNull { it.id == OfflineCacheManager.idFor(playbackUrl) }
+
+    val launchCastForUrl: (CastDevice, String, String?, Long) -> Unit = { device, targetPageUrl, epLabel, resumePos ->
+        scope.launch(Dispatchers.IO) {
+            val targetCached = cachedVideos.firstOrNull {
+                it.id == OfflineCacheManager.idFor(targetPageUrl) && it.isPlayableOffline
+            }
+            val resolved = runCatching { PlaybackResolver().resolve(targetPageUrl) }.getOrNull()
+            val source = if (targetCached != null && targetCached.mediaUrl != null) {
+                PlaybackSource(targetCached.mediaUrl, resolved?.referer ?: targetPageUrl)
+            } else {
+                resolved
+            }
+            if (source != null) {
+                val isLocalFile = source.url.startsWith("file://", ignoreCase = true) ||
+                    source.url.startsWith("/")
+                castManager.cast(
+                    device = device,
+                    videoUrl = source.url,
+                    title = if (epLabel.isNullOrBlank()) video.title else "${video.title} · $epLabel",
+                    referer = source.referer,
+                    localFilePath = if (isLocalFile) source.url else null,
+                    cacheKey = targetCached?.id,
+                    initialPositionMs = resumePos,
+                )
+            }
+        }
+    }
     val nextEpisode = episodes.firstOrNull { it.number > selectedEpisode }
     // Warm the next episode once per selection: switching episodes changes the key and re-runs it.
     LaunchedEffect(video.id, nextEpisode?.pageUrl) {
@@ -240,22 +300,148 @@ internal fun PlayerScreen(
     }
 
     Surface(
-        color = if (isFullscreen) Color.Black else MaterialTheme.colorScheme.background,
-        contentColor = if (isFullscreen) Color.White else MaterialTheme.colorScheme.onBackground,
+        color = if (isFullscreen) Color.Black else AuroraImmersiveBackground,
+        contentColor = Color.White,
         modifier = Modifier.fillMaxSize(),
     ) {
-        Box(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val screenWidth = maxWidth
+            val screenHeight = maxHeight
+            val density = LocalDensity.current
+            val listState = rememberLazyListState()
+
+            val targetPlayerHeight = remember(videoAspectRatio, screenWidth, screenHeight) {
+                calculateAdaptivePlayerHeight(
+                    aspectRatio = videoAspectRatio,
+                    containerWidth = screenWidth,
+                    containerHeight = screenHeight,
+                )
+            }
+            val animatedPlayerHeight by animateDpAsState(
+                targetValue = targetPlayerHeight,
+                animationSpec = spring(
+                    dampingRatio = 0.82f,
+                    stiffness = 300f,
+                ),
+                label = "player-height-expansion",
+            )
+
+            val collapsedHeight = remember(screenWidth, animatedPlayerHeight) {
+                minOf(animatedPlayerHeight, screenWidth * (9f / 16f))
+            }
+            val expandedHeight = animatedPlayerHeight
+            val maxCollapsePx = with(density) {
+                (expandedHeight - collapsedHeight).coerceAtLeast(0.dp).toPx()
+            }
+
+            var collapseOffsetPx by remember(playbackUrl) { mutableFloatStateOf(0f) }
+
+            // Whenever maxCollapsePx changes (e.g. video orientation changes), keep offset within valid bounds
+            LaunchedEffect(maxCollapsePx) {
+                if (collapseOffsetPx > maxCollapsePx) {
+                    collapseOffsetPx = maxCollapsePx
+                }
+            }
+
+            // When new video loads, reset collapse offset and scroll back to top
+            LaunchedEffect(playbackUrl) {
+                collapseOffsetPx = 0f
+                listState.scrollToItem(0)
+            }
+
+            val nestedScrollConnection = remember(maxCollapsePx) {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                        // When scrolling UP (available.y < 0, dragging content upwards):
+                        // Collapse the player height down to collapsedHeight (16:9) first,
+                        // before the LazyColumn scrolls its content!
+                        if (available.y < 0f && maxCollapsePx > 0.5f && collapseOffsetPx < maxCollapsePx) {
+                            val newOffset = (collapseOffsetPx - available.y).coerceAtMost(maxCollapsePx)
+                            val consumedY = -(newOffset - collapseOffsetPx)
+                            collapseOffsetPx = newOffset
+                            return Offset(0f, consumedY)
+                        }
+                        return Offset.Zero
+                    }
+
+                    override fun onPostScroll(
+                        consumed: Offset,
+                        available: Offset,
+                        source: NestedScrollSource,
+                    ): Offset {
+                        // When scrolling DOWN (available.y > 0, dragging content downwards):
+                        // After the LazyColumn has scrolled back to its top item (firstVisibleItem == 0),
+                        // any unconsumed downward scroll expands the player back towards expandedHeight!
+                        if (available.y > 0f && maxCollapsePx > 0.5f && collapseOffsetPx > 0f) {
+                            val newOffset = (collapseOffsetPx - available.y).coerceAtLeast(0f)
+                            val consumedY = collapseOffsetPx - newOffset
+                            collapseOffsetPx = newOffset
+                            return Offset(0f, consumedY)
+                        }
+                        return Offset.Zero
+                    }
+
+                    override suspend fun onPreFling(available: Velocity): Velocity {
+                        if (maxCollapsePx > 0.5f && collapseOffsetPx > 0f && collapseOffsetPx < maxCollapsePx) {
+                            val target = if (available.y < -300f || collapseOffsetPx > maxCollapsePx * 0.45f) {
+                                maxCollapsePx
+                            } else {
+                                0f
+                            }
+                            animate(
+                                initialValue = collapseOffsetPx,
+                                targetValue = target,
+                                initialVelocity = -available.y,
+                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 320f),
+                            ) { value, _ ->
+                                collapseOffsetPx = value
+                            }
+                            return Velocity(0f, available.y)
+                        }
+                        return Velocity.Zero
+                    }
+
+                    override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                        if (maxCollapsePx > 0.5f && available.y > 300f && collapseOffsetPx > 0f) {
+                            animate(
+                                initialValue = collapseOffsetPx,
+                                targetValue = 0f,
+                                initialVelocity = -available.y,
+                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 320f),
+                            ) { value, _ ->
+                                collapseOffsetPx = value
+                            }
+                            return Velocity(0f, available.y)
+                        }
+                        return Velocity.Zero
+                    }
+                }
+            }
+
+            val currentCollapseDp = with(density) { collapseOffsetPx.toDp() }
+            val effectivePlayerHeight = calculateEffectivePlayerHeight(
+                expandedHeight = expandedHeight,
+                collapsedHeight = collapsedHeight,
+                collapseOffsetDp = currentCollapseDp,
+            )
+
             if (!isFullscreen) {
                 LazyColumn(
+                    state = listState,
                     contentPadding = PaddingValues(bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(0.dp),
                     modifier = Modifier
                         .fillMaxSize()
                         .statusBarsPadding()
+                        .nestedScroll(nestedScrollConnection)
                         .testTag("player-details"),
                 ) {
                     item(key = "player-space") {
-                        Spacer(Modifier.fillMaxWidth().aspectRatio(16 / 9f))
+                        Spacer(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(effectivePlayerHeight)
+                        )
                     }
                     item(key = "player-info") {
                         PlayerDetails(
@@ -265,13 +451,20 @@ internal fun PlayerScreen(
                             episodes = episodes,
                             selectedEpisode = selectedEpisode,
                             isEpisodePickerVisible = isEpisodePickerVisible,
+                            isCasting = isCasting,
                             onFavorite = onFavorite,
                             onCache = onCache,
+                            onCast = { isCastSheetVisible = true },
                             onToggleEpisodes = { isEpisodePickerVisible = !isEpisodePickerVisible },
                             onEpisode = { episode ->
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 playbackUrl = episode.pageUrl
+                                currentPositionMs = 0L
                                 isEpisodePickerVisible = false
+                                val activeDevice = (castState as? CastState.Connected)?.device
+                                if (activeDevice != null) {
+                                    launchCastForUrl(activeDevice, episode.pageUrl, episode.label, 0L)
+                                }
                             },
                         )
                     }
@@ -281,6 +474,7 @@ internal fun PlayerScreen(
                                 text = "接着观看",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
+                                color = Color.White,
                                 modifier = Modifier
                                     .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 10.dp)
                                     .semantics { heading() },
@@ -303,52 +497,158 @@ internal fun PlayerScreen(
                 isFullscreen = isFullscreen,
                 onFullscreenChange = onFullscreenChange,
                 onVideoOrientationChange = onVideoOrientationChange,
+                onVideoAspectRatioChange = { videoAspectRatio = it },
+                onPositionChange = { currentPositionMs = it },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .then(
                         if (isFullscreen) {
                             Modifier.fillMaxSize()
                         } else {
-                            Modifier.statusBarsPadding().fillMaxWidth().aspectRatio(16 / 9f)
+                            Modifier
+                                .statusBarsPadding()
+                                .fillMaxWidth()
+                                .height(effectivePlayerHeight)
                         },
                     )
                     .testTag("native-player-container"),
             )
 
             if (!isFullscreen) {
-                Surface(
-                    onClick = onBack,
+                GlassSurface(
                     shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.58f),
-                    contentColor = Color.White,
+                    forceDark = true,
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .statusBarsPadding()
                         .padding(10.dp)
-                        .size(44.dp),
+                        .size(44.dp)
+                        .clickable(onClick = onBack),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
                     }
                 }
-                Surface(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onFullscreenChange(true)
-                    },
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.58f),
-                    contentColor = Color.White,
+                Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .statusBarsPadding()
-                        .padding(10.dp)
-                        .size(44.dp),
+                        .padding(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Fullscreen, contentDescription = "全屏播放")
+                    GlassSurface(
+                        shape = CircleShape,
+                        forceDark = true,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isCastSheetVisible = true
+                            },
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
+                                contentDescription = if (isCasting) "投屏中" else "投屏",
+                                tint = if (isCasting) AuroraCoral else Color.White,
+                            )
+                        }
+                    }
+                    GlassSurface(
+                        shape = CircleShape,
+                        forceDark = true,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clickable {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onFullscreenChange(true)
+                            },
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(Icons.Default.Fullscreen, contentDescription = "全屏播放")
+                        }
                     }
                 }
+            }
+
+            // Apple HIG / Netflix Floating Cast Banner when casting
+            AnimatedVisibility(
+                visible = isCasting,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 10.dp, start = 60.dp, end = 60.dp),
+            ) {
+                val connected = castState as? CastState.Connected
+                if (connected != null) {
+                    Surface(
+                        color = Color(0xDD14171F),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.5f)),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { isCastSheetVisible = true },
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CastConnected,
+                                contentDescription = null,
+                                tint = AuroraCoral,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "正在投屏至 ${connected.device.name}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            IconButton(
+                                onClick = {
+                                    if (connected.isPlaying) castManager.pause() else castManager.play()
+                                },
+                                modifier = Modifier.size(26.dp),
+                            ) {
+                                Icon(
+                                    imageVector = if (connected.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    contentDescription = if (connected.isPlaying) "暫停電視" else "播放",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                            }
+                            IconButton(
+                                onClick = { castManager.disconnect() },
+                                modifier = Modifier.size(26.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "斷開投屏",
+                                    tint = Color.White.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(14.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (isCastSheetVisible) {
+                CastDeviceSheet(
+                    castManager = castManager,
+                    onDismissRequest = { isCastSheetVisible = false },
+                    onDeviceSelected = { device ->
+                        isCastSheetVisible = false
+                        launchCastForUrl(device, playbackUrl, selectedEpisodeLabel, currentPositionMs)
+                    },
+                )
             }
         }
     }
@@ -362,8 +662,10 @@ private fun PlayerDetails(
     episodes: List<PlaybackEpisode>,
     selectedEpisode: Int,
     isEpisodePickerVisible: Boolean,
+    isCasting: Boolean,
     onFavorite: () -> Unit,
     onCache: () -> Unit,
+    onCast: () -> Unit,
     onToggleEpisodes: () -> Unit,
     onEpisode: (PlaybackEpisode) -> Unit,
 ) {
@@ -379,17 +681,17 @@ private fun PlayerDetails(
     val cacheActionDescription = when (cachedVideo?.state) {
         OfflineCacheState.RESOLVING,
         OfflineCacheState.QUEUED,
-        OfflineCacheState.DOWNLOADING -> "取消缓存"
-        OfflineCacheState.COMPLETED -> "已离线缓存"
-        OfflineCacheState.FAILED -> "重试缓存"
-        OfflineCacheState.REMOVING -> "正在删除缓存"
-        null -> "缓存当前视频"
+        OfflineCacheState.DOWNLOADING -> "缓存中"
+        OfflineCacheState.COMPLETED -> "已缓存"
+        OfflineCacheState.FAILED -> "重试"
+        OfflineCacheState.REMOVING -> "删除中"
+        null -> "缓存"
     }
     Column(
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
+            .background(AuroraImmersiveBackground)
             .padding(horizontal = 18.dp, vertical = 18.dp)
             .animateContentSize(),
     ) {
@@ -397,6 +699,7 @@ private fun PlayerDetails(
             text = video.title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
+            color = Color.White,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.semantics { heading() },
@@ -404,12 +707,12 @@ private fun PlayerDetails(
         Text(
             text = listOf(video.author, video.views).filter { it.isNotBlank() }.joinToString(" · "),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = AuroraMediaMuted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             PlayerActionButton(
@@ -449,6 +752,17 @@ private fun PlayerDetails(
                     null -> Icon(Icons.Default.Download, contentDescription = null)
                 }
             }
+            PlayerActionButton(
+                label = if (isCasting) "投屏中" else "投屏",
+                onClick = onCast,
+                modifier = Modifier.weight(1f),
+            ) {
+                Icon(
+                    imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
+                    contentDescription = null,
+                    tint = if (isCasting) AuroraCoral else LocalContentColor.current,
+                )
+            }
             if (episodes.size > 1) {
                 PlayerActionButton(
                     label = "选集 ${selectedEpisode}/${episodes.size}",
@@ -472,8 +786,8 @@ private fun PlayerDetails(
                     val selected = episode.number == selectedEpisode
                     Surface(
                         onClick = { onEpisode(episode) },
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (selected) AuroraCoral else AuroraMediaSurfaceVariant,
+                        contentColor = if (selected) Color.White else AuroraMediaLabel,
                         shape = RoundedCornerShape(14.dp),
                     ) {
                         Text(
@@ -485,7 +799,7 @@ private fun PlayerDetails(
                 }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        HorizontalDivider(color = Color(0xFF262626))
     }
 }
 
@@ -498,14 +812,12 @@ private fun PlayerActionButton(
     stateDescriptionText: String? = null,
     icon: @Composable () -> Unit,
 ) {
-    Surface(
-        onClick = onClick,
-        enabled = enabled,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(18.dp),
+    GlassSurface(
+        shape = RoundedCornerShape(16.dp),
+        forceDark = true,
         modifier = modifier
-            .heightIn(min = 64.dp)
+            .height(68.dp)
+            .applePressEffect(enabled = enabled, pressedScale = 0.94f, onClick = onClick)
             .then(
                 if (stateDescriptionText != null) {
                     Modifier.semantics { stateDescription = stateDescriptionText }
@@ -516,15 +828,30 @@ private fun PlayerActionButton(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 9.dp),
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 4.dp, vertical = 6.dp),
         ) {
-            icon()
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(24.dp),
+            ) {
+                icon()
+            }
+            Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 11.sp,
+                    letterSpacing = 0.2.sp,
+                ),
+                color = if (enabled) LocalContentColor.current.copy(alpha = 0.92f) else LocalContentColor.current.copy(alpha = 0.38f),
+                textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -578,20 +905,21 @@ private fun PlayerRecommendationRow(
                 text = video.title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Medium,
+                color = Color.White,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = video.author,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AuroraMediaMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = video.views,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = AuroraMediaMuted,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -606,7 +934,7 @@ private fun PlayerRecommendationRow(
             Icon(
                 imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                 contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
-                tint = if (isFavorite) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isFavorite) AuroraCoral else AuroraMediaMuted,
             )
         }
     }
@@ -614,6 +942,49 @@ private fun PlayerRecommendationRow(
 
 internal fun relatedVideos(current: VideoItem, videos: List<VideoItem>): List<VideoItem> =
     videos.distinctBy(VideoItem::id).filterNot { it.id == current.id }
+
+internal fun calculateAdaptivePlayerHeight(
+    aspectRatio: Float?,
+    containerWidth: Dp,
+    containerHeight: Dp,
+    maxPortraitHeightRatio: Float = 0.60f,
+): Dp {
+    if (containerWidth <= 0.dp || containerHeight <= 0.dp) {
+        return 220.dp
+    }
+    val isViewportPortrait = containerHeight >= containerWidth
+    val maxAllowedHeight = if (isViewportPortrait) {
+        containerHeight * maxPortraitHeightRatio
+    } else {
+        containerHeight * 0.70f
+    }
+
+    val standard16x9Height = containerWidth * (9f / 16f)
+    if (aspectRatio == null || aspectRatio <= 0f) {
+        return standard16x9Height.coerceAtMost(maxAllowedHeight)
+    }
+
+    // Floating-point tolerance around 16:9 to guarantee exact match with standard16x9Height
+    if (kotlin.math.abs(aspectRatio - (16f / 9f)) < 0.01f) {
+        return standard16x9Height.coerceAtMost(maxAllowedHeight)
+    }
+
+    val naturalHeight = containerWidth / aspectRatio
+    return naturalHeight.coerceIn(160.dp, maxAllowedHeight)
+}
+
+internal fun calculateEffectivePlayerHeight(
+    expandedHeight: Dp,
+    collapsedHeight: Dp,
+    collapseOffsetDp: Dp,
+): Dp {
+    val minH = minOf(expandedHeight, collapsedHeight)
+    val maxH = maxOf(expandedHeight, collapsedHeight)
+    if (minH >= maxH) {
+        return expandedHeight
+    }
+    return (expandedHeight - collapseOffsetDp).coerceIn(minH, maxH)
+}
 
 private const val TAG = "PlayerScreen"
 

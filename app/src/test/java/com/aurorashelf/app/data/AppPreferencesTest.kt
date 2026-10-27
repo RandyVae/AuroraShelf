@@ -1,6 +1,8 @@
 package com.aurorashelf.app.data
 
+import com.aurorashelf.app.model.ComicSummary
 import com.aurorashelf.app.model.ForumPost
+import com.aurorashelf.app.model.LiveItem
 import com.aurorashelf.app.model.VideoItem
 import org.json.JSONArray
 import org.json.JSONObject
@@ -230,6 +232,72 @@ class AppPreferencesTest {
         assertFalse(isForumCacheFresh(base, base + AppPreferences.FORUM_CACHE_TTL_MS + 1))
         assertFalse(isForumCacheFresh(0L, base))
         assertFalse("future timestamps are not trusted", isForumCacheFresh(base + 1, base))
+    }
+
+    @Test
+    fun comicCacheRoundTripsSourceCategoryAndComics() {
+        val comic = ComicSummary(
+            sourceId = "jm",
+            id = "12345",
+            title = "测试漫画",
+            subtitle = "作者名",
+            coverUrl = "https://example.com/cover.jpg",
+            coverReferer = "https://example.com",
+            tags = listOf("同人", "汉化"),
+        )
+        val cache = CachedComic("jm", "0", listOf(comic), 1_700_000_000_000L)
+        val encoded = encodeComicCache(cache)
+        val decoded = requireNotNull(decodeComicCache(encoded))
+
+        assertEquals("jm", decoded.sourceId)
+        assertEquals("0", decoded.categoryId)
+        assertEquals(1_700_000_000_000L, decoded.savedAtMillis)
+        assertEquals(1, decoded.comics.size)
+        assertEquals("12345", decoded.comics.first().id)
+        assertEquals("测试漫画", decoded.comics.first().title)
+        assertEquals(listOf("同人", "汉化"), decoded.comics.first().tags)
+    }
+
+    @Test
+    fun comicCacheFreshnessHonoursTwelveHourTtl() {
+        val base = 1_700_000_000_000L
+        assertTrue(isComicCacheFresh(base, base))
+        assertTrue(isComicCacheFresh(base, base + AppPreferences.COMIC_CACHE_TTL_MS))
+        assertFalse(isComicCacheFresh(base, base + AppPreferences.COMIC_CACHE_TTL_MS + 1))
+        assertFalse(isComicCacheFresh(0L, base))
+    }
+
+    @Test
+    fun liveCacheRoundTripsCategoryAndItems() {
+        val item = LiveItem(
+            id = "streamer_1",
+            username = "alice",
+            thumbnailUrl = "https://example.com/thumb.jpg",
+            viewersCount = 100,
+            countryCode = "US",
+            isHd = true,
+            playerUrl = "https://example.com/player",
+        )
+        val cache = CachedLive("stripchat", "girls", listOf(item), 1_700_000_000_000L)
+        val encoded = encodeLiveCache(cache)
+        val decoded = requireNotNull(decodeLiveCache(encoded))
+
+        assertEquals("stripchat", decoded.sourceId)
+        assertEquals("girls", decoded.category)
+        assertEquals(1_700_000_000_000L, decoded.savedAtMillis)
+        assertEquals(1, decoded.items.size)
+        assertEquals("streamer_1", decoded.items.first().id)
+        assertEquals("alice", decoded.items.first().username)
+        assertTrue(decoded.items.first().isHd)
+    }
+
+    @Test
+    fun liveCacheFreshnessHonoursTwelveHourTtl() {
+        val base = 1_700_000_000_000L
+        assertTrue(isLiveCacheFresh(base, base))
+        assertTrue(isLiveCacheFresh(base, base + AppPreferences.LIVE_CACHE_TTL_MS))
+        assertFalse(isLiveCacheFresh(base, base + AppPreferences.LIVE_CACHE_TTL_MS + 1))
+        assertFalse(isLiveCacheFresh(0L, base))
     }
 
     private fun forumPost(sourceId: String, id: String, updatedEpochSeconds: Long) = ForumPost(

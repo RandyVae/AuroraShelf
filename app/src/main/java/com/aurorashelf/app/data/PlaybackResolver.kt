@@ -11,9 +11,11 @@ import android.util.Log
 import com.aurorashelf.app.model.ContentSourceCatalog
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
+import org.jsoup.parser.Parser
 
 data class PlaybackSource(val url: String, val referer: String)
 data class PlaybackEpisode(val number: Int, val label: String, val pageUrl: String)
@@ -24,7 +26,15 @@ class PlaybackResolver {
         val startedAtMs = System.currentTimeMillis()
         require(SourceAddress.resolve(detailUrl, detailUrl) != null) { "视频页面地址无效" }
         val cached = episodeCache.get(detailUrl)
-        val episodes = cached ?: parseEpisodes(fetch(detailUrl), detailUrl).also { parsed ->
+        val episodes = cached ?: (
+            if (ContentSourceCatalog.isBeeg(detailUrl)) {
+                listOf(PlaybackEpisode(1, "正片", detailUrl))
+            } else if (ContentSourceCatalog.isHuavod(detailUrl)) {
+                parseHuavodEpisodes(fetch(detailUrl), detailUrl)
+            } else {
+                parseEpisodes(fetch(detailUrl), detailUrl)
+            }
+        ).also { parsed ->
             // Failures (empty lists) stay uncached so a transient page error is retried next time.
             if (parsed.isNotEmpty()) episodeCache.put(detailUrl, parsed)
         }
@@ -43,6 +53,15 @@ class PlaybackResolver {
         if (cached != null) {
             Log.i(TAG, "timing resolve ms=${System.currentTimeMillis() - startedAtMs} cache=hit")
             return@withContext cached
+        }
+        if (ContentSourceCatalog.isBeeg(pageUrl)) {
+            return@withContext resolveBeeg(pageUrl, startedAtMs)
+        }
+        if (ContentSourceCatalog.is91Dongman(pageUrl)) {
+            return@withContext resolve91Dongman(pageUrl, startedAtMs)
+        }
+        if (ContentSourceCatalog.isHuavod(pageUrl)) {
+            return@withContext resolveHuavod(pageUrl, startedAtMs)
         }
         if (PipePipeBridge.supports(pageUrl)) {
             runCatching { PipePipeBridge.resolve(pageUrl) }.onSuccess { source ->
@@ -116,6 +135,24 @@ class PlaybackResolver {
     private fun PlaybackSource.rememberFor(pageUrl: String, startedAtMs: Long): PlaybackSource = also {
         playbackCache.put(pageUrl, it)
         Log.i(TAG, "timing resolve ms=${System.currentTimeMillis() - startedAtMs} cache=miss")
+    }
+
+    internal fun resolve91Dongman(pageUrl: String, startedAtMs: Long): PlaybackSource {
+        val document = fetch(pageUrl)
+        val html = document.html()
+        val videoUrlAttr = document.selectFirst("div[data-video-url]")?.attr("data-video-url")?.takeIf(String::isNotBlank)
+            ?: Regex("""data-video-url=["']([^"']+)["']""").find(html)?.groupValues?.get(1)
+            ?: Regex("""var\s+url\s*=\s*["']([^"']+\.m3u8[^"']*)["']""").find(html)?.groupValues?.get(1)
+            ?: document.selectFirst("link[type='application/vnd.apple.mpegurl']")?.attr("href")
+
+        val rawUrl = videoUrlAttr ?: throw IOException("页面未提供 91动漫 视频播放流")
+        val cleanUrl = Parser.unescapeEntities(cleanHlsUrl(rawUrl), false)
+        val source = PlaybackSource(
+            url = cleanUrl,
+            referer = pageUrl,
+        )
+        Log.i(TAG, "resolve 91dongman host=${runCatching { URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
+        return source.rememberFor(pageUrl, startedAtMs)
     }
 
     private fun mediaType(url: String): String = when {
@@ -241,6 +278,115 @@ class PlaybackResolver {
             .toList()
     }
 
+    internal fun parseHuavodEpisodes(page: Document, fallbackBaseUrl: String = page.baseUri()): List<PlaybackEpisode> {
+        val matches = page.select("a[href*=/vodplay/]")
+        val seen = mutableSetOf<String>()
+        val result = mutableListOf<PlaybackEpisode>()
+        var fallbackIndex = 1
+        for (element in matches) {
+            val href = element.attr("href").trim()
+            val address = SourceAddress.resolve(page.baseUri().ifBlank { fallbackBaseUrl }, href) ?: continue
+            val parts = href.substringBefore(".html").split('-')
+            val sid = parts.getOrNull(1) ?: "1"
+            val nid = parts.getOrNull(2)?.toIntOrNull() ?: fallbackIndex
+            val key = "$sid-$nid"
+            if (seen.add(key)) {
+                val label = element.text().trim().ifBlank { "第${nid}集" }
+                result += PlaybackEpisode(nid, label, address)
+                fallbackIndex++
+            }
+        }
+        return result.sortedBy { it.number }
+    }
+
+    internal suspend fun resolveBeeg(pageUrl: String, startedAtMs: Long): PlaybackSource = withContext(Dispatchers.IO) {
+        val fileId = Regex("""(?:beeg\.com/(?:-0?|video/)?|/|^)(\d+)""").find(pageUrl)?.groupValues?.get(1)
+            ?: throw IOException("無法從鏈接中識別 Beeg 視頻 ID: $pageUrl")
+
+        val endpoint = "https://store.externulls.com/video/play_url/$fileId"
+        val playPath = try {
+            Jsoup.connect(endpoint)
+                .ignoreContentType(true)
+                .userAgent(VideoRepository.USER_AGENT)
+                .timeout(15_000)
+                .execute()
+                .body()
+                .trim()
+        } catch (e: Exception) {
+            throw IOException("請求 Beeg 播放地址失敗: ${e.message}", e)
+        }
+
+        if (playPath.isBlank() || (playPath.startsWith("{") && playPath.contains("error"))) {
+            throw IOException("Beeg 未返回有效的視頻流地址")
+        }
+
+        val masterUrl = "https://video.beeg.com/" + playPath.removePrefix("/")
+        PlaybackSource(masterUrl, referer = "https://beeg.com/").rememberFor(pageUrl, startedAtMs)
+    }
+
+    internal suspend fun resolveHuavod(pageUrl: String, startedAtMs: Long): PlaybackSource = withContext(Dispatchers.IO) {
+        val playUrl = if (pageUrl.contains("/voddetail/")) {
+            val detailDoc = fetch(pageUrl)
+            parseHuavodEpisodes(detailDoc, pageUrl).firstOrNull()?.pageUrl
+                ?: detailDoc.selectFirst("a[href*=/vodplay/]")?.attr("href")?.let {
+                    SourceAddress.resolve(pageUrl, it)
+                } ?: throw IOException("未找到该影片的播放集数")
+        } else {
+            pageUrl
+        }
+
+        val episodeMatch = Regex("""/vodplay/(\d+-\d+-\d+)""").find(playUrl)
+        val episodeParam = episodeMatch?.groupValues?.get(1)
+            ?: runCatching {
+                val parts = URI(playUrl).path.substringAfterLast('/').substringBefore(".html").split('-')
+                if (parts.size >= 3) "${parts[0]}-${parts[1]}-${parts[2]}" else null
+            }.getOrNull() ?: throw IOException("无法识别影片集数编号")
+
+        val cachedNext = huavodTokenCache.get(episodeParam)
+        val (token, adDurationMs, issuedAtMs) = cachedNext ?: run {
+            val nextUrl = "https://huavod.com/Player/next?episode=$episodeParam"
+            val responseText = Jsoup.connect(nextUrl)
+                .userAgent(VideoRepository.USER_AGENT)
+                .header("Referer", "https://huavod.com/Player/ec?episode=$episodeParam")
+                .header("Accept", "application/json")
+                .ignoreContentType(true)
+                .timeout(15_000)
+                .execute()
+                .body()
+            val mt = Regex(""""mt"\s*:\s*"([^"]+)"""").find(responseText)?.groupValues?.get(1)
+                ?: throw IOException("未能获取播放令牌")
+            val adMs = Regex(""""ad_duration_ms"\s*:\s*(\d+)""").find(responseText)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
+            val entry = Triple(mt, adMs, System.currentTimeMillis())
+            huavodTokenCache.put(episodeParam, entry)
+            entry
+        }
+
+        val elapsedMs = System.currentTimeMillis() - issuedAtMs
+        val targetWaitMs = (adDurationMs - 2000L).coerceAtLeast(0L)
+        val remainingWaitMs = (targetWaitMs - elapsedMs).coerceAtLeast(0L)
+        if (remainingWaitMs > 0L) {
+            Log.i(TAG, "huavod waiting ad duration ms=$remainingWaitMs")
+            delay(remainingWaitMs)
+        }
+
+        val resolveUrl = "https://huavod.com/Player/resolveUrl"
+        val resolveResp = Jsoup.connect(resolveUrl)
+            .userAgent(VideoRepository.USER_AGENT)
+            .header("Referer", "https://huavod.com/Player/ec?episode=$episodeParam")
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .data("token", token)
+            .ignoreContentType(true)
+            .timeout(15_000)
+            .method(org.jsoup.Connection.Method.POST)
+            .execute()
+            .body()
+
+        val directUrl = Regex(""""url"\s*:\s*"([^"]+)"""").find(resolveResp)?.groupValues?.get(1)?.replace("\\/", "/")
+            ?: throw IOException("未能解析到播放直链")
+
+        PlaybackSource(directUrl, "https://huavod.com/").rememberFor(pageUrl, startedAtMs)
+    }
+
     private fun fetch(url: String): Document {
         val startedAtMs = System.currentTimeMillis()
         var fetched = false
@@ -272,6 +418,7 @@ class PlaybackResolver {
         private val pageCache = PageFetchCache(PAGE_CACHE_TTL_MS, PAGE_CACHE_MAX_ENTRIES)
         private val playbackCache = CachedValue<PlaybackSource>(PLAYBACK_CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val episodeCache = CachedValue<List<PlaybackEpisode>>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
+        private val huavodTokenCache = CachedValue<Triple<String, Long, Long>>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val ENCODED_SOURCE = Regex("""strencode2\(\s*["']([^"']+)["']\s*\)""")
         private val ESCAPE = Regex("%u([0-9a-fA-F]{4})|%([0-9a-fA-F]{2})")
         private val JSON_STRING = Regex("""\"([^\"]+)\"\s*:\s*\"((?:\\\\.|[^\"\\\\])*)\"""")

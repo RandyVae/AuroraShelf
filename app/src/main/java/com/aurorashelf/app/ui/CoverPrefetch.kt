@@ -116,9 +116,10 @@ internal object CoverPrefetcher {
         val targets = livePrefetchTargets(items, limit).mapNotNull { item ->
             val url = coverMemoryCacheKey(item.thumbnailUrl) ?: return@mapNotNull null
             if (!deduplicator.markStartedIfAbsent(url)) return@mapNotNull null
+            val referer = if (item.playerUrl.contains("hornystudents.com")) "https://www.hornystudents.com/" else "${StripchatLiveRepository.SITE_BASE}/"
             WarmTarget(
                 cacheKey = url,
-                fetch = { CoverImageLoader.load(url, "${StripchatLiveRepository.SITE_BASE}/") },
+                fetch = { CoverImageLoader.load(url, referer) },
             )
         }
         warmBytesThenDecode(context, "live", targets)

@@ -26,9 +26,10 @@ public final class JavNoniStreamLinkHandlerFactory extends LinkHandlerFactory {
 
     @Override
     public boolean onAcceptUrl(final String url) {
-        return url != null
-                && JavNoniParsingHelper.normalizeUrl(url).contains("jav-noni.vip/archives/")
-                && !JavNoniParsingHelper.normalizeUrl(url).contains("/archives/category/")
-                && !JavNoniParsingHelper.normalizeUrl(url).contains("/archives/tag/");
+        if (url == null) return false;
+        final String normalized = JavNoniParsingHelper.normalizeUrl(url);
+        return (normalized.contains("javnoni.com/archives/") || normalized.contains("jav-noni.vip/archives/"))
+                && !normalized.contains("/archives/category/")
+                && !normalized.contains("/archives/tag/");
     }
 }
