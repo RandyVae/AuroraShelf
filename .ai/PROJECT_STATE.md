@@ -1,12 +1,17 @@
 # Project State
 
-Last Updated: 2026-10-27 17:18 HKT
+Last Updated: 2026-10-27 17:31 HKT
 
 ## Project
 
-Netgrey · Android 2.15.0（候选包 versionCode 172 正式完成打包与全项验证；改动覆盖 HornyStudents 直播流画面硬裁切根治、WebView 物理像素适配根治 100vh 高度塌陷黑屏、私密秀过早误判阻断加载修复、Native DOM 顶层脱敏拔出消除 40px 偏移、信息流卡片 4:3 比例适配与全屏沉浸播放横竖屏自适应无缝切换、找回现代化 Netflix 首页 UI、XVideos 完整 41 分类、播放器操作按鈕視覺 Bug 修復、8Muses/GEDE Comix/91動漫三大漫畫源深度接入、91動漫視頻源獨立接入、XVideos 官方視頻源接入並設為預設源、五大分類擴展、全網視頻源統一併發搜索與輪詢交織算法混排、HornyStudents 直播源深度接入、RSS 2.0 在線主播解析、四大性別分類過濾、雙直播源切換、Beeg 官方視頻源深度接入、REST API 解析、多態分類導航、聯網搜索、ExoPlayer 原生硬解播放、華視影院官方視頻源深度接入、五大分類多態映射、ArtPlayer/BunnyCDN 簽名解析、236 集自動識別、ExoPlayer 原生硬解播放、全量预设视频源深度修复、43分类100%探针通过、85po正则适配、JAV-NONI域名轮换与防回溯栈溢出重构、MissAV 403路由修复、OHentai死链过滤、视频源线路属性分组、Apple HIG状态胶囊、首页异常自愈回退、仿 Bilibili 视口底缘细线进度条与微光分割线、Apple HIG 控制器联动弹性动画、仿 Bilibili 纵向视频两阶段滚动收窄折叠机制、视口收折至 16:9 吸顶释放 833px 内容空间、Apple HIG 弹簧物理吸附、浮点公差与超宽屏数学健壮性防御、仿 Bilibili 纵向视频自适应展开与黑边消除、91 论坛 5 大核心板块并发聚合、帖量激增 1150%、筛选触底分页修复、播放器动作按钮双轴绝对居中与双字对称重构、全链路零等待预加载、12小时磁盘快照容灾、Apple HIG 流体物理微交互与抽屉展开过渡、Netgrey 品牌化、Netflix 像素级复刻、黄果短剧无限加载、液态玻璃与日夜间双模式沉浸一致性、直播间非全屏视口空间扩充、全屏 4 泳道防重叠弹幕系统与纯净影院模式、Netflix 3D 绯红丝带启动图标重构、全板块顶栏统一对齐首页与搜索框垂直居中根治、纯 Kotlin DLNA/UPnP 电视投屏核心协议栈、本地流媒体防盗链代理、离线缓存 SimpleCache 推流修复、HLS M3U8 清单代理重写、局域网代理 Token 安全加固与全链路性能优化、91自拍论坛域名轮换修复与门户页动态探测回退、论坛吸顶分类胶囊直达过滤）
+Netgrey · Android 2.16.0-dev（开发版本号已正式更新为 versionCode 173，versionName 2.16.0；2.15.0 versionCode 172 已正式打 tag 发布并在主干固化）
 
 ## Current Stage
+
+**2.16.0-dev（Candidate 173 开发阶段开启，单主线 main 分支已统一，所有过时分支全部清理）**：
+- 开发版本号：`versionCode = 173`，`versionName = "2.16.0"`
+- 单一产品线：`main`（已合入全部 172 项交付功能，其他临时与历史分支已全部移除，杜绝多 Agent 协作误解）
+- 2.15.0 正式发布基线：`v2.15.0` 对应 `versionCode = 172`，产物 `dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`（SHA-256 `ee4e955aaa283e53214c32804064d044d76605eae284389ee7fc5aedd07b7dfe`）。
 
 **172 版本（Candidate 172）HornyStudents 直播畫面裁切、視口黑屏與誤判私密秀深度根治已完成**（`versionCode = 172`，`versionName = 2.15.0`）：
 - 本地交付包：`dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`

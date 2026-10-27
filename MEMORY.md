@@ -1,4 +1,4 @@
-# 极光视界 · Android 2.15.0 · 跨 Agent 记忆
+# 极光视界 · Android 2.16.0-dev · 跨 Agent 记忆
 
 > 本文件是所有 AI Agent（DSH / Codex / Claude / Hermes / Antigravity）进入本项目的统一入口。
 > 开工先读本文件，再按「权威来源」读细节；收工前更新「当前状态」。
@@ -24,20 +24,14 @@
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：极光视界（Netgrey）Android 客户端：Kotlin + Compose + Material 3，保留真实视频源，以液态玻璃与 Netflix 风格信息层级重构，不是网页套壳。
-- 当前阶段：**172 版本（Candidate 172）HornyStudents 直播畫面裁切、視口黑屏與誤判私密秀深度根治已完成**（`versionCode = 172`，`versionName = 2.15.0`）：
-  - 正式本地交付物：`dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`
-  - 产物体积：**4,418,209 bytes**；SHA-256：`ee4e955aaa283e53214c32804064d044d76605eae284389ee7fc5aedd07b7dfe`
-  - 5 大核心问题根治（已验证）：
-    1. 根治 Chaturbate `video.js` 動態注入 `clip-path: inset(0px 199.5px)` 導致畫面左右兩側被硬削切 200px 丟失人體問題；
-    2. 根治 Android Compose WebView 嵌入環境下 CSS `100vh` 基準丟失導致播放器高度塌陷為 `0px`（黑屏）缺陷，全面使用精確物理像素 `${viewportWidth}px` 與 `${viewportHeight}px` 保護；
-    3. 根治加載初期誤將常規導航 `<a data-testid="private-shows-tab">` 判定為「主播正在進行私密表演」彈層並中斷加載的缺陷，限定選擇器並引入 3 秒保護寬限期；
-    4. 消除 Native DOM 頂部 40px `#static-header` 偏移與父容器 `overflow: hidden; height: 221px;` 底部截斷，將播放器直接拔出至 `document.body` 頂層；
-    5. 信息流卡片採用 4:3 比例消除主播頭部被切，非全屏播放器默認 4:3 並動態跟隨相機分辨率自適應，全屏橫屏完美鋪滿 2340×1080 視口無黑邊。
-  - 实测：JVM 205 tests（201 passed, 0 failed, 0 errors, 4 skipped）；Release 构建成功；missavtest 模拟器实测确认：主播 `waifusummerr` 成功出畫，畫面頭部、足部、兩側相機內容 100% 完整無損展示，實時聊天彈幕滾動順暢，全屏切換與旋轉橫屏順暢無黑框。
-- 进行中：Candidate 172 交付完成，等待 Randy 验收。
-- 下一步：按需提交 Git 代码或开启新功能迭代。
+- 当前阶段：**2.16.0-dev（Candidate 173 开发周期开启，统一收归 main 单主线，清理全部历史分支）**（`versionCode = 173`，`versionName = 2.16.0`）：
+  - 正式发布里程碑：`2.15.0`（`versionCode = 172`）已正式打 Tag `v2.15.0`，交付包 `dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`（SHA-256 `ee4e955aaa283e53214c32804064d044d76605eae284389ee7fc5aedd07b7dfe`）实测通过。
+  - 单一产品线固化：全局唯一保留 `main` 分支作为产品线，所有临时与过期分支（`origin/codex/feat-comic-source-settings`、`origin/codex/feat-forum-image-save`、`origin/codex/fix-forum-reader-loading`、`origin/feature/backdrop-liquid-tabs` 等）全部彻底砍掉，彻底消除后续其他 Agent 接手时的分支误解。
+  - 实测状态：JVM 205 tests 全通（201 passed, 0 failed, 4 skipped），Release 构建通过。
+- 进行中：开启 2.16.0 开发周期。
+- 下一步：按需接入新特性或执行下一阶段任务。
 - 阻塞：无代码层阻断。
-- 最近一次更新：2026-10-27 17:20 HKT by Antigravity (gemini-3-pro)
+- 最近一次更新：2026-10-27 17:32 HKT by Antigravity (gemini-3-flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
 

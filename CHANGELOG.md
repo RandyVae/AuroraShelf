@@ -1,5 +1,14 @@
 # 更新记录
 
+## 173 (2.16.0-dev) — 开启 2.16.0 开发周期与单主线收归
+
+- **版本周期升级**：
+  - 开发版本号正式更新为 `versionCode = 173`，`versionName = "2.16.0"`；
+  - 2.15.0（versionCode 172）正式打 tag `v2.15.0` 归档并在主干固化。
+- **Git 产品线统一与多余分支清理**：
+  - 仅保留全局唯一主产品线 `main`；
+  - 清理砍掉所有历史与临时分支（`codex/feat-comic-source-settings`、`codex/feat-forum-image-save`、`codex/fix-forum-reader-loading`、`feature/backdrop-liquid-tabs` 等），杜绝多 Agent 协作时对开发主线产生误会。
+
 ## 172 — HornyStudents 直播畫面裁切、視口黑屏與誤判私密秀深度根治
 
 - **HornyStudents 直播畫面裁切與遮擋根治（`LiveScreen.kt`）**：
