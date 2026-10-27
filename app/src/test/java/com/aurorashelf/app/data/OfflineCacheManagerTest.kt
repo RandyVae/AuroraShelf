@@ -87,4 +87,9 @@ class OfflineCacheManagerTest {
         assertFalse(OfflineCacheManager.shouldAcceptResolvedDownload("offline-a", emptySet()))
         assertFalse(OfflineCacheManager.shouldAcceptResolvedDownload("offline-a", setOf("offline-b")))
     }
+
+    @Test
+    fun minUsableDiskSpaceIs500MB() {
+        assertEquals(500L * 1024 * 1024, OfflineCacheManager.MIN_USABLE_DISK_SPACE_BYTES)
+    }
 }

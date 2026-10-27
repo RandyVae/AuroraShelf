@@ -121,6 +121,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -1553,6 +1554,10 @@ private fun EmbeddedLivePlayer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = if (controlsVisible) "隐藏控制栏" else "显示控制栏"
+                    }
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -2041,12 +2046,13 @@ private const val LIVE_COMMENTS_SCRIPT = """
 
 /** Return the room slug independent of an optional trailing slash or query string. */
 internal fun liveRoomSlug(roomUrl: String): String = runCatching {
-    java.net.URI(roomUrl).path.orEmpty()
+    val raw = java.net.URI(roomUrl).path.orEmpty()
         .split('/')
         .asReversed()
         .firstOrNull(String::isNotBlank)
         .orEmpty()
         .lowercase()
+    raw.filter { it.isLetterOrDigit() || it == '_' || it == '-' }
 }.getOrDefault("")
 
 /** Keep the source-owned video node and its stream while removing webpage chrome around it. */
@@ -2109,6 +2115,16 @@ private fun livePlayerModeScript(roomUrl: String): String {
                    activeVideo.closest('#player') ||
                    activeVideo.parentElement;
     if (!player) return false;
+
+    // Short-circuit: avoid redundant style mutations if stage is already configured for current dimensions
+    const vpW = Math.round(window.visualViewport?.width || window.innerWidth || 0);
+    const vpH = Math.round(window.visualViewport?.height || window.innerHeight || 0);
+    const stageSig = String(vpW) + 'x' + String(vpH) + ':' + String(activeVideo.videoWidth) + 'x' + String(activeVideo.videoHeight) + ':' + String(activeVideo.currentSrc || activeVideo.src);
+    if (activeVideo.__auroraStageSig === stageSig && activeVideo.parentElement === player) {
+      reportVideoSize(activeVideo);
+      return true;
+    }
+    activeVideo.__auroraStageSig = stageSig;
 
     const styleId = 'aurora-live-player-style';
     let style = document.getElementById(styleId);
@@ -2321,10 +2337,15 @@ private fun livePlayerModeScript(roomUrl: String): String {
           if (v) applyPlayerStage(v);
         });
       });
-      window.__auroraLivePlayerObserver.observe(document.body, { childList: true, subtree: true });
+      // Scope observation to player container hierarchy to avoid firing on chatroom stream insertions
+      const playerContainer = activeVideo.closest('#chat-player, #basePlayer, .player-wrapper, #mobile-room-root') || activeVideo.parentElement || document.body;
+      window.__auroraLivePlayerObserver.observe(playerContainer, { childList: true, subtree: playerContainer !== document.body });
       window.addEventListener('resize', () => {
         const v = document.querySelector(videoSelector);
-        if (v) applyPlayerStage(v);
+        if (v) {
+          if (v.__auroraStageSig) v.__auroraStageSig = '';
+          applyPlayerStage(v);
+        }
       });
     }
     const orient = reportVideoSize(activeVideo);

@@ -66,8 +66,10 @@ internal class PicacgComicSource(
         val item = request("GET", "comics/${comic.id}").path("data", "comic")
         val chapters = mutableListOf<ComicChapter>()
         var page = 1
+        var totalPages = 1
         do {
             val eps = request("GET", "comics/${comic.id}/eps?page=$page").path("data", "eps")
+            totalPages = eps.optInt("pages", 1).coerceIn(1, MAX_CHAPTER_PAGES)
             val docs = eps.optJSONArray("docs") ?: JSONArray()
             repeat(docs.length()) { index ->
                 val chapter = docs.optJSONObject(index) ?: return@repeat
@@ -75,7 +77,7 @@ internal class PicacgComicSource(
                 chapters += ComicChapter(order.toString(), chapter.optString("title").ifBlank { "第 $order 话" })
             }
             page++
-        } while (page <= eps.optInt("pages", 1))
+        } while (page <= totalPages)
         ComicDetails(
             comic = parseComic(item) ?: comic,
             description = item.optString("description"),
@@ -86,8 +88,10 @@ internal class PicacgComicSource(
     override suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage> = withContext(Dispatchers.IO) {
         val pages = mutableListOf<ComicPage>()
         var page = 1
+        var totalPages = 1
         do {
             val result = request("GET", "comics/${comic.id}/order/$chapterId/pages?page=$page").path("data", "pages")
+            totalPages = result.optInt("pages", 1).coerceIn(1, MAX_IMAGE_PAGES)
             val docs = result.optJSONArray("docs") ?: JSONArray()
             repeat(docs.length()) { index ->
                 mediaUrl(docs.optJSONObject(index)?.optJSONObject("media"))?.let { url ->
@@ -95,7 +99,7 @@ internal class PicacgComicSource(
                 }
             }
             page++
-        } while (page <= result.optInt("pages", 1))
+        } while (page <= totalPages)
         pages
     }
 
@@ -194,5 +198,7 @@ internal class PicacgComicSource(
 
     private companion object {
         const val API_ROOT = "https://picaapi.picacomic.com"
+        const val MAX_CHAPTER_PAGES = 50
+        const val MAX_IMAGE_PAGES = 100
     }
 }

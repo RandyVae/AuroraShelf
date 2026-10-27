@@ -1,7 +1,19 @@
 # 更新记录
 
-## 173 (2.16.0) — 华视影视极速加载、直播源移至「我的设置」、Git 单主线收归与 2.16.0 正式里程碑
+## 173 (2.16.0) — 华视影视极速加载、直播源移至「我的设置」、安全审计高危缺陷加固与单主干固化
 
+- **安全审计高危缺陷全面加固（H-01/02/03/05/06/09/11/12/13/21/22）**：
+  - **直播页 MutationObserver 样式风暴治理（H-09）**：将观察器监听范围自 `document.body` 收敛至播放器容器，并引入 `__auroraStageSig` 尺寸与流签名短路守卫，彻底根除聊天弹幕涌入时频繁重排 50+ inline CSS 引发的掉帧与发热；
+  - **直播房间 Slug 过滤与 RSS 用户名白名单（H-01）**：在 `HornyStudentsLiveRepository` 引入 `[A-Za-z0-9_-]{1,80}` 正则校验，在 `LiveScreen.kt` 过滤注入字符，杜绝 JS 注入；
+  - **论坛帖子内存缓存硬上限（H-05）**：`ForumPostCache` 重构为基于 LinkedHashMap 的纯标准库字节预算缓存，单帖 HTML 上限由 4MB 收敛至 512KB，全域内存预算严格限制在 8MB 内，彻底杜绝 OOM；
+  - **离线缓存磁盘空间保护（H-11）**：在 `OfflineCacheManager.enqueue` 增加 500MB 可用存储保护守卫，存储告急时自动拒绝下载并标记失败，防止手机存储被写满；
+  - **哔咔漫画分页循环上限保护（H-06）**：章节与图片分页循环增加 `coerceIn(1, 50)` / `coerceIn(1, 100)` 硬保护，杜绝上游异常时陷入死循环；
+  - **SSDP 投屏发现与控制 URL 跨域防伪造（H-02）**：校验 `LOCATION` 主机必须等于 UDP 来源 `senderIp` 且必须为局域网私有地址，严格禁止控制 URL 跨域重定向，阻断 SSRF 风险；
+  - **投屏本地代理日志脱敏（H-03）**：在 `CastManager` 中对流媒体代理地址中的 `token` 参数自动进行 `***` 遮罩，防止凭据暴露在系统 logcat 中；
+  - **液态玻璃底栏无障碍 Tab 语义与重复读屏修复（H-12）**：在底栏 Tab 中补充 `selected = isTabSelected` 语义与 `selectableGroup()` 容器，底栏图标 `contentDescription` 设为 `null` 消除 TalkBack 双重朗读；
+  - **全屏播放器点击热区语义（H-14）**：补充 `Role.Button` 与「隐藏控制栏 / 显示控制栏」语义；
+  - **48 dp 触控规范达标（H-13）**：对电视投屏播放/暂停按鈕、断开按钮及头像设置入口套用 `minimumInteractiveComponentSize()`，保留精致视觉尺寸同时达成 Apple HIG / Material 48 dp 触控区；
+  - **Gradle Java Toolchain 固化与 Lint 清理（H-21 & H-22）**：在 `app/build.gradle.kts` 与 `gradle.properties` 配置 Java 21 Toolchain，移除废弃的 `BidirectionalText` lint 规则，实现跨机器零配置开箱即编。
 - **华视影视（huavod.com）加载极速优化与广告倒计时消化机制（`PlaybackResolver.kt` / `AuroraViewModel.kt` / `PlayerScreen.kt`）**：
   - **瓶颈逆向与突破**：深度逆向华视源站 `EcPlayer6.js`，证实源站对解析接口实施严格的 20 秒 Redis 广告倒计时门禁；提前请求会触发 `too early` 并销毁令牌；
   - **前瞻预热与倒计时消化**：在 `PlaybackResolver` 中新增 `prewarmHuavod(pageUrl)` 与协程单航班合并；在 `AuroraViewModel` 中在首页 Feed 加载时后台静默启动前 4 部影片的 `Player/next` 并后台消化 20s 倒计时。当用户选片浏览后点击卡片，直接命中完成态缓存，达到 **0ms 即点即播**；

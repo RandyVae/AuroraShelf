@@ -640,16 +640,17 @@ private fun ExpressiveBottomBar(
                 AppDestination.FORUM -> Icons.Default.Forum
                 AppDestination.ME -> Icons.Default.Person
             }
+            val isTabSelected = selected == destination
             LiquidNavigationTab(
+                selected = isTabSelected,
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onSelect(destination)
                 },
             ) {
-                val isTabSelected = selected == destination
                 Icon(
                     imageVector = icon,
-                    contentDescription = destination.label,
+                    contentDescription = null, // Text provides the accessible label, avoid duplicate reading
                     tint = if (isTabSelected) Color.White else Color(0xFFA0AAB8),
                     modifier = Modifier.size(22.dp),
                 )

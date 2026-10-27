@@ -113,6 +113,16 @@ internal class SsdpDiscovery(
 
     internal fun parseDeviceFromLocation(location: String, senderIp: String): CastDevice? {
         return try {
+            val uri = runCatching { URI(location) }.getOrNull() ?: return null
+            val locationHost = uri.host.orEmpty()
+            if (senderIp.isNotBlank() && !locationHost.equals(senderIp, ignoreCase = true)) {
+                Log.w(TAG, "Rejected SSDP LOCATION host mismatch: $locationHost != sender $senderIp")
+                return null
+            }
+            if (!isPrivateOrLocalHost(locationHost)) {
+                Log.w(TAG, "Rejected non-local SSDP LOCATION host: $locationHost")
+                return null
+            }
             val request = Request.Builder().url(location).build()
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
@@ -126,10 +136,11 @@ internal class SsdpDiscovery(
                 // Find AVTransport control URL
                 val avTransportControlUrl = extractControlUrl(xml, "urn:schemas-upnp-org:service:AVTransport:1") ?: return null
                 val resolvedAvUrl = resolveUrl(location, avTransportControlUrl)
+                if (resolvedAvUrl.isBlank()) return null
 
                 // Find RenderingControl (for volume control)
                 val renderingControlUrl = extractControlUrl(xml, "urn:schemas-upnp-org:service:RenderingControl:1")
-                val resolvedRenderingUrl = renderingControlUrl?.let { resolveUrl(location, it) }
+                val resolvedRenderingUrl = renderingControlUrl?.let { resolveUrl(location, it).takeIf(String::isNotBlank) }
 
                 CastDevice(
                     id = udn,
@@ -166,8 +177,16 @@ internal class SsdpDiscovery(
         }
     }
 
+    private fun isPrivateOrLocalHost(host: String): Boolean {
+        if (host.equals("localhost", ignoreCase = true) || host == "127.0.0.1" || host == "::1") return true
+        return runCatching {
+            val address = java.net.InetAddress.getByName(host)
+            address.isSiteLocalAddress || address.isLoopbackAddress || address.isLinkLocalAddress
+        }.getOrDefault(false)
+    }
+
     private fun resolveUrl(baseUrl: String, controlUrl: String): String {
-        return if (controlUrl.startsWith("http://", ignoreCase = true) || controlUrl.startsWith("https://", ignoreCase = true)) {
+        val resolved = if (controlUrl.startsWith("http://", ignoreCase = true) || controlUrl.startsWith("https://", ignoreCase = true)) {
             controlUrl
         } else {
             try {
@@ -177,6 +196,13 @@ internal class SsdpDiscovery(
                 if (controlUrl.startsWith("/")) "$base$controlUrl" else "$base/$controlUrl"
             }
         }
+        val baseHost = runCatching { URI(baseUrl).host.orEmpty() }.getOrDefault("")
+        val resolvedHost = runCatching { URI(resolved).host.orEmpty() }.getOrDefault("")
+        if (baseHost.isNotBlank() && resolvedHost.isNotBlank() && !baseHost.equals(resolvedHost, ignoreCase = true)) {
+            Log.w(TAG, "Rejected cross-host controlUrl: $resolved for base $baseUrl")
+            return ""
+        }
+        return resolved
     }
 
     private fun extractHeader(response: String, headerName: String): String? {

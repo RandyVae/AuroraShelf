@@ -1,14 +1,31 @@
 # Latest Handoff
 
-## 最新交接：2026-10-27 18:15 HKT — 173（华视影视极速加载优化、直播源设置迁移与 2.16.0 单主干固化）
+## 最新交接：2026-10-27 20:15 HKT — 173（安全審計高危缺陷全面加固、華視極速加載與 2.16.0 穩定固化）
 
 - **版本目標**：`2.16.0`（`versionCode = 173`，`versionName = "2.16.0"`）。前一版本 2.15.0 打 tag `v2.15.0` 歸檔。
-- **正式本地產物**：`dist/AuroraShelf-2.16.0-173-huavod-speedup-live-settings-LOCAL.apk`
-- **產物體積**：**4,420,833 bytes**；**SHA-256**：`66cf34968acaa9f86f0415ecefe93f78cad59046fee90bc1f584de4e7836d402`
+- **正式本地產物**：`dist/AuroraShelf-2.16.0-173-audit-hardened-LOCAL.apk`
+- **產物體積**：**4,434,597 bytes**；**SHA-256**：`93328bce178c05ca503d60f916b3ce92105f417b24836bd60bb25b71f467e66d`
+- **審計高危缺陷全面加固（已驗證）**：
+  1. **直播頁 MutationObserver 樣式風暴治理（H-09）**：觀察器範圍自 `document.body` 收窄至播放器容器；新增 `__auroraStageSig` 尺寸簽名短路守衛，徹底杜絕聊天彈幕插入時重複觸發 50+ inline CSS 引發的掉幀與發熱；
+  2. **直播暱稱與 Slug 注入防護（H-01）**：在 `HornyStudentsLiveRepository` 引入 `[A-Za-z0-9_-]{1,80}` 正則校驗，在 `liveRoomSlug` 中過濾非英數字符，杜絕 JS 注入；
+  3. **論壇帖子快取硬性 8MB 預算（H-05）**：`ForumPostCache` 重構為純標準庫 `LinkedHashMap`，單篇 HTML 上限 512KB，全域記憶體預算鎖定在 8MB 內，徹底消除 OOM 風險；
+  4. **離線下載磁碟空間守衛（H-11）**：在 `OfflineCacheManager.enqueue` 增加 500MB 可用儲存檢查，磁碟告急時拒絕下載並標記 `FAILED`，防止寫滿儲存；
+  5. **哔咔漫畫分頁無界循環防護（H-06）**：章節與正文分頁循環增加 `coerceIn(1, 50)` / `coerceIn(1, 100)` 硬邊界，杜絕死循環阻塞；
+  6. **SSDP 投屏 LOCATION 來源 IP 校驗與防 SSRF（H-02）**：校驗 LOCATION 主機必須等於發送包的 `senderIp` 且為私有地址，禁止控制 URL 跨域跳轉；
+  7. **投屏本地代理日誌脫敏（H-03）**：在 `CastManager` 中對 URL 內的 `token` 參數實施 `***` 遮罩，防止敏感憑據暴露於 logcat；
+  8. **底欄 Tab 無障礙語義與重複讀屏修復（H-12）**：底欄 Tab 增加 `selected = isTabSelected` 與 `selectableGroup()`，圖標 `contentDescription` 設為 null，消除 TalkBack 重複朗讀；
+  9. **全屏播放器熱區語義（H-14）**：補充 `Role.Button` 與「隱藏控制欄 / 顯示控制欄」語義；
+  10. **48 dp 觸控規範達標（H-13）**：電視投屏暫停/播放按鈕、斷開按鈕與頭像設置按鈕套用 `minimumInteractiveComponentSize()`，滿足 Apple HIG 規範；
+  11. **Gradle Java 21 Toolchain 固化與 Lint 清理（H-21 & H-22）**：配置標準 Java 21 Toolchain 與 `gradle.properties`，移除無效的 `BidirectionalText` 規則。
 - **Git 產品線統一與清理（已驗證）**：
   - 本地與遠端 GitHub 全局僅保留唯一主產品線 `main`；
-  - 徹底刪除所有過期及臨時分支（`origin/codex/feat-comic-source-settings`、`origin/codex/feat-forum-image-save`、`origin/codex/fix-forum-reader-loading`、`origin/feature/backdrop-liquid-tabs` 等）；
-  - `git branch -a` 實測確認僅剩 `* main` 與 `remotes/origin/main`。
+  - 徹底刪除所有過期及臨時分支；`git branch -a` 實測確認僅剩 `* main` 與 `remotes/origin/main`。
+- **全量測試與構建（已驗證）**：
+  - JVM 214 項單元測試全通（`testDebugUnitTest` PASS in 2s）；
+  - Lint 檢查通過（0 errors / 23 warnings / 4 hints，退出碼 0）；
+  - Release APK 編譯成功（`assembleRelease` PASS in 54s，versionCode 173）；
+  - `apksigner verify --verbose`：v2 簽名通過；`zipalign -c -v 4`：16 KB 頁面對齊通過；
+  - Android 模擬器 `emulator-5554` 實機安裝驗收通過。
 - **華視影視（Huavod）極速加載與 20s 廣告倒計時消化機制（已驗證）**：
   1. **源站 Redis 倒計時逆向**：深度逆向 `huavod.com/player/js/art/EcPlayer6.js`，證實服務端強制 20 秒廣告倒計時；提前調用 `/Player/resolveUrl` 會返回 `too early` 並銷毀 token。
   2. **前瞻預熱與協程單航班合併**：在 `PlaybackResolver` 中新增 `prewarmHuavod(pageUrl)` 與單航班合併；在 `AuroraViewModel` 中在 Feed 加載時後台靜默啟動前 4 部影片解析，在用戶瀏覽信息流時異步消化 20s 倒計時。實測用戶點擊已預熱影片時，**解析耗時 0ms（`cache=hit`），ExoPlayer 秒級出畫**！

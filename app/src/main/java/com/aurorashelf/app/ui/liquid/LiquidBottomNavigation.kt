@@ -45,6 +45,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selectableGroup
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -180,6 +184,7 @@ internal fun LiquidBottomNavigation(
 
         Row(
             modifier = Modifier
+                .semantics { selectableGroup() }
                 .graphicsLayer { translationX = panelOffset }
                 .drawBackdrop(
                     backdrop = backdrop,
@@ -291,12 +296,17 @@ internal fun LiquidBottomNavigation(
 internal fun RowScope.LiquidNavigationTab(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scale = LocalLiquidTabScale.current
     Column(
         modifier = modifier
             .clip(Capsule())
+            .semantics {
+                this.selected = selected
+                this.role = Role.Tab
+            }
             .clickable(
                 interactionSource = null,
                 indication = null,

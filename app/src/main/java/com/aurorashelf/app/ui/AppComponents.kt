@@ -120,6 +120,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -740,13 +741,15 @@ internal fun NetflixProfileAvatar(
 ) {
     val haptic = LocalHapticFeedback.current
     val clickableModifier = if (onClick != null) {
-        Modifier.clickable(
-            role = Role.Button,
-            onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onClick()
-            },
-        ).semantics { this.contentDescription = contentDescription }
+        Modifier
+            .minimumInteractiveComponentSize()
+            .clickable(
+                role = Role.Button,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                },
+            ).semantics { this.contentDescription = contentDescription }
     } else Modifier
 
     Box(

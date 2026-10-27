@@ -59,7 +59,7 @@ class HornyStudentsLiveRepository {
                 ?: item.selectFirst("username")?.text()?.trim()
                 ?: item.selectFirst("title")?.text()?.trim()
                 ?: return@mapNotNull null
-            if (username.isBlank()) return@mapNotNull null
+            if (username.isBlank() || !USERNAME_PATTERN.matches(username)) return@mapNotNull null
             val gender = item.selectFirst("cb|gender")?.text()?.trim()
                 ?: item.selectFirst("gender")?.text()?.trim().orEmpty()
             val imageUrl = item.selectFirst("cb|image_url")?.text()?.trim()
@@ -144,6 +144,7 @@ class HornyStudentsLiveRepository {
         internal const val PAGE_SIZE = 30
         private const val CACHE_TTL_MS = 60_000L
         private const val REQUEST_TIMEOUT_MS = 15_000
+        private val USERNAME_PATTERN = Regex("[A-Za-z0-9_-]{1,80}")
 
         fun prefetchDns() {
             java.util.concurrent.Executors.newSingleThreadExecutor().execute {

@@ -1,7 +1,6 @@
 package com.aurorashelf.app.data.forum
 
 import android.util.Log
-import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -15,31 +14,56 @@ internal class CachedPostHtml(val html: String, val fetchedAtMs: Long)
 /**
  * Prefetches and caches rendered post HTML so opening a thread can paint from local data instead
  * of waiting for the full page round-trip. Entries are small (usually tens of KB) and expire so a
- * stale thread does not hide edits.
+ * stale thread does not hide edits. Enforces a strict 8 MB byte budget to prevent OOM.
  */
 internal object ForumPostCache {
     private const val TAG = "ForumPostCache"
-    private const val MAX_ENTRIES = 32
+    internal const val MAX_CACHE_BYTES = 8 * 1024 * 1024 // 8 MB total memory budget
     private const val TTL_MS = 30 * 60_000L
-    private const val MIN_HTML_SIZE = 1_024
-    private const val MAX_HTML_SIZE = 4_000_000
+    internal const val MIN_HTML_SIZE = 1_024
+    internal const val MAX_HTML_SIZE = 512_000 // 512 KB max per post to prevent OOM
 
-    private val cache = object : LruCache<String, CachedPostHtml>(MAX_ENTRIES) {}
+    private val lock = Any()
+    private var currentBytes = 0
+    private val cache = object : LinkedHashMap<String, CachedPostHtml>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedPostHtml>?): Boolean {
+            val shouldRemove = currentBytes > MAX_CACHE_BYTES
+            if (shouldRemove && eldest != null) {
+                currentBytes -= (eldest.key.length + eldest.value.html.length) * 2
+            }
+            return shouldRemove
+        }
+    }
     private val inFlight = mutableSetOf<String>()
 
-    fun get(url: String): String? {
-        val entry = cache.get(url) ?: return null
+    fun get(url: String): String? = synchronized(lock) {
+        val entry = cache[url] ?: return null
         if (System.currentTimeMillis() - entry.fetchedAtMs > TTL_MS) {
             cache.remove(url)
+            currentBytes -= (url.length + entry.html.length) * 2
             return null
         }
-        return entry.html
+        entry.html
     }
 
     fun put(url: String, html: String) {
-        if (html.length !in MIN_HTML_SIZE..MAX_HTML_SIZE) return
-        cache.put(url, CachedPostHtml(html, System.currentTimeMillis()))
+        synchronized(lock) {
+            if (html.length !in MIN_HTML_SIZE..MAX_HTML_SIZE) return
+            val entryBytes = (url.length + html.length) * 2
+            val old = cache.put(url, CachedPostHtml(html, System.currentTimeMillis()))
+            if (old != null) {
+                currentBytes -= (url.length + old.html.length) * 2
+            }
+            currentBytes += entryBytes
+        }
     }
+
+    fun clear() = synchronized(lock) {
+        cache.clear()
+        currentBytes = 0
+    }
+
+    fun sizeBytes(): Int = synchronized(lock) { currentBytes }
 
     /**
      * Prefetches up to [limit] posts with bounded concurrency so a 20-post warm-up does not

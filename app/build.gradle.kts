@@ -79,7 +79,12 @@ android {
 
     lint {
         disable += "ModifierParameter"
-        disable += "BidirectionalText"
+    }
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
 

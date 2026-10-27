@@ -104,6 +104,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -629,24 +630,28 @@ internal fun PlayerScreen(
                                 onClick = {
                                     if (connected.isPlaying) castManager.pause() else castManager.play()
                                 },
-                                modifier = Modifier.size(26.dp),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .size(36.dp),
                             ) {
                                 Icon(
                                     imageVector = if (connected.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = if (connected.isPlaying) "暫停電視" else "播放",
                                     tint = Color.White,
-                                    modifier = Modifier.size(16.dp),
+                                    modifier = Modifier.size(18.dp),
                                 )
                             }
                             IconButton(
                                 onClick = { castManager.disconnect() },
-                                modifier = Modifier.size(26.dp),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .size(36.dp),
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "斷開投屏",
                                     tint = Color.White.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(14.dp),
+                                    modifier = Modifier.size(16.dp),
                                 )
                             }
                         }

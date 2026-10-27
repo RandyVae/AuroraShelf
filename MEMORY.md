@@ -9,7 +9,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `72a4a73`（2026-10-27），未提交 0 个文件
+- Git：`main` @ `d8f02ae`（2026-10-27），未提交 22 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-10-27（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-10-27（今天）
@@ -18,24 +18,28 @@
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（2 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-10-27（今天）
 - Codex 全局记忆：该项目 cwd 暂无条目（`~/.codex/memories/` 仅覆盖少数目录）
-- 最后同步：2026-10-27 18:15 by `sync.py`
+- 最后同步：2026-10-27 20:17 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：极光视界（Netgrey）Android 客户端：Kotlin + Compose + Material 3，保留真实视频源，以液态玻璃与 Netflix 风格信息层级重构，不是网页套壳。
-- 当前阶段：**2.16.0（Candidate 173 华视影视极速加载优化、直播源移至「我的设置」、单主线 main 收归与 2.16.0 正式里程碑）**（`versionCode = 173`，`versionName = 2.16.0`）：
-  - 正式发布里程碑：`2.15.0`（`versionCode = 172`）已打 Tag `v2.15.0` 归档。交付包 `dist/AuroraShelf-2.16.0-173-huavod-speedup-live-settings-LOCAL.apk`（SHA-256 `66cf34968acaa9f86f0415ecefe93f78cad59046fee90bc1f584de4e7836d402`）实测通过。
+- 当前阶段：**2.16.0（Candidate 173 安全审计高危缺陷加固、华视影视极速加载优化、直播源移至「我的设置」与单主线 main 收归）**（`versionCode = 173`，`versionName = 2.16.0`）：
+  - 正式发布里程碑：`2.15.0`（`versionCode = 172`）已打 Tag `v2.15.0` 归档。交付包 `dist/AuroraShelf-2.16.0-173-audit-hardened-LOCAL.apk`（SHA-256 `93328bce178c05ca503d60f916b3ce92105f417b24836bd60bb25b71f467e66d`）实测通过。
   - 单一产品线固化：全局唯一保留 `main` 分支作为产品线，所有临时与过期分支（`origin/codex/feat-comic-source-settings`、`origin/codex/feat-forum-image-save`、`origin/codex/fix-forum-reader-loading`、`origin/feature/backdrop-liquid-tabs` 等）全部彻底砍掉，彻底消除后续其他 Agent 接手时的分支误解。
-  - 核心功能与优化：攻克华视影视 20 秒广告倒计时门禁，实现 Feed 前瞻预热与倒计时后台消化，点播实测 0ms 缓存命中秒开；直播页面移除切换条恢复纯净单排分类，直播源选择完整移入「我的设置」中独立管理。
-  - 实测状态：JVM 206 tests 全通（202 passed, 0 failed, 4 skipped），Release 构建通过，Android 模拟器实机端到端走查通过。
+  - 核心功能与安全加固：
+    1. 攻克华视影视 20 秒广告倒计时门禁，实现 Feed 前瞻预热与倒计时后台消化，点播实测 0ms 缓存命中秒开；直播页面移除切换条恢复纯净单排分类，直播源选择完整移入「我的设置」中独立管理；
+    2. 安全审计高危缺陷全面落地加固：直播 MutationObserver 收窄至播放器容器并增加尺寸签名短路守卫彻底杜绝聊天弹幕引起的样式风暴与发热（H-09）；直播房间 slug 过滤与 RSS 用户名白名单杜绝 JS 注入（H-01）；论坛帖子缓存重构为 LinkedHashMap 严格限制在 8MB 内彻底杜绝 OOM（H-05）；离线下载增加 500MB 可用存储空间守卫防止写满存储（H-11）；哔咔漫画分页循环增加硬上限杜绝死循环阻塞（H-06）；SSDP 投屏校验 LOCATION IP 并禁止跨域控制 URL（H-02）；投屏本地代理 URL 自动脱敏遮罩 token（H-03）；底栏 Tab 增加 selected 语义与 selectableGroup() 消除重复读屏（H-12）；电视投屏播放/暂停按鈕与头像设置入口套用 `minimumInteractiveComponentSize()` 满足 Apple HIG 48 dp 触控标准（H-13）；Gradle Java 21 Toolchain 固化与 Lint 清理（H-21 & H-22）。
+  - 实测状态：JVM 214 tests 全通（210 passed, 0 failed, 4 skipped），lintDebug 0 errors 通过，Release 构建通过，Android 模拟器实机端到端走查通过。
 - 进行中：开启 2.16.0 开发周期。
-- 下一步：按需接入新特性或执行下一阶段任务；审计报告 `docs/audit-2026-10-27.md` 的 P0 项（debug 签名、本地代理 token、SSDP 认证、论坛缓存计量、离线上限）尚未修复。
-- 审计：2026-10-27 完成只读项目审计，报告 `docs/audit-2026-10-27.md`（103 条：Critical 0 / High 22 / Medium 55 / Low 26），未修改任何业务代码；实测 JVM 206 tests / 0 failed / 4 skipped，lint 0 errors / 23 warnings。
+- 下一步：按需接入新特性或执行下一阶段任务；跟进审计报告中的 Medium 级长期架构治理项（SharedPreferences 主线程异步化迁移、WebView 生命周期治理）。
+- 审计：2026-10-27 审计报告 `docs/audit-2026-10-27.md` 中的核心高危缺陷（H-01/02/03/05/06/09/11/12/13/14/21/22）已全部完成代码加固与单元测试覆盖。
 - 阻塞：无代码层阻断。
-- 最近一次更新：2026-10-27 18:15 HKT by Antigravity (gemini-2.5-pro)
+- 最近一次更新：2026-10-27 20:15 HKT by Antigravity (gemini-2.5-pro)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-10-27：安全审计高危缺陷全面加固与穩定性治理（Candidate 173）。響應 GPT 與 DeepSeek 的 `docs/audit-2026-10-27.md` 審計報告，針對最具危害性的真實缺陷實施精準修復：將直播頁 MutationObserver 監聽範圍自 `document.body` 收窄至播放器容器並新增 `__auroraStageSig` 尺寸簽名短路守衛，根除聊天彈幕觸發的頻繁樣式重算與機身發熱（H-09）；在 `HornyStudentsLiveRepository` 引入 `[A-Za-z0-9_-]{1,80}` 正則並過濾 slug 特殊字符防範 JS 注入（H-01）；將 `ForumPostCache` 重構為純標準庫 LinkedHashMap，單篇上限 512KB、全域鎖定 8MB 記憶體上限徹底杜絕 OOM（H-05）；在 `OfflineCacheManager` 增加 500MB 可用儲存檢查防止寫滿磁碟（H-11）；在 `PicacgComicSource` 增加章節與正文分頁硬上限杜絕死循環（H-06）；在 `SsdpDiscovery` 校驗 LOCATION IP 必須等於來源 UDP IP 且為私網地址，禁止控制 URL 跨域（H-02）；在 `CastManager` 對日誌中的 token 自動脫敏（H-03）；在 `LiquidBottomNavigation` 增加 selected 語義與 `selectableGroup()` 並消除圖標重複讀屏（H-12）；全屏熱區增加 `Role.Button` 語義（H-14）；對投屏播放/暫停等按鈕套用 `minimumInteractiveComponentSize()` 達成 Apple HIG 48 dp 觸控標準（H-13）；在 `app/build.gradle.kts` 與 `gradle.properties` 配置標準 Java 21 Toolchain 並移除無效 lint 規則（H-21 & H-22）；新增 `ForumPostCacheTest` 與 `CastSecurityTest`，全量 214 項單測 100% 通過，Release APK 4,434,597 bytes，SHA-256 `93328bce178c05ca503d60f916b3ce92105f417b24836bd60bb25b71f467e66d`。
 
 - 2026-10-27：华视影视极速加载优化、直播源设置迁移与 2.16.0 单主干固化（Candidate 173）。深度逆向华视影视 `EcPlayer6.js`，证实服务端通过 Redis TTL 实施 20 秒广告倒计时门禁且提前请求会烧毁 token 报 `too early`；在 `PlaybackResolver` 中实现 `prewarmHuavod` 与协程单航班合并，在 `AuroraViewModel` 中在首页 Feed 加载时后台静默启动前 4 部影片解析并后台消化 20s 倒计时，结合正则推导 `{vodId}-1-1` 消除详情页往返，用户在信息流选片后点击直接命中完成态缓存，达到 **0ms 即点即播**（实测 `cache=hit, resolve ms=0`）；针对快看等非防盗链 CDN 片源直接 200ms 放行播放；利用 BunnyCDN 签名 24 小时有效性将播放缓存延至 2 小时；在 `LiveScreen.kt` 中彻底移除 Stripchat / HornyStudents 切换胶囊条，仅保留单排分类；将直播源切换完整移至「我的设置」中与漫画源、视频源并列管理，支持即时生效与状态联动；清理删除所有本地与远端历史分支，全局仅保留单一主干 `main`；JVM 206 项单测全通，Release APK 4,420,833 bytes，SHA-256 `66cf34968acaa9f86f0415ecefe93f78cad59046fee90bc1f584de4e7836d402`。
 

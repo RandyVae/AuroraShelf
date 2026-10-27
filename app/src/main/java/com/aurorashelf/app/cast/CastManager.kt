@@ -140,7 +140,7 @@ class CastManager private constructor(context: Context) {
                     else -> videoUrl
                 }
 
-                Log.i(TAG, "Casting to ${device.name}: streamUrl=$streamUrl")
+                Log.i(TAG, "Casting to ${device.name}: streamUrl=${sanitizeStreamUrl(streamUrl)}")
 
                 // 1. SetAVTransportURI
                 val mimeType = if (DlnaSoap.isHlsUrl(videoUrl)) "application/vnd.apple.mpegurl" else "video/mp4"
@@ -355,5 +355,9 @@ class CastManager private constructor(context: Context) {
             instance ?: synchronized(this) {
                 instance ?: CastManager(context).also { instance = it }
             }
+
+        internal fun sanitizeStreamUrl(url: String): String {
+            return url.replace(Regex("([?&]token=)[^&]+"), "$1***")
+        }
     }
 }

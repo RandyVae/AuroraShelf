@@ -169,6 +169,11 @@ class OfflineCacheManager private constructor(context: Context) {
         }
     }
 
+    fun hasSufficientDiskSpace(): Boolean {
+        val usable = runCatching { applicationContext.filesDir.usableSpace }.getOrDefault(Long.MAX_VALUE)
+        return usable >= MIN_USABLE_DISK_SPACE_BYTES
+    }
+
     fun enqueue(video: VideoItem, pageUrl: String, episodeLabel: String?) {
         val id = idFor(pageUrl)
         // A retried entry replaces its previous resolver; never let both add a download.
@@ -183,6 +188,11 @@ class OfflineCacheManager private constructor(context: Context) {
             mediaUrl = null,
             state = OfflineCacheState.RESOLVING,
         )
+        if (!hasSufficientDiskSpace()) {
+            transientEntries[id] = pending.copy(state = OfflineCacheState.FAILED)
+            publishWithTransient()
+            return
+        }
         transientEntries[id] = pending
         publishWithTransient()
         val resolveJob = scope.launch(start = CoroutineStart.LAZY) {
@@ -195,6 +205,11 @@ class OfflineCacheManager private constructor(context: Context) {
                         // download, so a deleted task can never come back as a download item.
                         coroutineContext.ensureActive()
                         if (!shouldAcceptResolvedDownload(id, transientEntries.keys)) return@onSuccess
+                        if (!hasSufficientDiskSpace()) {
+                            transientEntries[id] = pending.copy(state = OfflineCacheState.FAILED)
+                            publishWithTransient()
+                            return@onSuccess
+                        }
                         val metadata = OfflineMetadata(
                             videoId = video.id,
                             title = video.title,
@@ -332,6 +347,7 @@ class OfflineCacheManager private constructor(context: Context) {
     companion object {
         private const val CACHE_DIRECTORY = "offline_media"
         private const val PROGRESS_REFRESH_MS = 750L
+        internal const val MIN_USABLE_DISK_SPACE_BYTES = 500L * 1024 * 1024 // 500 MB minimum free storage
         @Volatile private var instance: OfflineCacheManager? = null
 
         fun get(context: Context): OfflineCacheManager = instance ?: synchronized(this) {

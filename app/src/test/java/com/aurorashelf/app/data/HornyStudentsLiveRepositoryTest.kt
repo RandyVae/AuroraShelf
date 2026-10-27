@@ -109,4 +109,30 @@ class HornyStudentsLiveRepositoryTest {
         assertEquals("https://www.hornystudents.com/student_girl", item.playerUrl)
         assertTrue(item.isHd)
     }
+
+    @Test
+    fun filtersOutMaliciousUsernamesWithInjection() {
+        val maliciousRss = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <rss version="2.0" xmlns:cb="https://chaturbate.com/feed/namespace/">
+            <channel>
+            <item>
+                <cb:username>valid_user123</cb:username>
+                <cb:gender>f</cb:gender>
+                <cb:number_of_users_watching>10</cb:number_of_users_watching>
+                <cb:current_show>public</cb:current_show>
+            </item>
+            <item>
+                <cb:username>bad';alert(1);'</cb:username>
+                <cb:gender>f</cb:gender>
+                <cb:number_of_users_watching>10</cb:number_of_users_watching>
+                <cb:current_show>public</cb:current_show>
+            </item>
+            </channel>
+            </rss>
+        """.trimIndent()
+        val parsed = repository.parseFeed(maliciousRss)
+        assertEquals(1, parsed.size)
+        assertEquals("valid_user123", parsed.first().username)
+    }
 }
