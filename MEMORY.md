@@ -9,16 +9,16 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`codex/feat-comic-source-settings` @ `1c0c677`（2026-10-25），未提交 84 个文件
+- Git：`main` @ `126b425`（2026-10-27），未提交 0 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-10-27（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-10-27（今天）
   - `.ai/TASKS.md` — 任务清单，最后更新 2026-10-27（今天）
   - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-10-27（今天）
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（2 天前）
-  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-10-24（3 天前）
+  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-10-27（今天）
 - Codex 全局记忆：该项目 cwd 暂无条目（`~/.codex/memories/` 仅覆盖少数目录）
-- 最后同步：2026-10-27 15:43 by `sync.py`
+- 最后同步：2026-10-27 17:33 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
