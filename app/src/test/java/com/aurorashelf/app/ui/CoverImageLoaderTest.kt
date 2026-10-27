@@ -190,6 +190,32 @@ class CoverImageLoaderTest {
         }
     }
 
+    @Test
+    fun normalizesXvideosThumbnumPlaceholder() {
+        assertEquals(
+            "https://thumb-cdn77.xvideos-cdn.com/uuid/6/xv_1_t.jpg",
+            CoverImageLoader.normalizeThumbnailUrl("https://thumb-cdn77.xvideos-cdn.com/uuid/6/xv_THUMBNUM_t.jpg"),
+        )
+        assertEquals(
+            "https://example.com/cover.jpg",
+            CoverImageLoader.normalizeThumbnailUrl("https://example.com/cover.jpg"),
+        )
+    }
+
+    @Test
+    fun recognizesGifAndMiafImages() {
+        val gifBytes = byteArrayOf('G'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), '8'.code.toByte(), '9'.code.toByte(), 'a'.code.toByte())
+        assertTrue("GIF89a must be recognized as image", CoverImageLoader.looksLikeImage(gifBytes))
+        assertTrue("MIAF brand must be recognized as image", CoverImageLoader.looksLikeImage(isoBmffImage("miaf")))
+    }
+
+    @Test
+    fun recognizes91DongmanAndPicDrleaoEncryptedCovers() {
+        assertTrue(CoverImageLoader.isEncryptedCover("https://pic.drleao.cn/md-204/cover.jpg"))
+        assertTrue(CoverImageLoader.isEncryptedCover("https://pic.drleao.cn/upload/xiao/cover.jpg", "https://91dongman.net/anime/lifan/8863/"))
+        assertTrue(CoverImageLoader.isEncryptedCover("https://91dongman.net/static/cover.jpg"))
+    }
+
     private fun newLoader(cache: CoverCache, fetcher: CoverFetcher): CoverLoader = CoverLoader(
         cache = cache,
         fetcher = fetcher,

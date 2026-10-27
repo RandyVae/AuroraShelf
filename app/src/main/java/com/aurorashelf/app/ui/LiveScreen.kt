@@ -349,7 +349,7 @@ private fun LiveFeed(
 @Composable
 private fun LiveHeader(
     onRefresh: () -> Unit,
-    onSettings: () -> Unit,
+    onSettings: () -> Unit = {},
 ) {
     NetflixTopBar(
         modifier = Modifier.padding(bottom = 6.dp),
@@ -365,10 +365,6 @@ private fun LiveHeader(
                 modifier = Modifier.size(22.dp),
             )
         }
-        NetflixProfileAvatar(
-            onClick = onSettings,
-            modifier = Modifier.padding(start = 2.dp),
-        )
     }
 }
 

@@ -431,7 +431,7 @@ internal fun homeGridRows(videos: List<VideoItem>, columns: Int = 2): List<List<
 @Composable
 private fun HomeHeader(
     onSearch: () -> Unit,
-    onSettings: () -> Unit,
+    onSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     NetflixTopBar(
@@ -440,10 +440,6 @@ private fun HomeHeader(
         NetflixSearchCapsule(
             label = "搜索视频",
             onClick = onSearch,
-        )
-        NetflixProfileAvatar(
-            onClick = onSettings,
-            modifier = Modifier.padding(start = 2.dp),
         )
     }
 }

@@ -624,3 +624,20 @@ Evidence:
 
 Residual risk:
 - TalkBack、真機 E4、200% 字體及 41 個 XVideos 分類逐項網絡加載未於本輪逐一加載；站方私密秀/下播狀態依賴源站即時狀態。
+
+## XVideos 與 91動漫封面加載修復與頂部冗餘入口移除（Candidate 173）
+
+Date: 2026-10-27
+
+Status: Implemented, unit-tested and verified on Android emulator
+
+Decision:
+1. 91動漫封面 AES-128-CBC 解密：91動漫圖片 CDN（`pic.drleao.cn`、`91dongman.net` 等）返回的圖像二進制字節經過 AES-128-CBC 加密（Key: `f5d965df75336270`，IV: `97b60394abc2fbe1`），在 `CoverImageLoader.kt` 中自動進行 AES 解密，根治 91動漫 封面 100% 失敗問題；
+2. XVideos 縮略圖佔位符清洗：XVideos 卡片在 HTML 中包含 `THUMBNUM` 動態幀佔位模板（`xv_THUMBNUM_t.jpg`），直接請求該 URL CDN77 會返回 404，在 `CoverImageLoader.kt`、`PipePipeBridge.kt` 與 `XVideosService.java` 中統一清洗替換為 `1`，遇 `lightbox-blank.gif` 優先提取 `data-sfwthumb`、`data-src-avif`，並修復 GIF/MIAF 格式校驗；
+3. 頂部冗餘「我的」入口徹底移除：依據用戶需求，底欄 Dock 已有「我的」Tab，頂欄右上角放置頭像入口純屬多餘；徹底移除首頁（`HomeScreen.kt`）、漫畫（`ComicScreen.kt`）、直播（`LiveScreen.kt`）、論壇（`ForumScreen.kt`）頂部 AppBar 右側的 `NetflixProfileAvatar`，保留底欄 Dock 的「我的」Tab 作為全域唯一入口；
+
+Evidence:
+- Release APK versionCode 173，4,435,017 bytes，SHA-256 `1fa803889871e7181b9e59501bac67b172fb06c083149331e7116a906ceda178`。
+- JVM 217 tests（213 passed, 4 skipped），0 failed。
+- 模擬器實機走查截圖驗證：四個頁面頂欄右上角均無頭像按鈕；91動漫與 XVideos 視頻封面 100% 正常出畫。
+

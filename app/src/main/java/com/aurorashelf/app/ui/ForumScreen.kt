@@ -161,10 +161,6 @@ internal fun ForumScreen(
                             modifier = Modifier.size(22.dp),
                         )
                     }
-                    NetflixProfileAvatar(
-                        onClick = onSettings,
-                        modifier = Modifier.padding(start = 2.dp),
-                    )
                 }
             }
 

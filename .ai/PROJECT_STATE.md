@@ -1,6 +1,6 @@
 # Project State
 
-Last Updated: 2026-10-27 20:15 HKT
+Last Updated: 2026-10-27 21:00 HKT
 
 ## Project
 
@@ -8,27 +8,21 @@ Netgrey · Android 2.16.0（开发版本号已正式更新为 versionCode 173，
 
 ## Current Stage
 
-**2.16.0（Candidate 173）安全审计高危缺陷全面加固、华视影视极速加载、直播源移至「我的设置」与单主线 main 收归**：
-- 本地交付包：`dist/AuroraShelf-2.16.0-173-audit-hardened-LOCAL.apk`
-- 产物体积：**4,434,597 bytes**；**SHA-256**：`93328bce178c05ca503d60f916b3ce92105f417b24836bd60bb25b71f467e66d`
+**2.16.0（Candidate 173）封面加載修復、頂部冗餘入口移除、安全審計全面加固與華視極速秒開**：
+- 本地交付包：`dist/AuroraShelf-2.16.0-173-cover-entry-fix-LOCAL.apk`
+- 产物体积：**4,435,017 bytes**；**SHA-256**：`1fa803889871e7181b9e59501bac67b172fb06c083149331e7116a906ceda178`
 - 开发版本号：`versionCode = 173`，`versionName = "2.16.0"`
-- 单一产品线：`main`（已合入全部交付功能，其他临时与历史分支已全部移除，杜绝多 Agent 协作误解）
-- 2.15.0 正式发布基线：`v2.15.0` 对应 `versionCode = 172`，产物 `dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`。
+- 单一产品线：`main`
+- 封面加載與冗餘入口治理（已驗證）：
+  1. **91動漫封面二進制 AES-128-CBC 解密**：CDN 圖片使用 AES-128-CBC 加密（Key: `f5d965df75336270`，IV: `97b60394abc2fbe1`），在 `CoverImageLoader.kt` 自動解密為標準 JPEG，根治 91動漫 封面 100% 失敗問題；
+  2. **XVideos 縮略圖佔位符清洗**：清洗 `THUMBNUM` 佔位符替換為 `1`，根治 CDN77 返回 404 問題；遇 `lightbox-blank.gif` 自動回退；修復 GIF 與 MIAF 格式檢驗；切換後 40 部視頻封面全量加載；
+  3. **頂部冗餘入口移除**：首頁、漫畫、直播、論壇頂部 AppBar 右側徹底移除 `NetflixProfileAvatar`，保留底欄 Dock 的「我的」Tab 作為全域唯一入口；
 - 核心功能与安全加固（已验证）：
-  1. **安全审计高危缺陷全面加固**：
-     - 直播 MutationObserver 收窄至播放器容器并增加尺寸签名短路守卫，彻底消灭聊天弹幕引起的样式风暴、掉帧与发热（H-09）；
-     - 直播房间 slug 过滤与 RSS 用户名白名单，杜绝 JS 注入（H-01）；
-     - 论坛帖子内存缓存重构为 LinkedHashMap 严格限制在 8MB 内，单篇上限 512KB，彻底杜绝 OOM（H-05）；
-     - 离线下载增加 500MB 可用存储空间守卫，防止写满手机存储（H-11）；
-     - 哔咔分页循环增加硬上限，杜绝死循环阻塞（H-06）；
-     - SSDP 投屏校验 LOCATION IP 并禁止跨域控制 URL，阻断 SSRF（H-02）；
-     - 投屏本地代理 URL 自动脱敏遮罩 token（H-03）；
-     - 底栏 Tab 增加 selected 语义与 selectableGroup()，清除重复读屏（H-12）；全屏热区增加 Role.Button 语义（H-14）；
-     - 电视投屏播放/暂停按鈕、断开按钮与头像入口套用 `minimumInteractiveComponentSize()` 满足 48 dp 触控标准（H-13）；
-     - Gradle Java 21 Toolchain 与 gradle.properties 固化，移除无效 BidirectionalText lint 规则（H-21 & H-22）。
-  2. **华视影视（Huavod）极速加载**：攻克源站 20 秒 Redis 广告倒计时门禁；实现首屏前瞻预热与倒计时后台消化，用户点播实测 **0ms 缓存命中秒开**；非防盗链 CDN 片源直出秒开；零网络集数推导；播放缓存由 2 分钟提升至 2 小时；
-  3. **直播源管理彻底移入「我的设置」**：直播页面吸顶栏精简为纯净单排分类，彻底移除源切换胶囊条；在「我的」->「设置」中新增「直播源」，与「视频源」、「漫画源」并列，支持 Stripchat / HornyStudents 自由切换并即时生效；
-  4. **全量测试与验证**：JVM 单元测试 214 项全量通过（210 passed, 4 skipped）；lintDebug 0 errors 通过；Release APK 编译、v2 签名、16 KB 页面对齐全部通过；模拟器实机端到端走查全部通过。
+  1. **安全审计高危缺陷全面加固**：H-01/02/03/05/06/09/11/12/13/14/21/22 全部落地；
+  2. **华视影视（Huavod）极速加载**：攻克源站 20 秒 Redis 广告倒计时门禁；实现首屏前瞻预热与倒计时后台消化，用户点播实测 **0ms 缓存命中秒开**；
+  3. **直播源管理彻底移入「我的设置」**：直播页面吸顶栏精简为纯净单排分类，直播源选择移至「我的设置」中独立管理；
+  4. **全量测试与验证**：JVM 单元测试 217 项全量通过（213 passed, 4 skipped）；lintDebug 0 errors 通过；Release APK 编译、v2 签名、16 KB 页面对齐全部通过；模拟器实机端到端走查全部通过。
+
 
 **172 版本（Candidate 172）HornyStudents 直播畫面裁切、視口黑屏與誤判私密秀深度根治已完成**（`versionCode = 172`，`versionName = 2.15.0`）：
 - 本地交付包：`dist/AuroraShelf-2.15.0-172-live-crop-fix-LOCAL.apk`

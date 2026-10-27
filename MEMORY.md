@@ -9,7 +9,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `0d31b25`（2026-10-27），未提交 0 个文件
+- Git：`main` @ `e62a1ea`（2026-10-27），未提交 12 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-10-27（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-10-27（今天）
@@ -18,26 +18,31 @@
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（2 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-10-27（今天）
 - Codex 全局记忆：该项目 cwd 暂无条目（`~/.codex/memories/` 仅覆盖少数目录）
-- 最后同步：2026-10-27 20:17 by `sync.py`
+- 最后同步：2026-10-27 21:00 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：极光视界（Netgrey）Android 客户端：Kotlin + Compose + Material 3，保留真实视频源，以液态玻璃与 Netflix 风格信息层级重构，不是网页套壳。
-- 当前阶段：**2.16.0（Candidate 173 安全审计高危缺陷加固、华视影视极速加载优化、直播源移至「我的设置」与单主线 main 收归）**（`versionCode = 173`，`versionName = 2.16.0`）：
-  - 正式发布里程碑：`2.15.0`（`versionCode = 172`）已打 Tag `v2.15.0` 归档。交付包 `dist/AuroraShelf-2.16.0-173-audit-hardened-LOCAL.apk`（SHA-256 `93328bce178c05ca503d60f916b3ce92105f417b24836bd60bb25b71f467e66d`）实测通过。
-  - 单一产品线固化：全局唯一保留 `main` 分支作为产品线，所有临时与过期分支（`origin/codex/feat-comic-source-settings`、`origin/codex/feat-forum-image-save`、`origin/codex/fix-forum-reader-loading`、`origin/feature/backdrop-liquid-tabs` 等）全部彻底砍掉，彻底消除后续其他 Agent 接手时的分支误解。
+- 当前阶段：**2.16.0（Candidate 173 封面加載修復、頂部冗餘入口移除、安全審計全面加固與華視極速秒開）**（`versionCode = 173`，`versionName = 2.16.0`）：
+  - 正式发布里程碑：`2.15.0`（`versionCode = 172`）已打 Tag `v2.15.0` 归档。交付包 `dist/AuroraShelf-2.16.0-173-cover-entry-fix-LOCAL.apk`（SHA-256 `1fa803889871e7181b9e59501bac67b172fb06c083149331e7116a906ceda178`）实测通过。
+  - 封面加载与冗余入口治理：
+    1. 91動漫封面二進制 AES-128-CBC 解密（Key: `f5d965df75336270`，IV: `97b60394abc2fbe1`），徹底修復 91動漫 封面 100% 失敗問題；
+    2. XVideos 縮略圖 `THUMBNUM` 佔位符清洗替換為 `1`，根治 CDN77 返回 404 問題；遇 `lightbox-blank.gif` 自動回退；修復 GIF 與 MIAF 格式檢驗；
+    3. 徹底移除首頁、漫畫、直播、論壇頂部 AppBar 右側的 `NetflixProfileAvatar`，保留底欄 Dock 作為「我的」全域唯一入口；
   - 核心功能与安全加固：
     1. 攻克华视影视 20 秒广告倒计时门禁，实现 Feed 前瞻预热与倒计时后台消化，点播实测 0ms 缓存命中秒开；直播页面移除切换条恢复纯净单排分类，直播源选择完整移入「我的设置」中独立管理；
-    2. 安全审计高危缺陷全面落地加固：直播 MutationObserver 收窄至播放器容器并增加尺寸签名短路守卫彻底杜绝聊天弹幕引起的样式风暴与发热（H-09）；直播房间 slug 过滤与 RSS 用户名白名单杜绝 JS 注入（H-01）；论坛帖子缓存重构为 LinkedHashMap 严格限制在 8MB 内彻底杜绝 OOM（H-05）；离线下载增加 500MB 可用存储空间守卫防止写满存储（H-11）；哔咔漫画分页循环增加硬上限杜绝死循环阻塞（H-06）；SSDP 投屏校验 LOCATION IP 并禁止跨域控制 URL（H-02）；投屏本地代理 URL 自动脱敏遮罩 token（H-03）；底栏 Tab 增加 selected 语义与 selectableGroup() 消除重复读屏（H-12）；电视投屏播放/暂停按鈕与头像设置入口套用 `minimumInteractiveComponentSize()` 满足 Apple HIG 48 dp 触控标准（H-13）；Gradle Java 21 Toolchain 固化与 Lint 清理（H-21 & H-22）。
-  - 实测状态：JVM 214 tests 全通（210 passed, 0 failed, 4 skipped），lintDebug 0 errors 通过，Release 构建通过，Android 模拟器实机端到端走查通过。
+    2. 安全审计高危缺陷全面落地加固（H-01/02/03/05/06/09/11/12/13/14/21/22）。
+  - 实测状态：JVM 217 tests 全通（213 passed, 0 failed, 4 skipped），lintDebug 0 errors 通过，Release 构建通过，Android 模拟器实机端到端走查通过。
 - 进行中：开启 2.16.0 开发周期。
-- 下一步：按需接入新特性或执行下一阶段任务；跟进审计报告中的 Medium 级长期架构治理项（SharedPreferences 主线程异步化迁移、WebView 生命周期治理）。
-- 审计：2026-10-27 审计报告 `docs/audit-2026-10-27.md` 中的核心高危缺陷（H-01/02/03/05/06/09/11/12/13/14/21/22）已全部完成代码加固与单元测试覆盖。
+- 下一步：按需接入新特性或执行下一阶段任务；跟进审计报告中的 Medium 级长期架构治理项。
+- 审计：2026-10-27 审计报告 `docs/audit-2026-10-27.md` 中的核心高危缺陷与后续衍生封面缺陷已全部闭环修复并通过自动化测试。
 - 阻塞：无代码层阻断。
-- 最近一次更新：2026-10-27 20:15 HKT by Antigravity (gemini-2.5-pro)
+- 最近一次更新：2026-10-27 21:00 HKT by Antigravity (gemini-2.5-pro)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-10-27：XVideos 與 91動漫封面加載修復與全板塊頂部冗餘「我的」入口徹底移除（Candidate 173）。91動漫圖片 CDN（`pic.drleao.cn`、`91dongman.net` 等）返回的圖像二進制字節經過 AES-128-CBC 加密（Key: `f5d965df75336270`，IV: `97b60394abc2fbe1`），在 `CoverImageLoader.kt` 中自動進行 AES 解密，根治 91動漫 封面 100% 失敗問題；XVideos 卡片在 HTML 中包含 `THUMBNUM` 動態幀佔位模板（`xv_THUMBNUM_t.jpg`），直接請求該 URL CDN77 會返回 404，在 `CoverImageLoader.kt`、`PipePipeBridge.kt` 與 `XVideosService.java` 中統一清洗替換為 `1`，遇 `lightbox-blank.gif` 優先提取 `data-sfwthumb`、`data-src-avif`，並修復 GIF/MIAF 格式校驗；針對用戶指出的入口冗餘問題，徹底移除首頁（`HomeScreen.kt`）、漫畫（`ComicScreen.kt`）、直播（`LiveScreen.kt`）、論壇（`ForumScreen.kt`）頂部 AppBar 右側的 `NetflixProfileAvatar`，保留底欄 Dock 的「我的」Tab 作為全域唯一入口；新增 3 項單元測試，全量 217 項單測 100% 通過，Release APK 4,435,017 bytes，SHA-256 `1fa803889871e7181b9e59501bac67b172fb06c083149331e7116a906ceda178`。
 
 - 2026-10-27：安全审计高危缺陷全面加固与穩定性治理（Candidate 173）。響應 GPT 與 DeepSeek 的 `docs/audit-2026-10-27.md` 審計報告，針對最具危害性的真實缺陷實施精準修復：將直播頁 MutationObserver 監聽範圍自 `document.body` 收窄至播放器容器並新增 `__auroraStageSig` 尺寸簽名短路守衛，根除聊天彈幕觸發的頻繁樣式重算與機身發熱（H-09）；在 `HornyStudentsLiveRepository` 引入 `[A-Za-z0-9_-]{1,80}` 正則並過濾 slug 特殊字符防範 JS 注入（H-01）；將 `ForumPostCache` 重構為純標準庫 LinkedHashMap，單篇上限 512KB、全域鎖定 8MB 記憶體上限徹底杜絕 OOM（H-05）；在 `OfflineCacheManager` 增加 500MB 可用儲存檢查防止寫滿磁碟（H-11）；在 `PicacgComicSource` 增加章節與正文分頁硬上限杜絕死循環（H-06）；在 `SsdpDiscovery` 校驗 LOCATION IP 必須等於來源 UDP IP 且為私網地址，禁止控制 URL 跨域（H-02）；在 `CastManager` 對日誌中的 token 自動脫敏（H-03）；在 `LiquidBottomNavigation` 增加 selected 語義與 `selectableGroup()` 並消除圖標重複讀屏（H-12）；全屏熱區增加 `Role.Button` 語義（H-14）；對投屏播放/暫停等按鈕套用 `minimumInteractiveComponentSize()` 達成 Apple HIG 48 dp 觸控標準（H-13）；在 `app/build.gradle.kts` 與 `gradle.properties` 配置標準 Java 21 Toolchain 並移除無效 lint 規則（H-21 & H-22）；新增 `ForumPostCacheTest` 與 `CastSecurityTest`，全量 214 項單測 100% 通過，Release APK 4,434,597 bytes，SHA-256 `93328bce178c05ca503d60f916b3ce92105f417b24836bd60bb25b71f467e66d`。
 
@@ -107,6 +112,8 @@
 - Chaturbate / HornyStudents 播放器動態 `clip-path` 硬裁切兩側畫面：Chaturbate 的 `video.js` 實例會在播放調度中動態計算並為 `<video class="vjs-tech">` 賦予內聯樣式 `clip-path: inset(0px 199.5px);`，強制將 4:3 攝像頭硬裁為寬屏，導致移動端畫面邊緣 200px 內容（人體、肢體）完全丟失，窄屏甚至全黑；做法是注入全域樣式 `video, .vjs-tech { clip-path: none !important; -webkit-clip-path: none !important; }`，並在 JS 調度循環中主動覆蓋清空 `clip-path`。
 - Android Compose WebView 嵌入環境 `100vh` 高度塌陷為 0px 黑屏：在 Compose 的 `AndroidView(factory = { WebView })` 中，固定定位（`position: fixed`）的 DOM 容器若使用 CSS `100vw`/`100vh`，因 WebView 缺少外層瀏覽器 UA 全屏基準，計算高度會直接塌陷為 `0px` 導致黑屏；做法是提取 `window.visualViewport?.width || window.innerWidth` 換算為具體物理像素 `${viewportWidth}px` 與 `${viewportHeight}px` 賦予容器及其所有中間父層。
 - 直播源特殊狀態（私密秀/門票秀）過早誤判阻斷加載：直播頁面常規頂部導航包含 `<a data-testid="private-shows-tab">`，操作欄常態包含 `.privateShowButton`。若腳本使用寬鬆選擇器（如 `[data-testid*=private]`）判定狀態，會在 `<video>` 尚未掛載的 150ms 內過早觸發誤判並彈出「正在進行私密表演」遮罩永久中斷加載；做法是嚴格限定選擇器至真正全屏遮罩類名（`.private-show-overlay` 等），並在 Kotlin 側引入 `MISMATCH_GRACE_MS`（3,000ms）保護寬限期。
+- 91動漫與通用 CMS 圖片 AES-128-CBC 加密陷阱：`pic.drleao.cn` 等 CDN 圖片並非明文圖像，而是 AES-128-CBC 加密的二進制流（密鑰 `f5d965df75336270`，IV `97b60394abc2fbe1`），若未解密直接交給 Android Bitmap 解碼器會被判定為無效字節而觸發 60 秒負快取；必須在下載層校驗字節並自動嘗試 AES 解密。
+- XVideos 動態縮略圖模板佔位符 `THUMBNUM` 陷阱：XVideos 的 HTML 卡片中包含帶有 `THUMBNUM` 佔位符的 URL 模板（用於鼠標 hover 輪播幀 1~30），直接請求該 URL CDN77 會返回 404；必須在解析層與加載層自動將 `THUMBNUM` 替換為 `1` 才能正確獲取首幀縮略圖。
 
 ## 权威来源（细节以这些文件为准）
 

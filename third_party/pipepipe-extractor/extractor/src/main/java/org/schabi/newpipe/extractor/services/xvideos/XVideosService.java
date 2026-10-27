@@ -530,10 +530,19 @@ final class XVideosParser {
             final String title = firstNonEmpty(titleLink == null ? "" : titleLink.text(),
                     titleLink == null ? "" : titleLink.attr("title"), image == null ? "" : image.attr("alt"));
             if (id.isEmpty() || title.isEmpty()) continue;
-            final String thumbnail = image == null ? "" : firstNonEmpty(
-                    image.absUrl("data-src"), image.absUrl("data-original"),
+            String thumbnail = image == null ? "" : firstNonEmpty(
+                    image.absUrl("data-src"), image.absUrl("data-sfwthumb"),
+                    image.absUrl("data-src-avif"), image.absUrl("data-original"),
                     image.absUrl("data-lazy-src"), firstSrc(image.attr("data-srcset")),
                     firstSrc(image.attr("srcset")), image.absUrl("src"));
+            if (thumbnail.contains("lightbox-blank.gif")) {
+                thumbnail = image == null ? "" : firstNonEmpty(
+                        image.absUrl("data-sfwthumb"), image.absUrl("data-src-avif"),
+                        image.absUrl("data-mzl"));
+            }
+            if (thumbnail.contains("THUMBNUM")) {
+                thumbnail = thumbnail.replace("THUMBNUM", "1");
+            }
             final Element duration = metadata == null ? null : metadata.selectFirst("span.duration, .duration");
             final Element uploader = card.selectFirst("a[href^=/profiles/], a[href^=/channels/], "
                     + "a[href^=/model/], a[href^=/pornstar/], a.name");
@@ -605,7 +614,11 @@ final class XVideosParser {
             final String title = firstNonEmpty(string(item.get("tf")), string(item.get("t")));
             if (id.isEmpty() || title.isEmpty()) continue;
             final String url = BASE + "/video." + id + "/_";
-            items.putIfAbsent(id, new XVideosItem(id, url, title, absolute(string(item.get("i"))),
+            String thumb = absolute(string(item.get("i")));
+            if (thumb.contains("THUMBNUM")) {
+                thumb = thumb.replace("THUMBNUM", "1");
+            }
+            items.putIfAbsent(id, new XVideosItem(id, url, title, thumb,
                     duration(string(item.get("d"))), string(item.get("pn")),
                     absolute(string(item.get("pu")))));
             if (items.size() >= maximum) break;

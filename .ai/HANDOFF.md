@@ -1,5 +1,40 @@
 # Latest Handoff
 
+## 最新交接：2026-10-27 21:00 HKT — 173（XVideos 與 91動漫封面加載修復、全板塊頂部冗餘「我的」入口徹底移除）
+
+- **版本目標**：`2.16.0`（`versionCode = 173`，`versionName = "2.16.0"`）。
+- **正式本地產物**：`dist/AuroraShelf-2.16.0-173-cover-entry-fix-LOCAL.apk`
+- **產物體積**：**4,435,017 bytes**（約 4.23 MB）；**SHA-256**：`1fa803889871e7181b9e59501bac67b172fb06c083149331e7116a906ceda178`
+- **核心修復與加固（已驗證）**：
+  1. **91動漫封面 AES-128-CBC 密文解密**：
+     - 分析確認 91動漫 CDN（`pic.drleao.cn`、`91dongman.net` 等）返回的圖像二進制字節經過 AES-128-CBC 加密（Key: `f5d965df75336270`，IV: `97b60394abc2fbe1`）；
+     - 在 `CoverImageLoader.kt` 中擴充 `KNOWN_ENCRYPTED_HOSTS` 與 `KNOWN_ENCRYPTED_SITE_HOSTS`，下載字節流後若未識別為標準圖片自動嘗試 AES-CBC 解密；
+     - 實機驗證 91動漫 Billboard 焦點圖、今日熱播 Top 10、為你推薦、熱播精選全量封面 100% 正常出畫。
+  2. **XVideos 縮略圖佔位符清洗與格式識別**：
+     - XVideos 卡片在 HTML 中包含 `THUMBNUM` 動態幀佔位模板（如 `xv_THUMBNUM_t.jpg`），直接請求該 URL CDN77 會返回 404；
+     - 在 `CoverImageLoader.kt`、`PipePipeBridge.kt` 與 `XVideosService.java` 中統一清洗將 `THUMBNUM` 替換為 `1`；
+     - 在 `XVideosService.java` 中遇 `lightbox-blank.gif` 時優先回退提取 `data-sfwthumb`、`data-src-avif` 或 `data-mzl`；
+     - 修復 `looksLikeImage` 中的 GIF 判斷長度（4 字節比較修正）並納入 `miaf`（AVIF）容器 brand；
+     - 實機驗證切換至 XVideos 源後 40 部視頻封面全量加載出畫，下載快取正常寫入。
+  3. **首頁、漫畫、直播、論壇頂部冗餘「我的」入口徹底移除**：
+     - 依據用戶反饋，底欄 Dock 已有全域「我的」Tab，頂欄右上角放置頭像入口純屬冗餘且佔用視覺焦點；
+     - 徹底移除 `HomeScreen.kt:431`（首頁頂部搜索條右側）、`ComicScreen.kt:314`（漫畫頂部刷新按鈕右側）、`LiveScreen.kt:350`（直播頂部投屏與刷新按鈕右側）、`ForumScreen.kt:150`（論壇頂部投屏與刷新按鈕右側）的 `NetflixProfileAvatar` 組件；
+     - 實機截圖走查驗證四個板塊頂部右上角均已乾淨，僅保留各板塊自身核心操作按鈕。
+- **全量測試與構建（已驗證）**：
+  - JVM 217 項單元測試全通（`testDebugUnitTest` PASS in 3s，新增 3 項針對封面清洗、AES 識別與圖片格式的單測）；
+  - Release APK 編譯成功（`assembleRelease` PASS in 3m 57s，versionCode 173）；
+  - `apksigner verify --verbose`：v2 簽名通過；`zipalign -c -v 4`：16 KB 頁面對齊通過；
+  - Android 模擬器 `missavtest` 實機安裝驗收通過。
+- **截圖存檔**：
+  - `screen_v173_fix_home.png`：首頁頂欄右上角頭像已徹底移除，僅留搜索視頻膠囊；
+  - `screen_v173_comic_view.png`：漫畫頂欄右上角頭像已移除，僅留搜索與刷新按鈕；
+  - `screen_v173_live_view.png`：直播頂欄右上角頭像已移除，僅留投屏與刷新按鈕；
+  - `screen_v173_forum_view.png`：論壇頂欄右上角頭像已移除，僅留投屏與刷新按鈕；
+  - `screen_v173_91dongman_covers.png` & `screen_v173_91dongman_scrolled.png`：91動漫視頻源全量封面正常解密出畫；
+  - `screen_v173_xvideos_verified.png` & `screen_v173_xvideos_scrolled.png`：XVideos 視頻源全量封面正常出畫。
+
+---
+
 ## 最新交接：2026-10-27 20:15 HKT — 173（安全審計高危缺陷全面加固、華視極速加載與 2.16.0 穩定固化）
 
 - **版本目標**：`2.16.0`（`versionCode = 173`，`versionName = "2.16.0"`）。前一版本 2.15.0 打 tag `v2.15.0` 歸檔。

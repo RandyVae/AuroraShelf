@@ -3,6 +3,7 @@ package com.aurorashelf.app.data
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.VideoItem
+import com.aurorashelf.app.ui.CoverImageLoader
 import java.io.IOException
 import java.security.MessageDigest
 import android.util.Log
@@ -94,7 +95,7 @@ internal object PipePipeBridge {
             duration = duration.takeIf { it >= 0 }?.asDuration() ?: "--:--",
             views = viewCount.takeIf { it >= 0 }?.let(::formatViews) ?: "来源：${serviceName(serviceId)}",
             pageUrl = address,
-            thumbnailUrl = thumbnailUrl?.takeIf(String::isNotBlank),
+            thumbnailUrl = thumbnailUrl?.takeIf(String::isNotBlank)?.let(CoverImageLoader::normalizeThumbnailUrl),
         )
     }
 

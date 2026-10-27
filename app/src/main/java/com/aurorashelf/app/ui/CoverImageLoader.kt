@@ -18,6 +18,8 @@ import okhttp3.Request
 /** Loads normal covers and decrypts Huangguo's public AES-wrapped cover bytes. */
 internal object CoverImageLoader {
     private val HUANGGUO_CDN_HOSTS = setOf("pic.cuinhri.cn", "pic.zdmhyg.cn", "pic.fisawck.cn")
+    private val KNOWN_ENCRYPTED_HOSTS = setOf("pic.cuinhri.cn", "pic.zdmhyg.cn", "pic.fisawck.cn", "pic.drleao.cn")
+    private val KNOWN_ENCRYPTED_SITE_HOSTS = setOf("huangguoai.com", "91dongman.net", "91dongman.com")
     private const val HUANGGUO_HOST = "huangguoai.com"
     private const val CRYPTO_WORKER_PATH = "/static/web/js/plugins/crypto-worker.js"
     private const val CONFIG_TTL_MS = 15 * 60 * 1000L
@@ -62,7 +64,16 @@ internal object CoverImageLoader {
         }
     }
 
-    fun load(address: String, referer: String): ByteArray? = loader().load(address, referer)
+    internal fun normalizeThumbnailUrl(url: String): String {
+        var clean = url.trim()
+        if (clean.contains("THUMBNUM")) {
+            clean = clean.replace("THUMBNUM", "1")
+        }
+        return clean
+    }
+
+    fun load(address: String, referer: String): ByteArray? =
+        loader().load(normalizeThumbnailUrl(address), referer)
 
     private fun loader(): CoverLoader = sharedLoader ?: synchronized(loaderLock) {
         sharedLoader ?: CoverLoader(
@@ -76,6 +87,15 @@ internal object CoverImageLoader {
         val host = URI(address).host?.lowercase(Locale.US).orEmpty()
         val refererHost = URI(referer.orEmpty()).host?.lowercase(Locale.US).orEmpty()
         host in HUANGGUO_CDN_HOSTS || (refererHost == HUANGGUO_HOST && host != HUANGGUO_HOST)
+    }.getOrDefault(false)
+
+    internal fun isEncryptedCover(address: String, referer: String? = null): Boolean = runCatching {
+        val host = URI(address).host?.lowercase(Locale.US).orEmpty()
+        val refererHost = URI(referer.orEmpty()).host?.lowercase(Locale.US).orEmpty()
+        host in KNOWN_ENCRYPTED_HOSTS ||
+            host in KNOWN_ENCRYPTED_SITE_HOSTS ||
+            refererHost in KNOWN_ENCRYPTED_SITE_HOSTS ||
+            isHuangguoCover(address, referer)
     }.getOrDefault(false)
 
     internal fun requestOrigin(referer: String): Pair<String, String>? = runCatching {
@@ -148,10 +168,12 @@ internal object CoverImageLoader {
 
     /** Downloads one cover, keeping the previous UA/Referer/Origin/Accept and AES semantics. */
     private fun download(address: String, referer: String): ByteArray? = runCatching {
-        val huangguoCover = isHuangguoCover(address, referer)
-        val cryptoConfig = if (huangguoCover) currentConfig(referer) else null
+        val normalizedAddress = normalizeThumbnailUrl(address)
+        val huangguoCover = isHuangguoCover(normalizedAddress, referer)
+        val encryptedCover = isEncryptedCover(normalizedAddress, referer)
+        val cryptoConfig = if (huangguoCover) currentConfig(referer) else FALLBACK_CONFIG
         val request = Request.Builder()
-            .url(address)
+            .url(normalizedAddress)
             .header("Accept", ACCEPT_HEADER)
             .header("User-Agent", VideoRepository.USER_AGENT)
             .apply {
@@ -162,13 +184,23 @@ internal object CoverImageLoader {
                 if (huangguoCover) {
                     header("Referer", "https://huangguoai.com/")
                     header("Origin", "https://huangguoai.com")
+                } else if (referer.contains("91dongman") || normalizedAddress.contains("drleao.cn")) {
+                    header("Referer", "https://91dongman.net/")
+                    header("Origin", "https://91dongman.net")
                 }
             }
             .build()
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@use null
             val bytes = response.body?.bytes() ?: return@use null
-            if (huangguoCover) decryptIfNeeded(bytes, cryptoConfig ?: FALLBACK_CONFIG) else bytes
+            if (looksLikeImage(bytes)) return@use bytes
+            if (encryptedCover || bytes.size >= AES_BLOCK_SIZE) {
+                decryptIfNeeded(bytes, cryptoConfig)
+                    ?: decryptIfNeeded(bytes, FALLBACK_CONFIG)
+                    ?: bytes
+            } else {
+                bytes
+            }
         }
     }.getOrNull()
 
@@ -188,7 +220,7 @@ internal object CoverImageLoader {
     internal fun looksLikeImage(bytes: ByteArray): Boolean {
         if (bytes.size >= 3 && bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() && bytes[2] == 0xFF.toByte()) return true
         if (bytes.size >= 8 && bytes.copyOfRange(0, 8).contentEquals(byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A))) return true
-        if (bytes.size >= 6 && bytes.copyOfRange(0, 6).contentEquals("GIF8".toByteArray())) return true
+        if (bytes.size >= 4 && bytes[0] == 0x47.toByte() && bytes[1] == 0x49.toByte() && bytes[2] == 0x46.toByte() && bytes[3] == 0x38.toByte()) return true
         if (bytes.size >= 12 && bytes.copyOfRange(0, 4).contentEquals("RIFF".toByteArray()) &&
             bytes.copyOfRange(8, 12).contentEquals("WEBP".toByteArray())) return true
         return isIsoBmffImage(bytes)
@@ -214,7 +246,7 @@ internal object CoverImageLoader {
     private const val MAJOR_BRAND_OFFSET = 8
     private const val MAJOR_BRAND_SIZE = 4
     private val FTYP_BOX_TYPE = "ftyp".toByteArray(Charsets.US_ASCII)
-    private val ISO_BMFF_IMAGE_BRANDS = setOf("avif", "avis", "heic", "heix", "hevc", "hevx", "mif1", "msf1")
+    private val ISO_BMFF_IMAGE_BRANDS = setOf("avif", "avis", "miaf", "heic", "heix", "hevc", "hevx", "mif1", "msf1")
 
     private class HttpCoverFetcher : CoverFetcher {
         override fun fetch(address: String, referer: String): ByteArray? = download(address, referer)
