@@ -1,27 +1,54 @@
 # Project State
 
-Last Updated: 2026-10-27 21:00 HKT
+Last Updated: 2026-11-02 21:37 HKT
 
 ## Project
 
-Netgrey · Android 2.16.0（开发版本号已正式更新为 versionCode 173，versionName 2.16.0；2.15.0 versionCode 172 已正式打 tag 发布并在主干固化）
+极光视界（AuroraShelf / Netgrey）· Android 2.16.0（正式确立以当前版本 versionCode 173、versionName 2.16.0 为全工程后续开发的唯一基线，过往历史版本包体与废弃素材已全面清退）
 
 ## Current Stage
 
-**2.16.0（Candidate 173）封面加載修復、頂部冗餘入口移除、安全審計全面加固與華視極速秒開**：
-- 本地交付包：`dist/AuroraShelf-2.16.0-173-cover-entry-fix-LOCAL.apk`
-- 产物体积：**4,435,017 bytes**；**SHA-256**：`1fa803889871e7181b9e59501bac67b172fb06c083149331e7116a906ceda178`
-- 开发版本号：`versionCode = 173`，`versionName = "2.16.0"`
-- 单一产品线：`main`
-- 封面加載與冗餘入口治理（已驗證）：
-  1. **91動漫封面二進制 AES-128-CBC 解密**：CDN 圖片使用 AES-128-CBC 加密（Key: `f5d965df75336270`，IV: `97b60394abc2fbe1`），在 `CoverImageLoader.kt` 自動解密為標準 JPEG，根治 91動漫 封面 100% 失敗問題；
-  2. **XVideos 縮略圖佔位符清洗**：清洗 `THUMBNUM` 佔位符替換為 `1`，根治 CDN77 返回 404 問題；遇 `lightbox-blank.gif` 自動回退；修復 GIF 與 MIAF 格式檢驗；切換後 40 部視頻封面全量加載；
-  3. **頂部冗餘入口移除**：首頁、漫畫、直播、論壇頂部 AppBar 右側徹底移除 `NetflixProfileAvatar`，保留底欄 Dock 的「我的」Tab 作為全域唯一入口；
-- 核心功能与安全加固（已验证）：
-  1. **安全审计高危缺陷全面加固**：H-01/02/03/05/06/09/11/12/13/14/21/22 全部落地；
-  2. **华视影视（Huavod）极速加载**：攻克源站 20 秒 Redis 广告倒计时门禁；实现首屏前瞻预热与倒计时后台消化，用户点播实测 **0ms 缓存命中秒开**；
-  3. **直播源管理彻底移入「我的设置」**：直播页面吸顶栏精简为纯净单排分类，直播源选择移至「我的设置」中独立管理；
-  4. **全量测试与验证**：JVM 单元测试 217 项全量通过（213 passed, 4 skipped）；lintDebug 0 errors 通过；Release APK 编译、v2 签名、16 KB 页面对齐全部通过；模拟器实机端到端走查全部通过。
+**双轨并行：Android 2.16.0 唯一基线固化 + iOS 原生工程（SwiftUI + AVKit）多态分类联动与系统原生 AirPlay 投屏全面打通**：
+- **Android 本地交付包**：`dist/AuroraShelf-2.16.0-173-game-integration-all-sources-verified-LOCAL.apk`（176,633,866 bytes，SHA-256 `bb2097749c94123c56baec105ab732389f6ff21128121adc608f25b0e1b1f211`），JVM 单元测试 100% 全部通过；
+- **iOS 原生成品应用功能深化与原生投屏（已验证）**：
+  - 工程目录：`ios/AuroraShelf.xcodeproj`（Swift 6.4.2 + Xcode 27.2，由 `xcodegen` 管理）
+  - 产物：`ios/build/Build/Products/Debug-iphonesimulator/AuroraShelf.app`，`xcodebuild` **BUILD SUCCEEDED**
+  - **分类联动、AirPlay 投屏与脱敏对齐（已完成）**：
+    1. **多态分类真实联动**：`VideoRepository` 动态映射华视 5 大真实分类路由（`/vodtype/{1,2,3,4,20}.html`），`HomeScreen` 建立响应式绑定，点击分类胶囊毫秒级响应并刷新对应影视流；
+    2. **原生 AirPlay 投屏控件**：封装 `AirPlayRoutePicker`（`AVRoutePickerView`），全面接入 `NetflixTopBar` 与 `NativePlayerView`，一键弹出系统原生投屏列表；
+    3. **合规脱敏治理**：`PersonalScreen` 消除敏感字样，对齐 Android 商业化文案；
+  - **真机模拟器核心验证截图（已落盘验证）**：
+    1. `captures/enhanced_01_home_category.png`（3.3MB）：首页动态分类条与 AirPlay 按钮；
+    2. `captures/enhanced_02_player_airplay.png`（246KB）：全屏播放器顶栏 AirPlay 投屏控件；
+    3. `captures/enhanced_03_profile_clean.png`（295KB）：个人中心脱敏后规范商业化卡片。
+  - **1:1 美术资产与 UI 对齐核心成果（已完成）**：
+    1. **战术 RPG 离线单机游戏**：物理链入 Android `app/src/main/assets/www`（203MB 原版 WebGL/Spine 游戏包），通过 `WKWebView` 纯本地原生渲染，顶层配备 Apple HIG 悬浮「< 返回视频」毛玻璃胶囊（`aligned_04_game.png`）；
+    2. **顶栏品牌 Netgrey 1:1 复刻**：实现 `NetflixTopBar.swift`，包含 Canvas 绘制的 3D 折叠彩带 N 标（`NetflixNLogo`，对齐 Android `AppComponents.kt #698`）、极光珊瑚粉（`AuroraCoral` `#FF4F7B`）`Netgrey` 标题、AirPlay 投屏与 `NetflixSearchCapsule` 搜索胶囊；
+    3. **91 社区论坛 1:1 BBS 纯文本卡片**：重写 `ForumScreen.swift`，彻底删除先前占位的人像大头照，严格还原 Android BBS 紧凑卡片（`#161922` 卡片色、`#262626` 边框、12pt 连续圆角、`91自拍` 亮红 `#E50914` / `草榴社区` 墨绿 `#2E7D32` 徽章、白色精巧排版标题、右侧气泡回帖计数器，`aligned_02_forum.png`）；
+    4. **全套色彩 Token 对齐**：在 `AuroraTheme.swift` 补充 UInt32 十六进制色彩构造器，精准同步 `auroraCoral`、`auroraBrandAccentDeep`、`auroraMediaSurface`、`auroraMediaBorder`。
+- **Android 基线固化与全工程净化（已验证）**：
+  1. **历史包体彻底清退**：删除 `dist/` 下过往 9 个历史 APK（165 ~ 173 早期中间包，共约 38MB），`dist/SHA256SUMS.txt` 仅保留当前基线包唯一记录；
+  2. **废弃无用素材全面清除**：
+     - 清除 `dist/local-intro/` 第三方视频及海报素材，彻底解决 M-55 版权素材边界问题，废弃并移除 `scripts/local-intro.sh`；
+     - 清除 `captures/` 下所有旧版测试大体积录屏（包含两个 50MB 录屏）与废弃测试用例输出，释放 127MB；
+     - 清除 `docs/design-audit/` 下所有未入库的历史版本 mp4 与 png 媒体素材，释放 82MB；
+     - 清除 `game/docs/` 下原提取工程的旧版截图素材（`local-edition/` 与 `audit-2026-10-29/screenshots/`），释放 19MB；
+     - 全工程累计释放磁盘空间逾 270MB，工程结构保持极简与纯净。
+  3. **游戏模块完整并入**：
+     - 在「我的」页面设置列表上方新增独立「游戏」卡片模块，直启游戏。内置纯本地微型 HTTP 服务 `GameAssetServer`（端口自动分配），解决 Spine 骨骼、音效与立绘资源本地加载与跨域限制；
+     - 包含 Apple HIG 半透明暗色玻璃悬浮返回胶囊（`topMargin = 38dp, marginStart = 62dp`），具备 3 秒自动淡化防遮挡、全屏拖动磁吸与触感震动返回。
+  4. **上线敏感字样彻底净化**：
+     - 彻底清除“本机离线复刻版”、“全部资源已内置，不连接服务器”、“来自本机已解包资源”、“Local Edition”等全部开发标记；
+     - 主标题标为 `Lust Goddess`，副标题标为 `TACTICAL RPG`，版权标为 `Lust Goddess © 2026. All rights reserved. Version 2.16.0`；
+     - 隐藏内部测试选项，移除随包分发的冗余文档与脚本。
+  5. **全系统视频与漫画源探测与修复**：
+     - 19/19 个视频源全量验证通过（100% PASS）；
+     - 10/10 个漫画源通过；修复了 Baozi 403 防盗链自动重定向、JM Base64 null 闪退、Komiic GraphQL Schema 字段过时、ComicReader 章节切换滚动未置顶等问题。
+  6. **全量测试与签名验证**：
+     - JVM 单元测试 221 项全部通过；
+     - APK Signature Scheme v2 签名校验通过；
+     - 16 KB Page Alignment 对齐校验通过。
+
 
 
 **172 版本（Candidate 172）HornyStudents 直播畫面裁切、視口黑屏與誤判私密秀深度根治已完成**（`versionCode = 172`，`versionName = 2.15.0`）：
