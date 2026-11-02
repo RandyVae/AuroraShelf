@@ -1,15 +1,37 @@
 # Project State
 
-Last Updated: 2026-11-02 21:37 HKT
+Last Updated: 2026-11-02 22:30 HKT
 
 ## Project
 
-极光视界（AuroraShelf / Netgrey）· Android 2.16.0（正式确立以当前版本 versionCode 173、versionName 2.16.0 为全工程后续开发的唯一基线，过往历史版本包体与废弃素材已全面清退）
+极光视界（AuroraShelf / Netgrey）· Android 2.16.0 + iOS 2.16.0（正式确立双端以当前版本 versionCode 173、versionName 2.16.0 为全工程后续开发的唯一基线，过往历史版本包体与废弃素材已全面清退）
 
 ## Current Stage
 
-**双轨并行：Android 2.16.0 唯一基线固化 + iOS 原生工程（SwiftUI + AVKit）多态分类联动与系统原生 AirPlay 投屏全面打通**：
-- **Android 本地交付包**：`dist/AuroraShelf-2.16.0-173-game-integration-all-sources-verified-LOCAL.apk`（176,633,866 bytes，SHA-256 `bb2097749c94123c56baec105ab732389f6ff21128121adc608f25b0e1b1f211`），JVM 单元测试 100% 全部通过；
+**双轨并行：Android 2.16.0 唯一基线固化 + iOS 原生工程（SwiftUI + AVKit + WebKit）全源真实流播放与直播出画彻底打通**：
+- **交付包状态**：
+  - Android APK：`dist/AuroraShelf-2.16.0-173-game-integration-all-sources-verified-LOCAL.apk`（176,633,866 bytes，SHA-256 `bb2097749c94123c56baec105ab732389f6ff21128121adc608f25b0e1b1f211`）；
+  - iOS IPA：`dist/AuroraShelf-2.16.0-173-arm64-LOCAL.ipa`（164MB，SHA-256 `7baa85127c20689289194d983d568d3ef1be8a8362065c6e1cd03430aa16e22f`）；
+  - 校验文件：`dist/SHA256SUMS.txt` 同步更新。
+- **iOS 原生工程视频源与直播流彻底根治（已验证）**：
+  1. **视频源播放解析彻底打通**：
+     - 彻底清除 `intro_film.mp4` 本地硬编码劫持代码；
+     - 重构 `VideoRepository.swift`：实现华视影院真实 Cloudflare M3U8 流解析（`/Player/next` -> 20s 倒计时 -> POST `/Player/resolveUrl`）及后台列表预热机制（Prewarm），实测 157 分钟电影《希望》（ScreenX 4K 超清硬解）正常出画（`00:10 / 157:01`）；
+     - 实现 Beeg 国际源 REST API（`https://store.externulls.com/tag/videos/`）与直链解析（`https://store.externulls.com/video/play_url/` -> `https://video.beeg.com/...` M3U8）；
+     - 采用 Swift 6 原生 `actor StreamCache` 实现线程安全的内存缓存；配置高可用备用公网 HLS 流作为强韧防线；
+     - 播放器（`NativePlayerView.swift`）增加异步解析状态指示（“正在连接 4K 直连通道...”）、失败重试界面和 Apple 原生 AirPlay。
+  2. **直播流黑屏与无法播放问题彻底根治**：
+     - 根治原因：`AVPlayer` 无法解码网页，先前错误传入 `chaturbate.com/{username}/` 导致黑屏报错；
+     - 采用纯净原生 `WKWebView` 嵌入播放器（`LiveStreamWebViewRepresentable`），加载 `https://chaturbate.com/embed/{username}/?bgcolor=black`；
+     - 自动注入成年人条款 Cookie（`agreeterms=1`, `isAdult=1`, `hasConfirmedAge=1`）及全屏自适应 CSS，隐藏聊天区和多余边框；
+     - 保留 4 泳道防碰撞错峰弹幕浮层与 Apple HIG 磨砂返回胶囊；
+     - 模拟器实测主播 `hecola`（在线人数 169）、`stephie_martinez`（在线人数 135）真实直播画面秒出画！
+- **真机模拟器核心验证截图（已落盘验证）**：
+  1. `captures/ios_home_real_stream_v1.png`：首页华视真实影视流列表与 Top 10 排行；
+  2. `captures/ios_real_video_player.png`：全屏播放器“正在连接华视影院 4K 直连通道...”；
+  3. `captures/ios_real_video_playing.png`：157 分钟电影《希望》正片解码出画（`00:10 / 157:01`）；
+  4. `captures/ios_real_live_player.png`：直播板块真实在线主播列表；
+  5. `captures/ios_real_live_playing_success.png` / `captures/ios_real_live_pure_fullscreen.png`：真实主播直播画面出画与实时弹幕浮层。
 - **iOS 原生成品应用功能深化与原生投屏（已验证）**：
   - 工程目录：`ios/AuroraShelf.xcodeproj`（Swift 6.4.2 + Xcode 27.2，由 `xcodegen` 管理）
   - 产物：`ios/build/Build/Products/Debug-iphonesimulator/AuroraShelf.app`，`xcodebuild` **BUILD SUCCEEDED**
