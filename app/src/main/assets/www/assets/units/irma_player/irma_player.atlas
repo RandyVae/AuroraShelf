@@ -1,0 +1,191 @@
+irma_player.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+at/at_bathrobe_1
+bounds:85,345,67,134
+offsets:0,0,68,134
+at/at_collar1
+bounds:280,287,24,52
+offsets:1,4,31,57
+at/at_pl_arm1
+bounds:216,323,42,28
+offsets:1,4,44,34
+at/at_pl_arm2
+bounds:89,324,33,47
+offsets:1,1,35,49
+at/at_pl_basin
+bounds:2,367,54,47
+offsets:2,2,57,50
+at/at_pl_body
+bounds:282,366,43,66
+offsets:2,1,51,68
+at/at_pl_body_bck
+bounds:425,442,54,68
+offsets:1,1,59,71
+at/at_pl_boob
+bounds:190,361,15,23
+offsets:2,1,18,26
+at/at_pl_boob1
+bounds:473,318,29,33
+offsets:2,1,32,37
+at/at_pl_boob2
+bounds:303,482,25,28
+offsets:8,5,39,38
+at/at_pl_collar
+bounds:162,301,35,22
+offsets:2,1,37,25
+at/at_pl_hair
+bounds:100,382,82,128
+offsets:0,0,86,128
+at/at_pl_hand_d
+bounds:209,299,22,24
+offsets:3,6,29,34
+at/at_pl_head
+bounds:205,343,40,45
+offsets:10,5,60,54
+at/at_pl_leg11
+bounds:422,371,52,73
+offsets:1,1,56,75
+at/at_pl_leg12
+bounds:347,308,27,52
+offsets:1,2,29,55
+at/at_pl_leg13
+bounds:232,295,31,30
+offsets:1,1,34,33
+at/at_pl_leg21
+bounds:471,375,39,95
+offsets:3,3,44,100
+at/at_pl_leg22
+bounds:54,327,25,61
+offsets:1,2,28,65
+at/at_pl_leg23
+bounds:365,295,20,36
+offsets:3,2,27,42
+at/att_pl_arm1
+bounds:482,460,27,50
+offsets:2,1,30,52
+at/att_pl_arm2
+bounds:438,325,34,46
+offsets:3,4,43,56
+at/att_pl_arm3
+bounds:148,490,18,20
+offsets:0,1,19,22
+at/att_pl_arm_fr1
+bounds:456,349,53,39
+offsets:0,0,55,40
+at/att_pl_arm_fr2
+bounds:373,321,41,33
+offsets:1,2,43,36
+at/att_pl_arm_fr3
+bounds:72,349,23,23
+offsets:2,3,26,32
+at/att_pl_basin
+bounds:350,355,50,41
+offsets:1,1,54,43
+at/att_pl_leg11
+bounds:183,382,36,82
+offsets:5,3,45,90
+at/att_pl_leg12
+bounds:407,332,25,64
+offsets:1,1,28,66
+at/att_pl_leg13
+bounds:450,299,26,28
+offsets:1,1,28,31
+at/att_pl_leg21
+bounds:303,440,81,70
+offsets:1,2,84,73
+at/att_pl_leg22
+bounds:303,326,30,64
+offsets:4,2,36,70
+at/att_pl_leg23
+bounds:2,303,34,32
+offsets:1,1,36,36
+at/bathrobe
+bounds:246,428,61,82
+offsets:2,1,64,84
+bank
+bounds:304,307,37,18
+offsets:3,5,44,25
+basin
+bounds:64,369,52,51
+offsets:6,8,65,63
+bathrobe 1
+bounds:269,275,33,82
+offsets:5,4,43,90
+bathrobe 2
+bounds:41,275,35,93
+offsets:3,3,42,99
+bathrobe 3
+bounds:2,411,99,99
+offsets:8,20,117,122
+body 1
+bounds:369,443,59,67
+offsets:4,7,73,78
+chairman
+bounds:375,393,70,56
+offsets:3,25,75,84
+chest 1
+bounds:111,313,29,31
+offsets:4,5,37,39
+chest 10
+bounds:424,308,27,31
+offsets:7,6,38,43
+collar
+bounds:90,303,29,19
+offsets:4,3,36,26
+collar 1
+bounds:75,284,17,60
+offsets:5,5,25,70
+collar 2
+bounds:139,299,30,31
+offsets:4,11,37,46
+hair 1
+bounds:2,427,18,39
+offsets:4,6,25,49
+hair 3
+bounds:169,402,82,108
+offsets:2,2,85,113
+hand 1_1
+bounds:111,418,27,52
+offsets:3,4,33,60
+hand 1_2
+bounds:2,333,41,46
+offsets:3,4,47,54
+hand 2_1
+bounds:492,305,18,28
+offsets:10,2,34,37
+hand 2_2
+bounds:190,310,23,46
+offsets:4,3,30,53
+hand 2_2+
+bounds:467,297,23,17
+offsets:3,9,30,30
+hand 2_2++
+bounds:73,494,16,16
+offsets:8,3,30,30
+hand 2_3
+bounds:264,317,28,53
+offsets:4,3,37,60
+leg 1_1
+bounds:245,351,32,89
+offsets:5,3,40,95
+leg 1_2
+bounds:384,295,20,32
+offsets:3,3,27,43
+leg 1_3
+bounds:327,323,21,59
+offsets:4,18,30,80
+leg 2_1
+bounds:325,383,46,86
+offsets:3,4,54,96
+leg 2_2
+bounds:25,299,26,30
+offsets:3,3,32,38
+leg 2_3
+bounds:145,321,24,61
+offsets:5,20,34,84
+skirt 1
+bounds:169,321,24,76
+offsets:5,5,33,84

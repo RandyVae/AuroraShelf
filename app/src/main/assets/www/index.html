@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<meta name="theme-color" content="#07080d">
+<meta name="color-scheme" content="dark">
+<title>Lust Goddess</title>
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/tactical.css">
+</head>
+<body>
+<div id="app">
+  <main class="stage" id="stage">
+
+    <!-- BOOT -->
+    <section class="screen active" id="screen-boot" aria-label="载入中">
+      <h1 class="boot-logo">LUST<br>GODDESS</h1>
+      <p class="boot-sub">TACTICAL RPG</p>
+      <div class="boot-load" role="progressbar" aria-label="载入进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="boot-bar"></i></div>
+      <p class="boot-note" id="boot-note">正在载入游戏数据…</p>
+    </section>
+
+    <!-- TITLE -->
+    <section class="screen" id="screen-title" aria-label="标题画面">
+      <div class="title-art" id="title-art"></div>
+      <div class="title-vignette"></div>
+      <span class="age-badge">18+</span>
+      <div class="title-block">
+        <h1 class="boot-logo" style="text-align:start">LUST<br>GODDESS</h1>
+        <p class="boot-sub" style="text-align:start">TACTICAL RPG</p>
+        <button class="btn primary block" id="btn-start">开始游戏</button>
+        <button class="btn ghost block" id="btn-continue" hidden>继续上次进度</button>
+        <p class="title-version">Version 2.16.0</p>
+      </div>
+    </section>
+
+    <!-- HUB -->
+    <section class="screen" id="screen-hub" aria-label="主大厅">
+      <div class="hub-bg" id="hub-bg"></div>
+      <div class="hub-grad"></div>
+      <canvas class="hub-canvas" id="hub-canvas" aria-hidden="true"></canvas>
+      <img class="hub-art" id="hub-art" alt="" hidden>
+      <button class="hub-hero-nav hub-hero-prev" id="btn-hub-hero-prev" aria-label="上一个特勤英雄">‹</button>
+      <button class="hub-hero-nav hub-hero-next" id="btn-hub-hero-next" aria-label="下一个特勤英雄">›</button>
+      <div class="hub-top">
+        <div class="hud">
+          <span class="pill" title="金币"><span class="ico">🪙</span><b id="hud-gold">0</b></span>
+          <span class="pill" title="契约钥匙"><span class="ico">🗝</span><b id="hud-keys">0</b></span>
+          <span class="pill" title="行动力"><span class="ico">⚡</span><b id="hud-energy">0</b></span>
+          <span class="spacer"></span>
+          <button class="icon-btn ghost" id="btn-missions" aria-label="特勤任务" style="position:relative">📋<span class="badge-dot" id="mission-dot" hidden></span></button>
+          <button class="icon-btn ghost" id="btn-settings" aria-label="设置">⚙</button>
+        </div>
+        <div class="hub-id">
+          <div class="avatar" id="hub-avatar"></div>
+          <div class="who">
+            <b id="hub-name">Ethan</b>
+            <span id="hub-meta">指挥官 · Lv.1</span>
+          </div>
+          <span class="vip-badge" aria-label="VIP 0">VIP 0</span>
+          <button class="hub-hero-switch-badge" id="btn-hub-hero-switch" aria-label="切换出阵特勤英雄" title="点击切换看板特勤">
+            <span class="hub-hero-switch-icon">↺</span>
+            <span class="hero-switch-name" id="hub-hero-name">Kitty</span>
+            <span class="hero-switch-count" id="hub-hero-count">1/55</span>
+          </button>
+          <button class="hub-outfit-btn" id="btn-hub-outfit" aria-label="切换战术装或18+装扮">
+            <span class="hub-outfit-icon">👗</span>
+            <span id="hub-outfit-label">18+觉醒</span>
+          </button>
+        </div>
+      </div>
+      <div class="hub-focus" aria-label="当前作战焦点">
+        <div class="hub-focus-main">
+          <div class="hub-focus-text">
+            <span class="hub-focus-kicker">战线部署 · 第一章</span>
+            <h2 class="hub-focus-title">霓虹雨夜</h2>
+            <p id="hub-lead" hidden><b>欢迎回家，指挥官。</b>今天该推进哪条战线？</p>
+          </div>
+          <button class="hub-fight" id="nav-campaign" aria-label="出击战役">
+            <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5 20.5 9.5 9 21H3v-6L14.5 3.5Z"/><path d="m13 5 6 6"/></svg></span>
+            <span class="label">FIGHT · 出击</span>
+            <span class="sub" id="nav-campaign-sub">8 章 · 41 关</span>
+          </button>
+        </div>
+        <div class="hub-path-card" aria-label="Captain's Path 进度">
+          <div class="hub-path-row">
+            <span class="hub-path-title">CAPTAIN'S PATH <b>前哨突破</b></span>
+            <span class="path-progress">01 / 08</span>
+          </div>
+          <i><em></em></i>
+        </div>
+      </div>
+      <div class="hub-bottom">
+        <nav class="nav-grid" aria-label="主导航">
+          <button class="nav-btn" id="nav-gacha">
+            <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18M5.6 5.6l12.8 12.8M18.4 5.6 5.6 18.4"/></svg></span>
+            <span class="label">招募</span>
+            <span class="sub">55 名作战单位</span>
+          </button>
+          <button class="nav-btn" id="nav-squad">
+            <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="label">编队</span>
+            <span class="sub" id="nav-squad-sub">3 / 3</span>
+          </button>
+          <button class="nav-btn" id="nav-roster">
+            <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg></span>
+            <span class="label">图鉴</span>
+            <span class="sub" id="nav-roster-sub">已收集 5 / 55</span>
+          </button>
+          <button class="nav-btn" id="nav-shop">
+            <span class="glyph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h16l-1.2 12H5.2L4 8Z"/><path d="M8.5 8V6a3.5 3.5 0 0 1 7 0v2"/></svg></span>
+            <span class="label">商店</span>
+            <span class="sub">补给与钥匙</span>
+          </button>
+          <button class="nav-btn slots-nav" id="nav-slots">
+            <span class="glyph">✦</span>
+            <span class="label">Slots</span>
+            <span class="sub">虚拟金币 · 免费旋转</span>
+          </button>
+        </nav>
+      </div>
+    </section>
+
+    <!-- CAMPAIGN -->
+    <section class="screen" id="screen-campaign" aria-label="战役地图">
+      <div class="topbar">
+        <button class="icon-btn" data-back aria-label="返回">‹</button>
+        <h1>战役地图</h1>
+        <span class="spacer"></span>
+        <span class="pill"><span class="ico">⚡</span><b id="camp-energy">0</b></span>
+      </div>
+      <div class="screen-scroll">
+        <div class="chapter-list" id="chapter-list"></div>
+        <div id="chapter-detail" hidden>
+          <div class="topbar" style="min-height:44px;margin-top:6px">
+            <button class="icon-btn ghost" id="btn-chapter-back" aria-label="返回章节列表">‹</button>
+            <h1 id="chapter-title" style="font-size:var(--type-headline)">章节</h1>
+          </div>
+          <div class="stage-grid" id="stage-grid"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STORY & PROLOGUE CINEMA -->
+    <section class="screen" id="screen-story" aria-label="剧情与序章">
+      <div class="story-viewport" id="story-viewport">
+        <div class="story-bg" id="story-bg"></div>
+        <div class="story-ambient-grid" id="story-ambient-grid"></div>
+        <div class="story-speedlines" id="story-speedlines" hidden></div>
+        <div class="story-shade"></div>
+
+        <!-- 主角色全屏大尺寸 Spine 舞台 (占视口高 >= 65%) -->
+        <canvas class="story-spine-canvas" id="story-spine-canvas" hidden aria-hidden="true"></canvas>
+
+        <!-- 战术协同副角色 (Dominica) -->
+        <div class="story-supp-actor" id="story-supp-actor" hidden>
+          <img class="supp-art" alt="" src="">
+          <span class="supp-badge">战术指挥</span>
+        </div>
+
+        <!-- 敌方目标锁定展示 (Target Enemy) -->
+        <div class="story-enemy-actor" id="story-enemy-actor" hidden>
+          <div class="enemy-reticle"></div>
+          <canvas class="story-enemy-canvas" id="story-enemy-canvas" aria-hidden="true"></canvas>
+          <img class="enemy-art" id="story-enemy-art" alt="" hidden>
+          <span class="enemy-badge">敌军警报</span>
+        </div>
+
+        <!-- 原有通用静态大图立绘兼容 -->
+        <img class="story-art" id="story-art" alt="" hidden>
+      </div>
+
+      <!-- 顶栏状态与控制 -->
+      <div class="story-top">
+        <span class="story-event-chip" id="story-event-chip">[1/4] EVT_ENV_ESTABLISH</span>
+        <div class="story-timeline-track"><i class="story-timeline-fill" id="story-timeline-fill"></i></div>
+        <button class="btn sm ghost" id="btn-story-auto" aria-pressed="false">自动播放</button>
+        <button class="btn sm ghost" id="btn-story-skip">跳过剧情</button>
+      </div>
+
+      <!-- 战术无线电简报通知 -->
+      <div class="story-tactical-prompt" id="story-tactical-prompt">【战术雷达】霓虹街区 1-1 区段热源扫描完成，侦测到 3 组混沌敌军能量波动。</div>
+
+      <!-- 对话框 -->
+      <div class="story-dialog">
+        <div class="story-dialog-header">
+          <span class="story-name" id="story-name">Kitty</span>
+          <span class="story-role-badge" id="story-role-badge">突击前锋</span>
+        </div>
+        <p class="story-text" id="story-text"></p>
+        <div class="story-hint">
+          <span id="story-progress">1 / 4</span>
+          <span id="story-tap">点击继续 ▸</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- BATTLE -->
+    <section class="screen" id="screen-battle" aria-label="战斗">
+      <div class="battle-hud">
+        <div class="wide">
+          <div class="hp-rail"><i id="ally-hp"></i></div>
+        </div>
+        <span class="tag" id="battle-timer">00:00</span>
+        <div class="wide">
+          <div class="hp-rail enemy"><i id="enemy-hp"></i></div>
+        </div>
+      </div>
+      <div class="battle-field" id="battle-field">
+        <canvas id="battle-canvas" width="1000" height="800"></canvas>
+        <!-- 戰鬥開場大魄力登場特寫舞台 -->
+        <div class="battle-entrance-cutin" id="battle-entrance-cutin" hidden>
+          <div class="entrance-backdrop"></div>
+          <div class="entrance-speedlines"></div>
+          <canvas class="entrance-spine-canvas" id="entrance-spine-canvas" aria-hidden="true"></canvas>
+          <div class="entrance-banner">
+            <span class="entrance-badge" id="entrance-badge">队 长 出 击</span>
+            <h2 class="entrance-name" id="entrance-name">Kitty</h2>
+            <p class="entrance-quote" id="entrance-quote">“锁定前方目标，准备全速突入！”</p>
+          </div>
+        </div>
+
+        <!-- 戰鬥勝利大魄力凱旋特寫 (Combat Victory Epilogue Showcase) -->
+        <div class="battle-victory-cutin" id="battle-victory-cutin" hidden>
+          <div class="victory-backdrop"></div>
+          <div class="victory-confetti" id="victory-confetti"></div>
+          <div class="victory-banner">
+            <span class="victory-badge" id="victory-badge">战 域 肃 清 · 凯 旋</span>
+            <h2 class="victory-name" id="victory-name">Kitty & 作战特勤队</h2>
+            <p class="victory-quote" id="victory-quote">“第一作战目标全数击溃，全员无伤突入下一战线！”</p>
+            <div class="victory-stars" id="victory-stars">★★★</div>
+          </div>
+        </div>
+      </div>
+      <div class="battle-squads" id="battle-squads" aria-label="我方作战单位"></div>
+      
+      <!-- COMMANDER TACTICAL CONSOLE -->
+      <div class="commander-deck" id="commander-deck" aria-label="指挥官战术指令">
+        <div class="commander-energy-row">
+          <span class="commander-label"><i class="cmd-dot"></i>指挥官支援</span>
+          <div class="commander-energy-track">
+            <div class="commander-energy-bar" id="commander-energy-bar" style="width: 20%"></div>
+          </div>
+          <span class="commander-energy-val" id="commander-energy-val">20 / 100</span>
+        </div>
+        <div class="commander-skills-row" id="commander-skills-row">
+          <button class="btn-commander-skill" id="cmd-skill-heal" data-cost="35" aria-label="战术空投 (快捷键 1)">
+            <span class="cskill-badge">1</span>
+            <span class="cskill-ico">💚</span>
+            <div class="cskill-info">
+              <b>战术空投</b>
+              <small>全队治疗+护盾 (35)</small>
+            </div>
+          </button>
+          <button class="btn-commander-skill" id="cmd-skill-emp" data-cost="50" aria-label="电磁脉冲 (快捷键 2)">
+            <span class="cskill-badge">2</span>
+            <span class="cskill-ico">⚡</span>
+            <div class="cskill-info">
+              <b>电磁脉冲</b>
+              <small>全敌瘫痪2.5秒 (50)</small>
+            </div>
+          </button>
+          <button class="btn-commander-skill" id="cmd-skill-strike" data-cost="75" aria-label="轨道歼灭炮 (快捷键 3)">
+            <span class="cskill-badge">3</span>
+            <span class="cskill-ico">💥</span>
+            <div class="cskill-info">
+              <b>轨道歼灭炮</b>
+              <small>终结重创 280% (75)</small>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <div class="battle-logbox"><b>战斗记录</b><ul id="battle-loglist" aria-live="polite"></ul></div>
+      <div class="battle-bar">
+        <span class="battle-log" id="battle-log">战斗准备…</span>
+        <button class="btn sm ghost" id="btn-battle-speed" aria-label="切换战斗倍速">1×</button>
+        <button class="btn sm ghost" id="btn-battle-skip">跳过</button>
+      </div>
+    </section>
+
+    <!-- RESULT -->
+    <section class="screen" id="screen-result" aria-label="战斗结算">
+      <div class="result-panel">
+        <div class="result-crest" aria-hidden="true"><span>✦</span></div>
+        <h2 id="result-title">战斗胜利</h2>
+        <div class="res-stars" id="result-stars">★★★</div>
+        <p id="result-sub" style="color:var(--text-secondary);font-size:var(--type-callout)">用时 32 秒 · 全员存活</p>
+        <div class="result-rewards" id="result-rewards"></div>
+        <button class="btn primary block" id="btn-result-next">继续</button>
+        <button class="btn ghost block" id="btn-result-back" style="margin-top:8px">返回战役地图</button>
+      </div>
+    </section>
+
+    <!-- SQUAD -->
+    <section class="screen" id="screen-squad" aria-label="编队">
+      <div class="topbar">
+        <button class="icon-btn" data-back aria-label="返回">‹</button>
+        <h1>编队</h1>
+        <span class="spacer"></span>
+        <span class="pill" id="squad-power-pill">战力 <b id="squad-power">0</b></span>
+      </div>
+      <p style="color:var(--text-secondary);font-size:var(--type-callout);margin:0 0 6px">选择 3 名作战单位。相同稀有度的单位战力差距主要来自等级与技能。</p>
+      <div class="squad-slots" id="squad-slots"></div>
+      <div class="squad-faction-synergies" id="squad-faction-synergies" style="margin:4px 0 8px"></div>
+      <div class="screen-scroll">
+        <div class="hero-grid" id="squad-grid"></div>
+      </div>
+      <button class="btn primary block" id="btn-squad-done" style="margin-top:8px">确认编队</button>
+    </section>
+
+    <!-- GACHA -->
+    <section class="screen" id="screen-gacha" aria-label="招募">
+      <div class="topbar">
+        <button class="icon-btn" data-back aria-label="返回">‹</button>
+        <h1>招募中心</h1>
+        <span class="spacer"></span>
+        <span class="pill"><span class="ico">🗝</span><b id="gacha-keys">0</b></span>
+      </div>
+      <div class="screen-scroll">
+        <div class="gacha-banner">
+          <img id="gacha-banner-img" alt="">
+          <div class="gb-text">
+            <h2>契约召唤</h2>
+            <p>SSR 3% · SR 18% · R 79%，30 抽内必得 SSR</p>
+          </div>
+        </div>
+        <div class="gacha-actions">
+          <button class="btn" id="btn-pull1">单次招募 · 1 钥匙</button>
+          <button class="btn pink" id="btn-pull10">十连招募 · 10 钥匙</button>
+        </div>
+        <div class="pity"><span>保底进度</span><b id="gacha-pity">0 / 30</b></div>
+        <div id="gacha-note" style="color:var(--text-tertiary);font-size:var(--type-caption);margin-top:12px">重复获得的单位会转化为突破碎片。招募池包含全部 55 名可用单位。</div>
+      </div>
+    </section>
+
+    <!-- ROSTER -->
+    <section class="screen" id="screen-roster" aria-label="图鉴">
+      <div class="topbar">
+        <button class="icon-btn" data-back aria-label="返回">‹</button>
+        <h1>图鉴</h1>
+        <span class="spacer"></span>
+        <button class="btn sm ghost" id="btn-cg" aria-label="动态 CG 回放">CG 回放</button>
+        <span class="pill" id="roster-count">0 / 0</span>
+      </div>
+      <div class="screen-scroll">
+        <div class="hero-grid" id="roster-grid"></div>
+      </div>
+    </section>
+
+    <!-- SHOP -->
+    <section class="screen" id="screen-shop" aria-label="商店">
+      <div class="topbar">
+        <button class="icon-btn" data-back aria-label="返回">‹</button>
+        <h1>军需商店</h1>
+        <span class="spacer"></span>
+        <span class="pill"><span class="ico">🪙</span><b id="shop-gold">0</b></span>
+      </div>
+      <div class="screen-scroll" id="shop-list"></div>
+    </section>
+
+    <!-- SLOTS -->
+    <section class="screen" id="screen-slots" aria-label="Slots 虚拟金币游戏">
+      <div class="topbar slots-topbar">
+        <button class="icon-btn" data-back aria-label="返回">‹</button>
+        <div><h1>NEON FRONTLINE SLOTS</h1><span class="slots-kicker">离线虚拟金币模式</span></div>
+        <span class="spacer"></span>
+        <span class="pill"><span class="ico">🪙</span><b id="slots-gold">0</b></span>
+      </div>
+      <div class="slots-jackpot-rail" aria-label="虚拟奖池">
+        <div class="jackpot-tier tier-grand"><span>GRAND</span><b id="slots-grand">50,000</b></div>
+        <div class="jackpot-tier tier-major"><span>MAJOR</span><b id="slots-major">10,000</b></div>
+        <div class="jackpot-tier tier-minor"><span>MINOR</span><b id="slots-minor">2,000</b></div>
+        <div class="jackpot-tier tier-mini"><span>MINI</span><b id="slots-mini">500</b></div>
+      </div>
+      <div class="slots-cabinet">
+        <div class="slots-marquee" aria-hidden="true">
+          <div class="marquee-chase-lights" id="marquee-lights">
+            <span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span>
+            <span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span>
+            <span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span>
+            <span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span>
+          </div>
+          <div class="marquee-banner">
+            <img src="assets/slots/cabinet_marquee.png" alt="Neon Frontline Slots" class="marquee-art">
+          </div>
+          <div class="marquee-sub"><span>TACTICAL REELS</span><i>•</i><span>5×3 MECHANICAL CYLINDER</span><i>•</i><span>9 PAYLINES</span></div>
+        </div>
+        <div class="slots-display">
+          <span class="slots-badge">TACTICAL JACKPOT</span>
+          <span id="slots-status-message">选择下注档位并旋转</span>
+        </div>
+        <div class="slots-reel-window" id="slots-reel-window">
+          <div class="reel-labels" aria-hidden="true"><span>REEL 01</span><span>REEL 02</span><span>REEL 03</span><span>REEL 04</span><span>REEL 05</span></div>
+          <div class="payline-rails payline-left" aria-hidden="true">
+            <span class="pl-tag" data-line="1">1</span>
+            <span class="pl-tag" data-line="4">4</span>
+            <span class="pl-tag" data-line="6">6</span>
+            <span class="pl-tag" data-line="8">8</span>
+            <span class="pl-tag" data-line="2">2</span>
+          </div>
+          <div class="payline-rails payline-right" aria-hidden="true">
+            <span class="pl-tag" data-line="3">3</span>
+            <span class="pl-tag" data-line="5">5</span>
+            <span class="pl-tag" data-line="7">7</span>
+            <span class="pl-tag" data-line="9">9</span>
+            <span class="pl-tag" data-line="2">2</span>
+          </div>
+          <div class="reel-cylinder-shadow-top" aria-hidden="true"></div>
+          <div class="slots-glass" aria-hidden="true"></div>
+          <div class="reel-cylinder-shadow-bottom" aria-hidden="true"></div>
+          <svg class="slots-line-overlay" id="slots-line-overlay" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true"></svg>
+          <div class="slots-grid" id="slots-grid" aria-live="polite"></div>
+        </div>
+        <div class="slots-win-meter">
+          <div class="win-meter-header">
+            <span class="meter-label">LAST WIN</span>
+            <span class="slots-badge" id="slots-win-tier">BASE GAME</span>
+          </div>
+          <b id="slots-last-win">0</b>
+          <small id="slots-result">选择下注档位并旋转</small>
+        </div>
+        <div class="slots-status">
+          <span id="slots-hint">每次旋转消耗虚拟金币，中奖自动结算</span>
+          <b>免费旋转 <i id="slots-free-spins">0</i></b>
+        </div>
+        <div class="slots-controls" aria-label="控制台">
+          <div class="slots-controls-aux">
+            <button class="btn sm ghost slots-extra" id="btn-slots-paytable">赔率表</button>
+            <div class="bet-stepper">
+              <button class="btn sm" id="btn-slots-bet-down" aria-label="降低下注">−</button>
+              <span class="slots-bet-readout">下注 <b id="slots-bet">20</b></span>
+              <button class="btn sm" id="btn-slots-bet-up" aria-label="提高下注">+</button>
+              <button class="btn sm ghost" id="btn-slots-max-bet" aria-label="最大下注">MAX</button>
+            </div>
+            <button class="btn sm ghost slots-extra" id="btn-slots-auto" aria-pressed="false">AUTO</button>
+            <button class="btn sm ghost slots-extra" id="btn-slots-turbo" aria-pressed="false">TURBO</button>
+          </div>
+          <button class="btn primary slots-spin" id="btn-slots-spin" aria-label="旋转滚轮">
+            <span class="spin-btn-content">
+              <img src="assets/slots/button_spin.png" alt="" class="spin-btn-icon" aria-hidden="true">
+              <b>SPIN 旋转</b>
+            </span>
+          </button>
+        </div>
+        <div class="slots-console-badge"><span class="console-dot"></span> ARCADE 3D CHASSIS <i>•</i> 9 PAYLINES <i>•</i> SPACEBAR TO SPIN</div>
+        <div class="slots-coin-tray" id="slots-coin-tray" aria-hidden="true">
+          <div class="coin-tray-lip"></div>
+          <div class="coin-tray-basin">
+            <div class="tray-coins" id="tray-coins"></div>
+          </div>
+          <div class="tray-label">TACTICAL COIN HOPPER</div>
+        </div>
+      </div>
+      <!-- 18+ LIVE SPINE MASCOT COMPANION STAGE -->
+      <div class="slots-mascot-deck" id="slots-mascot-deck" aria-label="18+ 幸运特勤伴游">
+        <div class="mascot-stage-ambient" aria-hidden="true"></div>
+        <div class="mascot-actor-wrap" id="mascot-actor-wrap" title="轻触特勤互动">
+          <canvas id="slots-mascot-canvas" class="slots-mascot-canvas" width="360" height="360" aria-label="18+ 伴游骨骼动画"></canvas>
+          <div class="mascot-speech-bubble" id="mascot-speech">
+            <span id="mascot-speech-text">指挥官，今天手气很旺盛呢，转一转试试看？</span>
+            <i class="speech-arrow"></i>
+          </div>
+        </div>
+        <div class="mascot-meta-panel">
+          <div class="mascot-header-row">
+            <span class="mascot-tag">✦ 18+ 幸运伴游 ✦</span>
+            <button class="mascot-switch-btn" id="btn-slots-mascot-switch" aria-label="切换伴游特勤" title="点击切换 18+ 动态伴游">
+              <span id="slots-mascot-name">Charlotte 18+</span> ↺
+            </button>
+          </div>
+          <div class="mascot-lucky-stats">
+            <div class="lucky-stat-item">
+              <span class="lsi-label">幸运加护</span>
+              <span class="lsi-val" id="mascot-lucky-mult">+15% 爆率</span>
+            </div>
+            <div class="lucky-stat-item">
+              <span class="lsi-label">伴游好感</span>
+              <span class="lsi-val" id="mascot-favor-level">Lv.5 · 亲密</span>
+            </div>
+          </div>
+          <div class="mascot-action-hint">轻触特勤互动 · 旋转触发助威</div>
+        </div>
+      </div>
+      <p class="slots-disclaimer">仅使用本地虚拟金币，不提供充值、提现或真实货币下注。</p>
+      <div class="slots-paytable" id="slots-paytable" hidden role="dialog" aria-modal="true" aria-label="Slots 赔率表">
+        <div class="slots-paytable-card">
+          <div class="topbar"><div><h2>PAYTABLE</h2><span>角色与战术符号赔率一览</span></div><span class="spacer"></span><button class="icon-btn" id="btn-slots-paytable-close" aria-label="关闭">✕</button></div>
+          <div class="slots-paytable-list" id="slots-paytable-list"></div>
+          <p class="paytable-note">Wild（皇冠）可替代所有普通符号；Scatter（能量核心）达到 3 个及以上触发免费旋转。</p>
+        </div>
+      </div>
+      <div class="slots-feature" id="slots-feature" hidden role="dialog" aria-modal="true" aria-label="Slots 连线奖励">
+        <div class="slots-feature-backdrop"></div>
+        <div class="slots-feature-panel">
+          <span class="slots-feature-badge" id="slots-feature-badge">LINE HIT</span>
+          <h2 id="slots-feature-name">角色奖励</h2>
+          <div class="slots-feature-stage">
+            <div class="slots-feature-rays" aria-hidden="true"></div>
+            <img id="slots-feature-portrait" class="slots-feature-portrait" alt="" hidden>
+            <canvas id="slots-feature-canvas" aria-hidden="true"></canvas>
+          </div>
+          <p id="slots-feature-quote" class="slots-feature-quote"></p>
+          <button class="btn sm ghost" id="btn-slots-feature-close">继续</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="screen" id="screen-settings" aria-label="设置">
+      <div class="topbar">
+        <button class="icon-btn" data-back aria-label="返回">‹</button>
+        <h1>设置</h1>
+      </div>
+      <div class="screen-scroll">
+        <div class="set-row">
+          <div class="set-main"><b>音乐音量</b><p>播放原版 BGM。</p></div>
+          <input type="range" id="set-bgm" min="0" max="100" value="55" aria-label="音乐音量">
+        </div>
+        <div class="set-row">
+          <div class="set-main"><b>音效音量</b><p>攻击、技能与界面音效。</p></div>
+          <input type="range" id="set-sfx" min="0" max="100" value="80" aria-label="音效音量">
+        </div>
+        <div class="set-row">
+          <div class="set-main"><b>减少动效</b><p>关闭位移与缩放动画，改为淡入淡出。</p></div>
+          <label class="switch-wrap"><input type="checkbox" id="set-motion" class="sr-only" aria-label="减少动效"><span class="switch" aria-hidden="true"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-main"><b>18+ 内容</b><p>在图鉴中显示成人向立绘。默认关闭。</p></div>
+          <label class="switch-wrap"><input type="checkbox" id="set-adult" class="sr-only" aria-label="18+ 内容"><span class="switch" aria-hidden="true"></span></label>
+        </div>
+        <div class="set-row" style="display:none">
+          <div class="set-main"><b>测试资源配置</b><p>一键解锁全部 55 名英雄，并将金币/钥匙/体力/碎片全拉满。</p></div>
+          <button class="btn sm primary" id="btn-qa-max">⚡ 资源全拉满</button>
+        </div>
+        <div class="set-row">
+          <div class="set-main"><b>存档</b><p>导出备份或导入存档。</p></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn sm" id="btn-export">导出</button>
+            <button class="btn sm" id="btn-import">导入</button>
+          </div>
+        </div>
+        <div class="set-row" style="border-bottom:0">
+          <div class="set-main"><b>重置存档</b><p>清空本机进度，重新开始。</p></div>
+          <button class="btn sm danger" id="btn-reset">重置</button>
+        </div>
+        <p style="color:var(--text-tertiary);font-size:var(--text-caption,0.75rem);line-height:1.6;margin-top:18px">
+          Lust Goddess © 2026. All rights reserved.<br>
+          Version 2.16.0
+        </p>
+      </div>
+    </section>
+
+    <!-- overlays -->
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-card">
+        <h3 id="modal-title">提示</h3>
+        <p id="modal-body"></p>
+        <div class="modal-actions">
+          <button class="btn ghost" id="modal-cancel">取消</button>
+          <button class="btn primary" id="modal-ok">确认</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sheet" id="detail-sheet" role="dialog" aria-modal="true" aria-label="单位详情">
+      <div class="sheet-panel">
+        <div class="sheet-grabber"></div>
+        <div class="topbar" style="min-height:44px">
+          <h1 id="detail-name" style="font-size:var(--type-title)">单位</h1>
+          <span class="spacer"></span>
+          <span class="tag" id="detail-rarity">SSR</span>
+          <button class="icon-btn" id="btn-detail-close" aria-label="关闭">✕</button>
+        </div>
+        <canvas class="detail-canvas" id="detail-canvas" aria-hidden="true"></canvas>
+        <img class="detail-art" id="detail-art" alt="">
+        <div class="art-tabs" id="detail-tabs"></div>
+
+        <!-- Progression & Stars -->
+        <div class="detail-progression-card" id="detail-prog-card">
+          <div class="prog-row">
+            <div>
+              <span class="prog-lvl" id="detail-lvl">Lv.1</span>
+              <span class="prog-stars" id="detail-stars">★☆☆☆☆</span>
+            </div>
+            <div class="prog-power">
+              <span>战力</span> <b id="detail-power">0</b>
+            </div>
+          </div>
+          <div class="prog-actions" id="detail-prog-actions">
+            <button class="btn sm primary" id="btn-hero-upgrade">强化升级</button>
+            <button class="btn sm" id="btn-hero-break">星级突破</button>
+          </div>
+        </div>
+
+        <div class="detail-stats" id="detail-stats"></div>
+
+        <!-- Equipment Slots -->
+        <div class="detail-section-title"><b>战术装备</b><span id="detail-equip-hint">点击槽位进行装备</span></div>
+        <div class="equip-slots" id="detail-equip-slots"></div>
+
+        <!-- Skills -->
+        <div class="detail-section-title"><b>技能特性</b><span id="detail-skill-lvl">Lv.1</span></div>
+        <div id="detail-skills"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:6px">
+          <button class="btn sm ghost" id="btn-hero-skillup">提升技能等级</button>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:14px">
+          <button class="btn" id="btn-detail-voice">播放语音</button>
+          <button class="btn primary" id="btn-detail-pick" hidden>加入编队</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MISSION SHEET -->
+    <div class="sheet" id="mission-sheet" role="dialog" aria-modal="true" aria-label="特勤任务中心">
+      <div class="sheet-panel">
+        <div class="sheet-grabber"></div>
+        <div class="topbar" style="min-height:44px">
+          <h1 style="font-size:var(--type-title)">特勤任务中心</h1>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="btn-mission-close" aria-label="关闭">✕</button>
+        </div>
+        <div class="art-tabs" id="mission-tabs" style="margin-bottom:12px">
+          <button class="btn sm primary" id="tab-mission-daily">每日任务</button>
+          <button class="btn sm" id="tab-mission-ach">历程成就</button>
+        </div>
+        <div class="screen-scroll" id="mission-list" style="max-height:60vh"></div>
+      </div>
+    </div>
+
+    <!-- STAGE ACTION SHEET (Deploy / Sweep) -->
+    <div class="sheet" id="stage-action-sheet" role="dialog" aria-modal="true" aria-label="出征部署">
+      <div class="sheet-panel">
+        <div class="sheet-grabber"></div>
+        <div class="topbar" style="min-height:44px">
+          <h1 id="stage-action-title" style="font-size:var(--type-title)">出征部署</h1>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="btn-stage-action-close" aria-label="关闭">✕</button>
+        </div>
+        <div id="stage-action-info" style="margin:10px 0 16px;color:var(--text-secondary);font-size:var(--type-body)"></div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <button class="btn primary block" id="btn-stage-launch">进入战斗 · 消耗 6 ⚡</button>
+          <div id="stage-sweep-group" style="display:none;gap:10px">
+            <button class="btn block" id="btn-stage-sweep1" style="flex:1">⚡ 扫荡 1 次</button>
+            <button class="btn pink block" id="btn-stage-sweep5" style="flex:1">⚡ 扫荡 5 次</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EQUIP PICKER SHEET -->
+    <div class="sheet" id="equip-picker-sheet" role="dialog" aria-modal="true" aria-label="选择装备">
+      <div class="sheet-panel">
+        <div class="sheet-grabber"></div>
+        <div class="topbar" style="min-height:44px">
+          <h1 id="equip-picker-title" style="font-size:var(--type-title)">选择装备</h1>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="btn-equip-picker-close" aria-label="关闭">✕</button>
+        </div>
+        <div class="screen-scroll" id="equip-picker-list" style="max-height:55vh"></div>
+      </div>
+    </div>
+
+    <div class="sheet" id="cg-sheet" role="dialog" aria-modal="true" aria-label="动态 CG 回放">
+      <div class="sheet-panel">
+        <div class="sheet-grabber"></div>
+        <div class="topbar" style="min-height:44px">
+          <h1 style="font-size:var(--type-title)">动态 CG 回放</h1>
+          <span class="spacer"></span>
+          <button class="icon-btn" id="btn-cg-close" aria-label="关闭">✕</button>
+        </div>
+        <div id="cg-list"></div>
+      </div>
+    </div>
+
+    <div class="gacha-reveal" id="gacha-reveal" role="dialog" aria-modal="true" aria-label="招募结果">
+      <div class="topbar">
+        <h1 style="font-size:var(--type-title)">招募结果</h1>
+        <span class="spacer"></span>
+        <button class="icon-btn" id="btn-reveal-close" aria-label="关闭">✕</button>
+      </div>
+      <canvas class="gacha-canvas" id="gacha-canvas" aria-hidden="true"></canvas>
+      <div class="reveal-grid" id="reveal-grid"></div>
+      <button class="btn primary block" id="btn-reveal-ok">收下</button>
+    </div>
+
+    <!-- 首通/戰役穿插全屏 CG 影片播放器 -->
+    <div class="cg-cinema-overlay" id="cg-cinema-overlay" hidden role="dialog" aria-modal="true" aria-label="特勤动态演出">
+      <div class="cg-cinema-wrap">
+        <video class="cg-cinema-video" id="cg-cinema-video" playsinline preload="auto"></video>
+        <div class="cg-cinema-controls">
+          <span class="cg-cinema-badge" id="cg-cinema-badge">战役突破 · 动态特写</span>
+          <button class="btn sm primary" id="btn-cg-skip">跳过演出 ⏭</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="vendor/spine-webgl.min.js"></script>
+<script src="js/spine.js"></script>
+<script src="js/vfx.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/save.js"></script>
+<script src="js/balance.js"></script>
+<script src="js/progression.js"></script>
+<script src="js/missions.js"></script>
+<script src="js/slots.js"></script>
+<script src="js/spinestage.js"></script>
+<script src="js/intro.js"></script>
+<script src="js/tactical-hud.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

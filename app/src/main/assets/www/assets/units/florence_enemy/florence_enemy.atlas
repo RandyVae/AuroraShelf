@@ -1,0 +1,56 @@
+florence_enemy.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+Leg 1_1
+bounds:2,276,39,94
+Leg 1_2
+bounds:48,49,28,67
+Leg 1_3
+bounds:48,2,29,45
+Leg 2_2
+bounds:265,412,36,67
+Leg 2_3
+bounds:51,201,30,46
+belt
+bounds:2,450,90,60
+body
+bounds:2,372,63,76
+chest
+bounds:94,442,65,68
+fire
+bounds:161,481,93,29
+offsets:1,1,96,31
+gun_v1
+bounds:2,41,44,75
+gun_v2
+bounds:161,425,51,54
+hair
+bounds:2,118,54,73
+hair1
+bounds:58,161,29,38
+hand_1_1
+bounds:214,424,49,55
+hand_1_2
+bounds:152,380,37,43
+hand_1_2_v2
+bounds:256,481,43,29
+hand_1_3_v2
+bounds:51,249,32,48
+hand_2_1
+bounds:93,312,33,58
+hand_2_2
+bounds:67,372,37,50
+hand_2_3
+bounds:58,126,32,33
+hat
+bounds:2,3,43,36
+head
+bounds:106,392,44,48
+leg2_1
+bounds:2,193,47,81
+neck
+bounds:301,482,25,28
+skirt
+bounds:43,299,48,71

@@ -26,7 +26,7 @@ internal class BaoziComicSource : ComicSource {
     )
 
     override suspend fun browse(categoryId: String, page: Int): List<ComicSummary> = withContext(Dispatchers.IO) {
-        val url = "$BASE_URL/api/bzmhq/amp_comic_list?type=$categoryId&region=all&state=all&filter=%2a&page=$page&limit=36&language=cn&__amp_source_origin=https%3A%2F%2Fcn.baozimh.com"
+        val url = "$BASE_URL/api/bzmhq/amp_comic_list?type=$categoryId&region=all&state=all&filter=%2a&page=$page&limit=36&language=cn"
         val items = JSONObject(ComicHttp.get(url)).getJSONArray("items")
         List(items.length()) { index ->
             val item = items.getJSONObject(index)
@@ -57,18 +57,24 @@ internal class BaoziComicSource : ComicSource {
 
     override suspend fun details(comic: ComicSummary): ComicDetails = withContext(Dispatchers.IO) {
         val url = "$BASE_URL/comic/${comic.id}"
-        val document = Jsoup.parse(ComicHttp.get(url), BASE_URL)
+        val response = ComicHttp.getResponse(url)
+        val finalUrl = response.finalUrl.ifBlank { url }
+        val document = Jsoup.parse(response.body, finalUrl)
         val chapters = buildList {
             document.select("div#chapter-items div.comics-chapters a, div#chapters_other_list div.comics-chapters a")
                 .forEachIndexed { index, element ->
-                    val title = element.selectFirst("span")?.text()?.trim().orEmpty()
-                    add(ComicChapter(index.toString(), title.ifBlank { "第 ${index + 1} 话" }))
+                    val title = element.selectFirst("span")?.text()?.trim().orEmpty().ifBlank {
+                        element.text().trim()
+                    }
+                    val href = element.attr("href").trim()
+                    val chapterId = href.ifBlank { index.toString() }
+                    add(ComicChapter(chapterId, title.ifBlank { "第 ${index + 1} 话" }))
                 }
         }
         val updatedComic = comic.copy(
             title = document.selectFirst("h1.comics-detail__title")?.text()?.trim().orEmpty().ifBlank { comic.title },
             subtitle = document.selectFirst("h2.comics-detail__author")?.text()?.trim().orEmpty().ifBlank { comic.subtitle },
-            coverUrl = ComicHttp.resolve(url, document.selectFirst("div.l-content amp-img")?.attr("src")) ?: comic.coverUrl,
+            coverUrl = ComicHttp.resolve(finalUrl, document.selectFirst("div.l-content amp-img")?.attr("src")) ?: comic.coverUrl,
             tags = document.select("div.tag-list span").map { it.text().trim() }.filter(String::isNotBlank),
         )
         ComicDetails(
@@ -79,10 +85,17 @@ internal class BaoziComicSource : ComicSource {
     }
 
     override suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage> = withContext(Dispatchers.IO) {
-        val pageUrl = "https://cn.czmanga.com/comic/chapter/${comic.id}/0_$chapterId.html"
-        val document = Jsoup.parse(ComicHttp.get(pageUrl), pageUrl)
-        document.select("ul.comic-contain amp-img").mapNotNull { element ->
-            ComicHttp.resolve(pageUrl, element.attr("src"))?.let { ComicPage(it, pageUrl) }
+        val targetUrl = when {
+            chapterId.startsWith("http://") || chapterId.startsWith("https://") -> chapterId
+            chapterId.startsWith("/") -> ComicHttp.resolve(BASE_URL, chapterId) ?: "$BASE_URL$chapterId"
+            else -> "$BASE_URL/comic/chapter/${comic.id}/0_$chapterId.html"
+        }
+        val response = ComicHttp.getResponse(targetUrl)
+        val finalUrl = response.finalUrl.ifBlank { targetUrl }
+        val document = Jsoup.parse(response.body, finalUrl)
+        document.select("ul.comic-contain amp-img, ul.comic-contain img").mapNotNull { element ->
+            val src = element.attr("src").ifBlank { element.attr("data-src") }
+            ComicHttp.resolve(finalUrl, src)?.let { ComicPage(it, finalUrl) }
         }
     }
 
@@ -100,6 +113,6 @@ internal class BaoziComicSource : ComicSource {
     }
 
     private companion object {
-        const val BASE_URL = "https://cn.baozimh.com"
+        const val BASE_URL = "https://cn.webmota.com"
     }
 }

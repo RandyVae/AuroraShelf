@@ -5,3 +5,8 @@
 -keepclassmembers class * extends androidx.lifecycle.ViewModel {
     <init>(...);
 }
+
+# Keep JavascriptInterface methods for WebView reflection
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}

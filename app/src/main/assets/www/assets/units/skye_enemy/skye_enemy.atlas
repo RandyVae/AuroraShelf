@@ -1,0 +1,71 @@
+skye_enemy.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+Leg 1_1
+bounds:2,185,52,69
+Leg 1_2
+bounds:2,40,28,69
+offsets:0,1,28,70
+Leg 1_3
+bounds:45,117,29,33
+Leg 2_1
+bounds:2,111,41,72
+Leg 2_2
+bounds:2,2,32,36
+offsets:0,1,32,37
+Leg 2_3
+bounds:76,123,19,30
+offsets:1,0,20,30
+arm 1_1
+bounds:56,155,43,42
+offsets:0,0,45,42
+arm 1_2
+bounds:214,194,35,60
+offsets:0,1,35,61
+arm 1_21
+bounds:97,126,15,26
+arm 1_3
+bounds:214,161,35,31
+arm 2_1
+bounds:36,10,37,43
+offsets:1,1,38,44
+arm 2_2
+bounds:164,209,48,45
+arm2_3
+bounds:180,178,32,29
+body
+bounds:56,199,55,55
+boobs
+bounds:113,204,49,50
+offsets:0,0,50,63
+collar
+bounds:213,132,41,27
+offsets:0,0,41,29
+hair
+bounds:180,146,31,30
+offsets:1,0,34,30
+hair 1
+bounds:45,152,9,31
+offsets:4,3,16,35
+hair 2
+bounds:62,59,23,21
+offsets:5,4,31,28
+hair3
+bounds:32,55,28,54
+offsets:4,4,36,61
+hair4
+bounds:101,154,10,43
+offsets:4,3,18,51
+head
+bounds:113,159,33,43
+offsets:2,0,35,44
+neck
+bounds:114,140,17,17
+skirt 1
+bounds:62,82,24,33
+offsets:6,3,33,40
+skirt 2
+bounds:148,167,30,35
+offsets:4,3,37,41

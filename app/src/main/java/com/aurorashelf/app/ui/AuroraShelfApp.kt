@@ -472,6 +472,9 @@ fun AuroraShelfApp(
                     onComicSource = comicViewModel::selectSource,
                     onLiveSource = liveViewModel::selectSource,
                     onOpenCached = viewModel::openVideo,
+                    onOpenGame = {
+                        context.startActivity(android.content.Intent(context, com.aurorashelf.app.game.GameActivity::class.java))
+                    },
                 )
             }
         }

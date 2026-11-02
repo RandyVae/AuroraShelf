@@ -1,0 +1,11 @@
+agrat_capsule.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+capsule_1
+bounds:2,2,138,265
+offsets:2,2,142,269
+lht_1
+bounds:142,243,37,24
+offsets:8,9,51,42

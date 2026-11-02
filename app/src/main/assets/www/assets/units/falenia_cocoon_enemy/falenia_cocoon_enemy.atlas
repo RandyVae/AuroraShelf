@@ -1,0 +1,13 @@
+falenia_cocoon_enemy.webp
+size:1024,1024
+filter:Linear,Linear
+pma:true
+scale:0.24
+enemy Cocoon Cyber
+bounds:380,334,187,263
+enemy Cocoon Cyber_00000
+bounds:191,334,187,263
+enemy Cocoon Cyber_fr
+bounds:2,334,187,263
+lht_g
+bounds:569,569,28,28

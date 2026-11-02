@@ -76,26 +76,41 @@ internal object ComicHttp {
         acceptErrors: Boolean = false,
         read: (HttpURLConnection) -> T,
     ): T {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = method
-            connection.connectTimeout = 15_000
-            connection.readTimeout = 25_000
-            connection.instanceFollowRedirects = true
-            connection.setRequestProperty("User-Agent", VideoRepository.USER_AGENT)
-            connection.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9")
-            headers.forEach(connection::setRequestProperty)
-            if (body != null) {
-                connection.doOutput = true
-                connection.outputStream.bufferedWriter().use { it.write(body) }
+        var currentUrl = url
+        var redirectCount = 0
+        val maxRedirects = 5
+
+        while (true) {
+            val connection = URL(currentUrl).openConnection() as HttpURLConnection
+            try {
+                connection.requestMethod = method
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 25_000
+                connection.instanceFollowRedirects = true
+                connection.setRequestProperty("User-Agent", VideoRepository.USER_AGENT)
+                connection.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9")
+                headers.forEach(connection::setRequestProperty)
+                if (body != null && (method == "POST" || method == "PUT")) {
+                    connection.doOutput = true
+                    connection.outputStream.bufferedWriter().use { it.write(body) }
+                }
+                val status = connection.responseCode
+                if (status in listOf(301, 302, 303, 307, 308) && redirectCount < maxRedirects) {
+                    val location = connection.getHeaderField("Location")
+                    if (!location.isNullOrBlank()) {
+                        connection.disconnect()
+                        currentUrl = resolve(currentUrl, location) ?: location
+                        redirectCount++
+                        continue
+                    }
+                }
+                if (!acceptErrors && status !in 200..299) {
+                    throw IOException("漫画源返回 HTTP $status")
+                }
+                return read(connection)
+            } finally {
+                connection.disconnect()
             }
-            val status = connection.responseCode
-            if (!acceptErrors && status !in 200..299) {
-                throw IOException("漫画源返回 HTTP $status")
-            }
-            return read(connection)
-        } finally {
-            connection.disconnect()
         }
     }
 

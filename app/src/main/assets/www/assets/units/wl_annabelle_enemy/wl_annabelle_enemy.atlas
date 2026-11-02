@@ -1,0 +1,152 @@
+wl_annabelle_enemy.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+enemy stand 3__arm 2_2
+bounds:72,39,15,45
+offsets:4,3,24,52
+enemy stand 3__arm 2_3
+bounds:145,18,28,13
+offsets:3,4,34,21
+enemy stand 3__arm_2_1
+bounds:144,62,47,28
+offsets:4,4,55,36
+enemy stand 3_arm 1_3
+bounds:172,22,31,19
+offsets:3,3,37,26
+enemy stand 3_arm_1_10
+bounds:116,80,40,49
+offsets:3,4,46,56
+enemy stand 3_arm_1_2
+bounds:3,23,21,31
+offsets:4,3,29,38
+enemy stand 3_boob 1
+bounds:2,53,27,29
+offsets:3,3,34,35
+enemy stand 3_boob 1_shadow
+bounds:187,31,27,26
+offsets:3,5,36,33
+enemy stand 3_boob 2
+bounds:141,31,28,23
+offsets:4,3,36,30
+enemy stand 3_boob 2_shadow
+bounds:88,234,17,20
+offsets:3,4,23,28
+enemy stand 3_chest
+bounds:145,198,57,56
+offsets:3,3,64,63
+enemy stand 3_hair back
+bounds:49,139,45,115
+offsets:3,4,52,122
+enemy stand 3_head
+bounds:189,82,34,32
+offsets:4,3,42,38
+enemy stand 3_hip 1
+bounds:39,65,33,33
+offsets:4,4,41,40
+enemy stand 3_hip 2
+bounds:123,45,29,35
+offsets:3,4,34,41
+enemy stand 3_leg 1_1
+bounds:194,182,40,72
+offsets:3,3,46,78
+enemy stand 3_leg 1_2
+bounds:193,108,41,71
+offsets:6,7,50,81
+enemy stand 3_leg 1_3
+bounds:169,40,30,35
+offsets:4,2,36,40
+enemy stand 3_leg 2_1
+bounds:161,133,32,68
+offsets:3,3,39,74
+enemy stand 3_leg 2_2
+bounds:224,77,30,61
+offsets:3,3,36,68
+enemy stand 3_leg_2_3
+bounds:25,13,14,31
+offsets:4,4,22,39
+enemy stand 3_neck
+bounds:72,16,25,23
+offsets:3,4,32,31
+enemy stand 3_waist
+bounds:80,110,39,62
+offsets:5,4,48,69
+enemy_arm 2_2
+bounds:40,30,27,34
+offsets:3,3,33,41
+enemy_arm 2_3
+bounds:192,9,22,21
+offsets:4,4,29,28
+enemy_arm_1_2
+bounds:89,25,27,30
+offsets:3,3,33,37
+enemy_arm_1_3
+bounds:211,15,28,19
+offsets:3,3,34,25
+enemy_arm_2_1
+bounds:229,203,25,46
+offsets:4,4,32,54
+enemy_boob 1
+bounds:201,54,27,30
+offsets:4,4,35,38
+enemy_boob 1_shadow
+bounds:105,34,27,26
+offsets:3,4,34,33
+enemy_boob 2
+bounds:25,45,26,25
+offsets:4,4,34,33
+enemy_boob 2_shadow
+bounds:40,234,12,20
+offsets:4,6,20,29
+enemy_chest
+bounds:95,189,52,65
+offsets:3,4,60,71
+enemy_hair 1
+bounds:229,52,25,39
+offsets:4,4,33,47
+enemy_hair 2
+bounds:43,13,31,55
+offsets:4,3,39,62
+enemy_hair 2_shadow
+bounds:91,176,11,26
+offsets:3,4,19,34
+enemy_hair back
+bounds:2,148,53,106
+offsets:3,2,59,111
+enemy_head
+bounds:23,108,34,45
+offsets:4,3,42,52
+enemy_hip 1
+bounds:88,58,34,30
+offsets:4,4,42,37
+enemy_hip 2
+bounds:79,79,32,33
+offsets:3,3,39,40
+enemy_leg 1
+bounds:223,138,31,68
+offsets:4,3,38,74
+enemy_leg 1_2
+bounds:157,88,50,48
+offsets:3,4,56,56
+enemy_leg 1_3
+bounds:220,31,34,23
+offsets:3,2,40,29
+enemy_leg 2_1
+bounds:103,158,67,43
+offsets:3,3,74,51
+enemy_leg 2_2
+bounds:38,89,49,42
+offsets:4,3,56,49
+enemy_leg 2_2_shadow
+bounds:107,89,22,23
+offsets:4,3,30,29
+enemy_leg_2_3
+bounds:116,18,29,18
+offsets:4,3,37,24
+enemy_waist
+bounds:123,113,42,54
+offsets:5,3,51,61
+player stand_arm_1_1
+bounds:2,81,33,51
+offsets:3,4,39,59

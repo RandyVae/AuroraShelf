@@ -1,0 +1,154 @@
+arachne_player.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+Arm 1_2
+bounds:368,365,22,35
+offsets:2,1,25,37
+Arm 1_2 coat
+bounds:192,373,27,38
+offsets:1,1,29,39
+Arm 1_2 coat (attack)
+bounds:220,455,44,22
+offsets:1,1,46,25
+Arm 1_3 coat back1
+bounds:386,497,18,13
+offsets:1,1,20,15
+Arm 1_30
+bounds:273,485,14,25
+offsets:0,1,16,27
+Arm 2_2 coat (attack)
+bounds:133,371,37,19
+offsets:1,1,40,21
+Arm 2_3
+bounds:337,491,8,19
+offsets:1,1,10,21
+Arm 2_3 (attack)
+bounds:53,492,16,18
+offsets:2,0,20,20
+Boobies 1
+bounds:136,391,37,37
+offsets:3,1,41,40
+Boobies 2
+bounds:284,372,29,31
+offsets:2,1,33,35
+Boot 1
+bounds:24,379,29,38
+offsets:1,0,31,39
+Boot 2
+bounds:241,365,24,27
+offsets:1,1,26,29
+Bra
+bounds:208,356,39,21
+offsets:1,1,42,23
+Bra 1
+bounds:63,363,38,48
+offsets:1,2,42,52
+Bra 2
+bounds:392,361,39,40
+offsets:3,1,44,46
+Chest
+bounds:268,439,58,71
+offsets:2,1,67,75
+Choker (comm)
+bounds:225,445,20,10
+offsets:1,1,22,14
+Coat back
+bounds:2,417,81,93
+offsets:0,0,83,94
+Coat back fur
+bounds:456,391,54,31
+offsets:1,4,56,36
+Coat right
+bounds:433,372,28,35
+offsets:1,1,30,42
+Gun
+bounds:40,360,52,90
+offsets:0,0,52,91
+Gun (attack)
+bounds:367,435,73,75
+offsets:1,1,75,77
+Hips
+bounds:327,380,46,44
+offsets:1,1,48,47
+Hips_1
+bounds:417,462,51,48
+offsets:1,1,53,50
+Index
+bounds:456,503,10,7
+offsets:2,1,14,10
+Left
+bounds:84,347,47,163
+offsets:0,1,48,165
+Left coat
+bounds:422,398,46,66
+offsets:0,1,47,68
+Leg 1_10
+bounds:467,439,33,71
+offsets:1,1,35,73
+Leg 1_2
+bounds:173,404,33,73
+offsets:2,1,36,75
+Leg 1_20
+bounds:2,369,24,54
+offsets:1,1,26,56
+Leg 2_11
+bounds:232,398,44,60
+offsets:0,1,45,61
+Leg 2_21
+bounds:171,363,24,52
+offsets:1,1,26,54
+Make up
+bounds:296,403,37,42
+offsets:1,1,40,45
+Neck
+bounds:462,369,22,29
+offsets:2,2,25,34
+Right
+bounds:441,442,17,22
+offsets:1,2,19,25
+Shadow
+bounds:321,486,18,24
+offsets:0,5,18,29
+arm 1_1
+bounds:391,383,26,65
+offsets:0,2,26,68
+arm 1_1 coat
+bounds:370,400,29,61
+offsets:1,1,31,63
+arm 1_3
+bounds:491,490,15,20
+offsets:1,1,17,22
+arm1_3 (attack)
+bounds:34,491,21,19
+offsets:1,1,23,20
+belt
+bounds:353,345,27,52
+offsets:1,1,29,54
+coat arm 2_2
+bounds:405,499,8,11
+offsets:3,6,13,18
+fire
+bounds:175,479,96,31
+hair
+bounds:325,423,48,87
+offsets:1,1,49,89
+hand_2_bck
+bounds:113,489,10,21
+offsets:0,2,13,25
+leg 1_1
+bounds:202,384,38,93
+offsets:1,1,40,94
+leg 2_1
+bounds:255,380,41,51
+offsets:0,1,43,53
+leg 2_2
+bounds:312,352,21,49
+offsets:1,2,24,51
+shadow_bra
+bounds:259,355,38,20
+offsets:1,1,41,23
+top_bck
+bounds:123,427,50,83
+offsets:1,1,53,84

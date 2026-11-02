@@ -1,0 +1,190 @@
+wl_tenebras_enemy.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+arm_1_1
+bounds:86,114,24,47
+offsets:3,3,30,53
+arm_1_2+
+bounds:221,80,33,24
+offsets:4,2,40,31
+arm_1_2_attack
+bounds:177,82,30,32
+offsets:3,3,36,38
+arm_2_1
+bounds:151,79,27,44
+offsets:3,5,43,53
+arm_2_2
+bounds:65,211,33,21
+offsets:3,4,41,35
+body
+bounds:119,153,44,49
+offsets:4,4,51,56
+boob_1
+bounds:3,193,30,30
+offsets:3,3,36,36
+boob_2
+bounds:86,89,29,26
+offsets:3,4,36,33
+chest
+bounds:125,202,51,52
+offsets:4,3,59,58
+en_dr/1 copy
+bounds:170,207,8,9
+offsets:3,3,15,16
+en_dr/10 copy
+bounds:156,61,16,26
+offsets:3,3,25,34
+en_dr/11 copy
+bounds:154,44,21,22
+offsets:4,4,28,29
+en_dr/12 copy
+bounds:191,60,25,15
+offsets:5,4,34,23
+en_dr/13 copy
+bounds:2,54,25,14
+offsets:4,4,33,22
+en_dr/14 copy
+bounds:113,54,23,19
+offsets:4,4,31,26
+en_dr/15 copy
+bounds:33,59,26,16
+offsets:3,4,33,24
+en_dr/16 copy
+bounds:231,68,23,18
+offsets:4,3,31,25
+en_dr/17 copy
+bounds:203,73,20,23
+offsets:4,3,27,30
+en_dr/18 copy
+bounds:2,71,18,27
+offsets:3,3,24,34
+en_dr/19 copy
+bounds:99,65,17,24
+offsets:4,4,24,32
+en_dr/2 copy
+bounds:48,245,9,9
+offsets:3,3,16,16
+en_dr/20 copy
+bounds:213,189,20,20
+offsets:4,4,27,28
+en_dr/21 copy
+bounds:107,74,29,16
+offsets:3,4,34,23
+en_dr/22 copy
+bounds:58,56,26,16
+offsets:4,4,33,23
+en_dr/3 copy
+bounds:124,201,9,10
+offsets:4,3,16,16
+en_dr/3_lht+
+bounds:240,51,14,14
+offsets:0,1,16,16
+en_dr/4 copy
+bounds:239,243,10,11
+offsets:3,4,17,18
+en_dr/5 copy
+bounds:2,183,14,15
+offsets:3,3,20,22
+en_dr/6 copy
+bounds:88,159,15,16
+offsets:3,3,21,22
+en_dr/7 copy
+bounds:35,128,15,17
+offsets:3,3,22,24
+en_dr/8 copy
+bounds:210,47,17,19
+offsets:3,4,23,27
+en_dr/9 copy
+bounds:84,55,17,24
+offsets:3,4,23,31
+en_dr/Layer 1
+bounds:2,109,46,40
+offsets:3,3,53,47
+en_dr/Layer 1 copy 2
+bounds:132,119,31,26
+offsets:4,5,40,36
+en_dr/Layer 13 copy
+bounds:2,138,52,45
+offsets:3,4,58,52
+en_dr/Layer 13 copy_lht+
+bounds:201,204,50,50
+offsets:7,0,58,52
+en_dr/Layer 2
+bounds:160,140,32,43
+offsets:4,17,65,64
+en_dr/Layer 3
+bounds:218,59,24,18
+offsets:3,4,30,25
+en_dr/Layer 31 copy
+bounds:236,185,18,21
+offsets:5,5,28,31
+en_dr/Layer 3_lht+
+bounds:2,100,30,25
+en_dr/Layer 4 copy
+bounds:59,170,66,84
+offsets:5,2,74,89
+en_dr/Layer 4 copy_lht+
+bounds:2,180,64,74
+offsets:6,0,74,89
+en_dr/Layer 47 copy
+bounds:214,146,40,37
+offsets:5,4,50,45
+en_dr/Layer 47 copy 2
+bounds:51,95,27,49
+offsets:4,4,34,56
+en_dr/hair_1
+bounds:143,40,17,35
+offsets:4,4,24,43
+en_dr/hair_2
+bounds:171,42,13,35
+offsets:4,4,20,42
+en_dr/hair_3
+bounds:21,57,17,43
+offsets:4,4,24,51
+en_dr/hair_5
+bounds:136,66,13,36
+offsets:4,5,21,43
+en_dr/tale copy
+bounds:32,83,31,37
+offsets:3,3,37,43
+en_dr/tale_lht+
+bounds:178,115,34,41
+offsets:3,0,37,43
+foot_1
+bounds:224,101,20,43
+offsets:3,2,25,48
+foot_2
+bounds:115,91,32,26
+offsets:3,4,38,34
+hand_1
+bounds:70,75,19,29
+offsets:3,5,26,37
+hand_1_attack
+bounds:168,72,23,22
+offsets:3,3,29,28
+hand_2
+bounds:51,69,20,21
+offsets:4,4,27,29
+leg1_2
+bounds:105,117,26,59
+offsets:4,4,36,66
+leg_1_1
+bounds:177,169,39,85
+offsets:3,16,45,105
+leg_2_1
+bounds:56,131,31,79
+offsets:3,3,37,85
+leg_2_2
+bounds:206,98,18,46
+offsets:4,3,25,52
+neck
+bounds:159,185,21,19
+offsets:3,4,27,27
+shoulder_pad_1
+bounds:108,234,24,20
+offsets:3,3,30,26
+shoulder_pad_2
+bounds:98,47,18,18
+offsets:3,3,24,24

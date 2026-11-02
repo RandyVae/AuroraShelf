@@ -1,0 +1,57 @@
+wl_ophidia_summon_enemy.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+blb/bubble_11
+bounds:150,500,10,10
+offsets:4,4,17,18
+blb/bubble_12
+bounds:56,500,10,10
+offsets:4,4,17,18
+blb/bubble_13
+bounds:45,500,10,10
+offsets:4,4,17,18
+blb/bubble_14
+bounds:34,500,10,10
+offsets:4,4,17,18
+bubble_1
+bounds:23,500,10,10
+offsets:4,4,17,18
+bubble_20
+bounds:8,499,14,11
+offsets:4,4,22,19
+bubble_21
+bounds:66,505,14,5
+offsets:3,4,21,13
+building_b
+bounds:8,394,198,116
+offsets:2,2,203,123
+en_light_1
+bounds:157,361,44,46
+offsets:3,3,55,52
+en_light_1R
+bounds:461,464,44,46
+offsets:3,3,55,52
+en_light_2
+bounds:2,364,49,45
+offsets:4,3,58,52
+en_light_2R
+bounds:2,392,49,45
+offsets:4,3,58,52
+en_snake
+bounds:198,357,104,153
+lights 20
+bounds:305,395,57,51
+lights 21
+bounds:283,448,176,62
+offsets:4,4,184,70
+water 20
+bounds:2,437,8,73
+offsets:4,7,16,84
+water 21
+bounds:358,365,88,40
+offsets:2,3,93,44
+water 22
+bounds:418,396,92,51
+offsets:3,3,98,57

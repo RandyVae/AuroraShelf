@@ -32,8 +32,8 @@ internal class KomiicComicSource : ComicSource {
         if (categoryId == "0") {
             parseComics(query("recentUpdate", variables, RECENT_QUERY).getJSONObject("data").getJSONArray("recentUpdate"))
         } else {
-            variables.put("categoryId", categoryId)
-            parseComics(query("comicByCategory", variables, CATEGORY_QUERY).getJSONObject("data").getJSONArray("comicByCategory"))
+            variables.put("categoryId", JSONArray().put(categoryId))
+            parseComics(query("comicByCategories", variables, CATEGORY_QUERY).getJSONObject("data").getJSONArray("comicByCategories"))
         }
     }
 
@@ -115,7 +115,7 @@ internal class KomiicComicSource : ComicSource {
         val HEADERS = mapOf("Referer" to "https://komiic.com/")
         const val COMIC_FIELDS = "id title status year imageUrl authors { id name } categories { id name } dateUpdated"
         const val RECENT_QUERY = "query recentUpdate(\$pagination: Pagination!) { recentUpdate(pagination: \$pagination) { $COMIC_FIELDS } }"
-        const val CATEGORY_QUERY = "query comicByCategory(\$categoryId: ID!, \$pagination: Pagination!) { comicByCategory(categoryId: \$categoryId, pagination: \$pagination) { $COMIC_FIELDS } }"
+        const val CATEGORY_QUERY = "query comicByCategories(\$categoryId: [ID!]!, \$pagination: Pagination!) { comicByCategories(categoryId: \$categoryId, pagination: \$pagination) { $COMIC_FIELDS } }"
         const val SEARCH_QUERY = "query searchComicAndAuthorQuery(\$keyword: String!) { searchComicsAndAuthors(keyword: \$keyword) { comics { $COMIC_FIELDS } } }"
         const val COMIC_QUERY = "query comicByIds(\$comicIds: [ID]!) { comicByIds(comicIds: \$comicIds) { $COMIC_FIELDS } }"
         const val CHAPTERS_QUERY = "query chapterByComicId(\$comicId: ID!) { chaptersByComicId(comicId: \$comicId) { id serial type dateUpdated size } }"

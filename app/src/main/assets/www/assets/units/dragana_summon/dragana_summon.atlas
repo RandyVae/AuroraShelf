@@ -1,0 +1,72 @@
+dragana_summon.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+L1
+bounds:195,191,18,63
+Layer 1
+bounds:175,191,18,63
+Layer 2
+bounds:221,118,33,62
+offsets:6,8,48,72
+Layer 3
+bounds:2,138,44,46
+offsets:3,4,60,53
+Layer 4
+bounds:44,136,40,36
+offsets:5,7,53,48
+Layer 5
+bounds:168,155,42,32
+offsets:10,3,57,38
+Layer 53 copy 2
+bounds:232,208,22,7
+offsets:5,5,33,17
+Layer 53 copy 3
+bounds:207,144,15,15
+offsets:5,5,26,25
+Layer 53 copy 4
+bounds:215,200,15,15
+offsets:6,5,26,25
+Layer 53 copy 5
+bounds:58,174,9,10
+offsets:5,5,19,20
+Layer 53 copy 6
+bounds:47,174,9,10
+offsets:5,5,19,20
+Layer 6
+bounds:207,164,47,36
+offsets:12,6,65,49
+Layer 7
+bounds:137,130,32,55
+offsets:3,6,42,77
+Layer 8
+bounds:139,187,34,67
+offsets:4,5,44,77
+Layer 9
+bounds:215,217,30,37
+offsets:11,4,45,45
+center
+bounds:86,146,51,108
+offsets:5,6,60,119
+m1
+bounds:165,146,8,11
+offsets:2,2,12,15
+m2
+bounds:13,171,11,13
+offsets:0,1,11,14
+m3
+bounds:247,247,7,7
+offsets:3,1,13,10
+m4
+bounds:2,173,9,11
+offsets:2,3,14,16
+m5
+bounds:139,174,10,11
+offsets:2,4,16,18
+m6
+bounds:69,173,8,11
+offsets:2,2,12,15
+stand
+bounds:2,186,82,68
+offsets:4,4,90,75

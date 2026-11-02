@@ -1,0 +1,97 @@
+falenia_enemy.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+body
+bounds:134,111,53,69
+offsets:10,4,68,77
+chairman 1
+bounds:236,226,16,28
+offsets:4,6,25,39
+chest 2_1
+bounds:201,153,21,26
+offsets:7,5,32,35
+chest 2_2
+bounds:79,184,26,28
+offsets:4,4,34,35
+fire
+bounds:158,181,96,31
+hair 3
+bounds:70,210,10,23
+offsets:6,4,20,31
+hair 4
+bounds:76,211,39,43
+offsets:3,5,45,51
+hair_dop
+bounds:2,22,14,232
+offsets:5,0,26,232
+hand 1_1
+bounds:216,73,35,45
+offsets:4,6,43,54
+hand 1_2
+bounds:53,95,65,42
+offsets:3,3,72,48
+hand 1_3
+bounds:124,49,41,30
+offsets:4,4,48,38
+hand 2_1
+bounds:223,113,26,66
+offsets:4,3,33,74
+hand 2_2
+bounds:204,44,25,43
+offsets:5,11,33,57
+hand 2_3
+bounds:163,46,29,47
+offsets:5,6,39,57
+hand 3_1
+bounds:79,60,35,35
+offsets:5,4,44,42
+hand 3_2
+bounds:114,40,37,24
+offsets:5,5,48,34
+hand 3_3
+bounds:124,84,58,40
+offsets:3,3,66,46
+hand 4_1
+bounds:31,50,22,57
+offsets:3,3,29,63
+hand 4_2
+bounds:227,42,27,35
+offsets:5,4,35,44
+hand 4_3
+bounds:178,76,44,52
+offsets:4,2,50,60
+leg 1_10
+bounds:77,48,20,30
+offsets:4,6,29,41
+leg 1_2
+bounds:16,108,36,76
+offsets:5,3,44,82
+leg 1_30
+bounds:48,70,31,42
+offsets:3,3,37,53
+leg 1_40
+bounds:13,57,20,61
+offsets:4,5,28,69
+leg 2_10
+bounds:114,123,24,22
+offsets:3,3,30,30
+leg 2_2
+bounds:176,113,48,66
+offsets:3,3,56,72
+leg 2_30
+bounds:211,219,26,35
+offsets:4,3,33,42
+leg 2_40
+bounds:102,79,52,20
+offsets:4,18,60,42
+pelvis
+bounds:163,214,47,40
+offsets:21,8,76,105
+wings 1+
+bounds:99,124,63,130
+offsets:4,3,70,136
+wings 2+
+bounds:14,119,85,135
+offsets:3,3,91,141

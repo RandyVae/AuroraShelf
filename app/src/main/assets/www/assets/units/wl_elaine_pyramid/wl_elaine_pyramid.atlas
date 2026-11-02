@@ -1,0 +1,21 @@
+wl_elaine_pyramid.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+Layer 1
+bounds:118,168,102,86
+offsets:3,2,108,90
+Layer 2
+bounds:195,131,59,54
+Layer 268 copy
+bounds:156,74,46,75
+offsets:0,2,49,77
+Layer 290 copy
+bounds:82,99,75,70
+Layer 3
+bounds:31,85,50,76
+offsets:3,2,56,78
+Levels 1
+bounds:2,151,115,103
+offsets:2,3,117,106

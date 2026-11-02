@@ -85,6 +85,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Search
@@ -211,6 +212,7 @@ internal fun PersonalScreen(
     onComicSource: (String) -> Unit,
     onLiveSource: (String) -> Unit = {},
     onOpenCached: (VideoItem) -> Unit,
+    onOpenGame: () -> Unit = {},
 ) {
     BackHandler(enabled = route != PersonalRoute.OVERVIEW) { onRoute(PersonalRoute.OVERVIEW) }
     Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
@@ -230,6 +232,7 @@ internal fun PersonalScreen(
                     onFavorites = { onRoute(PersonalRoute.FAVORITES) },
                     onHistory = { onRoute(PersonalRoute.HISTORY) },
                     onSettings = { onRoute(PersonalRoute.SETTINGS) },
+                    onOpenGame = onOpenGame,
                 )
                 PersonalRoute.FAVORITES -> LibraryScreen(
                     title = "我的收藏",
@@ -285,6 +288,7 @@ private fun PersonalOverview(
     onFavorites: () -> Unit,
     onHistory: () -> Unit,
     onSettings: () -> Unit,
+    onOpenGame: () -> Unit = {},
 ) {
     LazyColumn(
         contentPadding = PaddingValues(
@@ -396,6 +400,19 @@ private fun PersonalOverview(
                     value = "$historyCount 条",
                     onClick = onHistory,
                     modifier = Modifier.testTag("personal-history-entry"),
+                )
+            }
+        }
+        item { SettingsSectionLabel("娱乐") }
+        item {
+            SettingsNavigationCard {
+                SettingsNavigationRow(
+                    icon = { Icon(Icons.Default.SportsEsports, contentDescription = null, tint = AuroraCoral) },
+                    title = "游戏",
+                    supporting = "欲望女神（Lust Goddess）· 战术 RPG",
+                    value = "开始游戏",
+                    onClick = onOpenGame,
+                    modifier = Modifier.testTag("personal-game-entry"),
                 )
             }
         }

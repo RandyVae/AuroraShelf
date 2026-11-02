@@ -1,0 +1,173 @@
+wl_bernice_enemy.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+backpack
+bounds:313,487,20,23
+offsets:3,3,27,29
+body
+bounds:160,449,47,61
+offsets:4,4,63,68
+cannon
+bounds:2,383,134,127
+offsets:3,0,141,130
+cannon+
+bounds:91,383,134,127
+offsets:3,0,141,130
+chairperson
+bounds:208,471,32,39
+offsets:3,7,38,50
+chest 1
+bounds:237,488,20,22
+offsets:5,4,29,30
+chest 2
+bounds:259,489,18,21
+offsets:4,5,26,29
+hair
+bounds:220,399,95,111
+offsets:1,2,98,114
+hair_d
+bounds:2,444,17,24
+offsets:1,0,18,24
+hand 1_1
+bounds:138,470,21,40
+offsets:7,8,31,51
+hand 1_10
+bounds:74,493,17,17
+offsets:4,4,24,24
+hand 1_2
+bounds:484,302,26,48
+offsets:9,9,39,60
+hand 2_1
+bounds:117,493,16,17
+offsets:4,4,24,25
+hand 2_2
+bounds:77,451,15,38
+offsets:9,13,29,55
+hand 2_3
+bounds:226,308,36,34
+offsets:4,6,47,43
+leg 1_1
+bounds:358,424,29,86
+offsets:4,3,39,92
+leg 1_2
+bounds:494,346,16,35
+offsets:3,3,23,43
+leg 1_3
+bounds:362,303,29,53
+offsets:4,21,36,78
+leg 2_1
+bounds:306,438,53,72
+offsets:4,2,61,78
+leg 2_2
+bounds:486,433,24,32
+offsets:50,3,78,107
+leg 2_3
+bounds:204,430,18,43
+offsets:3,3,25,50
+pelvis
+bounds:42,474,37,36
+offsets:10,4,55,45
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00000
+bounds:195,308,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00001
+bounds:6,309,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00002
+bounds:426,311,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00003
+bounds:34,312,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00004
+bounds:86,313,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00005
+bounds:153,317,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00006
+bounds:375,321,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00007
+bounds:256,326,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00008
+bounds:50,335,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/cannon_crcl/cannon_crcl 2_00009
+bounds:280,339,32,38
+offsets:88,75,141,130
+wl_bernice_fx1/fire/fire_00000
+bounds:111,329,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00001
+bounds:315,331,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00002
+bounds:212,338,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00003
+bounds:445,338,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00004
+bounds:171,346,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00005
+bounds:395,347,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00006
+bounds:8,349,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00007
+bounds:75,352,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00008
+bounds:346,357,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00009
+bounds:243,365,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00010
+bounds:135,369,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00011
+bounds:293,374,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00012
+bounds:39,375,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00013
+bounds:422,382,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00014
+bounds:468,382,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00015
+bounds:374,390,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00016
+bounds:2,392,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00017
+bounds:324,401,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00018
+bounds:262,408,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00019
+bounds:444,425,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00020
+bounds:401,425,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00021
+bounds:466,468,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00022
+bounds:423,468,42,42
+offsets:3,0,48,46
+wl_bernice_fx1/fire/fire_00023
+bounds:380,468,42,42
+offsets:3,0,48,46

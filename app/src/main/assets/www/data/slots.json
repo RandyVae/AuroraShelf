@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "title": "Neon Frontline Slots",
+  "reels": 5,
+  "rows": 3,
+  "minBet": 10,
+  "maxBet": 200,
+  "defaultBet": 20,
+  "paylines": [
+    [0, 0, 0, 0, 0],
+    [1, 1, 1, 1, 1],
+    [2, 2, 2, 2, 2],
+    [0, 1, 2, 1, 0],
+    [2, 1, 0, 1, 2],
+    [0, 0, 1, 2, 2],
+    [2, 2, 1, 0, 0],
+    [1, 0, 1, 2, 1],
+    [1, 2, 1, 0, 1]
+  ],
+  "symbols": [
+    {"id": "kitty", "label": "Kitty", "kind": "hero", "weight": 24, "payouts": {"2": 2, "3": 4, "4": 12, "5": 40}, "icon": "assets/slots/symbol_kitty.webp"},
+    {"id": "dominica", "label": "Dominica", "kind": "hero", "weight": 20, "payouts": {"2": 2, "3": 5, "4": 16, "5": 55}, "icon": "assets/slots/symbol_dominica.webp"},
+    {"id": "regina", "label": "Regina", "kind": "hero", "weight": 18, "payouts": {"2": 3, "3": 6, "4": 20, "5": 70}, "icon": "assets/slots/symbol_regina.webp"},
+    {"id": "florence", "label": "Esther", "kind": "hero", "weight": 15, "payouts": {"2": 4, "3": 8, "4": 28, "5": 100}, "icon": "assets/slots/symbol_esther.webp"},
+    {"id": "drone_enemy", "label": "Combat Drone", "kind": "enemy", "weight": 12, "payouts": {"2": 5, "3": 10, "4": 36, "5": 140}, "icon": "assets/slots/symbol_drone.webp"},
+    {"id": "hilda_enemy", "label": "Hilda Boss", "kind": "enemy", "weight": 8, "payouts": {"2": 7, "3": 14, "4": 50, "5": 220}, "icon": "assets/slots/symbol_hilda.webp"},
+    {"id": "wild", "label": "Wild Crown", "kind": "wild", "weight": 3, "payouts": {"2": 10, "3": 20, "4": 80, "5": 400}, "icon": "assets/slots/symbol_wild.webp"},
+    {"id": "scatter", "label": "Scatter Core", "kind": "scatter", "weight": 2, "payouts": {}, "icon": "assets/slots/symbol_scatter.webp"}
+  ],
+  "scatter": {"id": "scatter", "freeSpins": 5, "threshold": 3}
+}

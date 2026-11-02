@@ -1,0 +1,47 @@
+{
+  "project": "Lust Goddess Local Edition",
+  "version": "2.19",
+  "buildDate": "2026-11-02",
+  "targetPlatforms": [
+    "Web (Offline loopback / standalone HTTP)",
+    "Android (API 24-36, WebView + loopback asset server)"
+  ],
+  "apk": {
+    "file": "dist/LustGoddess-2.19-release-qa.apk",
+    "versionCode": 20,
+    "versionName": "2.19",
+    "minSdk": 24,
+    "compileSdk": 36,
+    "targetSdk": 36,
+    "sha256": "abfae258b7b2676cb79e275385ddfa47e555b74fa805898af36b82b474e21a06"
+  },
+  "schema": {
+    "version": 2,
+    "storageKey": "lg-local-edition-v2",
+    "backupKey": "lg-local-edition-v2-backup",
+    "migrationFrom": "v1 auto-migrated"
+  },
+  "coreSystems": {
+    "introTimeline": "web/js/intro.js & web/data/intro-sequences.json (Full-screen 5s cinematic prologue, 4-stage event chain, multi-actor Kitty & Dominica & Drone, dynamic camera transforms, tactical prompt HUD, reduce motion compliance)",
+    "progression": "web/js/progression.js (Level 1~30, Stars 1~5, Skills 1~10)",
+    "missions": "web/js/missions.js (Daily quests, long-term achievements)",
+    "equipment": "web/data/equipment.json (Weapons, Armors, Cores)",
+    "battleMath": "web/js/balance.js & web/js/battle.js (Mulberry32 PRNG, event replay, 100% deterministic)",
+    "vfx": "web/js/vfx.js (Slash, projectile streaks, hit sparks, crit screen impacts, heal/shield auras, freeze/poison)",
+    "animationManifest": "web/data/animation-manifest.json (7-state canonical mapping & fallback pipeline, native vs synthetic accounting)",
+    "victoryEpilogue": "web/js/app.js & web/css/app.css (2.2s battle victory close-up, cheer animation, golden confetti burst, tactical report)",
+    "accessibility": "Reduce Motion full coverage across CSS, Spine skeleton time scale, and canvas particles",
+    "sweep": "Stage sweep (1x / 5x) for 3★ cleared stages"
+  },
+  "verification": {
+    "assetVerification": "tools/verify_curated_assets.py (PASS: 55/55 heroes, 168/168 enemies, intro contract, 100% complete assets)",
+    "prologueAuditTest": "tools/test_prologue_audit.py (PASS: 0s/1s/3s/5s/battle/victory/reduce-motion screenshots captured to qa/prologue/)",
+    "androidAuditTest": "tools/test_android_audit.py (PASS: Android API 34+ emulator screencaps captured to qa/prologue/android/)",
+    "e2eScript": "tools/e2e_local.py",
+    "e2eStatus": "PASS on 2026-10-30 (fresh save, chapter 1 battle 3-star, sweep, progression, equipment, gacha, shop, settings, reload persistence; 0 JS exceptions, 0 external HTTP requests)",
+    "determinismTest": "tools/test_battle_determinism.js",
+    "determinismStatus": "PASS (1000 simulated battles, 0 NaN, 0 negative HP, exact replay match)"
+  },
+  "buildKind": "QA side-load candidate; debug certificate; Android device runtime not verified in this turn",
+  "complianceNotice": "素材僅供本機離線復刻與架構研究驗證，未獲 POCHEMU LTD 原作授權禁止任何分發。當前 QA APK 採用本機 debug 憑證用於個人側載測試。"
+}

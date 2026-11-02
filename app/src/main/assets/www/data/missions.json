@@ -1,0 +1,154 @@
+{
+  "daily": [
+    {
+      "id": "daily_login",
+      "title": "每日签到",
+      "desc": "进入游戏向战术指挥中心报道",
+      "target": 1,
+      "type": "login",
+      "rewards": { "gold": 300, "energy": 20 }
+    },
+    {
+      "id": "daily_battle",
+      "title": "战意澎湃",
+      "desc": "完成 1 场战役对决",
+      "target": 1,
+      "type": "battle",
+      "rewards": { "gold": 250, "keys": 1 }
+    },
+    {
+      "id": "daily_sweep",
+      "title": "迅捷扫荡",
+      "desc": "在三星通关关卡完成 1 次扫荡",
+      "target": 1,
+      "type": "sweep",
+      "rewards": { "gold": 250, "shards": 10 }
+    },
+    {
+      "id": "daily_upgrade",
+      "title": "战力精进",
+      "desc": "强化提升 1 次女神等级",
+      "target": 1,
+      "type": "upgrade",
+      "rewards": { "gold": 300, "shards": 10 }
+    },
+    {
+      "id": "daily_recruit",
+      "title": "契约共鸣",
+      "desc": "在招募中心完成 1 次召唤",
+      "target": 1,
+      "type": "recruit",
+      "rewards": { "gold": 400, "keys": 1 }
+    },
+    {
+      "id": "daily_slots_spin",
+      "title": "霓虹转轮",
+      "desc": "完成 3 次 Slots 旋转",
+      "target": 3,
+      "type": "slots_spin",
+      "rewards": { "gold": 350, "energy": 10 }
+    }
+  ],
+  "achievements": [
+    {
+      "id": "ach_chapter_1",
+      "title": "初涉战阵",
+      "desc": "通关战役第一章全部关卡",
+      "target": 1,
+      "type": "chapter_clear",
+      "chapterId": 1,
+      "rewards": { "gold": 1000, "keys": 3 }
+    },
+    {
+      "id": "ach_chapter_3",
+      "title": "破晓之刃",
+      "desc": "通关战役第三章全部关卡",
+      "target": 1,
+      "type": "chapter_clear",
+      "chapterId": 3,
+      "rewards": { "gold": 2000, "keys": 5 }
+    },
+    {
+      "id": "ach_chapter_5",
+      "title": "绝境突围",
+      "desc": "通关战役第五章全部关卡",
+      "target": 1,
+      "type": "chapter_clear",
+      "chapterId": 5,
+      "rewards": { "gold": 3000, "keys": 8 }
+    },
+    {
+      "id": "ach_chapter_8",
+      "title": "终焉审判",
+      "desc": "通关战役第八章全部关卡",
+      "target": 1,
+      "type": "chapter_clear",
+      "chapterId": 8,
+      "rewards": { "gold": 5000, "keys": 15 }
+    },
+    {
+      "id": "ach_stars_30",
+      "title": "战术大师",
+      "desc": "战役累计收集 30 颗星星",
+      "target": 30,
+      "type": "total_stars",
+      "rewards": { "gold": 1500, "shards": 50 }
+    },
+    {
+      "id": "ach_stars_80",
+      "title": "传奇指挥官",
+      "desc": "战役累计收集 80 颗星星",
+      "target": 80,
+      "type": "total_stars",
+      "rewards": { "gold": 3500, "shards": 100 }
+    },
+    {
+      "id": "ach_collect_10",
+      "title": "众星聚首",
+      "desc": "招募收集达到 10 名女神",
+      "target": 10,
+      "type": "collect_count",
+      "rewards": { "gold": 2000, "keys": 5 }
+    },
+    {
+      "id": "ach_collect_25",
+      "title": "军团规模",
+      "desc": "招募收集达到 25 名女神",
+      "target": 25,
+      "type": "collect_count",
+      "rewards": { "gold": 4000, "keys": 10 }
+    },
+    {
+      "id": "ach_level_15",
+      "title": "战火洗礼",
+      "desc": "任意一名女神升至 Lv.15",
+      "target": 15,
+      "type": "hero_level",
+      "rewards": { "gold": 1500, "shards": 30 }
+    },
+    {
+      "id": "ach_level_30",
+      "title": "巅峰造极",
+      "desc": "任意一名女神升至满级 Lv.30",
+      "target": 30,
+      "type": "hero_level",
+      "rewards": { "gold": 5000, "shards": 100 }
+    },
+    {
+      "id": "ach_star_break",
+      "title": "潜能觉醒",
+      "desc": "任意一名女神完成 1 次星级突破",
+      "target": 1,
+      "type": "star_break",
+      "rewards": { "gold": 2000, "keys": 5 }
+    },
+    {
+      "id": "ach_pulls_30",
+      "title": "命运羁绊",
+      "desc": "累计招募契约召唤 30 次",
+      "target": 30,
+      "type": "pulls_count",
+      "rewards": { "gold": 3000, "keys": 10 }
+    }
+  ]
+}

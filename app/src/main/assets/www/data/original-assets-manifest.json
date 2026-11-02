@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "pipeline": "Spine4.2-WebP-PMA",
+  "units": {
+    "valkyrie_original": {
+      "key": "valkyrie",
+      "name": "女武神·瓦爾基麗",
+      "unit": "valkyrie_original",
+      "class": "melee",
+      "race": "order",
+      "atlas": "assets/units_original/valkyrie_original/valkyrie_original.atlas",
+      "webp": "assets/units_original/valkyrie_original/valkyrie_original.webp",
+      "skeleton": "assets/units_original/valkyrie_original/skeleton.json",
+      "artWeb": {
+        "base": "assets/heroes_original/valkyrie/base.webp",
+        "lega": "assets/heroes_original/valkyrie/lega.webp",
+        "baseThumb": "assets/heroes_original/valkyrie/base_thumb.webp"
+      },
+      "verified": true,
+      "pma": true,
+      "spineVersion": "4.2.40"
+    }
+  },
+  "unitOverrides": {},
+  "stats": {
+    "totalOriginalUnits": 1,
+    "tier1Replaced": 0,
+    "tier2Replaced": 0
+  }
+}

@@ -1,0 +1,173 @@
+bonita_enemy.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+!
+bounds:346,418,12,19
+#
+bounds:223,393,17,16
+$
+bounds:100,388,14,18
+%
+bounds:304,393,16,17
+8
+bounds:223,448,10,10
+@
+bounds:204,395,17,18
+EN_ATTCK_arm 1 2
+bounds:264,476,16,34
+offsets:4,3,23,41
+EN_ATTCK_arm 1 3
+bounds:341,399,14,17
+offsets:3,3,21,23
+EN_ATTCK_arm 2 1
+bounds:238,388,25,46
+offsets:3,3,32,53
+EN_ATTCK_arm 2 2
+bounds:371,388,34,27
+offsets:3,3,40,34
+EN_ATTCK_arm 2 3
+bounds:494,386,16,18
+offsets:4,3,24,24
+EN_ATTCK_bangs
+bounds:61,382,22,29
+offsets:4,4,29,37
+EN_ATTCK_booba 1
+bounds:88,470,21,28
+offsets:3,4,28,36
+EN_ATTCK_booba 2
+bounds:405,396,24,33
+offsets:3,3,30,39
+EN_ATTCK_chest
+bounds:314,455,49,55
+offsets:4,4,56,63
+EN_ATTCK_earring
+bounds:431,500,6,10
+offsets:4,4,16,17
+EN_ATTCK_hair back
+bounds:2,444,40,56
+offsets:3,3,46,62
+EN_ATTCK_head
+bounds:272,408,35,43
+offsets:4,4,42,51
+EN_ATTCK_hips
+bounds:422,413,51,36
+offsets:3,3,57,42
+EN_ATTCK_leg 1 1
+bounds:401,443,51,67
+offsets:3,3,57,73
+EN_ATTCK_leg 1 2
+bounds:440,446,44,64
+offsets:3,3,50,69
+EN_ATTCK_leg 2 1
+bounds:370,410,52,48
+offsets:3,4,59,55
+EN_ATTCK_leg 2 2
+bounds:475,401,35,59
+offsets:3,3,41,65
+EN_ATTCK_megaphone
+bounds:194,409,43,35
+offsets:3,3,49,41
+EN_ATTCK_neck
+bounds:472,384,19,19
+offsets:2,3,24,25
+EN_arm 1 1
+bounds:2,392,17,57
+offsets:4,3,24,63
+EN_arm 1 2
+bounds:40,453,14,41
+offsets:3,3,21,48
+EN_arm 1 3
+bounds:263,385,14,21
+offsets:4,4,21,29
+EN_arm 1_3 down
+bounds:398,466,10,16
+offsets:3,4,17,24
+EN_arm 2 1
+bounds:127,389,23,49
+offsets:3,3,30,55
+EN_arm 2 2
+bounds:16,385,16,19
+offsets:4,3,23,25
+EN_arm 2 3
+bounds:314,495,15,15
+offsets:4,4,23,23
+EN_bangs
+bounds:69,393,22,32
+offsets:4,10,29,45
+EN_booba 1
+bounds:108,406,25,32
+offsets:3,3,35,38
+EN_booba 2
+bounds:428,390,20,28
+offsets:5,5,29,36
+EN_chest
+bounds:266,448,50,62
+offsets:3,3,58,69
+EN_hair 1
+bounds:188,378,14,34
+offsets:4,4,22,42
+EN_hair back
+bounds:363,447,39,63
+offsets:3,3,45,70
+EN_head
+bounds:479,463,29,47
+offsets:3,4,36,54
+EN_hips
+bounds:25,409,46,40
+offsets:3,4,53,48
+EN_leg 1_1
+bounds:52,434,37,67
+offsets:4,15,46,86
+EN_leg 1_2
+bounds:223,428,49,82
+offsets:3,3,57,89
+EN_leg 1_3
+bounds:146,398,19,29
+offsets:5,4,30,43
+EN_leg 2 1_clth
+bounds:339,375,32,75
+offsets:4,3,42,84
+EN_leg 2 1_nkd
+bounds:80,405,29,63
+offsets:4,5,42,84
+EN_leg 2 3
+bounds:452,391,30,25
+offsets:5,3,39,33
+EN_leg_2_2
+bounds:312,399,34,56
+offsets:3,4,42,64
+EN_megaphone
+bounds:162,394,35,48
+offsets:3,3,40,54
+EN_neck
+bounds:164,386,16,15
+offsets:4,4,23,22
+EN_ring 1
+bounds:359,502,7,8
+offsets:4,3,15,15
+EN_ring 2
+bounds:438,501,5,9
+offsets:4,3,13,15
+SMB_LINE11
+bounds:56,498,53,12
+SMB_LINE12
+bounds:2,498,53,12
+SMB_LINE21
+bounds:17,385,36,43
+SMB_LINE22
+bounds:260,385,36,43
+SMB_crcl
+bounds:111,440,52,70
+SMB_crcl_blr
+bounds:165,445,56,65
+line1
+bounds:322,379,18,21
+offsets:2,2,21,25
+line2
+bounds:296,436,14,13
+offsets:3,3,19,18
+line3
+bounds:399,387,23,14
+offsets:3,3,28,19

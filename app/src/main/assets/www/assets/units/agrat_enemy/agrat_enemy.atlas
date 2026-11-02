@@ -1,0 +1,101 @@
+agrat_enemy.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
++/at_body1_n
+bounds:169,187,55,67
+offsets:9,1,69,69
++/at_body_n
+bounds:46,129,56,52
+offsets:7,4,67,59
++/at_chest1_n
+bounds:34,46,24,32
+offsets:1,5,26,38
++/at_chest2_n
+bounds:167,66,30,35
+offsets:3,4,37,39
++/at_hand1_1
+bounds:36,71,50,23
+offsets:2,2,54,27
++/at_hand1_2
+bounds:165,128,32,18
+offsets:2,2,37,21
++/at_hand1_3
+bounds:2,83,38,55
+offsets:2,1,42,57
++/at_hand_21
+bounds:2,54,32,47
+offsets:1,1,35,49
++/at_hand_22
+bounds:2,32,26,36
+offsets:1,2,30,41
++/at_hand_23
+bounds:137,34,16,25
+offsets:1,1,18,28
++/at_sword
+bounds:139,86,115,57
+offsets:0,1,116,58
+basin 1_n
+bounds:80,94,52,52
+offsets:5,3,65,58
+body 2
+bounds:110,184,58,70
+offsets:6,3,73,76
+chest 1_1_n
+bounds:224,64,30,33
+offsets:3,3,36,39
+chest 1_2_n
+bounds:2,221,27,33
+offsets:4,4,35,37
+hair
+bounds:2,136,124,118
+offsets:3,3,129,128
+hand 1_1
+bounds:88,39,28,20
+offsets:3,3,36,31
+hand 1_2
+bounds:222,43,32,20
+offsets:3,8,57,32
+hand 1_3
+bounds:32,91,50,50
+offsets:3,3,56,56
+hand 2_1
+bounds:55,181,23,24
+offsets:3,3,30,30
+hand 2_2
+bounds:185,48,42,28
+offsets:3,13,60,46
+hand 2_3
+bounds:195,89,59,30
+offsets:3,3,65,36
+head
+bounds:173,138,81,58
+offsets:3,6,86,72
+knife
+bounds:74,53,66,55
+offsets:3,2,76,64
+leg 1_1_n
+bounds:75,146,59,83
+offsets:3,3,66,87
+leg 1_2
+bounds:224,195,21,59
+offsets:6,28,31,90
+leg 1_3
+bounds:111,36,26,34
+offsets:3,5,33,43
+leg 1_4
+bounds:229,169,25,26
+offsets:4,4,40,33
+leg 2_1_n
+bounds:129,109,49,90
+offsets:3,4,54,98
+leg 2_2
+bounds:129,62,38,26
+offsets:4,3,45,33
+leg 2_3
+bounds:154,39,19,32
+offsets:3,3,26,39
+leg 2_4
+bounds:56,35,21,22
+offsets:3,3,28,43

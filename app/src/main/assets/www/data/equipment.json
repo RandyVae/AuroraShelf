@@ -1,0 +1,202 @@
+[
+  {
+    "id": "wp_plasma_blade",
+    "name": "高频离子刃",
+    "slot": "weapon",
+    "rarity": "R",
+    "atk": 90,
+    "hp": 0,
+    "crit": 0.02,
+    "desc": "近战特勤标配战术刀，刃部带有微波高频振动"
+  },
+  {
+    "id": "wp_arc_rifle",
+    "name": "弧光磁轨步枪",
+    "slot": "weapon",
+    "rarity": "SR",
+    "atk": 180,
+    "hp": 0,
+    "crit": 0.04,
+    "desc": "中距离精准脉冲步枪，具有极佳的穿甲破坏力"
+  },
+  {
+    "id": "wp_goddess_judgement",
+    "name": "女神圣裁超重刃",
+    "slot": "weapon",
+    "rarity": "SSR",
+    "atk": 320,
+    "hp": 0,
+    "crit": 0.07,
+    "desc": "古代科技重铸的特勤审判重刃，挥斩时引发空间共振"
+  },
+  {
+    "id": "wp_striker_blade",
+    "name": "突击者破阵光刃",
+    "slot": "weapon",
+    "rarity": "SR",
+    "setKey": "set_striker",
+    "setName": "突击者套装",
+    "atk": 210,
+    "hp": 0,
+    "crit": 0.05,
+    "desc": "突击部队专用高能粒子短刃，激发极速破阵效果"
+  },
+  {
+    "id": "wp_nano_dagger",
+    "name": "纳米活化短匕",
+    "slot": "weapon",
+    "rarity": "SSR",
+    "setKey": "set_nano",
+    "setName": "纳米生化套装",
+    "atk": 290,
+    "hp": 800,
+    "crit": 0.04,
+    "desc": "浸润活性纳米流体的刺杀武器，命中时反哺生命活性"
+  },
+  {
+    "id": "wp_quantum_cannon",
+    "name": "量子坍缩超导炮",
+    "slot": "weapon",
+    "rarity": "SSR",
+    "setKey": "set_quantum",
+    "setName": "量子终结套装",
+    "atk": 380,
+    "hp": 0,
+    "crit": 0.10,
+    "desc": "凝聚反物质能量的终极火炮，对暴击伤害有极大加成"
+  },
+  {
+    "id": "ar_kevlar_suit",
+    "name": "特勤防护轻甲",
+    "slot": "armor",
+    "rarity": "R",
+    "atk": 0,
+    "hp": 950,
+    "mitigation": 0.03,
+    "desc": "轻量化防弹织物战术背心，兼顾灵活性与基础防护"
+  },
+  {
+    "id": "ar_nano_composite",
+    "name": "纳米复合外骨骼",
+    "slot": "armor",
+    "rarity": "SR",
+    "atk": 0,
+    "hp": 1900,
+    "mitigation": 0.06,
+    "desc": "覆盖重要脏器的活性纳米纤维外骨骼，受击自修复"
+  },
+  {
+    "id": "ar_aegis_barrier",
+    "name": "宙斯之盾战术装甲",
+    "slot": "armor",
+    "rarity": "SSR",
+    "atk": 0,
+    "hp": 3600,
+    "mitigation": 0.10,
+    "desc": "全覆式重装动力战甲，内置微型偏转防护力场"
+  },
+  {
+    "id": "ar_striker_vest",
+    "name": "突击者机动战背",
+    "slot": "armor",
+    "rarity": "SR",
+    "setKey": "set_striker",
+    "setName": "突击者套装",
+    "atk": 60,
+    "hp": 2200,
+    "mitigation": 0.06,
+    "desc": "提升冲刺机动性的特种战术背心，协同强化攻击输出"
+  },
+  {
+    "id": "ar_nano_armor",
+    "name": "超导活性纳米甲",
+    "slot": "armor",
+    "rarity": "SSR",
+    "setKey": "set_nano",
+    "setName": "纳米生化套装",
+    "atk": 0,
+    "hp": 4200,
+    "mitigation": 0.09,
+    "desc": "全面附着活化纳米矩阵的生化重甲，提供持续受损修复"
+  },
+  {
+    "id": "ar_quantum_cloak",
+    "name": "量子相位折射袍",
+    "slot": "armor",
+    "rarity": "SSR",
+    "setKey": "set_quantum",
+    "setName": "量子终结套装",
+    "atk": 80,
+    "hp": 3200,
+    "crit": 0.05,
+    "mitigation": 0.07,
+    "desc": "产生微观光学折射的战术披风，大幅提高弱点打击概率"
+  },
+  {
+    "id": "cr_overclock_chip",
+    "name": "超频运算芯片",
+    "slot": "core",
+    "rarity": "R",
+    "atk": 30,
+    "hp": 300,
+    "crit": 0.04,
+    "desc": "战术辅助运算模组，提升技能索敌与暴击率"
+  },
+  {
+    "id": "cr_energy_matrix",
+    "name": "高能反应力场",
+    "slot": "core",
+    "rarity": "SR",
+    "atk": 50,
+    "hp": 600,
+    "mitigation": 0.07,
+    "desc": "单兵相位阻尼发生器，显著平抑受到的直接伤害"
+  },
+  {
+    "id": "cr_eternity_prism",
+    "name": "永恒共振棱镜",
+    "slot": "core",
+    "rarity": "SSR",
+    "atk": 100,
+    "hp": 1200,
+    "crit": 0.08,
+    "mitigation": 0.10,
+    "desc": "极度罕见的以太晶核核心，全方位激发作战潜能"
+  },
+  {
+    "id": "cr_striker_core",
+    "name": "突击者过载核心",
+    "slot": "core",
+    "rarity": "SR",
+    "setKey": "set_striker",
+    "setName": "突击者套装",
+    "atk": 90,
+    "hp": 700,
+    "crit": 0.05,
+    "desc": "瞬间爆发动能的突击核心，三件套激活狂暴攻击力"
+  },
+  {
+    "id": "cr_nano_matrix",
+    "name": "纳米再生核心",
+    "slot": "core",
+    "rarity": "SSR",
+    "setKey": "set_nano",
+    "setName": "纳米生化套装",
+    "atk": 40,
+    "hp": 1600,
+    "mitigation": 0.08,
+    "desc": "持续释放生物纳米机器人的再生中枢，三件套大幅减伤"
+  },
+  {
+    "id": "cr_quantum_singularity",
+    "name": "奇点坍缩核心",
+    "slot": "core",
+    "rarity": "SSR",
+    "setKey": "set_quantum",
+    "setName": "量子终结套装",
+    "atk": 140,
+    "hp": 900,
+    "crit": 0.10,
+    "desc": "微型时空奇点供能中枢，将暴击率与致命伤害推至极点"
+  }
+]

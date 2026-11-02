@@ -1,0 +1,119 @@
+belle_player.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+Arm 11_1
+bounds:28,49,26,58
+offsets:5,6,35,70
+Arm 11_2
+bounds:183,420,48,25
+offsets:5,7,55,38
+Arm 12_2
+bounds:66,248,17,46
+offsets:3,4,24,53
+Arm 12_3
+bounds:89,336,22,30
+offsets:3,4,29,37
+Arm 21_1
+bounds:306,463,37,47
+offsets:5,4,46,54
+Arm 21_2
+bounds:46,245,18,48
+offsets:5,5,26,59
+Arm 21_3
+bounds:384,458,29,15
+offsets:5,7,37,26
+Arm 22_3
+bounds:283,438,21,26
+offsets:4,4,29,33
+Leg 11_1
+bounds:53,338,34,77
+offsets:4,7,42,88
+Leg 11_2
+bounds:2,46,24,61
+offsets:4,7,32,72
+Leg 11_3
+bounds:111,377,28,34
+offsets:4,4,36,42
+Leg 21_1
+bounds:2,215,42,78
+offsets:4,4,50,86
+Leg 21_2
+bounds:89,368,20,47
+offsets:4,4,29,55
+Leg 21_3
+bounds:2,6,18,38
+offsets:4,3,27,48
+Leg 22_3
+bounds:141,384,30,27
+offsets:3,4,37,35
+arm11_3
+bounds:173,399,11,12
+offsets:6,4,22,21
+body
+bounds:183,447,64,63
+offsets:4,6,72,73
+boop1
+bounds:2,161,46,52
+offsets:4,4,55,60
+boop2
+bounds:2,109,47,50
+offsets:4,4,55,59
+fx/health_icon
+bounds:427,475,41,35
+offsets:11,12,61,61
+fx/health_icon b
+bounds:384,475,41,35
+offsets:11,12,61,61
+fx/pixel1
+bounds:249,413,27,25
+offsets:2,3,31,31
+fx/pixel2
+bounds:50,169,19,19
+offsets:6,6,31,30
+fx/pixel3
+bounds:415,455,27,18
+offsets:2,5,32,31
+fx/pixel4
+bounds:444,458,16,15
+offsets:8,8,31,31
+fx/pixel_heart
+bounds:2,417,109,93
+offsets:7,15,123,123
+fx/sparcle
+bounds:345,465,37,45
+offsets:8,5,57,58
+hair 1
+bounds:233,416,14,29
+offsets:5,3,24,35
+hair 2
+bounds:113,413,68,97
+offsets:18,5,92,109
+hair2
+bounds:53,296,27,40
+offsets:5,7,36,51
+head
+bounds:470,474,40,36
+offsets:6,5,52,46
+neck
+bounds:82,303,23,31
+offsets:5,4,36,39
+pelvis
+bounds:249,466,55,44
+offsets:4,6,69,54
+wing 1_1
+bounds:2,295,49,120
+offsets:4,4,56,127
+wing 1_2
+bounds:306,436,30,25
+offsets:4,4,38,34
+wing 1_3
+bounds:249,440,32,24
+offsets:4,5,40,33
+wing 2_2
+bounds:46,217,27,26
+offsets:4,3,36,33
+wing 2_3
+bounds:50,190,20,25
+offsets:4,5,28,34

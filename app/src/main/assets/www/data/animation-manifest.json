@@ -1,0 +1,126 @@
+{
+  "version": "2.0",
+  "auditRef": "CASE_DEEP_AUDIT_2026-10-29_v2.7",
+  "actionStateDefinitions": {
+    "wake": {
+      "native": "idle",
+      "category": "synthetic_cinematic",
+      "loop": false,
+      "fallback": "darkEstablish_to_blurFadeIn",
+      "desc": "主角唤醒：由暗场微弱心跳/呼吸音效唤醒，视口模糊度过渡由 10px -> 0px"
+    },
+    "enter": {
+      "native": "idle",
+      "category": "synthetic_cinematic",
+      "loop": false,
+      "fallback": "slide_in_fade + ether_burst",
+      "desc": "战术入场：Spine 姿态由 xRatio 0.50 滑动至目标位，伴随以太爆发光效"
+    },
+    "talk": {
+      "native": "idle",
+      "category": "synthetic_cinematic",
+      "loop": true,
+      "fallback": "breath_scale_1.02 + radio_wave",
+      "desc": "对白说话：Spine 骨骼配合 1.02x 轻微呼吸律动与通讯波纹"
+    },
+    "react": {
+      "native": "damage",
+      "category": "native_enhanced",
+      "loop": false,
+      "fallback": "posture_jolt + alert_reticle",
+      "desc": "响应/警报反应：调用 damage 骨骼姿态结合红色警报网格"
+    },
+    "attack": {
+      "native": "hit/rangehit",
+      "category": "native_spine_track",
+      "loop": false,
+      "fallback": "lunge_18px + slash_vfx",
+      "desc": "原生攻击骨骼挥击或射击 track，附带命中点 marker 与受击震屏"
+    },
+    "hit": {
+      "native": "damage",
+      "category": "native_spine_track",
+      "loop": false,
+      "fallback": "white_flash + spark_vfx",
+      "desc": "受击反馈：直接触发 damage 骨骼动作，配合白闪与火花粒子"
+    },
+    "victory": {
+      "native": "idle",
+      "category": "synthetic_cinematic",
+      "loop": true,
+      "fallback": "cheer_bounce + golden_radiance_burst",
+      "desc": "凯旋结算：Spine 骨骼配合胜者律动缩放（1.0 -> 1.08）与胜利金辉粒子爆裂"
+    }
+  },
+  "accountingSummary": {
+    "totalHeroes": 55,
+    "totalEnemies": 168,
+    "nativeActionsCount": {
+      "idle": 55,
+      "damage": 55,
+      "hit_or_rangehit": 55
+    },
+    "syntheticFallbackCount": {
+      "wake": 55,
+      "enter": 55,
+      "talk": 55,
+      "react": 55,
+      "skill": 55,
+      "fall": 55,
+      "victory": 55
+    },
+    "nativeAnimationCoverage": "100% 具备原生待机与受击骨骼，普攻 100% 覆盖近战(hit)或远程(rangehit)",
+    "syntheticFallbackCoverage": "100% 叙事唤醒、入场、对白、战技与胜利通过 Marker/VFX 合成增强，两类动作严格统计分离",
+    "verificationMethod": "严格区分原生 Spine 骨骼 track 动画与代码/VFX 合成表现，杜绝虚假全原生动作宣称"
+  },
+  "representatives": {
+    "kitty_player": {
+      "name": "Kitty",
+      "class": "melee",
+      "archetype": "突击前锋",
+      "unit": "kitty_player",
+      "nativeAnimations": ["idle", "damage", "rangehit"],
+      "actionBindings": {
+        "wake": { "type": "synthetic", "durationMs": 1300, "composition": "darkEstablish_to_blurFadeIn + breath_kitty_5", "audio": "breath_kitty_5" },
+        "enter": { "type": "synthetic", "durationMs": 1400, "composition": "slide_in_fade + ether_burst", "vfx": "vfx-hero-aura" },
+        "talk": { "type": "synthetic", "loop": true, "composition": "idle_breath_pulse", "rate": 1.02 },
+        "react": { "type": "native_enhanced", "track": "damage", "durationMs": 400, "vfx": "alertSpark" },
+        "attack": { "type": "native_enhanced", "track": "rangehit", "vfx": "vfx-slash", "lungePx": 20 },
+        "hit": { "type": "native", "track": "damage", "vfx": "hitSpark", "flash": true },
+        "victory": { "type": "synthetic_cinematic", "track": "idle", "bounceScale": 1.08, "vfx": "victoryBurst" }
+      }
+    },
+    "dominica_player": {
+      "name": "Dominica",
+      "class": "melee",
+      "archetype": "战术指挥",
+      "unit": "dominica_player",
+      "nativeAnimations": ["idle", "damage", "hit"],
+      "actionBindings": {
+        "wake": { "type": "synthetic", "durationMs": 1000, "composition": "comms_connect_tone", "audio": "comms" },
+        "enter": { "type": "synthetic", "durationMs": 1200, "composition": "tactical_link_fade", "vfx": "tacticalLink" },
+        "talk": { "type": "synthetic", "loop": true, "composition": "comms_glow_pulse", "rate": 1.04 },
+        "react": { "type": "native_enhanced", "track": "damage", "durationMs": 400, "vfx": "shieldFlash" },
+        "attack": { "type": "native_enhanced", "track": "hit", "vfx": "vfx-slash", "lungePx": 16 },
+        "hit": { "type": "native", "track": "damage", "vfx": "hitSpark", "flash": true },
+        "victory": { "type": "synthetic_cinematic", "track": "idle", "bounceScale": 1.08, "vfx": "victoryBurst" }
+      }
+    },
+    "regina_player": {
+      "name": "Regina",
+      "class": "melee",
+      "archetype": "钢铁守卫",
+      "unit": "regina_player",
+      "nativeAnimations": ["idle", "damage", "hit"],
+      "actionBindings": {
+        "wake": { "type": "synthetic", "durationMs": 1000, "composition": "armor_lock_sfx", "audio": "shield" },
+        "enter": { "type": "synthetic", "durationMs": 1200, "composition": "shield_slam_in", "vfx": "shieldBarrier" },
+        "talk": { "type": "synthetic", "loop": true, "composition": "idle_steady", "rate": 1.0 },
+        "react": { "type": "native_enhanced", "track": "damage", "durationMs": 400, "vfx": "heavyArmorBlock" },
+        "attack": { "type": "native_enhanced", "track": "hit", "vfx": "vfx-slash", "lungePx": 14 },
+        "hit": { "type": "native", "track": "damage", "vfx": "hitSpark", "flash": true },
+        "victory": { "type": "synthetic_cinematic", "track": "idle", "bounceScale": 1.08, "vfx": "victoryBurst" }
+      }
+    }
+  }
+}

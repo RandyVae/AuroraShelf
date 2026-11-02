@@ -1,0 +1,220 @@
+arachne_maze_nude_enemy.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+Arm 1_3 coat (attack)
+bounds:351,491,20,19
+offsets:3,3,26,25
+Arm 2_2
+bounds:258,338,27,37
+offsets:3,4,33,44
+Arm 2_2 (attack)
+bounds:394,340,38,27
+offsets:4,3,44,33
+Arm 2_3
+bounds:248,336,18,23
+offsets:4,3,25,30
+Back fur
+bounds:216,392,45,25
+offsets:3,3,51,31
+Bra underboob
+bounds:134,333,43,13
+offsets:4,4,51,22
+Chest
+bounds:131,429,56,81
+offsets:3,3,78,86
+Choker
+bounds:424,501,18,9
+offsets:4,4,25,17
+Coat arm 2_1 (attack)
+bounds:84,381,37,46
+offsets:3,3,43,52
+Coat arm 2_2
+bounds:378,358,22,43
+offsets:2,4,26,51
+Coat arm 2_3
+bounds:55,358,33,41
+offsets:3,4,39,49
+Coat right
+bounds:219,333,21,47
+offsets:10,2,34,52
+Fingers
+bounds:54,500,10,10
+offsets:4,3,17,16
+Fingers copy
+bounds:132,500,9,10
+offsets:4,3,18,17
+Gun
+bounds:403,427,58,83
+offsets:3,4,63,90
+Hair_bck
+bounds:20,333,14,35
+offsets:4,4,22,42
+Hair_up_1
+bounds:2,381,34,51
+offsets:3,3,44,58
+Hair_up_2
+bounds:134,349,23,49
+offsets:4,4,42,75
+Hair_up_3
+bounds:188,340,19,27
+offsets:4,4,26,34
+Head_m1
+bounds:480,395,28,43
+offsets:4,3,36,50
+Hips
+bounds:263,438,57,44
+offsets:3,3,63,50
+Index
+bounds:309,502,8,8
+offsets:3,3,14,14
+Shadow 2
+bounds:178,356,24,45
+offsets:4,3,34,51
+Shadow_hair
+bounds:357,374,27,51
+offsets:7,5,39,58
+Shadow_head
+bounds:106,365,31,38
+offsets:10,25,45,67
+Shadow_neck
+bounds:479,331,15,23
+offsets:4,5,23,32
+Shdw
+bounds:274,418,22,22
+offsets:4,4,30,31
+arm 1_1
+bounds:358,406,43,58
+offsets:3,4,50,65
+arm 1_1coat  (attack)
+bounds:187,415,39,62
+offsets:3,4,45,68
+arm 1_2
+bounds:279,392,45,37
+offsets:4,3,53,44
+arm 1_2 coat (attack)
+bounds:279,355,33,37
+offsets:3,3,39,43
+arm 1_30
+bounds:63,339,33,28
+offsets:3,3,39,34
+arm 2_2 coat (attack)
+bounds:145,380,41,33
+offsets:3,3,48,40
+arm 2_3 back
+bounds:205,337,18,18
+offsets:4,3,25,25
+arm1_2 (attack)
+bounds:153,343,25,37
+offsets:3,4,32,44
+arm2_1 (attack)
+bounds:473,351,37,41
+offsets:3,4,42,50
+back right
+bounds:222,415,30,62
+offsets:2,2,35,66
+belt 1
+bounds:447,319,29,56
+offsets:4,2,36,62
+belt 2
+bounds:486,317,24,62
+offsets:3,3,30,68
+boob_1
+bounds:121,403,30,40
+offsets:4,6,38,50
+boob_2
+bounds:235,353,24,38
+offsets:4,4,32,45
+boot_1
+bounds:420,348,25,42
+offsets:3,3,32,47
+boot_2
+bounds:2,343,25,39
+offsets:3,2,32,44
+bra_10+
+bounds:335,329,29,47
+offsets:4,3,42,54
+bra_20+
+bounds:355,322,24,40
+offsets:3,4,30,49
+ear
+bounds:73,498,6,12
+offsets:4,4,14,19
+fire
+bounds:185,479,96,31
+gun attack
+bounds:283,457,91,53
+offsets:3,3,96,59
+hand 2_3 (attack)
+bounds:30,493,26,17
+offsets:4,4,35,42
+hand1_3 (attack)
+bounds:151,415,17,14
+offsets:3,3,29,20
+hip_1
+bounds:374,431,49,79
+offsets:3,3,55,85
+hip_2
+bounds:475,437,31,73
+offsets:4,3,38,78
+left 1
+bounds:32,347,26,52
+offsets:4,10,34,65
+left 1_fur
+bounds:172,400,30,50
+offsets:5,35,38,88
+left 2 coat
+bounds:247,373,31,104
+offsets:5,17,40,124
+leg 1_1
+bounds:315,401,44,64
+offsets:4,3,52,70
+leg 1_2
+bounds:446,353,23,64
+offsets:4,4,30,69
+leg 2_1
+bounds:418,384,33,63
+offsets:3,4,40,70
+leg 2_2
+bounds:96,339,20,48
+offsets:4,3,28,54
+panties
+bounds:302,373,53,35
+offsets:3,3,60,41
+r_1
+bounds:27,328,21,24
+offsets:4,13,27,41
+r_2
+bounds:455,485,12,25
+offsets:29,16,45,44
+right fur
+bounds:305,352,29,34
+offsets:4,4,36,42
+shadow
+bounds:286,340,44,14
+offsets:4,3,51,22
+shadow_coat
+bounds:446,378,38,132
+offsets:3,4,46,142
+shdw_boob 1
+bounds:376,326,29,29
+offsets:4,5,46,40
+shdw_boob 2
+bounds:300,425,19,15
+offsets:4,5,32,49
+shdw_fur_L
+bounds:115,338,18,21
+offsets:5,5,28,31
+shin_1
+bounds:401,370,20,52
+offsets:3,3,26,58
+shin_2
+bounds:202,358,22,53
+offsets:4,3,29,59
+skirt
+bounds:2,399,80,111
+offsets:3,3,86,117
+top_bck
+bounds:80,427,51,83
+offsets:1,1,53,84

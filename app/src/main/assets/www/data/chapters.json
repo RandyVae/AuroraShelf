@@ -1,0 +1,2169 @@
+[
+  {
+    "id": 1,
+    "title": "第一章 · 霓虹雨夜",
+    "subtitle": "从后台走出第一步",
+    "bg": "bg_dialogue_night_street_1_small",
+    "stages": [
+      {
+        "id": "1-1",
+        "stage": 1,
+        "title": "第一章 · 霓虹雨夜 · 1",
+        "enemy": [
+          {
+            "id": "drone_enemy",
+            "name": "Drone",
+            "unit": "drone_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 23,
+            "hp": 222,
+            "battleHp": 1776,
+            "rank": 0.144
+          },
+          {
+            "id": "harper_enemy",
+            "name": "Harper",
+            "unit": "harper_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 95,
+            "hp": 83,
+            "battleHp": 664,
+            "rank": 0.156
+          },
+          {
+            "id": "hilda_enemy",
+            "name": "Hilda",
+            "unit": "hilda_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 80,
+            "hp": 122,
+            "battleHp": 976,
+            "rank": 0.168
+          }
+        ],
+        "level": 4,
+        "rewardGold": 180,
+        "rewardKeys": 0,
+        "rewardShards": 6
+      },
+      {
+        "id": "1-2",
+        "stage": 2,
+        "title": "第一章 · 霓虹雨夜 · 2",
+        "enemy": [
+          {
+            "id": "kiana_enemy",
+            "name": "Kiana",
+            "unit": "kiana_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 75,
+            "hp": 60,
+            "battleHp": 480,
+            "rank": 0.102
+          },
+          {
+            "id": "lola_enemy",
+            "name": "Lola",
+            "unit": "lola_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 98,
+            "hp": 80,
+            "battleHp": 640,
+            "rank": 0.162
+          },
+          {
+            "id": "morana_enemy",
+            "name": "Morana",
+            "unit": "morana_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 52,
+            "hp": 159,
+            "battleHp": 1272,
+            "rank": 0.138
+          }
+        ],
+        "level": 5,
+        "rewardGold": 200,
+        "rewardKeys": 0,
+        "rewardShards": 6
+      },
+      {
+        "id": "1-3",
+        "stage": 3,
+        "title": "第一章 · 霓虹雨夜 · 3",
+        "enemy": [
+          {
+            "id": "natasha_enemy",
+            "name": "Natasha",
+            "unit": "natasha_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 69,
+            "hp": 146,
+            "battleHp": 1168,
+            "rank": 0.174
+          },
+          {
+            "id": "nicole_enemy",
+            "name": "Nicole",
+            "unit": "nicole_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 62,
+            "hp": 110,
+            "battleHp": 880,
+            "rank": 0.114
+          },
+          {
+            "id": "rose_enemy",
+            "name": "Rose",
+            "unit": "rose_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 91,
+            "hp": 106,
+            "battleHp": 848,
+            "rank": 0.18
+          }
+        ],
+        "level": 6,
+        "rewardGold": 220,
+        "rewardKeys": 0,
+        "rewardShards": 6
+      },
+      {
+        "id": "1-4",
+        "stage": 4,
+        "title": "第一章 · 霓虹雨夜 · 4",
+        "enemy": [
+          {
+            "id": "beck_enemy",
+            "name": "Beck",
+            "unit": "beck_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 71,
+            "hp": 105,
+            "battleHp": 840,
+            "rank": 0.126
+          },
+          {
+            "id": "bloom_enemy",
+            "name": "Bloom",
+            "unit": "bloom_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 79,
+            "hp": 80,
+            "battleHp": 640,
+            "rank": 0.12
+          },
+          {
+            "id": "bonita_enemy",
+            "name": "Bonita",
+            "unit": "bonita_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 30,
+            "hp": 120,
+            "battleHp": 960,
+            "rank": 0.09
+          }
+        ],
+        "level": 7,
+        "rewardGold": 240,
+        "rewardKeys": 1,
+        "rewardShards": 6,
+        "rewardCg": "assets/videos/cg_ch1.mp4"
+      }
+    ],
+    "story": [
+      {
+        "who": "Kitty",
+        "text": "欢迎回来，指挥官。后台的线报说，今晚有三支人在找我们的麻烦。"
+      },
+      {
+        "who": "Ethan",
+        "text": "三支？我们连一支都还没凑齐。"
+      },
+      {
+        "who": "Kitty",
+        "text": "所以才要你上场。别担心，我会站在你前面——至少大部分时间。"
+      },
+      {
+        "who": "Ethan",
+        "text": "那就从最近的一条街开始。把灯关掉，我们从后面进去。"
+      }
+    ],
+    "bgWeb": "assets/bg/ch1.webp",
+    "rewardCg": "assets/videos/cg_ch1.mp4"
+  },
+  {
+    "id": 2,
+    "title": "第二章 · 废弃街区",
+    "subtitle": "秩序与混沌的第一次碰撞",
+    "bg": "bg_dialogue_outskirts_small",
+    "stages": [
+      {
+        "id": "2-1",
+        "stage": 1,
+        "title": "第二章 · 废弃街区 · 1",
+        "enemy": [
+          {
+            "id": "belle_enemy",
+            "name": "Belle",
+            "unit": "belle_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 84,
+            "hp": 175,
+            "battleHp": 1400,
+            "rank": 0.281
+          },
+          {
+            "id": "blanche_enemy",
+            "name": "Blanche",
+            "unit": "blanche_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 135,
+            "hp": 58,
+            "battleHp": 464,
+            "rank": 0.251
+          },
+          {
+            "id": "casey_enemy",
+            "name": "Casey",
+            "unit": "casey_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 109,
+            "hp": 92,
+            "battleHp": 736,
+            "rank": 0.222
+          }
+        ],
+        "level": 7,
+        "rewardGold": 220,
+        "rewardKeys": 0,
+        "rewardShards": 7
+      },
+      {
+        "id": "2-2",
+        "stage": 2,
+        "title": "第二章 · 废弃街区 · 2",
+        "enemy": [
+          {
+            "id": "hilda_enemy",
+            "name": "Hilda",
+            "unit": "hilda_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 80,
+            "hp": 122,
+            "battleHp": 976,
+            "rank": 0.168
+          },
+          {
+            "id": "kayya_enemy",
+            "name": "Kayya",
+            "unit": "kayya_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "epic",
+            "atk": 114,
+            "hp": 114,
+            "battleHp": 912,
+            "rank": 0.275
+          },
+          {
+            "id": "lilith_enemy",
+            "name": "Lilith",
+            "unit": "lilith_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 103,
+            "hp": 95,
+            "battleHp": 760,
+            "rank": 0.198
+          }
+        ],
+        "level": 8,
+        "rewardGold": 240,
+        "rewardKeys": 0,
+        "rewardShards": 7
+      },
+      {
+        "id": "2-3",
+        "stage": 3,
+        "title": "第二章 · 废弃街区 · 3",
+        "enemy": [
+          {
+            "id": "lola_enemy",
+            "name": "Lola",
+            "unit": "lola_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 98,
+            "hp": 80,
+            "battleHp": 640,
+            "rank": 0.162
+          },
+          {
+            "id": "lorraine_enemy",
+            "name": "Lorraine",
+            "unit": "lorraine_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 77,
+            "hp": 135,
+            "battleHp": 1080,
+            "rank": 0.186
+          },
+          {
+            "id": "lucretia_enemy",
+            "name": "Lucretia",
+            "unit": "lucretia_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 121,
+            "hp": 71,
+            "battleHp": 568,
+            "rank": 0.228
+          }
+        ],
+        "level": 9,
+        "rewardGold": 260,
+        "rewardKeys": 0,
+        "rewardShards": 7
+      },
+      {
+        "id": "2-4",
+        "stage": 4,
+        "title": "第二章 · 废弃街区 · 4",
+        "enemy": [
+          {
+            "id": "mitsuki_enemy",
+            "name": "Mitsuki",
+            "unit": "mitsuki_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 102,
+            "hp": 122,
+            "battleHp": 976,
+            "rank": 0.24
+          },
+          {
+            "id": "naomi_enemy",
+            "name": "Naomi",
+            "unit": "naomi_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 108,
+            "hp": 83,
+            "battleHp": 664,
+            "rank": 0.192
+          },
+          {
+            "id": "natasha_enemy",
+            "name": "Natasha",
+            "unit": "natasha_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 69,
+            "hp": 146,
+            "battleHp": 1168,
+            "rank": 0.174
+          }
+        ],
+        "level": 10,
+        "rewardGold": 280,
+        "rewardKeys": 1,
+        "rewardShards": 7,
+        "rewardCg": "assets/videos/cg_ch2.mp4"
+      }
+    ],
+    "story": [
+      {
+        "who": "Regina",
+        "text": "站住。你们踏进了混沌的地盘，连招呼都不打一声？"
+      },
+      {
+        "who": "Ethan",
+        "text": "我们只是想借这条路。"
+      },
+      {
+        "who": "Regina",
+        "text": "借？在这座城里，路是用拳头写规矩的。"
+      },
+      {
+        "who": "Kitty",
+        "text": "指挥官，她很强。但她的手下更怕她，而不是怕我们。"
+      },
+      {
+        "who": "Ethan",
+        "text": "那就让她们知道，今晚的规矩换人写了。"
+      }
+    ],
+    "bgWeb": "assets/bg/ch2.webp",
+    "rewardCg": "assets/videos/cg_ch2.mp4"
+  },
+  {
+    "id": 3,
+    "title": "第三章 · 丛林哨站",
+    "subtitle": "自然系的呼救",
+    "bg": "bg_dialogue_jungle_1_small",
+    "stages": [
+      {
+        "id": "3-1",
+        "stage": 1,
+        "title": "第三章 · 丛林哨站 · 1",
+        "enemy": [
+          {
+            "id": "billie_enemy",
+            "name": "Billie",
+            "unit": "billie_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 73,
+            "hp": 214,
+            "battleHp": 1712,
+            "rank": 0.305
+          },
+          {
+            "id": "britney_enemy",
+            "name": "Britney",
+            "unit": "britney_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 132,
+            "hp": 131,
+            "battleHp": 1048,
+            "rank": 0.323
+          }
+        ],
+        "level": 10,
+        "rewardGold": 260,
+        "rewardKeys": 0,
+        "rewardShards": 8
+      },
+      {
+        "id": "3-2",
+        "stage": 2,
+        "title": "第三章 · 丛林哨站 · 2",
+        "enemy": [
+          {
+            "id": "florence_enemy",
+            "name": "Florence",
+            "unit": "florence_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "epic",
+            "atk": 158,
+            "hp": 123,
+            "battleHp": 984,
+            "rank": 0.347
+          },
+          {
+            "id": "grace_enemy",
+            "name": "Grace",
+            "unit": "grace_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 138,
+            "hp": 84,
+            "battleHp": 672,
+            "rank": 0.299
+          },
+          {
+            "id": "kayya_enemy",
+            "name": "Kayya",
+            "unit": "kayya_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "epic",
+            "atk": 114,
+            "hp": 114,
+            "battleHp": 912,
+            "rank": 0.275
+          }
+        ],
+        "level": 11,
+        "rewardGold": 280,
+        "rewardKeys": 0,
+        "rewardShards": 8
+      },
+      {
+        "id": "3-3",
+        "stage": 3,
+        "title": "第三章 · 丛林哨站 · 3",
+        "enemy": [
+          {
+            "id": "kira_enemy",
+            "name": "Kira",
+            "unit": "kira_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "common",
+            "atk": 216,
+            "hp": 63,
+            "battleHp": 504,
+            "rank": 0.359
+          },
+          {
+            "id": "kirsten_enemy",
+            "name": "Kirsten",
+            "unit": "kirsten_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 106,
+            "hp": 228,
+            "battleHp": 1824,
+            "rank": 0.353
+          },
+          {
+            "id": "luther_enemy",
+            "name": "Luther",
+            "unit": "luther_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 103,
+            "hp": 310,
+            "battleHp": 2480,
+            "rank": 0.377
+          }
+        ],
+        "level": 12,
+        "rewardGold": 300,
+        "rewardKeys": 0,
+        "rewardShards": 8
+      },
+      {
+        "id": "3-4",
+        "stage": 4,
+        "title": "第三章 · 丛林哨站 · 4",
+        "enemy": [
+          {
+            "id": "paloma_holo_enemy",
+            "name": "Paloma Holo",
+            "unit": "paloma_holo_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 240,
+            "hp": 50,
+            "battleHp": 400,
+            "rank": 0.389
+          },
+          {
+            "id": "regina_enemy",
+            "name": "Regina",
+            "unit": "regina_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 76,
+            "hp": 265,
+            "battleHp": 2120,
+            "rank": 0.341
+          },
+          {
+            "id": "sixtine_enemy",
+            "name": "Sixtine",
+            "unit": "sixtine_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 137,
+            "hp": 76,
+            "battleHp": 608,
+            "rank": 0.293
+          }
+        ],
+        "level": 13,
+        "rewardGold": 320,
+        "rewardKeys": 0,
+        "rewardShards": 8
+      },
+      {
+        "id": "3-5",
+        "stage": 5,
+        "title": "第三章 · 丛林哨站 · 5",
+        "enemy": [
+          {
+            "id": "skye_enemy",
+            "name": "Skye",
+            "unit": "skye_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 83,
+            "hp": 180,
+            "battleHp": 1440,
+            "rank": 0.287
+          },
+          {
+            "id": "spider_enemy",
+            "name": "Spider",
+            "unit": "spider_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 85,
+            "hp": 354,
+            "battleHp": 2832,
+            "rank": 0.383
+          },
+          {
+            "id": "sunmi_enemy",
+            "name": "Sunmi",
+            "unit": "sunmi_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "epic",
+            "atk": 170,
+            "hp": 155,
+            "battleHp": 1240,
+            "rank": 0.365
+          }
+        ],
+        "level": 14,
+        "rewardGold": 340,
+        "rewardKeys": 1,
+        "rewardShards": 8,
+        "rewardCg": "assets/videos/cg_ch3.mp4"
+      }
+    ],
+    "story": [
+      {
+        "who": "Mitsuki",
+        "text": "你们来得太迟了。哨站昨晚就被撕开了一个口子。"
+      },
+      {
+        "who": "Ethan",
+        "text": "是什么东西干的？"
+      },
+      {
+        "who": "Mitsuki",
+        "text": "不是东西，是饥饿。被赶到林子深处的东西，现在只剩饥饿。"
+      },
+      {
+        "who": "Kitty",
+        "text": "那就喂饱它们——用我们自己?"
+      },
+      {
+        "who": "Mitsuki",
+        "text": "不。用刃。跟我来，我知道它们在哪。"
+      }
+    ],
+    "bgWeb": "assets/bg/ch3.webp",
+    "rewardCg": "assets/videos/cg_ch3.mp4"
+  },
+  {
+    "id": 4,
+    "title": "第四章 · 沙海关卡",
+    "subtitle": "商路尽头的敌意",
+    "bg": "bg_dialogue_desert_2_small",
+    "stages": [
+      {
+        "id": "4-1",
+        "stage": 1,
+        "title": "第四章 · 沙海关卡 · 1",
+        "enemy": [
+          {
+            "id": "irma_enemy",
+            "name": "Irma",
+            "unit": "irma_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 75,
+            "hp": 625,
+            "battleHp": 5000,
+            "rank": 0.497
+          },
+          {
+            "id": "ivy_enemy",
+            "name": "Ivy",
+            "unit": "ivy_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 225,
+            "hp": 270,
+            "battleHp": 2160,
+            "rank": 0.461
+          },
+          {
+            "id": "kitty_enemy",
+            "name": "Kitty",
+            "unit": "kitty_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 219,
+            "hp": 239,
+            "battleHp": 1912,
+            "rank": 0.449
+          }
+        ],
+        "level": 13,
+        "rewardGold": 300,
+        "rewardKeys": 0,
+        "rewardShards": 9
+      },
+      {
+        "id": "4-2",
+        "stage": 2,
+        "title": "第四章 · 沙海关卡 · 2",
+        "enemy": [
+          {
+            "id": "leta_enemy",
+            "name": "Leta",
+            "unit": "leta_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 233,
+            "hp": 291,
+            "battleHp": 2328,
+            "rank": 0.473
+          },
+          {
+            "id": "madeleine_enemy",
+            "name": "Madeleine",
+            "unit": "madeleine_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 247,
+            "hp": 177,
+            "battleHp": 1416,
+            "rank": 0.437
+          },
+          {
+            "id": "mitsuki_summon_enemy",
+            "name": "Mitsuki Summon",
+            "unit": "mitsuki_summon_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 211,
+            "hp": 257,
+            "battleHp": 2056,
+            "rank": 0.455
+          }
+        ],
+        "level": 14,
+        "rewardGold": 320,
+        "rewardKeys": 0,
+        "rewardShards": 9
+      },
+      {
+        "id": "4-3",
+        "stage": 3,
+        "title": "第四章 · 沙海关卡 · 3",
+        "enemy": [
+          {
+            "id": "paloma_enemy",
+            "name": "Paloma",
+            "unit": "paloma_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 207,
+            "hp": 247,
+            "battleHp": 1976,
+            "rank": 0.431
+          },
+          {
+            "id": "paloma_holo_enemy",
+            "name": "Paloma Holo",
+            "unit": "paloma_holo_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 240,
+            "hp": 50,
+            "battleHp": 400,
+            "rank": 0.389
+          },
+          {
+            "id": "salma_enemy",
+            "name": "Salma",
+            "unit": "salma_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 303,
+            "hp": 180,
+            "battleHp": 1440,
+            "rank": 0.509
+          }
+        ],
+        "level": 15,
+        "rewardGold": 340,
+        "rewardKeys": 0,
+        "rewardShards": 9
+      },
+      {
+        "id": "4-4",
+        "stage": 4,
+        "title": "第四章 · 沙海关卡 · 4",
+        "enemy": [
+          {
+            "id": "scarlett_enemy",
+            "name": "Scarlett",
+            "unit": "scarlett_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 166,
+            "hp": 432,
+            "battleHp": 3456,
+            "rank": 0.479
+          },
+          {
+            "id": "shelby_enemy",
+            "name": "Shelby",
+            "unit": "shelby_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 74,
+            "hp": 630,
+            "battleHp": 5040,
+            "rank": 0.503
+          },
+          {
+            "id": "spider_enemy",
+            "name": "Spider",
+            "unit": "spider_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 85,
+            "hp": 354,
+            "battleHp": 2832,
+            "rank": 0.383
+          }
+        ],
+        "level": 16,
+        "rewardGold": 360,
+        "rewardKeys": 0,
+        "rewardShards": 9
+      },
+      {
+        "id": "4-5",
+        "stage": 5,
+        "title": "第四章 · 沙海关卡 · 5",
+        "enemy": [
+          {
+            "id": "trixie_enemy",
+            "name": "Trixie",
+            "unit": "trixie_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 161,
+            "hp": 267,
+            "battleHp": 2136,
+            "rank": 0.401
+          },
+          {
+            "id": "vivienne_enemy",
+            "name": "Vivienne",
+            "unit": "vivienne_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 225,
+            "hp": 225,
+            "battleHp": 1800,
+            "rank": 0.443
+          },
+          {
+            "id": "wayne_enemy",
+            "name": "Wayne",
+            "unit": "wayne_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 110,
+            "hp": 547,
+            "battleHp": 4376,
+            "rank": 0.485
+          }
+        ],
+        "level": 17,
+        "rewardGold": 380,
+        "rewardKeys": 1,
+        "rewardShards": 9,
+        "rewardCg": "assets/videos/cg_ch4.mp4"
+      }
+    ],
+    "story": [
+      {
+        "who": "Lucretia",
+        "text": "过了这道关，你们就得按沙海的规矩付钱。"
+      },
+      {
+        "who": "Ethan",
+        "text": "我们付不起。"
+      },
+      {
+        "who": "Lucretia",
+        "text": "那就付别的东西。在这片沙里，命比钱好使。"
+      },
+      {
+        "who": "Kitty",
+        "text": "她身后那群人不是沙匪，是她的旧部。"
+      },
+      {
+        "who": "Ethan",
+        "text": "旧部更好办——他们还记得怎么输。"
+      }
+    ],
+    "bgWeb": "assets/bg/ch4.webp",
+    "rewardCg": "assets/videos/cg_ch4.mp4"
+  },
+  {
+    "id": 5,
+    "title": "第五章 · 霓虹港湾",
+    "subtitle": "线人与谎言",
+    "bg": "bg_dialogue_sea_of_thieves_small",
+    "stages": [
+      {
+        "id": "5-1",
+        "stage": 1,
+        "title": "第五章 · 霓虹港湾 · 1",
+        "enemy": [
+          {
+            "id": "falenia_enemy",
+            "name": "Falenia",
+            "unit": "falenia_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 133,
+            "hp": 699,
+            "battleHp": 5592,
+            "rank": 0.563
+          },
+          {
+            "id": "ginny_enemy",
+            "name": "Ginny",
+            "unit": "ginny_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 160,
+            "hp": 822,
+            "battleHp": 6576,
+            "rank": 0.617
+          },
+          {
+            "id": "gwenny_enemy",
+            "name": "Gwenny",
+            "unit": "gwenny_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 300,
+            "hp": 540,
+            "battleHp": 4320,
+            "rank": 0.611
+          }
+        ],
+        "level": 16,
+        "rewardGold": 340,
+        "rewardKeys": 0,
+        "rewardShards": 10
+      },
+      {
+        "id": "5-2",
+        "stage": 2,
+        "title": "第五章 · 霓虹港湾 · 2",
+        "enemy": [
+          {
+            "id": "hunter_dog_enemy",
+            "name": "Hunter Dog",
+            "unit": "hunter_dog_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 313,
+            "hp": 418,
+            "battleHp": 3344,
+            "rank": 0.587
+          },
+          {
+            "id": "irma_enemy",
+            "name": "Irma",
+            "unit": "irma_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 75,
+            "hp": 625,
+            "battleHp": 5000,
+            "rank": 0.497
+          },
+          {
+            "id": "korben_enemy",
+            "name": "Korben",
+            "unit": "korben_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 274,
+            "hp": 297,
+            "battleHp": 2376,
+            "rank": 0.533
+          }
+        ],
+        "level": 17,
+        "rewardGold": 360,
+        "rewardKeys": 0,
+        "rewardShards": 10
+      },
+      {
+        "id": "5-3",
+        "stage": 3,
+        "title": "第五章 · 霓虹港湾 · 3",
+        "enemy": [
+          {
+            "id": "maddie_enemy",
+            "name": "Maddie",
+            "unit": "maddie_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 270,
+            "hp": 326,
+            "battleHp": 2608,
+            "rank": 0.545
+          },
+          {
+            "id": "nonna_enemy",
+            "name": "Nonna",
+            "unit": "nonna_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 22,
+            "hp": 780,
+            "battleHp": 6240,
+            "rank": 0.521
+          },
+          {
+            "id": "omega_enemy",
+            "name": "Omega",
+            "unit": "omega_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 282,
+            "hp": 239,
+            "battleHp": 1912,
+            "rank": 0.515
+          }
+        ],
+        "level": 18,
+        "rewardGold": 380,
+        "rewardKeys": 0,
+        "rewardShards": 10
+      },
+      {
+        "id": "5-4",
+        "stage": 4,
+        "title": "第五章 · 霓虹港湾 · 4",
+        "enemy": [
+          {
+            "id": "orin_enemy",
+            "name": "Orin",
+            "unit": "orin_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 304,
+            "hp": 264,
+            "battleHp": 2112,
+            "rank": 0.551
+          },
+          {
+            "id": "salma_enemy",
+            "name": "Salma",
+            "unit": "salma_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 303,
+            "hp": 180,
+            "battleHp": 1440,
+            "rank": 0.509
+          },
+          {
+            "id": "shelby_enemy",
+            "name": "Shelby",
+            "unit": "shelby_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 74,
+            "hp": 630,
+            "battleHp": 5040,
+            "rank": 0.503
+          }
+        ],
+        "level": 19,
+        "rewardGold": 400,
+        "rewardKeys": 0,
+        "rewardShards": 10
+      },
+      {
+        "id": "5-5",
+        "stage": 5,
+        "title": "第五章 · 霓虹港湾 · 5",
+        "enemy": [
+          {
+            "id": "ariane_enemy",
+            "name": "Ariane",
+            "unit": "ariane_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 296,
+            "hp": 243,
+            "battleHp": 1944,
+            "rank": 0.527
+          },
+          {
+            "id": "diya_enemy",
+            "name": "Diya",
+            "unit": "diya_enemy",
+            "class": "ranged",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 180,
+            "hp": 500,
+            "battleHp": 4000,
+            "rank": 0.539
+          },
+          {
+            "id": "dominica_enemy",
+            "name": "Dominica",
+            "unit": "dominica_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 250,
+            "hp": 494,
+            "battleHp": 3952,
+            "rank": 0.569
+          }
+        ],
+        "level": 20,
+        "rewardGold": 420,
+        "rewardKeys": 1,
+        "rewardShards": 10
+      }
+    ],
+    "story": [
+      {
+        "who": "Bea",
+        "text": "你们要找的人跑了，线人是我的人，账要算在你们头上。"
+      },
+      {
+        "who": "Ethan",
+        "text": "还是算在你账上吧，毕竟是你开的价。"
+      },
+      {
+        "who": "Bea",
+        "text": "好大的口气。港湾的规矩是先动手的人先死。"
+      },
+      {
+        "who": "Kitty",
+        "text": "她不喜欢输，指挥官。可她更不喜欢被人看穿。"
+      },
+      {
+        "who": "Ethan",
+        "text": "那就让她两样都占上。"
+      }
+    ],
+    "bgWeb": "assets/bg/ch5.webp"
+  },
+  {
+    "id": 6,
+    "title": "第六章 · 机库回廊",
+    "subtitle": "钢铁也会害怕",
+    "bg": "bg_dialogue_robotwar_small",
+    "stages": [
+      {
+        "id": "6-1",
+        "stage": 1,
+        "title": "第六章 · 机库回廊 · 1",
+        "enemy": [
+          {
+            "id": "faye_maze_enemy",
+            "name": "Faye Maze",
+            "unit": "faye_maze_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.707
+          },
+          {
+            "id": "ginny_enemy",
+            "name": "Ginny",
+            "unit": "ginny_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 160,
+            "hp": 822,
+            "battleHp": 6576,
+            "rank": 0.617
+          },
+          {
+            "id": "ginny_skin_nude_enemy",
+            "name": "Ginny Skin Nude",
+            "unit": "ginny_skin_nude_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.713
+          }
+        ],
+        "level": 19,
+        "rewardGold": 380,
+        "rewardKeys": 0,
+        "rewardShards": 11
+      },
+      {
+        "id": "6-2",
+        "stage": 2,
+        "title": "第六章 · 机库回廊 · 2",
+        "enemy": [
+          {
+            "id": "gwenny_enemy",
+            "name": "Gwenny",
+            "unit": "gwenny_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 300,
+            "hp": 540,
+            "battleHp": 4320,
+            "rank": 0.611
+          },
+          {
+            "id": "ivy_skin_nude_enemy",
+            "name": "Ivy Skin Nude",
+            "unit": "ivy_skin_nude_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.701
+          },
+          {
+            "id": "justina_enemy",
+            "name": "Justina",
+            "unit": "justina_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 180,
+            "hp": 1050,
+            "battleHp": 8400,
+            "rank": 0.635
+          }
+        ],
+        "level": 20,
+        "rewardGold": 400,
+        "rewardKeys": 0,
+        "rewardShards": 11
+      },
+      {
+        "id": "6-3",
+        "stage": 3,
+        "title": "第六章 · 机库回廊 · 3",
+        "enemy": [
+          {
+            "id": "salma_maze_enemy",
+            "name": "Salma Maze",
+            "unit": "salma_maze_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.695
+          },
+          {
+            "id": "skye_skin_nude_enemy",
+            "name": "Skye Skin Nude",
+            "unit": "skye_skin_nude_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.719
+          },
+          {
+            "id": "summon_marcela_enemy",
+            "name": "Summon Marcela",
+            "unit": "summon_marcela_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "epic",
+            "atk": 580,
+            "hp": 928,
+            "battleHp": 7424,
+            "rank": 0.671
+          }
+        ],
+        "level": 21,
+        "rewardGold": 420,
+        "rewardKeys": 0,
+        "rewardShards": 11
+      },
+      {
+        "id": "6-4",
+        "stage": 4,
+        "title": "第六章 · 机库回廊 · 4",
+        "enemy": [
+          {
+            "id": "faye_enemy",
+            "name": "Faye",
+            "unit": "faye_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "common",
+            "atk": 1188,
+            "hp": 1,
+            "battleHp": 8,
+            "rank": 0.677
+          },
+          {
+            "id": "faye_maze_enemy",
+            "name": "Faye Maze",
+            "unit": "faye_maze_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.707
+          },
+          {
+            "id": "ginny_enemy",
+            "name": "Ginny",
+            "unit": "ginny_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 160,
+            "hp": 822,
+            "battleHp": 6576,
+            "rank": 0.617
+          }
+        ],
+        "level": 22,
+        "rewardGold": 440,
+        "rewardKeys": 0,
+        "rewardShards": 11
+      },
+      {
+        "id": "6-5",
+        "stage": 5,
+        "title": "第六章 · 机库回廊 · 5",
+        "enemy": [
+          {
+            "id": "ginny_skin_nude_enemy",
+            "name": "Ginny Skin Nude",
+            "unit": "ginny_skin_nude_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.713
+          },
+          {
+            "id": "gwenny_enemy",
+            "name": "Gwenny",
+            "unit": "gwenny_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 300,
+            "hp": 540,
+            "battleHp": 4320,
+            "rank": 0.611
+          },
+          {
+            "id": "ivy_skin_nude_enemy",
+            "name": "Ivy Skin Nude",
+            "unit": "ivy_skin_nude_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.701
+          }
+        ],
+        "level": 23,
+        "rewardGold": 460,
+        "rewardKeys": 0,
+        "rewardShards": 11
+      },
+      {
+        "id": "6-6",
+        "stage": 6,
+        "title": "第六章 · 机库回廊 · 6",
+        "enemy": [
+          {
+            "id": "justina_enemy",
+            "name": "Justina",
+            "unit": "justina_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 180,
+            "hp": 1050,
+            "battleHp": 8400,
+            "rank": 0.635
+          },
+          {
+            "id": "salma_maze_enemy",
+            "name": "Salma Maze",
+            "unit": "salma_maze_enemy",
+            "class": "ranged",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.695
+          },
+          {
+            "id": "skye_skin_nude_enemy",
+            "name": "Skye Skin Nude",
+            "unit": "skye_skin_nude_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.719
+          }
+        ],
+        "level": 24,
+        "rewardGold": 480,
+        "rewardKeys": 1,
+        "rewardShards": 11
+      }
+    ],
+    "story": [
+      {
+        "who": "Hilda",
+        "text": "别碰那些机器。它们已经不太认得人了。"
+      },
+      {
+        "who": "Ethan",
+        "text": "它们认枪吗？"
+      },
+      {
+        "who": "Hilda",
+        "text": "认。可惜是先认出枪，再认出人。"
+      },
+      {
+        "who": "Kitty",
+        "text": "回廊太窄了，我们的远程优势会被削掉一半。"
+      },
+      {
+        "who": "Ethan",
+        "text": "那就不走回廊。炸开侧墙，让它们自己挤成一团。"
+      }
+    ],
+    "bgWeb": "assets/bg/ch6.webp"
+  },
+  {
+    "id": 7,
+    "title": "第七章 · 星界裂隙",
+    "subtitle": "不属于这座城的东西",
+    "bg": "bg_dialogue_cosmos_small",
+    "stages": [
+      {
+        "id": "7-1",
+        "stage": 1,
+        "title": "第七章 · 星界裂隙 · 1",
+        "enemy": [
+          {
+            "id": "casey_maze_enemy",
+            "name": "Casey Maze",
+            "unit": "casey_maze_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 3500,
+            "battleHp": 28000,
+            "rank": 0.784
+          },
+          {
+            "id": "charlotte_maze_nude_enemy",
+            "name": "Charlotte Maze Nude",
+            "unit": "charlotte_maze_nude_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 3500,
+            "battleHp": 28000,
+            "rank": 0.772
+          },
+          {
+            "id": "chloe_enemy",
+            "name": "Chloe",
+            "unit": "chloe_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 1675,
+            "hp": 772,
+            "battleHp": 6176,
+            "rank": 0.808
+          }
+        ],
+        "level": 22,
+        "rewardGold": 420,
+        "rewardKeys": 0,
+        "rewardShards": 12
+      },
+      {
+        "id": "7-2",
+        "stage": 2,
+        "title": "第七章 · 星界裂隙 · 2",
+        "enemy": [
+          {
+            "id": "ginny_skin_nude_enemy",
+            "name": "Ginny Skin Nude",
+            "unit": "ginny_skin_nude_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.713
+          },
+          {
+            "id": "morana_maze_enemy",
+            "name": "Morana Maze",
+            "unit": "morana_maze_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 3500,
+            "battleHp": 28000,
+            "rank": 0.796
+          },
+          {
+            "id": "nicole2_skin_nude_enemy",
+            "name": "Nicole2 Skin Nude",
+            "unit": "nicole2_skin_nude_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 3500,
+            "battleHp": 28000,
+            "rank": 0.766
+          }
+        ],
+        "level": 23,
+        "rewardGold": 440,
+        "rewardKeys": 0,
+        "rewardShards": 12
+      },
+      {
+        "id": "7-3",
+        "stage": 3,
+        "title": "第七章 · 星界裂隙 · 3",
+        "enemy": [
+          {
+            "id": "ravenna_enemy",
+            "name": "Ravenna",
+            "unit": "ravenna_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 540,
+            "hp": 1947,
+            "battleHp": 15576,
+            "rank": 0.754
+          },
+          {
+            "id": "skye_skin_nude_enemy",
+            "name": "Skye Skin Nude",
+            "unit": "skye_skin_nude_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.719
+          },
+          {
+            "id": "sunmi_skin_enemy",
+            "name": "Sunmi Skin",
+            "unit": "sunmi_skin_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 2700,
+            "battleHp": 21600,
+            "rank": 0.725
+          }
+        ],
+        "level": 24,
+        "rewardGold": 460,
+        "rewardKeys": 0,
+        "rewardShards": 12
+      },
+      {
+        "id": "7-4",
+        "stage": 4,
+        "title": "第七章 · 星界裂隙 · 4",
+        "enemy": [
+          {
+            "id": "tenebras_mecha_dragon_enemy",
+            "name": "Tenebras Mecha Dragon",
+            "unit": "tenebras_mecha_dragon_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 1275,
+            "hp": 1700,
+            "battleHp": 13600,
+            "rank": 0.814
+          },
+          {
+            "id": "wl_ceres_enemy",
+            "name": "Wl Ceres",
+            "unit": "wl_ceres_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "rare",
+            "atk": 0,
+            "hp": 2800,
+            "battleHp": 22400,
+            "rank": 0.731
+          },
+          {
+            "id": "wl_ethan_enemy",
+            "name": "Wl Ethan",
+            "unit": "wl_ethan_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "rare",
+            "atk": 0,
+            "hp": 2800,
+            "battleHp": 22400,
+            "rank": 0.737
+          }
+        ],
+        "level": 25,
+        "rewardGold": 480,
+        "rewardKeys": 0,
+        "rewardShards": 12
+      },
+      {
+        "id": "7-5",
+        "stage": 5,
+        "title": "第七章 · 星界裂隙 · 5",
+        "enemy": [
+          {
+            "id": "wl_orsa_enemy_3",
+            "name": "Wl Orsa 3",
+            "unit": "wl_orsa_enemy_3",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 6496,
+            "battleHp": 51968,
+            "rank": 0.832
+          },
+          {
+            "id": "wl_rachie_enemy",
+            "name": "Wl Rachie",
+            "unit": "wl_rachie_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "rare",
+            "atk": 0,
+            "hp": 2800,
+            "battleHp": 22400,
+            "rank": 0.743
+          },
+          {
+            "id": "zelia_maze_enemy",
+            "name": "Zelia Maze",
+            "unit": "zelia_maze_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 3500,
+            "battleHp": 28000,
+            "rank": 0.778
+          }
+        ],
+        "level": 26,
+        "rewardGold": 500,
+        "rewardKeys": 0,
+        "rewardShards": 12
+      },
+      {
+        "id": "7-6",
+        "stage": 6,
+        "title": "第七章 · 星界裂隙 · 6",
+        "enemy": [
+          {
+            "id": "arachne_maze_nude_enemy",
+            "name": "Arachne Maze Nude",
+            "unit": "arachne_maze_nude_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 3500,
+            "battleHp": 28000,
+            "rank": 0.76
+          },
+          {
+            "id": "casey_maze_enemy",
+            "name": "Casey Maze",
+            "unit": "casey_maze_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 3500,
+            "battleHp": 28000,
+            "rank": 0.784
+          },
+          {
+            "id": "charlotte_maze_nude_enemy",
+            "name": "Charlotte Maze Nude",
+            "unit": "charlotte_maze_nude_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 3500,
+            "battleHp": 28000,
+            "rank": 0.772
+          }
+        ],
+        "level": 27,
+        "rewardGold": 520,
+        "rewardKeys": 1,
+        "rewardShards": 12
+      }
+    ],
+    "story": [
+      {
+        "who": "Nicole",
+        "text": "裂隙在扩张。你们看见的那些“人”，只是它吐出来的影子。"
+      },
+      {
+        "who": "Ethan",
+        "text": "影子会流血吗？"
+      },
+      {
+        "who": "Nicole",
+        "text": "会。会流我们看不懂的血。"
+      },
+      {
+        "who": "Kitty",
+        "text": "指挥官，如果把裂隙算作一场考试，我们大概才写到第二题。"
+      },
+      {
+        "who": "Ethan",
+        "text": "那就把笔放下，用刀写。"
+      }
+    ],
+    "bgWeb": "assets/bg/ch7.webp"
+  },
+  {
+    "id": 8,
+    "title": "第八章 · 终局契约",
+    "subtitle": "签下名字的那一刻",
+    "bg": "bg_dialogue_castle_small",
+    "stages": [
+      {
+        "id": "8-1",
+        "stage": 1,
+        "title": "第八章 · 终局契约 · 1",
+        "enemy": [
+          {
+            "id": "wl_aurelia_enemy",
+            "name": "Wl Aurelia",
+            "unit": "wl_aurelia_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.898
+          },
+          {
+            "id": "wl_cirax_enemy",
+            "name": "Wl Cirax",
+            "unit": "wl_cirax_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.922
+          },
+          {
+            "id": "wl_domino_enemy",
+            "name": "Wl Domino",
+            "unit": "wl_domino_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.946
+          }
+        ],
+        "level": 25,
+        "rewardGold": 460,
+        "rewardKeys": 0,
+        "rewardShards": 13
+      },
+      {
+        "id": "8-2",
+        "stage": 2,
+        "title": "第八章 · 终局契约 · 2",
+        "enemy": [
+          {
+            "id": "wl_dragana_enemy",
+            "name": "Wl Dragana",
+            "unit": "wl_dragana_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.916
+          },
+          {
+            "id": "wl_gia_enemy",
+            "name": "Wl Gia",
+            "unit": "wl_gia_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.844
+          },
+          {
+            "id": "wl_hunter_enemy",
+            "name": "Wl Hunter",
+            "unit": "wl_hunter_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.934
+          }
+        ],
+        "level": 26,
+        "rewardGold": 480,
+        "rewardKeys": 0,
+        "rewardShards": 13
+      },
+      {
+        "id": "8-3",
+        "stage": 3,
+        "title": "第八章 · 终局契约 · 3",
+        "enemy": [
+          {
+            "id": "wl_inferna_enemy",
+            "name": "Wl Inferna",
+            "unit": "wl_inferna_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.91
+          },
+          {
+            "id": "wl_kraisa_enemy",
+            "name": "Wl Kraisa",
+            "unit": "wl_kraisa_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.892
+          },
+          {
+            "id": "wl_marcela_enemy",
+            "name": "Wl Marcela",
+            "unit": "wl_marcela_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.928
+          }
+        ],
+        "level": 27,
+        "rewardGold": 500,
+        "rewardKeys": 0,
+        "rewardShards": 13
+      },
+      {
+        "id": "8-4",
+        "stage": 4,
+        "title": "第八章 · 终局契约 · 4",
+        "enemy": [
+          {
+            "id": "wl_morgan_enemy",
+            "name": "Wl Morgan",
+            "unit": "wl_morgan_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.886
+          },
+          {
+            "id": "wl_orsa_enemy_1",
+            "name": "Wl Orsa 1",
+            "unit": "wl_orsa_enemy_1",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.862
+          },
+          {
+            "id": "wl_orsa_enemy_2",
+            "name": "Wl Orsa 2",
+            "unit": "wl_orsa_enemy_2",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.868
+          }
+        ],
+        "level": 28,
+        "rewardGold": 520,
+        "rewardKeys": 0,
+        "rewardShards": 13
+      },
+      {
+        "id": "8-5",
+        "stage": 5,
+        "title": "第八章 · 终局契约 · 5",
+        "enemy": [
+          {
+            "id": "wl_orsa_enemy_3",
+            "name": "Wl Orsa 3",
+            "unit": "wl_orsa_enemy_3",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 6496,
+            "battleHp": 51968,
+            "rank": 0.832
+          },
+          {
+            "id": "wl_roxie_enemy",
+            "name": "Wl Roxie",
+            "unit": "wl_roxie_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.85
+          },
+          {
+            "id": "wl_solt_enemy",
+            "name": "Wl Solt",
+            "unit": "wl_solt_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.856
+          }
+        ],
+        "level": 29,
+        "rewardGold": 540,
+        "rewardKeys": 0,
+        "rewardShards": 13
+      },
+      {
+        "id": "8-6",
+        "stage": 6,
+        "title": "第八章 · 终局契约 · 6",
+        "enemy": [
+          {
+            "id": "wl_alexa_enemy",
+            "name": "Wl Alexa",
+            "unit": "wl_alexa_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.874
+          },
+          {
+            "id": "wl_annabelle_enemy",
+            "name": "Wl Annabelle",
+            "unit": "wl_annabelle_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.94
+          },
+          {
+            "id": "wl_aurelia_enemy",
+            "name": "Wl Aurelia",
+            "unit": "wl_aurelia_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9280,
+            "battleHp": 74240,
+            "rank": 0.898
+          }
+        ],
+        "level": 30,
+        "rewardGold": 560,
+        "rewardKeys": 1,
+        "rewardShards": 13
+      }
+    ],
+    "story": [
+      {
+        "who": "Lilith",
+        "text": "你终于来了。契约上的名字，写的是你，还是你身后的她们？"
+      },
+      {
+        "who": "Ethan",
+        "text": "写的是我们。"
+      },
+      {
+        "who": "Lilith",
+        "text": "同样的答案，我听过很多次。换来的都是同一座空城。"
+      },
+      {
+        "who": "Kitty",
+        "text": "那就让她看看不一样的结局。"
+      },
+      {
+        "who": "Ethan",
+        "text": "全队听令——今晚之后，这座城不再有谁能替我们签名。"
+      }
+    ],
+    "bgWeb": "assets/bg/ch8.webp"
+  }
+]

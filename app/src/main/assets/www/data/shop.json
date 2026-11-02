@@ -1,0 +1,8 @@
+[
+  {"id":"gold_small","name":"金币补给","cost":{"keys":1},"gain":{"gold":300},"desc":"用 1 把契约钥匙换 300 金币。"},
+  {"id":"gold_large","name":"金币空投","cost":{"keys":3},"gain":{"gold":1000},"desc":"用 3 把契约钥匙换 1000 金币。"},
+  {"id":"key_pack","name":"钥匙包","cost":{"gold":800},"gain":{"keys":2},"desc":"用 800 金币换 2 把契约钥匙。"},
+  {"id":"shard_pack","name":"突破碎片","cost":{"gold":500},"gain":{"shards":30},"desc":"用 500 金币换 30 个通用突破碎片。"},
+  {"id":"energy","name":"行动力","cost":{"gold":200},"gain":{"energy":30},"desc":"用 200 金币补充 30 点行动力。"},
+  {"id":"equip_box","name":"特勤装备箱","cost":{"gold":1200},"gain":{"equipment":1},"desc":"开启获取 1 件随机品质特勤装备。"}
+]

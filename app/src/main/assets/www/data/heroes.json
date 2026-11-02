@@ -1,0 +1,4411 @@
+[
+  {
+    "id": "428",
+    "key": "esther",
+    "name": "Esther",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 567,
+    "hp": 120,
+    "battleHp": 960,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Esther_AppFirstRowMark",
+        "name": "伤害",
+        "desc": "登场时，对单个敌人对目标造成伤害。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "Esther_EvadeMarkSelf",
+        "name": "伤害",
+        "desc": "攻击时，对自身对目标造成伤害。",
+        "effect": {
+          "type": "evade"
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "self",
+        "value": 0,
+        "chance": 0,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/esther_big",
+      "lega": "events_monsters/esther_lega_big",
+      "nude": "events_monsters/esther_nude_big"
+    },
+    "unit": "esther_player",
+    "voice": [],
+    "power": 1821,
+    "artWeb": {
+      "base": "assets/heroes/esther/base.webp",
+      "baseThumb": "assets/heroes/esther/base_thumb.webp",
+      "lega": "assets/heroes/esther/lega.webp",
+      "legaThumb": "assets/heroes/esther/lega_thumb.webp",
+      "nude": "assets/heroes/esther/nude.webp",
+      "nudeThumb": "assets/heroes/esther/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/esther_player/esther_player.atlas"
+  },
+  {
+    "id": "437",
+    "key": "justina",
+    "name": "Justina",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 180,
+    "hp": 1050,
+    "battleHp": 8400,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Hammer_SetHP_hit",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 20%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 20,
+        "chance": 200,
+        "duration": 1
+      },
+      {
+        "token": "Hammer_GetBarrier",
+        "name": "护盾",
+        "desc": "攻击时，对单个敌人获得吸收伤害的护盾，强度 20%。",
+        "effect": {
+          "type": "shield",
+          "mult": 1.8
+        },
+        "trigger": "on_attack",
+        "action": "shield",
+        "target": "single_enemy",
+        "value": 20,
+        "chance": 200,
+        "duration": 1
+      },
+      {
+        "token": "Hammer_AppBuffSpikesFrWl",
+        "name": "护盾",
+        "desc": "登场时，对我方全体获得吸收伤害的护盾，强度 20%。",
+        "effect": {
+          "type": "thorns"
+        },
+        "trigger": "on_appear",
+        "action": "shield",
+        "target": "all_allies",
+        "value": 20,
+        "chance": 200,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/justina_big",
+      "lega": "events_monsters/justina_lega_big",
+      "nude": "events_monsters/justina_nude_big"
+    },
+    "unit": "justina_player",
+    "voice": [],
+    "power": 1590,
+    "artWeb": {
+      "base": "assets/heroes/justina/base.webp",
+      "baseThumb": "assets/heroes/justina/base_thumb.webp",
+      "lega": "assets/heroes/justina/lega.webp",
+      "legaThumb": "assets/heroes/justina/lega_thumb.webp",
+      "nude": "assets/heroes/justina/nude.webp",
+      "nudeThumb": "assets/heroes/justina/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/justina_player/justina_player.atlas"
+  },
+  {
+    "id": "291",
+    "key": "zoechloe",
+    "name": "Zoe",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 450,
+    "hp": 200,
+    "battleHp": 1600,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AppCurseAllRanged",
+        "name": "剧毒",
+        "desc": "登场时，对远程单位使目标持续损失生命，强度 9%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_appear",
+        "action": "poison",
+        "target": "ranged",
+        "value": 9,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "ShowSummonStats896",
+        "name": "召唤",
+        "desc": "攻击时，对单个敌人召唤援军加入战场，强度 10%。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_attack",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 10,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "One_KillMeAddSkill_DeathSelfSum896",
+        "name": "技能操控",
+        "desc": "阵亡时，对自身添加或移除技能，强度 10%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_death",
+        "action": "skill_control",
+        "target": "self",
+        "value": 10,
+        "chance": 0,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/zoechloe_big",
+      "lega": "events_monsters/zoechloe_lega_big",
+      "nude": "events_monsters/zoechloe_nude_big"
+    },
+    "unit": "zoe_player",
+    "voice": [],
+    "power": 1550,
+    "artWeb": {
+      "base": "assets/heroes/zoechloe/base.webp",
+      "baseThumb": "assets/heroes/zoechloe/base_thumb.webp",
+      "lega": "assets/heroes/zoechloe/lega.webp",
+      "legaThumb": "assets/heroes/zoechloe/lega_thumb.webp",
+      "nude": "assets/heroes/zoechloe/nude.webp",
+      "nudeThumb": "assets/heroes/zoechloe/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/zoe_player/zoe_player.atlas"
+  },
+  {
+    "id": "413",
+    "key": "bonita",
+    "name": "Bonita",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 288,
+    "hp": 650,
+    "battleHp": 5200,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "SaverWLDmgHealWL",
+        "name": "治疗",
+        "desc": "治疗时，对指挥官恢复生命，强度 4%。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_heal",
+        "action": "heal",
+        "target": "warlord",
+        "value": 4,
+        "chance": 25,
+        "duration": 1
+      },
+      {
+        "token": "SaverETStrongRow",
+        "name": "攻击强化",
+        "desc": "回合时，对单个敌人提升攻击力，强度 10%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_turn",
+        "action": "buff_atk",
+        "target": "single_enemy",
+        "value": 10,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "ImmuneSilence",
+        "name": "沉默",
+        "desc": "攻击时，对单个敌人使目标无法施放技能，强度 18%。",
+        "effect": {
+          "type": "cleanse"
+        },
+        "trigger": "on_attack",
+        "action": "silence",
+        "target": "single_enemy",
+        "value": 18,
+        "chance": 54,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/bonita_big",
+      "lega": "events_monsters/bonita_lega_big",
+      "nude": "events_monsters/bonita_nude_big"
+    },
+    "unit": "bonita_player",
+    "voice": [
+      "main/bonita_attack/bonita_attack.m4a"
+    ],
+    "power": 1514,
+    "artWeb": {
+      "base": "assets/heroes/bonita/base.webp",
+      "baseThumb": "assets/heroes/bonita/base_thumb.webp",
+      "lega": "assets/heroes/bonita/lega.webp",
+      "legaThumb": "assets/heroes/bonita/lega_thumb.webp",
+      "nude": "assets/heroes/bonita/nude.webp",
+      "nudeThumb": "assets/heroes/bonita/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/bonita_player/bonita_player.atlas"
+  },
+  {
+    "id": "446",
+    "key": "gwenny",
+    "name": "Gwenny",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 300,
+    "hp": 540,
+    "battleHp": 4320,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "zontik_SummonModule",
+        "name": "召唤",
+        "desc": "攻击时，对单个敌人召唤援军加入战场。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_attack",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "zontik_MuteWL",
+        "name": "沉默",
+        "desc": "攻击时，对指挥官使目标无法施放技能。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "silence",
+        "target": "warlord",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "zontik_BuffAtk",
+        "name": "攻击强化",
+        "desc": "攻击时，对单个敌人提升攻击力。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_attack",
+        "action": "buff_atk",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/gwenny_big",
+      "lega": "events_monsters/gwenny_lega_big",
+      "nude": "events_monsters/gwenny_nude_big"
+    },
+    "unit": "gwenny_player",
+    "voice": [],
+    "power": 1440,
+    "artWeb": {
+      "base": "assets/heroes/gwenny/base.webp",
+      "baseThumb": "assets/heroes/gwenny/base_thumb.webp",
+      "lega": "assets/heroes/gwenny/lega.webp",
+      "legaThumb": "assets/heroes/gwenny/lega_thumb.webp",
+      "nude": "assets/heroes/gwenny/nude.webp",
+      "nudeThumb": "assets/heroes/gwenny/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/gwenny_player/gwenny_player.atlas"
+  },
+  {
+    "id": "132",
+    "key": "arachne",
+    "name": "Arachne",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 354,
+    "hp": 375,
+    "battleHp": 3000,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackGetCursedinLine",
+        "name": "剧毒",
+        "desc": "攻击时，对同列使目标持续损失生命，强度 12%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_attack",
+        "action": "poison",
+        "target": "lane",
+        "value": 12,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "AppStunAllEnMelee2",
+        "name": "冰冻",
+        "desc": "登场时，对敌方全体冻结目标，使其短暂无法行动，强度 12%。",
+        "effect": {
+          "type": "stun",
+          "chance": 0.55
+        },
+        "trigger": "on_appear",
+        "action": "freeze",
+        "target": "all_enemies",
+        "value": 12,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "EnDeathSummonSpiders",
+        "name": "召唤",
+        "desc": "阵亡时，对单个敌人召唤援军加入战场，强度 12%。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_death",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 12,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/arachne_big",
+      "lega": "events_monsters/arachne_lega_big",
+      "nude": "events_monsters/arachne_nude_big"
+    },
+    "unit": "arachne_player",
+    "voice": [],
+    "power": 1437,
+    "artWeb": {
+      "base": "assets/heroes/arachne/base.webp",
+      "baseThumb": "assets/heroes/arachne/base_thumb.webp",
+      "lega": "assets/heroes/arachne/lega.webp",
+      "legaThumb": "assets/heroes/arachne/lega_thumb.webp",
+      "nude": "assets/heroes/arachne/nude.webp",
+      "nudeThumb": "assets/heroes/arachne/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/arachne_player/arachne_player.atlas"
+  },
+  {
+    "id": "219",
+    "key": "asha",
+    "name": "Asha",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 319,
+    "hp": 307,
+    "battleHp": 2456,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "EnAppSetAttackEnInLineTo1",
+        "name": "攻击削弱",
+        "desc": "登场时，对同列降低目标攻击力，强度 1%。",
+        "effect": {
+          "type": "debuff_atk",
+          "mult": 0.3
+        },
+        "trigger": "on_appear",
+        "action": "debuff_atk",
+        "target": "lane",
+        "value": 1,
+        "chance": 4,
+        "duration": 1
+      },
+      {
+        "token": "EnAttackStartBuffAtkSelf",
+        "name": "攻击强化",
+        "desc": "登场时，对自身提升攻击力，强度 1%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_appear",
+        "action": "buff_atk",
+        "target": "self",
+        "value": 1,
+        "chance": 4,
+        "duration": 1
+      },
+      {
+        "token": "counter_attack_melee",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "counter"
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/asha_big",
+      "lega": "events_monsters/asha_lega_big",
+      "nude": "events_monsters/asha_nude_big"
+    },
+    "unit": "asha_player",
+    "voice": [
+      "tutorial_next/natasha_attack/natasha_attack.m4a",
+      "main/dialogue_aw_10_2_natasha/dialogue_aw_10_2_natasha.m4a",
+      "main/dialogue_aw_10_1_natasha/dialogue_aw_10_1_natasha.m4a"
+    ],
+    "power": 1264,
+    "artWeb": {
+      "base": "assets/heroes/asha/base.webp",
+      "baseThumb": "assets/heroes/asha/base_thumb.webp",
+      "lega": "assets/heroes/asha/lega.webp",
+      "legaThumb": "assets/heroes/asha/lega_thumb.webp",
+      "nude": "assets/heroes/asha/nude.webp",
+      "nudeThumb": "assets/heroes/asha/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/asha_player/asha_player.atlas"
+  },
+  {
+    "id": "1120",
+    "key": "dominica",
+    "name": "Dominica",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 250,
+    "hp": 494,
+    "battleHp": 3952,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "FrAooBuffHp",
+        "name": "战术突刺",
+        "desc": "对目标造成一次强力攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        }
+      }
+    ],
+    "art": {
+      "base": "tutorial_next/dominica_big",
+      "lega": "main/dominica_lega_big",
+      "nude": "tutorial/dominica_nude_big"
+    },
+    "unit": "dominica_player",
+    "voice": [
+      "tutorial/dominica_attack/dominica_attack.m4a",
+      "main/dialogue_aw_4_4_dominica/dialogue_aw_4_4_dominica.m4a",
+      "main/dialogue_aw_4_5_dominica/dialogue_aw_4_5_dominica.m4a"
+    ],
+    "power": 1244,
+    "artWeb": {
+      "base": "assets/heroes/dominica/base.webp",
+      "baseThumb": "assets/heroes/dominica/base_thumb.webp",
+      "lega": "assets/heroes/dominica/lega.webp",
+      "legaThumb": "assets/heroes/dominica/lega_thumb.webp",
+      "nude": "assets/heroes/dominica/nude.webp",
+      "nudeThumb": "assets/heroes/dominica/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/dominica_player/dominica_player.atlas"
+  },
+  {
+    "id": "214",
+    "key": "yumiko",
+    "name": "Yumiko",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 190,
+    "hp": 655,
+    "battleHp": 5240,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "FrAtkStartHealAff",
+        "name": "治愈之息",
+        "desc": "回复全队生命。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        }
+      },
+      {
+        "token": "FrAtkStartCleansAff",
+        "name": "战术突刺",
+        "desc": "对目标造成一次强力攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        }
+      },
+      {
+        "token": "Immune",
+        "name": "净化之息",
+        "desc": "解除自身负面状态并获得短时免疫。",
+        "effect": {
+          "type": "cleanse"
+        }
+      }
+    ],
+    "art": {
+      "base": "main/yumiko_big",
+      "lega": "main/yumiko_lega_big",
+      "nude": "tutorial_next/yumiko_nude_big"
+    },
+    "unit": "yumiko_player",
+    "voice": [
+      "tutorial_next/yumiko_attack/yumiko_attack.m4a",
+      "tutorial/giggle_yumiko_1/giggle_yumiko_1.m4a",
+      "tutorial/ahh_yumiko_3/ahh_yumiko_3.m4a",
+      "tutorial/moan_yumiko_2/moan_yumiko_2.m4a"
+    ],
+    "power": 1225,
+    "artWeb": {
+      "base": "assets/heroes/yumiko/base.webp",
+      "baseThumb": "assets/heroes/yumiko/base_thumb.webp",
+      "lega": "assets/heroes/yumiko/lega.webp",
+      "legaThumb": "assets/heroes/yumiko/lega_thumb.webp",
+      "nude": "assets/heroes/yumiko/nude.webp",
+      "nudeThumb": "assets/heroes/yumiko/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/yumiko_player/yumiko_player.atlas"
+  },
+  {
+    "id": "264",
+    "key": "britney",
+    "name": "Britney",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 150,
+    "hp": 750,
+    "battleHp": 6000,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "BritneyAppearPurifyAllyField",
+        "name": "净化",
+        "desc": "登场时，对我方全体清除自身或队友的负面状态，强度 1%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "cleanse",
+        "target": "all_allies",
+        "value": 1,
+        "chance": 3,
+        "duration": 1
+      },
+      {
+        "token": "BritneyAttackedSummonRunes",
+        "name": "召唤",
+        "desc": "受击时，对单个敌人召唤援军加入战场，强度 1%。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_attacked",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 3,
+        "duration": 1
+      },
+      {
+        "token": "BritneyAllyAttackedHealSelf",
+        "name": "治疗",
+        "desc": "受击时，对我方全体恢复生命，强度 1%。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_attacked",
+        "action": "heal",
+        "target": "all_allies",
+        "value": 1,
+        "chance": 3,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/britney_big",
+      "lega": "events_monsters/britney_lega_big",
+      "nude": "events_monsters/britney_nude_big"
+    },
+    "unit": "britney_player",
+    "voice": [
+      "scene_dynamic_load/giggle_britney_3/giggle_britney_3.m4a",
+      "scene_dynamic_load/ahh_britney_7/ahh_britney_7.m4a",
+      "scene_dynamic_load/ahh_britney_9/ahh_britney_9.m4a",
+      "scene_dynamic_load/ahh_britney_4/ahh_britney_4.m4a"
+    ],
+    "power": 1200,
+    "artWeb": {
+      "base": "assets/heroes/britney/base.webp",
+      "baseThumb": "assets/heroes/britney/base_thumb.webp",
+      "lega": "assets/heroes/britney/lega.webp",
+      "legaThumb": "assets/heroes/britney/lega_thumb.webp",
+      "nude": "assets/heroes/britney/nude.webp",
+      "nudeThumb": "assets/heroes/britney/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/britney_player/britney_player.atlas"
+  },
+  {
+    "id": "153",
+    "key": "nicole",
+    "name": "Nicole",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 299,
+    "hp": 300,
+    "battleHp": 2400,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "FrWLAttackedOverDmgRandomEn",
+        "name": "伤害",
+        "desc": "受击时，对随机敌人对目标造成伤害，强度 31%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attacked",
+        "action": "damage",
+        "target": "random_enemy",
+        "value": 31,
+        "chance": 10,
+        "duration": 1
+      },
+      {
+        "token": "EnAppStun2RndEn",
+        "name": "冰冻",
+        "desc": "登场时，对随机敌人冻结目标，使其短暂无法行动，强度 31%。",
+        "effect": {
+          "type": "stun",
+          "chance": 0.55
+        },
+        "trigger": "on_appear",
+        "action": "freeze",
+        "target": "random_enemy",
+        "value": 31,
+        "chance": 10,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/nicole_big",
+      "lega": "events_monsters/nicole_lega_big",
+      "nude": "events_monsters/nicole_nude_big"
+    },
+    "unit": "nicole_player",
+    "voice": [],
+    "power": 1197,
+    "artWeb": {
+      "base": "assets/heroes/nicole/base.webp",
+      "baseThumb": "assets/heroes/nicole/base_thumb.webp",
+      "lega": "assets/heroes/nicole/lega.webp",
+      "legaThumb": "assets/heroes/nicole/lega_thumb.webp",
+      "nude": "assets/heroes/nicole/nude.webp",
+      "nudeThumb": "assets/heroes/nicole/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/nicole_player/nicole_player.atlas"
+  },
+  {
+    "id": "104",
+    "key": "orin",
+    "name": "Orin",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 304,
+    "hp": 264,
+    "battleHp": 2112,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "ETSummonZombieTokenForward",
+        "name": "召唤",
+        "desc": "回合时，对单个敌人召唤援军加入战场。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_turn",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "silenceatk",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 5%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 5,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "STBuffAtkFrEachCursed",
+        "name": "剧毒",
+        "desc": "登场时，对我方全体使目标持续损失生命。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_appear",
+        "action": "poison",
+        "target": "all_allies",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/orin_big",
+      "lega": "events_monsters/orin_lega_big",
+      "nude": "events_monsters/orin_nude_big"
+    },
+    "unit": "orin_player",
+    "voice": [],
+    "power": 1176,
+    "artWeb": {
+      "base": "assets/heroes/orin/base.webp",
+      "baseThumb": "assets/heroes/orin/base_thumb.webp",
+      "lega": "assets/heroes/orin/lega.webp",
+      "legaThumb": "assets/heroes/orin/lega_thumb.webp",
+      "nude": "assets/heroes/orin/nude.webp",
+      "nudeThumb": "assets/heroes/orin/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/orin_player/orin_player.atlas"
+  },
+  {
+    "id": "182",
+    "key": "lorraine",
+    "name": "Lorraine",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 144,
+    "hp": 736,
+    "battleHp": 5888,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackedFreezeRange",
+        "name": "冰冻",
+        "desc": "受击时，对我方全体冻结目标，使其短暂无法行动，强度 2%。",
+        "effect": {
+          "type": "stun",
+          "chance": 0.55
+        },
+        "trigger": "on_attacked",
+        "action": "freeze",
+        "target": "all_allies",
+        "value": 2,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "Immune",
+        "name": "生命强化",
+        "desc": "攻击时，对单个敌人提升生命上限或获得免疫，强度 150%。",
+        "effect": {
+          "type": "cleanse"
+        },
+        "trigger": "on_attack",
+        "action": "buff_hp",
+        "target": "single_enemy",
+        "value": 150,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "SaloWrkdStealHpEnWl",
+        "name": "夺取",
+        "desc": "攻击时，对单个敌人夺取目标的增益或生命，强度 2%。",
+        "effect": {
+          "type": "lifesteal",
+          "mult": 0.6
+        },
+        "trigger": "on_attack",
+        "action": "steal",
+        "target": "single_enemy",
+        "value": 2,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/lorraine_big",
+      "lega": "events_monsters/lorraine_lega_big",
+      "nude": "events_monsters/lorraine_nude_big"
+    },
+    "unit": "lorraine_player",
+    "voice": [],
+    "power": 1168,
+    "artWeb": {
+      "base": "assets/heroes/lorraine/base.webp",
+      "baseThumb": "assets/heroes/lorraine/base_thumb.webp",
+      "lega": "assets/heroes/lorraine/lega.webp",
+      "legaThumb": "assets/heroes/lorraine/lega_thumb.webp",
+      "nude": "assets/heroes/lorraine/nude.webp",
+      "nudeThumb": "assets/heroes/lorraine/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/lorraine_player/lorraine_player.atlas"
+  },
+  {
+    "id": "440",
+    "key": "maddie",
+    "name": "Maddie",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 270,
+    "hp": 326,
+    "battleHp": 2608,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "FT3_Appmel",
+        "name": "伤害",
+        "desc": "登场时，对单个敌人对目标造成伤害，强度 27%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 27,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "FT3_BuffAtkForBurn",
+        "name": "攻击强化",
+        "desc": "攻击时，对单个敌人提升攻击力，强度 27%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_attack",
+        "action": "buff_atk",
+        "target": "single_enemy",
+        "value": 27,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "FT3_SummonFireRuneScale",
+        "name": "召唤",
+        "desc": "攻击时，对单个敌人召唤援军加入战场，强度 27%。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_attack",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 27,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/maddie_big",
+      "lega": "events_monsters/maddie_lega_big",
+      "nude": "events_monsters/maddie_nude_big"
+    },
+    "unit": "maddie_player",
+    "voice": [],
+    "power": 1136,
+    "artWeb": {
+      "base": "assets/heroes/maddie/base.webp",
+      "baseThumb": "assets/heroes/maddie/base_thumb.webp",
+      "lega": "assets/heroes/maddie/lega.webp",
+      "legaThumb": "assets/heroes/maddie/lega_thumb.webp",
+      "nude": "assets/heroes/maddie/nude.webp",
+      "nudeThumb": "assets/heroes/maddie/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/maddie_player/maddie_player.atlas"
+  },
+  {
+    "id": "255",
+    "key": "morana",
+    "name": "Morana",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 213,
+    "hp": 494,
+    "battleHp": 3952,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Immune",
+        "name": "生命强化",
+        "desc": "攻击时，对单个敌人提升生命上限或获得免疫，强度 150%。",
+        "effect": {
+          "type": "cleanse"
+        },
+        "trigger": "on_attack",
+        "action": "buff_hp",
+        "target": "single_enemy",
+        "value": 150,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "AttackedSetHp1TurnAffected",
+        "name": "伤害",
+        "desc": "受击时，对单个敌人对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attacked",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "AppearFrBuffHP",
+        "name": "生命强化",
+        "desc": "登场时，对我方全体提升生命上限或获得免疫，强度 1%。",
+        "effect": {
+          "type": "fortify"
+        },
+        "trigger": "on_appear",
+        "action": "buff_hp",
+        "target": "all_allies",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/morana_big",
+      "lega": "events_monsters/morana_lega_big",
+      "nude": "events_monsters/morana_nude_big"
+    },
+    "unit": "morana_player",
+    "voice": [],
+    "power": 1133,
+    "artWeb": {
+      "base": "assets/heroes/morana/base.webp",
+      "baseThumb": "assets/heroes/morana/base_thumb.webp",
+      "lega": "assets/heroes/morana/lega.webp",
+      "legaThumb": "assets/heroes/morana/lega_thumb.webp",
+      "nude": "assets/heroes/morana/nude.webp",
+      "nudeThumb": "assets/heroes/morana/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/morana_player/morana_player.atlas"
+  },
+  {
+    "id": "343",
+    "key": "blanche",
+    "name": "Blanche",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 325,
+    "hp": 127,
+    "battleHp": 1016,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "BfAtkStealAtkInLine_mel",
+        "name": "夺取",
+        "desc": "攻击时，对同列夺取目标的增益或生命，强度 60%。",
+        "effect": {
+          "type": "lifesteal",
+          "mult": 0.6
+        },
+        "trigger": "on_attack",
+        "action": "steal",
+        "target": "lane",
+        "value": 60,
+        "chance": 60,
+        "duration": 1
+      },
+      {
+        "token": "KillBuffHpByAtk",
+        "name": "伤害",
+        "desc": "击杀时，对单个敌人对目标造成伤害，强度 60%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_kill",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 60,
+        "chance": 60,
+        "duration": 1
+      },
+      {
+        "token": "KillPoisonNear",
+        "name": "剧毒",
+        "desc": "击杀时，对相邻使目标持续损失生命，强度 60%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_kill",
+        "action": "poison",
+        "target": "adjacent",
+        "value": 60,
+        "chance": 60,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/blanche_big",
+      "lega": "events_monsters/blanche_lega_big",
+      "nude": "events_monsters/blanche_nude_big"
+    },
+    "unit": "blanche_player",
+    "voice": [],
+    "power": 1102,
+    "artWeb": {
+      "base": "assets/heroes/blanche/base.webp",
+      "baseThumb": "assets/heroes/blanche/base_thumb.webp",
+      "lega": "assets/heroes/blanche/lega.webp",
+      "legaThumb": "assets/heroes/blanche/lega_thumb.webp",
+      "nude": "assets/heroes/blanche/nude.webp",
+      "nudeThumb": "assets/heroes/blanche/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/blanche_player/blanche_player.atlas"
+  },
+  {
+    "id": "434",
+    "key": "falenia",
+    "name": "Falenia",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 133,
+    "hp": 699,
+    "battleHp": 5592,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Falenia_TransformDispel_WL",
+        "name": "形态转换",
+        "desc": "攻击时，对指挥官转换为更强形态，强度 1%。",
+        "effect": {
+          "type": "fortify"
+        },
+        "trigger": "on_attack",
+        "action": "transform",
+        "target": "warlord",
+        "value": 1,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "Falenia_Transfrom_BuffAttack_Self",
+        "name": "攻击强化",
+        "desc": "攻击时，对自身提升攻击力，强度 1%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_attack",
+        "action": "buff_atk",
+        "target": "self",
+        "value": 1,
+        "chance": 0,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/falenia_big",
+      "lega": "events_monsters/falenia_lega_big",
+      "nude": "events_monsters/falenia_nude_big"
+    },
+    "unit": "falenia_player",
+    "voice": [],
+    "power": 1098,
+    "artWeb": {
+      "base": "assets/heroes/falenia/base.webp",
+      "baseThumb": "assets/heroes/falenia/base_thumb.webp",
+      "lega": "assets/heroes/falenia/lega.webp",
+      "legaThumb": "assets/heroes/falenia/lega_thumb.webp",
+      "nude": "assets/heroes/falenia/nude.webp",
+      "nudeThumb": "assets/heroes/falenia/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/falenia_player/falenia_player.atlas"
+  },
+  {
+    "id": "135",
+    "key": "lilith",
+    "name": "Lilith",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 257,
+    "hp": 318,
+    "battleHp": 2544,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "DebuffAllEnOnTurn",
+        "name": "攻击削弱",
+        "desc": "回合时，对敌方全体降低目标攻击力，强度 17%。",
+        "effect": {
+          "type": "debuff_atk",
+          "mult": 0.3
+        },
+        "trigger": "on_turn",
+        "action": "debuff_atk",
+        "target": "all_enemies",
+        "value": 17,
+        "chance": 9,
+        "duration": 1
+      },
+      {
+        "token": "EnAppBuffHpself",
+        "name": "伤害",
+        "desc": "登场时，对单个敌人对目标造成伤害，强度 17%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 17,
+        "chance": 9,
+        "duration": 1
+      },
+      {
+        "token": "STBuffAtkSelfEqualHpProcent",
+        "name": "攻击强化",
+        "desc": "登场时，对自身提升攻击力，强度 17%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_appear",
+        "action": "buff_atk",
+        "target": "self",
+        "value": 17,
+        "chance": 9,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "main/lilith_big",
+      "lega": "main/lilith_lega_big",
+      "nude": "main/lilith_nude_big"
+    },
+    "unit": "lilith_player",
+    "voice": [],
+    "power": 1089,
+    "artWeb": {
+      "base": "assets/heroes/lilith/base.webp",
+      "baseThumb": "assets/heroes/lilith/base_thumb.webp",
+      "lega": "assets/heroes/lilith/lega.webp",
+      "legaThumb": "assets/heroes/lilith/lega_thumb.webp",
+      "nude": "assets/heroes/lilith/nude.webp",
+      "nudeThumb": "assets/heroes/lilith/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/lilith_player/lilith_player.atlas"
+  },
+  {
+    "id": "95",
+    "key": "omega",
+    "name": "Omega",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 282,
+    "hp": 239,
+    "battleHp": 1912,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "EnAppStealATK",
+        "name": "夺取",
+        "desc": "登场时，对单个敌人夺取目标的增益或生命，强度 7%。",
+        "effect": {
+          "type": "lifesteal",
+          "mult": 0.6
+        },
+        "trigger": "on_appear",
+        "action": "steal",
+        "target": "single_enemy",
+        "value": 7,
+        "chance": 2,
+        "duration": 1
+      },
+      {
+        "token": "FreezeEn",
+        "name": "冰冻",
+        "desc": "攻击时，对我方全体冻结目标，使其短暂无法行动，强度 7%。",
+        "effect": {
+          "type": "stun",
+          "chance": 0.55
+        },
+        "trigger": "on_attack",
+        "action": "freeze",
+        "target": "all_allies",
+        "value": 7,
+        "chance": 2,
+        "duration": 1
+      },
+      {
+        "token": "ETGetHPforFreezeEn",
+        "name": "冰冻",
+        "desc": "回合时，对我方全体冻结目标，使其短暂无法行动，强度 7%。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_turn",
+        "action": "freeze",
+        "target": "all_allies",
+        "value": 7,
+        "chance": 2,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/omega_big",
+      "lega": "events_monsters/omega_lega_big",
+      "nude": "events_monsters/omega_nude_big"
+    },
+    "unit": "omega_player",
+    "voice": [],
+    "power": 1085,
+    "artWeb": {
+      "base": "assets/heroes/omega/base.webp",
+      "baseThumb": "assets/heroes/omega/base_thumb.webp",
+      "lega": "assets/heroes/omega/lega.webp",
+      "legaThumb": "assets/heroes/omega/lega_thumb.webp",
+      "nude": "assets/heroes/omega/nude.webp",
+      "nudeThumb": "assets/heroes/omega/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/omega_player/omega_player.atlas"
+  },
+  {
+    "id": "374",
+    "key": "bea",
+    "name": "Bea",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 195,
+    "hp": 487,
+    "battleHp": 3896,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackGetCursed2RndEnemies",
+        "name": "剧毒",
+        "desc": "攻击时，对随机敌人使目标持续损失生命，强度 12%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_attack",
+        "action": "poison",
+        "target": "random_enemy",
+        "value": 12,
+        "chance": 16,
+        "duration": 1
+      },
+      {
+        "token": "EvadeMelee",
+        "name": "伤害",
+        "desc": "攻击时，对自身对目标造成伤害，强度 100%。",
+        "effect": {
+          "type": "evade"
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "self",
+        "value": 100,
+        "chance": 0,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/bea_big",
+      "lega": "tutorial/bea_lega_big",
+      "nude": "events_monsters/bea_nude_big"
+    },
+    "unit": "bea_player",
+    "voice": [
+      "Disable/vo_collect_legendary_bear/vo_collect_legendary_bear.m4a",
+      "Disable/vo_collect_epic_bear/vo_collect_epic_bear.m4a"
+    ],
+    "power": 1072,
+    "artWeb": {
+      "base": "assets/heroes/bea/base.webp",
+      "baseThumb": "assets/heroes/bea/base_thumb.webp",
+      "lega": "assets/heroes/bea/lega.webp",
+      "legaThumb": "assets/heroes/bea/lega_thumb.webp",
+      "nude": "assets/heroes/bea/nude.webp",
+      "nudeThumb": "assets/heroes/bea/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/bea_player/bea_player.atlas"
+  },
+  {
+    "id": "377",
+    "key": "charlotte",
+    "name": "Charlotte",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 97,
+    "hp": 777,
+    "battleHp": 6216,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "SummonGreatSwordBack2",
+        "name": "召唤",
+        "desc": "攻击时，对单个敌人召唤援军加入战场。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_attack",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "AttackGetChargeGreatSword2",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "ETGetHPForEachBuild2",
+        "name": "治疗",
+        "desc": "回合时，对单个敌人恢复生命。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_turn",
+        "action": "heal",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "main/charlotte_big",
+      "lega": "main/charlotte_lega_big",
+      "nude": "main/charlotte_nude_big"
+    },
+    "unit": "charlotte_skin_player",
+    "voice": [],
+    "power": 1068,
+    "artWeb": {
+      "base": "assets/heroes/charlotte/base.webp",
+      "baseThumb": "assets/heroes/charlotte/base_thumb.webp",
+      "lega": "assets/heroes/charlotte/lega.webp",
+      "legaThumb": "assets/heroes/charlotte/lega_thumb.webp",
+      "nude": "assets/heroes/charlotte/nude.webp",
+      "nudeThumb": "assets/heroes/charlotte/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/charlotte_skin_player/charlotte_skin_player.atlas"
+  },
+  {
+    "id": "300",
+    "key": "selina",
+    "name": "Selina",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 234,
+    "hp": 360,
+    "battleHp": 2880,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "SelinaSummon",
+        "name": "召唤",
+        "desc": "攻击时，对单个敌人召唤援军加入战场。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_attack",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 14,
+        "duration": 1
+      },
+      {
+        "token": "SelinaAoEDamage",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害。",
+        "effect": {
+          "type": "aoe",
+          "mult": 0.9
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 14,
+        "duration": 1
+      },
+      {
+        "token": "counter_attack_melee",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "counter"
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/selina_big",
+      "lega": "events_monsters/selina_lega_big",
+      "nude": "events_monsters/selina_nude_big"
+    },
+    "unit": "selina_player",
+    "voice": [],
+    "power": 1062,
+    "artWeb": {
+      "base": "assets/heroes/selina/base.webp",
+      "baseThumb": "assets/heroes/selina/base_thumb.webp",
+      "lega": "assets/heroes/selina/lega.webp",
+      "legaThumb": "assets/heroes/selina/lega_thumb.webp",
+      "nude": "assets/heroes/selina/nude.webp",
+      "nudeThumb": "assets/heroes/selina/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/selina_player/selina_player.atlas"
+  },
+  {
+    "id": "123",
+    "key": "lola",
+    "name": "Lola",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 254,
+    "hp": 294,
+    "battleHp": 2352,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AppearSetHPEnRanged",
+        "name": "伤害",
+        "desc": "登场时，对远程单位对目标造成伤害，强度 15%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "damage",
+        "target": "ranged",
+        "value": 15,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "GiveShieldAllyAppearThisRow",
+        "name": "护盾",
+        "desc": "登场时，对我方全体获得吸收伤害的护盾，强度 15%。",
+        "effect": {
+          "type": "shield",
+          "mult": 1.8
+        },
+        "trigger": "on_appear",
+        "action": "shield",
+        "target": "all_allies",
+        "value": 15,
+        "chance": 0,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/lola_big",
+      "lega": "events_monsters/lola_lega_big",
+      "nude": "events_monsters/lola_nude_big"
+    },
+    "unit": "lola_player",
+    "voice": [],
+    "power": 1056,
+    "artWeb": {
+      "base": "assets/heroes/lola/base.webp",
+      "baseThumb": "assets/heroes/lola/base_thumb.webp",
+      "lega": "assets/heroes/lola/lega.webp",
+      "legaThumb": "assets/heroes/lola/lega_thumb.webp",
+      "nude": "assets/heroes/lola/nude.webp",
+      "nudeThumb": "assets/heroes/lola/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/lola_player/lola_player.atlas"
+  },
+  {
+    "id": "208",
+    "key": "vespina",
+    "name": "Vespina",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 300,
+    "hp": 150,
+    "battleHp": 1200,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "VespinaAppOrDeathDMGthisLine",
+        "name": "伤害",
+        "desc": "登场时，对同列对目标造成伤害，强度 46%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "damage",
+        "target": "lane",
+        "value": 46,
+        "chance": 9,
+        "duration": 1
+      },
+      {
+        "token": "VespinaInfectEnDeathGetReborn",
+        "name": "重生",
+        "desc": "阵亡时，对单个敌人阵亡时以部分生命复活，强度 46%。",
+        "effect": {
+          "type": "fortify"
+        },
+        "trigger": "on_death",
+        "action": "reborn",
+        "target": "single_enemy",
+        "value": 46,
+        "chance": 9,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/vespina_big",
+      "lega": "events_monsters/vespina_lega_big",
+      "nude": "events_monsters/vespina_nude_big"
+    },
+    "unit": "vespina_player",
+    "voice": [],
+    "power": 1050,
+    "artWeb": {
+      "base": "assets/heroes/vespina/base.webp",
+      "baseThumb": "assets/heroes/vespina/base_thumb.webp",
+      "lega": "assets/heroes/vespina/lega.webp",
+      "legaThumb": "assets/heroes/vespina/lega_thumb.webp",
+      "nude": "assets/heroes/vespina/nude.webp",
+      "nudeThumb": "assets/heroes/vespina/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/vespina_player/vespina_player.atlas"
+  },
+  {
+    "id": "449",
+    "key": "diya",
+    "name": "Diya",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 180,
+    "hp": 500,
+    "battleHp": 4000,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Diya_BuffHP",
+        "name": "生命强化",
+        "desc": "攻击时，对单个敌人提升生命上限或获得免疫，强度 60%。",
+        "effect": {
+          "type": "fortify"
+        },
+        "trigger": "on_attack",
+        "action": "buff_hp",
+        "target": "single_enemy",
+        "value": 60,
+        "chance": 100,
+        "duration": 1
+      },
+      {
+        "token": "Diya_PoisonWL",
+        "name": "剧毒",
+        "desc": "攻击时，对指挥官使目标持续损失生命，强度 60%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_attack",
+        "action": "poison",
+        "target": "warlord",
+        "value": 60,
+        "chance": 100,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/diya_big",
+      "lega": "events_monsters/diya_lega_big",
+      "nude": "events_monsters/diya_nude_big"
+    },
+    "unit": "diya_player",
+    "voice": [],
+    "power": 1040,
+    "artWeb": {
+      "base": "assets/heroes/diya/base.webp",
+      "baseThumb": "assets/heroes/diya/base_thumb.webp",
+      "lega": "assets/heroes/diya/lega.webp",
+      "legaThumb": "assets/heroes/diya/lega_thumb.webp",
+      "nude": "assets/heroes/diya/nude.webp",
+      "nudeThumb": "assets/heroes/diya/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/diya_player/diya_player.atlas"
+  },
+  {
+    "id": "169",
+    "key": "hilda",
+    "name": "Hilda",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 259,
+    "hp": 237,
+    "battleHp": 1896,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "BuffATKSelfForEachOrder",
+        "name": "攻击强化",
+        "desc": "攻击时，对自身提升攻击力，强度 5%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_attack",
+        "action": "buff_atk",
+        "target": "self",
+        "value": 5,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "AttackedGetsDivineShield",
+        "name": "护盾",
+        "desc": "受击时，对单个敌人获得吸收伤害的护盾，强度 5%。",
+        "effect": {
+          "type": "shield",
+          "mult": 1.8
+        },
+        "trigger": "on_attacked",
+        "action": "shield",
+        "target": "single_enemy",
+        "value": 5,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "pierce",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 2%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 2,
+        "chance": 0,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/hilda_big",
+      "lega": "tutorial/hilda_lega_big",
+      "nude": "events_monsters/hilda_nude_big"
+    },
+    "unit": "hilda_player",
+    "voice": [],
+    "power": 1014,
+    "artWeb": {
+      "base": "assets/heroes/hilda/base.webp",
+      "baseThumb": "assets/heroes/hilda/base_thumb.webp",
+      "lega": "assets/heroes/hilda/lega.webp",
+      "legaThumb": "assets/heroes/hilda/lega_thumb.webp",
+      "nude": "assets/heroes/hilda/nude.webp",
+      "nudeThumb": "assets/heroes/hilda/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/hilda_player/hilda_player.atlas"
+  },
+  {
+    "id": "325",
+    "key": "casey",
+    "name": "Casey",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 208,
+    "hp": 385,
+    "battleHp": 3080,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AppearFrGiveMissRandEn",
+        "name": "伤害",
+        "desc": "登场时，对我方全体对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "damage",
+        "target": "all_allies",
+        "value": 1,
+        "chance": 8,
+        "duration": 1
+      },
+      {
+        "token": "ETBuffAtkForOrder",
+        "name": "攻击强化",
+        "desc": "回合时，对单个敌人提升攻击力，强度 1%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_turn",
+        "action": "buff_atk",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 8,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "main/casey_big",
+      "lega": "main/casey_lega_big",
+      "nude": "main/casey_nude_big"
+    },
+    "unit": "casey_player",
+    "voice": [],
+    "power": 1009,
+    "artWeb": {
+      "base": "assets/heroes/casey/base.webp",
+      "baseThumb": "assets/heroes/casey/base_thumb.webp",
+      "lega": "assets/heroes/casey/lega.webp",
+      "legaThumb": "assets/heroes/casey/lega_thumb.webp",
+      "nude": "assets/heroes/casey/nude.webp",
+      "nudeThumb": "assets/heroes/casey/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/casey_player/casey_player.atlas"
+  },
+  {
+    "id": "410",
+    "key": "kiana",
+    "name": "Kiana",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 234,
+    "hp": 300,
+    "battleHp": 2400,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "KianaKillEnLessthan50hp",
+        "name": "伤害",
+        "desc": "击杀时，对单个敌人对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_kill",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 45,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/kiana_big",
+      "lega": "events_monsters/kiana_lega_big",
+      "nude": "events_monsters/kiana_nude_big"
+    },
+    "unit": "kiana_player",
+    "voice": [],
+    "power": 1002,
+    "artWeb": {
+      "base": "assets/heroes/kiana/base.webp",
+      "baseThumb": "assets/heroes/kiana/base_thumb.webp",
+      "lega": "assets/heroes/kiana/lega.webp",
+      "legaThumb": "assets/heroes/kiana/lega_thumb.webp",
+      "nude": "assets/heroes/kiana/nude.webp",
+      "nudeThumb": "assets/heroes/kiana/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/kiana_player/kiana_player.atlas"
+  },
+  {
+    "id": "249",
+    "key": "victoria",
+    "name": "Victoria",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 185,
+    "hp": 416,
+    "battleHp": 3328,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackSummonRuneExAttacke",
+        "name": "召唤",
+        "desc": "攻击时，对单个敌人召唤援军加入战场，强度 1%。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_attack",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "AppFrAddBlock",
+        "name": "护盾",
+        "desc": "登场时，对我方全体获得吸收伤害的护盾，强度 4%。",
+        "effect": {
+          "type": "shield",
+          "mult": 1.8
+        },
+        "trigger": "on_appear",
+        "action": "shield",
+        "target": "all_allies",
+        "value": 4,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "EvadeRanged",
+        "name": "伤害",
+        "desc": "攻击时，对远程单位对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "evade"
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "ranged",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/victoria_big",
+      "lega": "events_monsters/victoria_lega_big",
+      "nude": "main/victoria_nude_big"
+    },
+    "unit": "victoria_player",
+    "voice": [],
+    "power": 971,
+    "artWeb": {
+      "base": "assets/heroes/victoria/base.webp",
+      "baseThumb": "assets/heroes/victoria/base_thumb.webp",
+      "lega": "assets/heroes/victoria/lega.webp",
+      "legaThumb": "assets/heroes/victoria/lega_thumb.webp",
+      "nude": "assets/heroes/victoria/nude.webp",
+      "nudeThumb": "assets/heroes/victoria/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/victoria_player/victoria_player.atlas"
+  },
+  {
+    "id": "346",
+    "key": "tsintah",
+    "name": "Tsintah",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 225,
+    "hp": 270,
+    "battleHp": 2160,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "CintahHeal",
+        "name": "治疗",
+        "desc": "治疗时，对单个敌人恢复生命，强度 80%。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_heal",
+        "action": "heal",
+        "target": "single_enemy",
+        "value": 80,
+        "chance": 8,
+        "duration": 1
+      },
+      {
+        "token": "CintahBuffAttack",
+        "name": "攻击强化",
+        "desc": "攻击时，对单个敌人提升攻击力，强度 80%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_attack",
+        "action": "buff_atk",
+        "target": "single_enemy",
+        "value": 80,
+        "chance": 8,
+        "duration": 1
+      },
+      {
+        "token": "CintahCleanse",
+        "name": "净化",
+        "desc": "攻击时，对单个敌人清除自身或队友的负面状态，强度 80%。",
+        "effect": {
+          "type": "cleanse"
+        },
+        "trigger": "on_attack",
+        "action": "cleanse",
+        "target": "single_enemy",
+        "value": 80,
+        "chance": 8,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/tsintah_big",
+      "lega": "events_monsters/tsintah_lega_big",
+      "nude": "events_monsters/tsintah_nude_big"
+    },
+    "unit": "tsintah_player",
+    "voice": [],
+    "power": 945,
+    "artWeb": {
+      "base": "assets/heroes/tsintah/base.webp",
+      "baseThumb": "assets/heroes/tsintah/base_thumb.webp",
+      "lega": "assets/heroes/tsintah/lega.webp",
+      "legaThumb": "assets/heroes/tsintah/lega_thumb.webp",
+      "nude": "assets/heroes/tsintah/nude.webp",
+      "nudeThumb": "assets/heroes/tsintah/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/tsintah_player/tsintah_player.atlas"
+  },
+  {
+    "id": "303",
+    "key": "alisha",
+    "name": "Alisha",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 217,
+    "hp": 290,
+    "battleHp": 2320,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AppSetBuildHp1",
+        "name": "伤害",
+        "desc": "登场时，对单个敌人对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 15,
+        "duration": 1
+      },
+      {
+        "token": "AppStealHpEn",
+        "name": "夺取",
+        "desc": "登场时，对单个敌人夺取目标的增益或生命，强度 1%。",
+        "effect": {
+          "type": "lifesteal",
+          "mult": 0.6
+        },
+        "trigger": "on_appear",
+        "action": "steal",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 15,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/alisha_big",
+      "lega": "events_monsters/alisha_lega_big",
+      "nude": "events_monsters/alisha_nude_big"
+    },
+    "unit": "alisha_player",
+    "voice": [
+      "scene_dynamic_load/confused_alisha_3/confused_alisha_3.m4a",
+      "scene_dynamic_load/ahh_alisha_6/ahh_alisha_6.m4a",
+      "scene_dynamic_load/ahh_alisha_11/ahh_alisha_11.m4a",
+      "scene_dynamic_load/orgasm_alisha_1/orgasm_alisha_1.m4a"
+    ],
+    "power": 941,
+    "artWeb": {
+      "base": "assets/heroes/alisha/base.webp",
+      "baseThumb": "assets/heroes/alisha/base_thumb.webp",
+      "lega": "assets/heroes/alisha/lega.webp",
+      "legaThumb": "assets/heroes/alisha/lega_thumb.webp",
+      "nude": "assets/heroes/alisha/nude.webp",
+      "nudeThumb": "assets/heroes/alisha/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/alisha_player/alisha_player.atlas"
+  },
+  {
+    "id": "416",
+    "key": "vivienne",
+    "name": "Vivienne",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 225,
+    "hp": 225,
+    "battleHp": 1800,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Vivi_SelfAtkStun2EnR1",
+        "name": "冰冻",
+        "desc": "攻击时，对自身冻结目标，使其短暂无法行动，强度 1%。",
+        "effect": {
+          "type": "stun",
+          "chance": 0.55
+        },
+        "trigger": "on_attack",
+        "action": "freeze",
+        "target": "self",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "Vivi_EtCleanseSelf",
+        "name": "净化",
+        "desc": "攻击时，对自身清除自身或队友的负面状态，强度 1%。",
+        "effect": {
+          "type": "cleanse"
+        },
+        "trigger": "on_attack",
+        "action": "cleanse",
+        "target": "self",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "Vivi_appSupress6ForceShields",
+        "name": "护盾",
+        "desc": "攻击时，对单个敌人获得吸收伤害的护盾，强度 1%。",
+        "effect": {
+          "type": "shield",
+          "mult": 1.8
+        },
+        "trigger": "on_attack",
+        "action": "shield",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/vivienne_big",
+      "lega": "events_monsters/vivienne_lega_big",
+      "nude": "events_monsters/vivienne_nude_big"
+    },
+    "unit": "vivienne_player",
+    "voice": [],
+    "power": 900,
+    "artWeb": {
+      "base": "assets/heroes/vivienne/base.webp",
+      "baseThumb": "assets/heroes/vivienne/base_thumb.webp",
+      "lega": "assets/heroes/vivienne/lega.webp",
+      "legaThumb": "assets/heroes/vivienne/lega_thumb.webp",
+      "nude": "assets/heroes/vivienne/nude.webp",
+      "nudeThumb": "assets/heroes/vivienne/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/vivienne_player/vivienne_player.atlas"
+  },
+  {
+    "id": "229",
+    "key": "kitty",
+    "name": "Kitty",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 219,
+    "hp": 239,
+    "battleHp": 1912,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AppEnGiveDivShieldFr2",
+        "name": "护盾",
+        "desc": "登场时，对我方全体获得吸收伤害的护盾，强度 1%。",
+        "effect": {
+          "type": "shield",
+          "mult": 1.8
+        },
+        "trigger": "on_appear",
+        "action": "shield",
+        "target": "all_allies",
+        "value": 1,
+        "chance": 9,
+        "duration": 1
+      },
+      {
+        "token": "DeathDebuffAtkAllEn",
+        "name": "攻击削弱",
+        "desc": "阵亡时，对敌方全体降低目标攻击力，强度 1%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_death",
+        "action": "debuff_atk",
+        "target": "all_enemies",
+        "value": 1,
+        "chance": 9,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "tutorial_next/kitty_big",
+      "lega": "tutorial/kitty_lega_big",
+      "nude": "main/kitty_nude_big"
+    },
+    "unit": "kitty_player",
+    "voice": [
+      "tutorial/moan_kitty_3/moan_kitty_3.m4a",
+      "tutorial/mmm_kitty_3/mmm_kitty_3.m4a",
+      "tutorial/breath_kitty_5/breath_kitty_5.m4a",
+      "tutorial/kitty_attack/kitty_attack.m4a"
+    ],
+    "power": 896,
+    "artWeb": {
+      "base": "assets/heroes/kitty/base.webp",
+      "baseThumb": "assets/heroes/kitty/base_thumb.webp",
+      "lega": "assets/heroes/kitty/lega.webp",
+      "legaThumb": "assets/heroes/kitty/lega_thumb.webp"
+    },
+    "unitWeb": "assets/units/kitty_player/kitty_player.atlas"
+  },
+  {
+    "id": "102",
+    "key": "wendy",
+    "name": "Wendy",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 138,
+    "hp": 472,
+    "battleHp": 3776,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackEnPoisonAffected",
+        "name": "剧毒",
+        "desc": "攻击时，对单个敌人使目标持续损失生命，强度 18%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_attack",
+        "action": "poison",
+        "target": "single_enemy",
+        "value": 18,
+        "chance": 14,
+        "duration": 1
+      },
+      {
+        "token": "AtkdBuffHpSelfPerPois",
+        "name": "伤害",
+        "desc": "受击时，对自身对目标造成伤害，强度 18%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attacked",
+        "action": "damage",
+        "target": "self",
+        "value": 18,
+        "chance": 14,
+        "duration": 1
+      },
+      {
+        "token": "PoisonEnDeathHealFrWL",
+        "name": "剧毒",
+        "desc": "阵亡时，对指挥官使目标持续损失生命，强度 18%。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_death",
+        "action": "poison",
+        "target": "warlord",
+        "value": 18,
+        "chance": 14,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/wendy_big",
+      "lega": "events_monsters/wendy_lega_big",
+      "nude": "events_monsters/wendy_nude_big"
+    },
+    "unit": "wendy_player",
+    "voice": [
+      "mascot_dynamic_load/wendy_main_sound_4/wendy_main_sound_4.m4a",
+      "mascot_dynamic_load/wendy_main_sound_7/wendy_main_sound_7.m4a",
+      "mascot_dynamic_load/wendy_main_sound_1/wendy_main_sound_1.m4a",
+      "mascot_dynamic_load/wendy_main_sound_3/wendy_main_sound_3.m4a"
+    ],
+    "power": 886,
+    "artWeb": {
+      "base": "assets/heroes/wendy/base.webp",
+      "baseThumb": "assets/heroes/wendy/base_thumb.webp",
+      "lega": "assets/heroes/wendy/lega.webp",
+      "legaThumb": "assets/heroes/wendy/lega_thumb.webp",
+      "nude": "assets/heroes/wendy/nude.webp",
+      "nudeThumb": "assets/heroes/wendy/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/wendy_player/wendy_player.atlas"
+  },
+  {
+    "id": "443",
+    "key": "paloma",
+    "name": "Paloma",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 207,
+    "hp": 247,
+    "battleHp": 1976,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Paloma_SumHolocopy",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 23,
+        "duration": 1
+      },
+      {
+        "token": "Paloma_WeakStunEn",
+        "name": "冰冻",
+        "desc": "攻击时，对单个敌人冻结目标，使其短暂无法行动。",
+        "effect": {
+          "type": "stun",
+          "chance": 0.55
+        },
+        "trigger": "on_attack",
+        "action": "freeze",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 23,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/paloma_big",
+      "lega": "events_monsters/paloma_lega_big",
+      "nude": "events_monsters/paloma_nude_big"
+    },
+    "unit": "paloma_player",
+    "voice": [],
+    "power": 868,
+    "artWeb": {
+      "base": "assets/heroes/paloma/base.webp",
+      "baseThumb": "assets/heroes/paloma/base_thumb.webp",
+      "lega": "assets/heroes/paloma/lega.webp",
+      "legaThumb": "assets/heroes/paloma/lega_thumb.webp",
+      "nude": "assets/heroes/paloma/nude.webp",
+      "nudeThumb": "assets/heroes/paloma/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/paloma_player/paloma_player.atlas"
+  },
+  {
+    "id": "99",
+    "key": "kirsten",
+    "name": "Kirsten",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 138,
+    "hp": 450,
+    "battleHp": 3600,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "KirstenAppMarkEnStrongTmp",
+        "name": "攻击强化",
+        "desc": "登场时，对单个敌人提升攻击力。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "buff_atk",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "AppGiveSpikesFrSelf",
+        "name": "护盾",
+        "desc": "登场时，对我方全体获得吸收伤害的护盾。",
+        "effect": {
+          "type": "thorns"
+        },
+        "trigger": "on_appear",
+        "action": "shield",
+        "target": "all_allies",
+        "value": 0,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "KirstenAnySuppressTrigBuffHPLine",
+        "name": "生命强化",
+        "desc": "攻击时，对同列提升生命上限或获得免疫。",
+        "effect": {
+          "type": "fortify"
+        },
+        "trigger": "on_attack",
+        "action": "buff_hp",
+        "target": "lane",
+        "value": 0,
+        "chance": 0,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "main/kirsten_big",
+      "lega": "main/kirsten_lega_big",
+      "nude": "main/kirsten_nude_big"
+    },
+    "unit": "kirsten_player",
+    "voice": [],
+    "power": 864,
+    "artWeb": {
+      "base": "assets/heroes/kirsten/base.webp",
+      "baseThumb": "assets/heroes/kirsten/base_thumb.webp",
+      "lega": "assets/heroes/kirsten/lega.webp",
+      "legaThumb": "assets/heroes/kirsten/lega_thumb.webp",
+      "nude": "assets/heroes/kirsten/nude.webp",
+      "nudeThumb": "assets/heroes/kirsten/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/kirsten_player/kirsten_player.atlas"
+  },
+  {
+    "id": "419",
+    "key": "shelby",
+    "name": "Shelby",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 74,
+    "hp": 630,
+    "battleHp": 5040,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Shelby_TransformEnemy",
+        "name": "形态转换",
+        "desc": "攻击时，对单个敌人转换为更强形态。",
+        "effect": {
+          "type": "fortify"
+        },
+        "trigger": "on_attack",
+        "action": "transform",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "Shelby_GainMultiattack",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "Shelby_HealthSiphon",
+        "name": "治疗",
+        "desc": "治疗时，对单个敌人恢复生命。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_heal",
+        "action": "heal",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/shelby_big",
+      "lega": "events_monsters/shelby_lega_big",
+      "nude": "events_monsters/shelby_nude_big"
+    },
+    "unit": "shelby_player",
+    "voice": [],
+    "power": 852,
+    "artWeb": {
+      "base": "assets/heroes/shelby/base.webp",
+      "baseThumb": "assets/heroes/shelby/base_thumb.webp",
+      "lega": "assets/heroes/shelby/lega.webp",
+      "legaThumb": "assets/heroes/shelby/lega_thumb.webp",
+      "nude": "assets/heroes/shelby/nude.webp",
+      "nudeThumb": "assets/heroes/shelby/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/shelby_player/shelby_player.atlas"
+  },
+  {
+    "id": "425",
+    "key": "irma",
+    "name": "Irma",
+    "rarity": "epic",
+    "rarityCn": "SR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 75,
+    "hp": 625,
+    "battleHp": 5000,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Irma_AppASBurstMelee",
+        "name": "伤害",
+        "desc": "登场时，对自身对目标造成伤害，强度 16%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_appear",
+        "action": "damage",
+        "target": "self",
+        "value": 16,
+        "chance": 200,
+        "duration": 1
+      },
+      {
+        "token": "Irma_PoisonPercDmg",
+        "name": "剧毒",
+        "desc": "攻击时，对单个敌人使目标持续损失生命，强度 16%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_attack",
+        "action": "poison",
+        "target": "single_enemy",
+        "value": 16,
+        "chance": 200,
+        "duration": 1
+      },
+      {
+        "token": "EvadeRanged",
+        "name": "伤害",
+        "desc": "攻击时，对远程单位对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "evade"
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "ranged",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/irma_big",
+      "lega": "events_monsters/irma_lega_big",
+      "nude": "events_monsters/irma_nude_big"
+    },
+    "unit": "irma_player",
+    "voice": [
+      "scene_dynamic_load/ouu_irma_3/ouu_irma_3.m4a",
+      "scene_dynamic_load/mmm_irma_2/mmm_irma_2.m4a",
+      "scene_dynamic_load/mmm_irma_1/mmm_irma_1.m4a",
+      "scene_dynamic_load/ouu_irma_2/ouu_irma_2.m4a"
+    ],
+    "power": 850,
+    "artWeb": {
+      "base": "assets/heroes/irma/base.webp",
+      "baseThumb": "assets/heroes/irma/base_thumb.webp",
+      "lega": "assets/heroes/irma/lega.webp",
+      "legaThumb": "assets/heroes/irma/lega_thumb.webp",
+      "nude": "assets/heroes/irma/nude.webp",
+      "nudeThumb": "assets/heroes/irma/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/irma_player/irma_player.atlas"
+  },
+  {
+    "id": "368",
+    "key": "grace",
+    "name": "Grace",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 166,
+    "hp": 348,
+    "battleHp": 2784,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackDmg7times",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 4%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 4,
+        "chance": 3,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/grace_big",
+      "lega": "events_monsters/grace_lega_big",
+      "nude": "events_monsters/grace_nude_big"
+    },
+    "unit": "grace_player",
+    "voice": [],
+    "power": 846,
+    "artWeb": {
+      "base": "assets/heroes/grace/base.webp",
+      "baseThumb": "assets/heroes/grace/base_thumb.webp",
+      "lega": "assets/heroes/grace/lega.webp",
+      "legaThumb": "assets/heroes/grace/lega_thumb.webp",
+      "nude": "assets/heroes/grace/nude.webp",
+      "nudeThumb": "assets/heroes/grace/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/grace_player/grace_player.atlas"
+  },
+  {
+    "id": "422",
+    "key": "nonna",
+    "name": "Nonna",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 22,
+    "hp": 780,
+    "battleHp": 6240,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Nonna_EvadeMelee",
+        "name": "伤害",
+        "desc": "攻击时，对自身对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "evade"
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "self",
+        "value": 1,
+        "chance": 99999,
+        "duration": 1
+      },
+      {
+        "token": "Nonna_Blockself_Inv",
+        "name": "护盾",
+        "desc": "攻击时，对单个敌人获得吸收伤害的护盾，强度 1%。",
+        "effect": {
+          "type": "shield",
+          "mult": 1.8
+        },
+        "trigger": "on_attack",
+        "action": "shield",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 99999,
+        "duration": 1
+      },
+      {
+        "token": "Nonna_HealWL",
+        "name": "治疗",
+        "desc": "治疗时，对指挥官恢复生命，强度 1%。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_heal",
+        "action": "heal",
+        "target": "warlord",
+        "value": 1,
+        "chance": 99999,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/nonna_big",
+      "lega": "events_monsters/nonna_lega_big",
+      "nude": "events_monsters/nonna_nude_big"
+    },
+    "unit": "nonna_player",
+    "voice": [],
+    "power": 846,
+    "artWeb": {
+      "base": "assets/heroes/nonna/base.webp",
+      "baseThumb": "assets/heroes/nonna/base_thumb.webp",
+      "lega": "assets/heroes/nonna/lega.webp",
+      "legaThumb": "assets/heroes/nonna/lega_thumb.webp",
+      "nude": "assets/heroes/nonna/nude.webp",
+      "nudeThumb": "assets/heroes/nonna/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/nonna_player/nonna_player.atlas"
+  },
+  {
+    "id": "386",
+    "key": "thora",
+    "name": "Thora",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 145,
+    "hp": 403,
+    "battleHp": 3224,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "strong",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 6%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 6,
+        "chance": 25,
+        "duration": 1
+      },
+      {
+        "token": "ETGiveRegenWl",
+        "name": "伤害",
+        "desc": "回合时，对单个敌人对目标造成伤害，强度 15%。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_turn",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 15,
+        "chance": 13,
+        "duration": 1
+      },
+      {
+        "token": "ImmuneSilenceTransform",
+        "name": "形态转换",
+        "desc": "攻击时，对单个敌人转换为更强形态，强度 15%。",
+        "effect": {
+          "type": "cleanse"
+        },
+        "trigger": "on_attack",
+        "action": "transform",
+        "target": "single_enemy",
+        "value": 15,
+        "chance": 13,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "main/thora_big",
+      "lega": "main/thora_lega_big",
+      "nude": "main/thora_nude_big"
+    },
+    "unit": "thora_player",
+    "voice": [],
+    "power": 838,
+    "artWeb": {
+      "base": "assets/heroes/thora/base.webp",
+      "baseThumb": "assets/heroes/thora/base_thumb.webp",
+      "lega": "assets/heroes/thora/lega.webp",
+      "legaThumb": "assets/heroes/thora/lega_thumb.webp",
+      "nude": "assets/heroes/thora/nude.webp",
+      "nudeThumb": "assets/heroes/thora/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/thora_player/thora_player.atlas"
+  },
+  {
+    "id": "138",
+    "key": "lucretia",
+    "name": "Lucretia",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 170,
+    "hp": 324,
+    "battleHp": 2592,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackPoisonEnRanged",
+        "name": "剧毒",
+        "desc": "攻击时，对远程单位使目标持续损失生命，强度 8%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_attack",
+        "action": "poison",
+        "target": "ranged",
+        "value": 8,
+        "chance": 2,
+        "duration": 1
+      },
+      {
+        "token": "PoisonWrkdStealAtkAff",
+        "name": "夺取",
+        "desc": "攻击时，对单个敌人夺取目标的增益或生命，强度 8%。",
+        "effect": {
+          "type": "lifesteal",
+          "mult": 0.6
+        },
+        "trigger": "on_attack",
+        "action": "steal",
+        "target": "single_enemy",
+        "value": 8,
+        "chance": 2,
+        "duration": 1
+      },
+      {
+        "token": "ETBuffHPAllAllies",
+        "name": "生命强化",
+        "desc": "回合时，对我方全体提升生命上限或获得免疫，强度 8%。",
+        "effect": {
+          "type": "fortify"
+        },
+        "trigger": "on_turn",
+        "action": "buff_hp",
+        "target": "all_allies",
+        "value": 8,
+        "chance": 2,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/lucretia_big",
+      "lega": "events_monsters/lucretia_lega_big",
+      "nude": "events_monsters/lucretia_nude_big"
+    },
+    "unit": "lucretia_player",
+    "voice": [],
+    "power": 834,
+    "artWeb": {
+      "base": "assets/heroes/lucretia/base.webp",
+      "baseThumb": "assets/heroes/lucretia/base_thumb.webp",
+      "lega": "assets/heroes/lucretia/lega.webp",
+      "legaThumb": "assets/heroes/lucretia/lega_thumb.webp",
+      "nude": "assets/heroes/lucretia/nude.webp",
+      "nudeThumb": "assets/heroes/lucretia/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/lucretia_player/lucretia_player.atlas"
+  },
+  {
+    "id": "176",
+    "key": "sixtine",
+    "name": "Sixtine",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 168,
+    "hp": 296,
+    "battleHp": 2368,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "ETSummonInstKillRune",
+        "name": "召唤",
+        "desc": "击杀时，对单个敌人召唤援军加入战场，强度 1%。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_kill",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 4,
+        "duration": 1
+      },
+      {
+        "token": "AttackGiveExplosiveEn",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 30%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 30,
+        "chance": 5,
+        "duration": 1
+      },
+      {
+        "token": "AttackSplashNear2_2",
+        "name": "伤害",
+        "desc": "攻击时，对相邻对目标造成伤害，强度 30%。",
+        "effect": {
+          "type": "aoe",
+          "mult": 0.9
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "adjacent",
+        "value": 30,
+        "chance": 5,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/sixtine_big",
+      "lega": "events_monsters/sixtine_lega_big",
+      "nude": "events_monsters/sixtine_nude_big"
+    },
+    "unit": "sixtine_player",
+    "voice": [],
+    "power": 800,
+    "artWeb": {
+      "base": "assets/heroes/sixtine/base.webp",
+      "baseThumb": "assets/heroes/sixtine/base_thumb.webp",
+      "lega": "assets/heroes/sixtine/lega.webp",
+      "legaThumb": "assets/heroes/sixtine/lega_thumb.webp",
+      "nude": "assets/heroes/sixtine/nude.webp",
+      "nudeThumb": "assets/heroes/sixtine/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/sixtine_player/sixtine_player.atlas"
+  },
+  {
+    "id": "294",
+    "key": "zelia",
+    "name": "Zelia",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 105,
+    "hp": 432,
+    "battleHp": 3456,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "FrResKillGetAtk",
+        "name": "伤害",
+        "desc": "击杀时，对我方全体对目标造成伤害，强度 7%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_kill",
+        "action": "damage",
+        "target": "all_allies",
+        "value": 7,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/zelia_big",
+      "lega": "events_monsters/zelia_lega_big",
+      "nude": "events_monsters/zelia_nude_big"
+    },
+    "unit": "zelia_player",
+    "voice": [],
+    "power": 747,
+    "artWeb": {
+      "base": "assets/heroes/zelia/base.webp",
+      "baseThumb": "assets/heroes/zelia/base_thumb.webp",
+      "lega": "assets/heroes/zelia/lega.webp",
+      "legaThumb": "assets/heroes/zelia/lega_thumb.webp",
+      "nude": "assets/heroes/zelia/nude.webp",
+      "nudeThumb": "assets/heroes/zelia/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/zelia_player/zelia_player.atlas"
+  },
+  {
+    "id": "129",
+    "key": "regina",
+    "name": "Regina",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 105,
+    "hp": 412,
+    "battleHp": 3296,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "Immune",
+        "name": "生命强化",
+        "desc": "攻击时，对单个敌人提升生命上限或获得免疫，强度 150%。",
+        "effect": {
+          "type": "cleanse"
+        },
+        "trigger": "on_attack",
+        "action": "buff_hp",
+        "target": "single_enemy",
+        "value": 150,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "HealWLonATK",
+        "name": "治疗",
+        "desc": "治疗时，对指挥官恢复生命，强度 1%。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_heal",
+        "action": "heal",
+        "target": "warlord",
+        "value": 1,
+        "chance": 10,
+        "duration": 1
+      },
+      {
+        "token": "ETGetExtrAttack",
+        "name": "伤害",
+        "desc": "回合时，对单个敌人对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_turn",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 10,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "main/regina_big",
+      "lega": "tutorial/regina_lega_big",
+      "nude": "main/regina_nude_big"
+    },
+    "unit": "regina_player",
+    "voice": [
+      "main/regina_attack/regina_attack.m4a"
+    ],
+    "power": 727,
+    "artWeb": {
+      "base": "assets/heroes/regina/base.webp",
+      "baseThumb": "assets/heroes/regina/base_thumb.webp",
+      "lega": "assets/heroes/regina/lega.webp",
+      "legaThumb": "assets/heroes/regina/lega_thumb.webp",
+      "nude": "assets/heroes/regina/nude.webp",
+      "nudeThumb": "assets/heroes/regina/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/regina_player/regina_player.atlas"
+  },
+  {
+    "id": "358",
+    "key": "pixie",
+    "name": "Pixie",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 162,
+    "hp": 240,
+    "battleHp": 1920,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AppFreezRndEnPixie",
+        "name": "伤害",
+        "desc": "登场时，对随机敌人对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "aoe",
+          "mult": 0.9
+        },
+        "trigger": "on_appear",
+        "action": "damage",
+        "target": "random_enemy",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "EachStealAtkFreeze",
+        "name": "夺取",
+        "desc": "攻击时，对我方全体夺取目标的增益或生命，强度 1%。",
+        "effect": {
+          "type": "lifesteal",
+          "mult": 0.6
+        },
+        "trigger": "on_attack",
+        "action": "steal",
+        "target": "all_allies",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "EnTDmgEnWarlordOnPercentAttack",
+        "name": "伤害",
+        "desc": "攻击时，对指挥官对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "warlord",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/pixie_big",
+      "lega": "events_monsters/pixie_lega_big",
+      "nude": "events_monsters/pixie_nude_big"
+    },
+    "unit": "pixie_player",
+    "voice": [
+      "scene_dynamic_load/moan_pixie_2/moan_pixie_2.m4a",
+      "scene_dynamic_load/mmm_pixie_2/mmm_pixie_2.m4a",
+      "scene_dynamic_load/ahh_pixie_2/ahh_pixie_2.m4a",
+      "scene_dynamic_load/ahh_pixie_10/ahh_pixie_10.m4a"
+    ],
+    "power": 726,
+    "artWeb": {
+      "base": "assets/heroes/pixie/base.webp",
+      "baseThumb": "assets/heroes/pixie/base_thumb.webp",
+      "lega": "assets/heroes/pixie/lega.webp",
+      "legaThumb": "assets/heroes/pixie/lega_thumb.webp",
+      "nude": "assets/heroes/pixie/nude.webp",
+      "nudeThumb": "assets/heroes/pixie/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/pixie_player/pixie_player.atlas"
+  },
+  {
+    "id": "122",
+    "key": "rose",
+    "name": "Rose",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 133,
+    "hp": 322,
+    "battleHp": 2576,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "buffATforAll",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 3%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 3,
+        "chance": 45,
+        "duration": 1
+      },
+      {
+        "token": "AtFrBuffAtkaff",
+        "name": "攻击强化",
+        "desc": "攻击时，对我方全体提升攻击力，强度 3%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_attack",
+        "action": "buff_atk",
+        "target": "all_allies",
+        "value": 3,
+        "chance": 45,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/rose_big",
+      "lega": "events_monsters/rose_lega_big",
+      "nude": "events_monsters/rose_nude_big"
+    },
+    "unit": "rose_player",
+    "voice": [
+      "scene_dynamic_load/bj_rose_3/bj_rose_3.m4a",
+      "scene_dynamic_load/bj_rose_1/bj_rose_1.m4a",
+      "scene_dynamic_load/bj_rose_2/bj_rose_2.m4a"
+    ],
+    "power": 721,
+    "artWeb": {
+      "base": "assets/heroes/rose/base.webp",
+      "baseThumb": "assets/heroes/rose/base_thumb.webp",
+      "lega": "assets/heroes/rose/lega.webp",
+      "legaThumb": "assets/heroes/rose/lega_thumb.webp",
+      "nude": "assets/heroes/rose/nude.webp",
+      "nudeThumb": "assets/heroes/rose/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/rose_player/rose_player.atlas"
+  },
+  {
+    "id": "371",
+    "key": "mitsuki",
+    "name": "Mitsuki",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 177,
+    "hp": 185,
+    "battleHp": 1480,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackSummonClone",
+        "name": "召唤",
+        "desc": "攻击时，对单个敌人召唤援军加入战场，强度 1%。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_attack",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 1,
+        "chance": 3,
+        "duration": 1
+      },
+      {
+        "token": "MitsukiPierce",
+        "name": "伤害",
+        "desc": "攻击时，对单个敌人对目标造成伤害，强度 3%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "single_enemy",
+        "value": 3,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "AppearFrBuffAttackThis",
+        "name": "攻击强化",
+        "desc": "登场时，对我方全体提升攻击力，强度 1%。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_appear",
+        "action": "buff_atk",
+        "target": "all_allies",
+        "value": 1,
+        "chance": 3,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/mitsuki_big",
+      "lega": "tutorial/mitsuki_lega_big",
+      "nude": "events_monsters/mitsuki_nude_big"
+    },
+    "unit": "mitsuki_player",
+    "voice": [],
+    "power": 716,
+    "artWeb": {
+      "base": "assets/heroes/mitsuki/base.webp",
+      "baseThumb": "assets/heroes/mitsuki/base_thumb.webp",
+      "lega": "assets/heroes/mitsuki/lega.webp",
+      "legaThumb": "assets/heroes/mitsuki/lega_thumb.webp",
+      "nude": "assets/heroes/mitsuki/nude.webp",
+      "nudeThumb": "assets/heroes/mitsuki/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/mitsuki_player/mitsuki_player.atlas"
+  },
+  {
+    "id": "189",
+    "key": "ravenna",
+    "name": "Ravenna",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 114,
+    "hp": 373,
+    "battleHp": 2984,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AppSummonRavChamb",
+        "name": "召唤",
+        "desc": "登场时，对单个敌人召唤援军加入战场。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_appear",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 7,
+        "duration": 1
+      },
+      {
+        "token": "ETPoisonNearEnemies",
+        "name": "剧毒",
+        "desc": "回合时，对相邻使目标持续损失生命，强度 9%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_turn",
+        "action": "poison",
+        "target": "adjacent",
+        "value": 9,
+        "chance": 0,
+        "duration": 1
+      },
+      {
+        "token": "HealWLForPoison_Rav",
+        "name": "剧毒",
+        "desc": "治疗时，对指挥官使目标持续损失生命。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_heal",
+        "action": "poison",
+        "target": "warlord",
+        "value": 0,
+        "chance": 7,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/ravenna_big",
+      "lega": "events_monsters/ravenna_lega_big",
+      "nude": "events_monsters/ravenna_nude_big"
+    },
+    "unit": "ravenna_player",
+    "voice": [],
+    "power": 715,
+    "artWeb": {
+      "base": "assets/heroes/ravenna/base.webp",
+      "baseThumb": "assets/heroes/ravenna/base_thumb.webp",
+      "lega": "assets/heroes/ravenna/lega.webp",
+      "legaThumb": "assets/heroes/ravenna/lega_thumb.webp",
+      "nude": "assets/heroes/ravenna/nude.webp",
+      "nudeThumb": "assets/heroes/ravenna/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/ravenna_player/ravenna_player.atlas"
+  },
+  {
+    "id": "972",
+    "key": "kira",
+    "name": "Kira",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 216,
+    "hp": 63,
+    "battleHp": 504,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "DeathSelfGetDivShield1Fr",
+        "name": "圣盾屏障",
+        "desc": "为全队附加护盾，吸收伤害。",
+        "effect": {
+          "type": "shield",
+          "mult": 1.8
+        }
+      },
+      {
+        "token": "DeathSelfHealAllyWL",
+        "name": "治愈之息",
+        "desc": "回复全队生命。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        }
+      }
+    ],
+    "art": {
+      "base": "main/kira_big",
+      "lega": "main/kira_lega_big",
+      "nude": "tutorial/kira_nude_big"
+    },
+    "unit": "kira_player",
+    "voice": [
+      "tutorial/kira_attack/kira_attack.m4a",
+      "main/dialogue_aw_4_6_kira/dialogue_aw_4_6_kira.m4a",
+      "main/dialogue_aw_4_1_kira/dialogue_aw_4_1_kira.m4a",
+      "main/dialogue_aw_4_2_kira/dialogue_aw_4_2_kira.m4a"
+    ],
+    "power": 711,
+    "artWeb": {
+      "base": "assets/heroes/kira/base.webp",
+      "baseThumb": "assets/heroes/kira/base_thumb.webp",
+      "lega": "assets/heroes/kira/lega.webp",
+      "legaThumb": "assets/heroes/kira/lega_thumb.webp"
+    },
+    "unitWeb": "assets/units/kira_player/kira_player.atlas"
+  },
+  {
+    "id": "276",
+    "key": "harper",
+    "name": "Harper",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 142,
+    "hp": 282,
+    "battleHp": 2256,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackEnWLgiveextraATK",
+        "name": "伤害",
+        "desc": "攻击时，对敌方指挥官对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "enemy_warlord",
+        "value": 1,
+        "chance": 18,
+        "duration": 1
+      },
+      {
+        "token": "EvadeRanged",
+        "name": "伤害",
+        "desc": "攻击时，对远程单位对目标造成伤害，强度 1%。",
+        "effect": {
+          "type": "evade"
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "ranged",
+        "value": 1,
+        "chance": 1,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/harper_big",
+      "lega": "events_monsters/harper_lega_big",
+      "nude": "events_monsters/harper_nude_big"
+    },
+    "unit": "harper_player",
+    "voice": [],
+    "power": 708,
+    "artWeb": {
+      "base": "assets/heroes/harper/base.webp",
+      "baseThumb": "assets/heroes/harper/base_thumb.webp",
+      "lega": "assets/heroes/harper/lega.webp",
+      "legaThumb": "assets/heroes/harper/lega_thumb.webp",
+      "nude": "assets/heroes/harper/nude.webp",
+      "nudeThumb": "assets/heroes/harper/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/harper_player/harper_player.atlas"
+  },
+  {
+    "id": "166",
+    "key": "naomi",
+    "name": "Naomi",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 176,
+    "hp": 173,
+    "battleHp": 1384,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AppSelfStealHPThisLine",
+        "name": "夺取",
+        "desc": "登场时，对自身夺取目标的增益或生命，强度 14%。",
+        "effect": {
+          "type": "lifesteal",
+          "mult": 0.6
+        },
+        "trigger": "on_appear",
+        "action": "steal",
+        "target": "self",
+        "value": 14,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "KillSummonSelfCopy",
+        "name": "召唤",
+        "desc": "击杀时，对自身召唤援军加入战场，强度 14%。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_kill",
+        "action": "summon",
+        "target": "self",
+        "value": 14,
+        "chance": 1,
+        "duration": 1
+      },
+      {
+        "token": "EvadeMelee",
+        "name": "伤害",
+        "desc": "攻击时，对自身对目标造成伤害，强度 100%。",
+        "effect": {
+          "type": "evade"
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "self",
+        "value": 100,
+        "chance": 0,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/naomi_big",
+      "lega": "events_monsters/naomi_lega_big",
+      "nude": "events_monsters/naomi_nude_big"
+    },
+    "unit": "naomi_player",
+    "voice": [],
+    "power": 701,
+    "artWeb": {
+      "base": "assets/heroes/naomi/base.webp",
+      "baseThumb": "assets/heroes/naomi/base_thumb.webp",
+      "lega": "assets/heroes/naomi/lega.webp",
+      "legaThumb": "assets/heroes/naomi/lega_thumb.webp",
+      "nude": "assets/heroes/naomi/nude.webp",
+      "nudeThumb": "assets/heroes/naomi/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/naomi_player/naomi_player.atlas"
+  },
+  {
+    "id": "380",
+    "key": "belle",
+    "name": "Belle",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 100,
+    "hp": 395,
+    "battleHp": 3160,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AttackWeakNear2",
+        "name": "攻击削弱",
+        "desc": "攻击时，对相邻降低目标攻击力，强度 15%。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "debuff_atk",
+        "target": "adjacent",
+        "value": 15,
+        "chance": 6,
+        "duration": 1
+      },
+      {
+        "token": "AttackedWarlordGetHP",
+        "name": "治疗",
+        "desc": "受击时，对指挥官恢复生命，强度 15%。",
+        "effect": {
+          "type": "heal",
+          "mult": 1.4
+        },
+        "trigger": "on_attacked",
+        "action": "heal",
+        "target": "warlord",
+        "value": 15,
+        "chance": 6,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/belle_big",
+      "lega": "events_monsters/belle_lega_big",
+      "nude": "events_monsters/belle_nude_big"
+    },
+    "unit": "belle_player",
+    "voice": [
+      "mascot_dynamic_load/belle_main_sound_2/belle_main_sound_2.m4a",
+      "mascot_dynamic_load/belle_main_sound_3/belle_main_sound_3.m4a",
+      "mascot_dynamic_load/belle_main_sound_6/belle_main_sound_6.m4a",
+      "mascot_dynamic_load/belle_main_sound_1/belle_main_sound_1.m4a"
+    ],
+    "power": 695,
+    "artWeb": {
+      "base": "assets/heroes/belle/base.webp",
+      "baseThumb": "assets/heroes/belle/base_thumb.webp",
+      "lega": "assets/heroes/belle/lega.webp",
+      "legaThumb": "assets/heroes/belle/lega_thumb.webp",
+      "nude": "assets/heroes/belle/nude.webp",
+      "nudeThumb": "assets/heroes/belle/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/belle_player/belle_player.atlas"
+  },
+  {
+    "id": "383",
+    "key": "river",
+    "name": "River",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 126,
+    "hp": 314,
+    "battleHp": 2512,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "AppSummon4DragonsCenter_alt",
+        "name": "召唤",
+        "desc": "登场时，对单个敌人召唤援军加入战场。",
+        "effect": {
+          "type": "summon"
+        },
+        "trigger": "on_appear",
+        "action": "summon",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 11,
+        "duration": 1
+      },
+      {
+        "token": "AllyStrATKdDMGall",
+        "name": "伤害",
+        "desc": "攻击时，对我方全体对目标造成伤害。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.35
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "all_allies",
+        "value": 0,
+        "chance": 11,
+        "duration": 1
+      },
+      {
+        "token": "ETBuffAtkPerDrg_alt",
+        "name": "攻击强化",
+        "desc": "回合时，对单个敌人提升攻击力。",
+        "effect": {
+          "type": "buff_atk",
+          "mult": 0.35
+        },
+        "trigger": "on_turn",
+        "action": "buff_atk",
+        "target": "single_enemy",
+        "value": 0,
+        "chance": 11,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/river_big",
+      "lega": "events_monsters/river_lega_big",
+      "nude": "events_monsters/river_nude_big"
+    },
+    "unit": "river_player",
+    "voice": [],
+    "power": 692,
+    "artWeb": {
+      "base": "assets/heroes/river/base.webp",
+      "baseThumb": "assets/heroes/river/base_thumb.webp",
+      "lega": "assets/heroes/river/lega.webp",
+      "legaThumb": "assets/heroes/river/lega_thumb.webp",
+      "nude": "assets/heroes/river/nude.webp",
+      "nudeThumb": "assets/heroes/river/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/river_player/river_player.atlas"
+  },
+  {
+    "id": "108",
+    "key": "nymeria",
+    "name": "Nymeria",
+    "rarity": "rare",
+    "rarityCn": "R",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 90,
+    "hp": 396,
+    "battleHp": 3168,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "战术打击",
+        "desc": "对目标造成一次普通攻击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1
+        }
+      },
+      {
+        "token": "BfAtkPoisonAllEn",
+        "name": "剧毒",
+        "desc": "攻击时，对敌方全体使目标持续损失生命，强度 8%。",
+        "effect": {
+          "type": "poison",
+          "mult": 0.5
+        },
+        "trigger": "on_attack",
+        "action": "poison",
+        "target": "all_enemies",
+        "value": 8,
+        "chance": 12,
+        "duration": 1
+      },
+      {
+        "token": "StealHPtrigBuffATK",
+        "name": "夺取",
+        "desc": "攻击时，对单个敌人夺取目标的增益或生命，强度 8%。",
+        "effect": {
+          "type": "lifesteal",
+          "mult": 0.6
+        },
+        "trigger": "on_attack",
+        "action": "steal",
+        "target": "single_enemy",
+        "value": 8,
+        "chance": 12,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/nymeria_big",
+      "lega": "events_monsters/nymeria_lega_big",
+      "nude": "events_monsters/nymeria_nude_big"
+    },
+    "unit": "nymeria_player",
+    "voice": [],
+    "power": 666,
+    "artWeb": {
+      "base": "assets/heroes/nymeria/base.webp",
+      "baseThumb": "assets/heroes/nymeria/base_thumb.webp",
+      "lega": "assets/heroes/nymeria/lega.webp",
+      "legaThumb": "assets/heroes/nymeria/lega_thumb.webp",
+      "nude": "assets/heroes/nymeria/nude.webp",
+      "nudeThumb": "assets/heroes/nymeria/nude_thumb.webp"
+    },
+    "unitWeb": "assets/units/nymeria_player/nymeria_player.atlas"
+  }
+]

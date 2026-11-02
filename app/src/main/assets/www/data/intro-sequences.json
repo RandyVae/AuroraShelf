@@ -1,0 +1,550 @@
+{
+  "version": "2.0",
+  "auditRef": "CASE_DEEP_AUDIT_2026-10-29_v2.7",
+  "sequences": {
+    "ch1_prologue": {
+      "id": "ch1_prologue",
+      "chapterId": 1,
+      "stageId": "1-1",
+      "title": "第一章 · 霓虹雨夜：战术突入序章",
+      "totalDurationMs": 6800,
+      "events": [
+        {
+          "id": "scene_establish",
+          "name": "暗场建立与环境侦测",
+          "timeOffsetMs": 0,
+          "durationMs": 1400,
+          "background": "assets/bg/ch1.webp",
+          "camera": {
+            "scale": 1.15,
+            "panX": 0,
+            "panY": -20,
+            "shake": false
+          },
+          "actors": [],
+          "vfx": {
+            "type": "vfx-ambient-scan",
+            "overlay": "rgba(4, 6, 14, 0.88)",
+            "speedlines": false,
+            "scanGrid": true,
+            "darkEstablish": true
+          },
+          "audio": {
+            "bgm": "story",
+            "sfx": "tutorial/vo_fight_hit_new/vo_fight_hit_new.m4a"
+          },
+          "dialogue": {
+            "speaker": "???",
+            "role": "未确认声音",
+            "text": "“……队长？听得到吗……队长！睁开眼睛，队长！”"
+          },
+          "tacticalPrompt": "【微弱通讯】生理指标检测中：脑波频率恢复，生物电特征同步。"
+        },
+        {
+          "id": "hero_wake",
+          "name": "主角唤醒与近景对焦",
+          "timeOffsetMs": 1400,
+          "durationMs": 1300,
+          "background": "assets/bg/ch1.webp",
+          "camera": {
+            "scale": 1.10,
+            "panX": -15,
+            "panY": -10,
+            "shake": false
+          },
+          "actors": [
+            {
+              "key": "kitty",
+              "name": "???",
+              "role": "战备呼唤",
+              "unit": "kitty_player",
+              "type": "spine",
+              "animation": "idle",
+              "actionState": "wake",
+              "size": {
+                "heightRatio": 0.72,
+                "yRatio": 0.05,
+                "xRatio": 0.40
+              },
+              "badge": "意识苏醒"
+            }
+          ],
+          "vfx": {
+            "type": "vfx-wake-flash",
+            "darkEstablish": false,
+            "flash": true
+          },
+          "audio": {
+            "sfx": "tutorial/breath_kitty_5/breath_kitty_5.m4a"
+          },
+          "dialogue": {
+            "speaker": "???",
+            "role": "呼唤声",
+            "text": "“呼……生命体征稳定，瞳孔光反应正常。战术雷达重新上线！”"
+          },
+          "tacticalPrompt": "【意识唤醒】先锋队长生命体征确认稳定，外部战术视界重新接入。"
+        },
+        {
+          "id": "identity_reveal",
+          "name": "身份揭示与大尺寸登场",
+          "timeOffsetMs": 2700,
+          "durationMs": 1400,
+          "background": "assets/bg/ch1.webp",
+          "camera": {
+            "scale": 1.02,
+            "panX": -25,
+            "panY": 0,
+            "shake": false
+          },
+          "actors": [
+            {
+              "key": "kitty",
+              "name": "Kitty",
+              "role": "突击先锋",
+              "unit": "kitty_player",
+              "type": "spine",
+              "animation": "idle",
+              "actionState": "enter",
+              "size": {
+                "heightRatio": 0.76,
+                "yRatio": 0.04,
+                "xRatio": 0.38
+              },
+              "badge": "突击先锋",
+              "quote": "“我是 Kitty！突击队长，战力已完全激活！”"
+            }
+          ],
+          "vfx": {
+            "type": "vfx-hero-aura",
+            "speedlines": true,
+            "flash": true
+          },
+          "audio": {
+            "sfx": "tutorial/kitty_attack/kitty_attack.m4a"
+          },
+          "dialogue": {
+            "speaker": "Kitty",
+            "role": "突击先锋",
+            "text": "“指挥官，我是 Kitty！前哨防线已经被我们撕开，突击准备完毕！”"
+          },
+          "tacticalPrompt": "【身份认证】代号：Kitty · 突击先锋。战刃充能 100%，随时准许自由交火！"
+        },
+        {
+          "id": "ally_response",
+          "name": "双角色同框与指令协同",
+          "timeOffsetMs": 4100,
+          "durationMs": 1300,
+          "background": "assets/bg/ch1.webp",
+          "camera": {
+            "scale": 1.0,
+            "panX": 0,
+            "panY": 0,
+            "shake": false
+          },
+          "actors": [
+            {
+              "key": "kitty",
+              "name": "Kitty",
+              "role": "突击先锋",
+              "unit": "kitty_player",
+              "type": "spine",
+              "animation": "idle",
+              "size": {
+                "heightRatio": 0.74,
+                "yRatio": 0.04,
+                "xRatio": 0.32
+              },
+              "badge": "先锋战位"
+            },
+            {
+              "key": "dominica",
+              "name": "Dominica",
+              "role": "战术指挥",
+              "unit": "dominica_player",
+              "type": "portrait",
+              "artWeb": "assets/heroes/dominica/lega.webp",
+              "size": {
+                "heightRatio": 0.65,
+                "yRatio": 0.08,
+                "xRatio": 0.82
+              },
+              "badge": "战术指挥"
+            }
+          ],
+          "vfx": {
+            "type": "vfx-tactical-link",
+            "speedlines": false
+          },
+          "audio": {
+            "sfx": "tutorial/regina_attack/regina_attack.m4a"
+          },
+          "dialogue": {
+            "speaker": "Dominica",
+            "role": "战术指挥",
+            "text": "“战术链路已锁定！全员保持散开阵型，准许自由交火！”"
+          },
+          "tacticalPrompt": "【双角色协同】Kitty（先锋）与 Dominica（指挥）战术频道接通，阵线协同完毕。"
+        },
+        {
+          "id": "context_objective",
+          "name": "地点威胁与任务目标",
+          "timeOffsetMs": 5400,
+          "durationMs": 1000,
+          "background": "assets/bg/battle.webp",
+          "camera": {
+            "scale": 1.08,
+            "panX": 25,
+            "panY": 0,
+            "shake": true
+          },
+          "actors": [
+            {
+              "key": "drone_enemy",
+              "name": "巡航侦测无人机",
+              "role": "敌方先哨",
+              "unit": "drone_enemy",
+              "type": "spine",
+              "animation": "idle",
+              "size": {
+                "heightRatio": 0.58,
+                "yRatio": 0.15,
+                "xRatio": 0.72
+              },
+              "badge": "敌军警报",
+              "targetLock": true
+            }
+          ],
+          "vfx": {
+            "type": "vfx-alert-target",
+            "targetLock": true,
+            "speedlines": true,
+            "reticle": true
+          },
+          "audio": {
+            "sfx": "tutorial_next/skill_damage/skill_damage.m4a"
+          },
+          "dialogue": {
+            "speaker": "战术无线电",
+            "role": "任务通报",
+            "text": "【首要战术目标】击溃拦截型无人机与先遣守军，确保以太核心据点不失！"
+          },
+          "tacticalPrompt": "【作战目标】肃清 1-1 区段全部敌军单位，建立前哨补给站。"
+        },
+        {
+          "id": "story_to_battle",
+          "name": "剧情至三路战术战斗转场",
+          "timeOffsetMs": 6400,
+          "durationMs": 400,
+          "background": "assets/bg/battle.webp",
+          "camera": {
+            "scale": 1.0,
+            "panX": 0,
+            "panY": 0,
+            "zoomIn": true
+          },
+          "actors": [],
+          "vfx": {
+            "type": "vfx-warp-transition",
+            "cutToBattle": true
+          },
+          "audio": {
+            "bgm": "battle"
+          },
+          "dialogue": null,
+          "tacticalPrompt": "【转场进入】剧情结束，无缝切入三路战术战斗盘面！"
+        }
+      ]
+    },
+    "ch4_desert": {
+      "id": "ch4_desert",
+      "chapterId": 4,
+      "stageId": "4-1",
+      "title": "第四章 · 沙海关卡：热浪与沙尘封锁线",
+      "totalDurationMs": 7200,
+      "events": [
+        {
+          "id": "ch4_scene_establish",
+          "name": "热浪侦测与沙暴封锁",
+          "timeOffsetMs": 0,
+          "durationMs": 1800,
+          "background": "assets/bg/ch4.webp",
+          "camera": {
+            "scale": 1.15,
+            "panX": 0,
+            "panY": -15,
+            "shake": false
+          },
+          "actors": [],
+          "vfx": {
+            "type": "vfx-ambient-scan",
+            "overlay": "rgba(24, 16, 6, 0.72)",
+            "speedlines": false,
+            "scanGrid": true,
+            "darkEstablish": true
+          },
+          "audio": {
+            "bgm": "story",
+            "sfx": "tutorial/vo_fight_hit_new/vo_fight_hit_new.m4a"
+          },
+          "dialogue": {
+            "speaker": "Ethan",
+            "role": "指挥官",
+            "text": "“热传感器读数已突破极限。沙尘暴正在封锁前方峡谷通路。”"
+          },
+          "tacticalPrompt": "【环境侦测】沙海 4-1 区段遭遇高浓度以太沙暴，热浪指数 48℃，能见度骤降。"
+        },
+        {
+          "id": "ch4_sand_ambush",
+          "name": "沙匪截击与战术警告",
+          "timeOffsetMs": 1800,
+          "durationMs": 2000,
+          "background": "assets/bg/ch4.webp",
+          "camera": {
+            "scale": 1.08,
+            "panX": 20,
+            "panY": 0,
+            "shake": true
+          },
+          "actors": [
+            {
+              "key": "lucretia",
+              "name": "Lucretia",
+              "role": "沙海领主",
+              "artWeb": "assets/heroes/lucretia/lega.webp",
+              "isEnemy": true,
+              "badge": "关卡封锁",
+              "targetLock": true
+            }
+          ],
+          "vfx": {
+            "type": "vfx-target-alert",
+            "speedlines": true,
+            "flash": true
+          },
+          "audio": {
+            "sfx": "tutorial_next/skill_damage/skill_damage.m4a"
+          },
+          "dialogue": {
+            "speaker": "Lucretia",
+            "role": "沙海领主",
+            "text": "“过了这道关，就得按沙海的规矩留下买路钱——或者留下你们的命！”"
+          },
+          "tacticalPrompt": "【敌情锁定】沙海领主 Lucretia 封锁峡谷要道，拦截编队已进入接敌范围！"
+        },
+        {
+          "id": "ch4_hero_counter",
+          "name": "重砲轰鸣与阵线展开",
+          "timeOffsetMs": 3800,
+          "durationMs": 2200,
+          "background": "assets/bg/ch4.webp",
+          "camera": {
+            "scale": 1.05,
+            "panX": -15,
+            "panY": 0,
+            "shake": false
+          },
+          "actors": [
+            {
+              "key": "regina",
+              "name": "Regina",
+              "role": "火力压制",
+              "artWeb": "assets/heroes/regina/lega.webp",
+              "size": { "heightRatio": 0.74, "xRatio": 0.35, "yRatio": 0.04 },
+              "badge": "重砲就绪"
+            },
+            {
+              "key": "dominica",
+              "name": "Dominica",
+              "role": "战术指挥",
+              "artWeb": "assets/heroes/dominica/lega.webp",
+              "isSupp": true,
+              "badge": "战术链路"
+            }
+          ],
+          "vfx": {
+            "tacticalLink": true,
+            "heroAura": true
+          },
+          "audio": {
+            "sfx": "tutorial/regina_attack/regina_attack.m4a"
+          },
+          "dialogue": {
+            "speaker": "Regina",
+            "role": "火力压制",
+            "text": "“重砲膛压充能完毕！指挥官，把这些沙海劫掠者轰成碎片！”"
+          },
+          "tacticalPrompt": "【特勤反击】Regina 重火力压制阵位展开，全员武器解除安全保险！"
+        },
+        {
+          "id": "ch4_story_to_battle",
+          "name": "转入沙海关卡交火",
+          "timeOffsetMs": 6000,
+          "durationMs": 1200,
+          "background": "assets/bg/battle.webp",
+          "camera": {
+            "scale": 1.0,
+            "panX": 0,
+            "panY": 0,
+            "zoomIn": true
+          },
+          "actors": [],
+          "vfx": {
+            "type": "vfx-warp-transition",
+            "cutToBattle": true
+          },
+          "audio": {
+            "bgm": "battle"
+          },
+          "dialogue": null,
+          "tacticalPrompt": "【转场进入】剧情结束，无缝切入沙海关卡战术盘面！"
+        }
+      ]
+    },
+    "ch8_finale": {
+      "id": "ch8_finale",
+      "chapterId": 8,
+      "stageId": "8-1",
+      "title": "第八章 · 终局契约：王座空城与最终审判",
+      "totalDurationMs": 7600,
+      "events": [
+        {
+          "id": "ch8_scene_establish",
+          "name": "神殿逆转与重力坍缩",
+          "timeOffsetMs": 0,
+          "durationMs": 1900,
+          "background": "assets/bg/ch8.webp",
+          "camera": {
+            "scale": 1.18,
+            "panX": 0,
+            "panY": -20,
+            "shake": false
+          },
+          "actors": [],
+          "vfx": {
+            "type": "vfx-ambient-scan",
+            "overlay": "rgba(14, 4, 18, 0.82)",
+            "speedlines": false,
+            "scanGrid": true,
+            "darkEstablish": true
+          },
+          "audio": {
+            "bgm": "story",
+            "sfx": "tutorial/vo_fight_hit_new/vo_fight_hit_new.m4a"
+          },
+          "dialogue": {
+            "speaker": "Ethan",
+            "role": "指挥官",
+            "text": "“以太核心神殿的重力场在逆转……我们终于站在终局的门前了。”"
+          },
+          "tacticalPrompt": "【神殿深处】检测到超限以太奇点坍缩，最终守护者觉醒。"
+        },
+        {
+          "id": "ch8_boss_confront",
+          "name": "深渊君临与契约质问",
+          "timeOffsetMs": 1900,
+          "durationMs": 2100,
+          "background": "assets/bg/ch8.webp",
+          "camera": {
+            "scale": 1.10,
+            "panX": 25,
+            "panY": 0,
+            "shake": true
+          },
+          "actors": [
+            {
+              "key": "lilith",
+              "name": "Lilith",
+              "role": "终局审判者",
+              "artWeb": "assets/heroes/lilith/lega.webp",
+              "isEnemy": true,
+              "badge": "神殿主宰",
+              "targetLock": true
+            }
+          ],
+          "vfx": {
+            "type": "vfx-target-alert",
+            "speedlines": true,
+            "flash": true
+          },
+          "audio": {
+            "sfx": "tutorial_next/skill_damage/skill_damage.m4a"
+          },
+          "dialogue": {
+            "speaker": "Lilith",
+            "role": "终局审判者",
+            "text": "“你终于来了。契约上的名字，写的是你，还是你身后的她们？”"
+          },
+          "tacticalPrompt": "【深渊君临】Lilith · 终局契约裁决者现身，全域以太压制生效！"
+        },
+        {
+          "id": "ch8_squad_resolve",
+          "name": "全队誓约与极限超频",
+          "timeOffsetMs": 4000,
+          "durationMs": 2300,
+          "background": "assets/bg/ch8.webp",
+          "camera": {
+            "scale": 1.02,
+            "panX": -10,
+            "panY": 0,
+            "shake": false
+          },
+          "actors": [
+            {
+              "key": "kitty",
+              "name": "Kitty",
+              "role": "特勤队长",
+              "unit": "kitty_player",
+              "size": { "heightRatio": 0.76, "xRatio": 0.35, "yRatio": 0.04 },
+              "badge": "全队誓约"
+            },
+            {
+              "key": "dominica",
+              "name": "Dominica",
+              "role": "极限超频",
+              "artWeb": "assets/heroes/dominica/lega.webp",
+              "isSupp": true,
+              "badge": "超频指挥"
+            }
+          ],
+          "vfx": {
+            "tacticalLink": true,
+            "heroAura": true,
+            "flash": true
+          },
+          "audio": {
+            "sfx": "tutorial/kitty_attack/kitty_attack.m4a"
+          },
+          "dialogue": {
+            "speaker": "Dominica",
+            "role": "极限超频",
+            "text": "“写的是我们！指挥官，战术指挥链路已突破上限，与她彻底了断！”"
+          },
+          "tacticalPrompt": "【全员誓约】特勤指挥链路突破上限，全队战术指挥官技能解锁最大出力！"
+        },
+        {
+          "id": "ch8_story_to_battle",
+          "name": "转入终局巅峰决战",
+          "timeOffsetMs": 6300,
+          "durationMs": 1300,
+          "background": "assets/bg/battle.webp",
+          "camera": {
+            "scale": 1.0,
+            "panX": 0,
+            "panY": 0,
+            "zoomIn": true
+          },
+          "actors": [],
+          "vfx": {
+            "type": "vfx-warp-transition",
+            "cutToBattle": true
+          },
+          "audio": {
+            "bgm": "battle"
+          },
+          "dialogue": null,
+          "tacticalPrompt": "【转场进入】剧情结束，无缝切入终局之战决胜盘面！"
+        }
+      ]
+    }
+  }
+}

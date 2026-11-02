@@ -1,0 +1,131 @@
+irma_enemy.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+at/at_arm2_1
+bounds:20,6,28,40
+offsets:8,8,42,59
+at/at_arm2_2
+bounds:210,85,20,30
+offsets:3,1,25,34
+at/at_basin_en
+bounds:132,92,47,45
+offsets:4,4,53,53
+at/at_body_en
+bounds:107,145,63,67
+offsets:1,1,69,69
+at/at_chest1_en
+bounds:219,222,26,31
+offsets:3,1,30,34
+at/at_chest2_en
+bounds:95,52,27,35
+offsets:1,1,30,37
+at/at_collar 1_en
+bounds:230,178,19,60
+offsets:2,1,22,62
+at/at_hand 3_1_en
+bounds:224,143,29,35
+offsets:5,6,38,48
+at/at_hand 3_2_en
+bounds:145,27,45,26
+offsets:1,1,48,28
+at/att_arm1
+bounds:32,25,47,36
+offsets:4,7,53,48
+at/att_arm2
+bounds:99,31,45,20
+offsets:13,8,69,38
+at/att_arm3
+bounds:2,199,12,17
+offsets:4,3,20,23
+at/att_arm4+
+bounds:167,46,31,18
+offsets:2,1,34,20
+bank
+bounds:49,9,37,18
+offsets:3,5,44,25
+basin
+bounds:2,110,53,46
+offsets:5,14,61,63
+bathrobe 1
+bounds:13,24,43,92
+offsets:3,3,49,99
+bathrobe 2
+bounds:198,40,23,85
+offsets:3,2,32,91
+bathrobe 3
+bounds:2,155,89,98
+offsets:3,2,99,102
+body
+bounds:169,185,57,68
+offsets:7,5,71,78
+chairman
+bounds:168,125,60,67
+offsets:13,3,76,72
+chest 1
+bounds:45,58,24,29
+offsets:4,4,32,36
+chest 2
+bounds:122,51,26,32
+offsets:5,4,36,39
+collar 1
+bounds:215,7,16,56
+offsets:5,4,25,64
+collar 2
+bounds:2,4,24,33
+offsets:4,4,33,42
+collar 3
+bounds:206,115,32,18
+offsets:2,3,37,24
+hair 1
+bounds:222,64,19,30
+offsets:4,4,27,38
+hair 2
+bounds:190,4,18,34
+offsets:6,5,28,43
+hair 3
+bounds:70,154,79,88
+offsets:3,3,84,93
+hand 1_1
+bounds:89,234,24,19
+offsets:4,4,33,27
+hand 1_2
+bounds:153,53,28,44
+offsets:5,3,37,49
+hand 1_3
+bounds:75,25,23,53
+offsets:6,4,35,60
+hand 2_1
+bounds:90,2,31,30
+offsets:3,10,47,43
+hand 2_2+
+bounds:126,128,24,18
+offsets:3,9,30,30
+hand 2_2++
+bounds:20,94,16,16
+offsets:8,3,30,30
+hand 2_3
+bounds:205,153,29,46
+offsets:3,10,62,60
+leg 1_1
+bounds:98,87,37,79
+offsets:16,6,58,89
+leg 1_2
+bounds:147,218,20,35
+offsets:3,3,27,41
+leg 1_3
+bounds:177,67,35,61
+offsets:5,4,44,70
+leg 2_1
+bounds:53,87,27,74
+offsets:5,5,39,84
+leg 2_2
+bounds:2,56,20,54
+offsets:4,4,27,63
+leg 2_3
+bounds:132,3,18,31
+offsets:4,3,29,47
+skirt 1
+bounds:75,79,22,75
+offsets:3,5,33,83

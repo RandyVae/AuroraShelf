@@ -1,0 +1,15 @@
+wl_elaine_remains.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+lht
+bounds:2,133,10,10
+remains_1
+bounds:2,145,157,107
+remains_2
+bounds:161,96,91,77
+offsets:37,9,157,107
+remains_3
+bounds:161,175,91,77
+offsets:37,9,157,107

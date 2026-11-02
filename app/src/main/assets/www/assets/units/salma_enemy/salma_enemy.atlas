@@ -1,0 +1,100 @@
+salma_enemy.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+Leg 1_1
+bounds:211,142,37,66
+offsets:1,1,41,71
+Leg 1_2
+bounds:41,57,27,75
+offsets:1,8,30,84
+Leg 1_4
+bounds:169,177,40,41
+offsets:1,1,47,157
+Leg 2_1
+bounds:82,14,27,60
+offsets:1,6,42,67
+Leg 2_2
+bounds:111,9,35,24
+offsets:2,2,39,27
+Leg 2_3
+bounds:70,76,30,64
+offsets:2,3,34,74
+Leg 2_4
+bounds:129,114,17,26
+arm 1_1
+bounds:157,156,24,19
+offsets:1,3,27,24
+arm 2_1
+bounds:214,210,40,44
+offsets:1,1,42,47
+arm 2_2
+bounds:54,9,26,46
+offsets:1,1,29,58
+arm 2_3
+bounds:137,159,18,28
+offsets:12,4,33,63
+arm 2_4
+bounds:102,80,25,60
+arm 2_5
+bounds:148,94,18,20
+offsets:3,2,23,24
+arm 3_3
+bounds:183,152,21,23
+offsets:5,6,28,43
+arm 3_4
+bounds:169,220,43,34
+arm1_2
+bounds:138,189,29,32
+offsets:12,15,65,54
+arm1_3
+bounds:2,10,32,51
+offsets:1,2,34,54
+arm1_4
+bounds:148,9,16,24
+offsets:3,3,22,29
+body
+bounds:2,188,67,66
+offsets:0,19,69,85
+boobs 1_1
+bounds:2,134,55,52
+offsets:3,33,94,86
+boobs 1_2
+bounds:93,142,27,16
+offsets:2,3,31,22
+collar_1_1
+bounds:78,142,13,17
+offsets:3,4,18,23
+collar_1_2
+bounds:166,133,14,21
+offsets:1,1,17,22
+collar_2_1
+bounds:148,116,16,24
+offsets:2,4,20,30
+collar_2_2
+bounds:115,160,20,29
+offsets:1,1,21,30
+collar_2_3
+bounds:36,2,16,53
+offsets:9,0,27,55
+fire
+bounds:71,223,96,31
+hair
+bounds:2,63,37,69
+offsets:10,3,55,79
+hat_1
+bounds:71,191,65,30
+offsets:1,2,66,39
+hat_2
+bounds:78,161,35,28
+offsets:4,4,44,34
+head
+bounds:111,35,36,43
+offsets:5,11,50,57
+holster
+bounds:59,151,17,35
+offsets:3,2,23,42
+neck
+bounds:129,86,17,26
+offsets:2,2,25,31

@@ -1,0 +1,31 @@
+valkyrie_original.webp
+size: 1024,1024
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+pma: true
+scale: 1.0
+leg_left
+  bounds: 4, 4, 123, 308
+leg_right
+  bounds: 131, 4, 123, 308
+head
+  bounds: 258, 4, 245, 226
+body
+  bounds: 507, 4, 205, 225
+arm_left
+  bounds: 716, 4, 123, 204
+arm_right
+  bounds: 843, 4, 143, 204
+chest_armor
+  bounds: 4, 316, 245, 185
+hair_front
+  bounds: 253, 316, 287, 184
+tactical_rifle
+  bounds: 544, 316, 308, 184
+shoulder_left
+  bounds: 856, 316, 123, 133
+shoulder_right
+  bounds: 4, 505, 123, 133
+face
+  bounds: 131, 505, 163, 123

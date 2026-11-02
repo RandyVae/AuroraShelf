@@ -153,7 +153,17 @@ internal class JmComicSource : ComicSource {
         val key = md5Hex(timestamp + BuildConfig.JM_DATA_SECRET).toByteArray(StandardCharsets.UTF_8)
         val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"))
-        return cipher.doFinal(Base64.decode(encoded, Base64.DEFAULT)).toString(StandardCharsets.UTF_8)
+        val decoded = decodeBase64(encoded)
+        return cipher.doFinal(decoded).toString(StandardCharsets.UTF_8)
+    }
+
+    private fun decodeBase64(value: String): ByteArray {
+        val clean = value.replace("\n", "").replace("\r", "").trim()
+        return runCatching { java.util.Base64.getMimeDecoder().decode(clean) }
+            .getOrElse {
+                runCatching { java.util.Base64.getDecoder().decode(clean) }
+                    .getOrElse { Base64.decode(clean, Base64.DEFAULT) }
+            }
     }
 
     private fun coverUrl(id: String) = "https://${IMAGE_DOMAINS.first()}/media/albums/${id}_3x4.jpg"

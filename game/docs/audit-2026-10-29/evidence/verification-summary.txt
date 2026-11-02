@@ -1,0 +1,31 @@
+Audit run: 2026-10-29 (Asia/Hong_Kong)
+
+Static:
+- node --check offline/app.js: PASS
+- node --check offline/audio.js: PASS
+- android gradle --offline clean :app:assembleRelease: PASS (warnings: deprecated android.useAndroidX=false, deprecated Gradle features, Java deprecated API)
+- adb devices -l: no connected devices
+
+Browser/CDP:
+- tools/test_features.py: PASS 10/10
+- offline/qa/test_comprehensive_audit.py: PASS 8/8
+- offline/qa/test_expanded_systems.py: PASS 9/9 (rerun alone; first parallel run timed out)
+- offline/qa/verify_fixes.py: PASS (all hero dimensions/CG flows)
+- offline/qa/test_bugs.py: FAIL: stale hard-coded CDP target, HTTP 500 WebSocket rejection
+- system python3 QA scripts: BLOCKED: missing websockets; project .venv-assets Python used for rerun
+
+Current artifacts:
+- dist/LustGoddess-1.2.apk SHA-256: 7e21f1cd167f857538551381ef33474140cd7a47659224010361e3e96938e134
+- freshly rebuilt android/app/build/outputs/apk/release/app-release.apk SHA-256: 5167455ad2e1b6f8ac32ce6a550e624348734a13387cfa5306c7d2524c10e071
+- both APKs: 263086058 bytes; same package/version; not bit-for-bit reproducible
+- source snapshot hashes: offline/app.js 838d1400307cbf4e9f4baa05cb389be2a443e5fed39311f31c31057ccc812059; offline/styles.css d664d1b5430f44fb0c0033cee3b4363a6bf73be2bdfac87d0ed75df83e6e63b1; offline/game_data.json 7439e55886956ed5d8ab495770e85b712c7a221837d89539dce8c30dd3f9ecdc
+
+Responsive measurements at 390x844:
+- document width 496.1875 > viewport 390
+- topbar width 496.1875; stats width 419.2890625; tabs x=443.2890625, width=36.8984375 (navigation mostly offscreen)
+- battle actions x=12, width=472.1875; skill button x=253.09375..484.1875 (right edge clipped)
+- heroes layout width=464.1875; hero-detail-empty hidden=true but computed display=grid and height=1373.09375; hero-detail-content starts at y=3081.09375 (hidden element consumes space)
+
+Browser console:
+- 404 /favicon.ico
+- AudioContext autoplay warning before user gesture

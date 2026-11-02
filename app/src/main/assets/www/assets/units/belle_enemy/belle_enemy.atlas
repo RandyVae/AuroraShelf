@@ -1,0 +1,134 @@
+belle_enemy.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+Leg 11_1
+bounds:75,345,28,70
+offsets:4,6,36,81
+Leg 11_2
+bounds:105,365,20,50
+offsets:4,3,28,57
+Leg 11_3
+bounds:57,33,18,38
+offsets:4,3,26,44
+Leg 12_2
+bounds:449,456,21,54
+offsets:3,6,29,64
+Leg 12_3
+bounds:87,214,20,40
+offsets:4,4,28,48
+Leg 21_1
+bounds:2,5,32,66
+offsets:4,3,41,73
+Leg 21_2
+bounds:54,256,21,57
+offsets:4,3,28,62
+Leg 21_3
+bounds:77,33,14,38
+offsets:4,4,22,45
+Leg 22_3
+bounds:494,475,16,35
+offsets:4,4,25,43
+arm 11_1
+bounds:55,145,28,51
+offsets:4,4,37,59
+arm 11_2
+bounds:472,458,20,52
+offsets:3,3,27,59
+arm 12_1
+bounds:54,198,31,56
+offsets:4,4,39,64
+arm 12_2
+bounds:155,383,15,32
+offsets:4,4,23,40
+arm 12_3
+bounds:159,417,26,16
+offsets:4,4,34,25
+arm 21_2
+bounds:113,417,44,16
+offsets:4,3,52,23
+arm 22_1
+bounds:55,93,26,50
+offsets:4,4,34,58
+arm 22_2
+bounds:127,376,26,39
+offsets:3,4,33,48
+arm 22_3
+bounds:333,454,25,19
+offsets:5,4,34,29
+arm11_3
+bounds:57,15,27,16
+offsets:3,4,34,24
+arm11_3_f
+bounds:181,435,19,7
+offsets:5,4,27,15
+arm21_1
+bounds:36,15,19,56
+offsets:6,5,29,64
+arm21_3
+bounds:105,349,19,14
+offsets:4,4,27,24
+body
+bounds:113,435,66,75
+offsets:3,3,72,82
+boobs
+bounds:237,472,53,38
+offsets:4,4,60,46
+chest
+bounds:181,444,54,66
+offsets:4,3,61,73
+fx/health_icon
+bounds:335,475,41,35
+offsets:11,12,61,61
+fx/health_icon b
+bounds:292,475,41,35
+offsets:11,12,61,61
+fx/pixel1
+bounds:304,448,27,25
+offsets:2,3,31,31
+fx/pixel2
+bounds:87,193,19,19
+offsets:6,6,31,30
+fx/pixel3
+bounds:55,73,27,18
+offsets:2,5,32,31
+fx/pixel4
+bounds:494,458,16,15
+offsets:8,8,31,31
+fx/pixel_heart
+bounds:2,417,109,93
+offsets:7,15,123,123
+fx/sparcle
+bounds:378,465,37,45
+offsets:8,5,57,58
+hair 1
+bounds:172,388,18,27
+offsets:4,3,26,34
+hair 2
+bounds:77,278,25,37
+offsets:4,3,31,43
+hair 3
+bounds:2,315,71,100
+offsets:4,4,93,108
+head
+bounds:417,466,30,44
+offsets:4,4,38,54
+wing 1_1
+bounds:2,73,51,118
+offsets:3,4,58,126
+wing 1_2
+bounds:77,256,29,20
+offsets:4,4,36,29
+wing 1_3
+bounds:271,440,31,30
+offsets:4,3,39,37
+wing 2_1
+bounds:2,193,50,120
+offsets:3,4,56,127
+wing 2_2
+bounds:75,317,30,26
+offsets:4,4,38,34
+wing 2_3
+bounds:237,443,32,27
+offsets:4,3,40,33

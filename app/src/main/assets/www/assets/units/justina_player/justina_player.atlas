@@ -1,0 +1,94 @@
+justina_player.webp
+size:512,512
+filter:Linear,Linear
+pma:true
+scale:0.24
+Layer 1
+bounds:249,457,73,53
+offsets:3,3,79,59
+Layer 2
+bounds:370,366,84,144
+offsets:10,20,97,168
+arm_1_1
+bounds:380,408,26,40
+offsets:3,4,35,51
+arm_1_2
+bounds:370,460,17,31
+offsets:6,8,28,42
+arm_2_1
+bounds:470,417,39,39
+offsets:3,3,46,45
+arm_2_2
+bounds:176,496,31,14
+offsets:4,3,38,20
+at/hand 1_1 copy 2
+bounds:88,416,38,46
+offsets:2,9,45,61
+at/hand 1_2 copy 2
+bounds:468,496,17,14
+offsets:3,6,24,25
+at/hand 1_3 copy
+bounds:77,432,30,27
+offsets:4,17,50,48
+at/hand_1
+bounds:310,495,17,15
+offsets:2,3,22,21
+at/Слой 145 copy
+bounds:277,431,119,33
+offsets:2,40,148,75
+body_AW
+bounds:321,456,50,54
+offsets:4,3,57,60
+boob_AW
+bounds:312,451,18,24
+offsets:4,5,26,34
+chest
+bounds:401,456,44,54
+offsets:4,3,52,61
+coat_1
+bounds:210,376,45,134
+offsets:8,3,56,140
+coat_2
+bounds:118,360,42,150
+offsets:7,3,52,157
+foot_1
+bounds:2,447,22,27
+offsets:4,4,30,35
+foot_2
+bounds:328,408,26,30
+offsets:3,4,33,37
+hair
+bounds:161,393,65,117
+offsets:3,3,71,122
+hand_1
+bounds:32,490,15,20
+offsets:4,5,23,29
+hand_2
+bounds:385,493,20,17
+offsets:3,4,26,23
+head
+bounds:2,470,29,40
+offsets:4,4,40,48
+hm_crcl
+bounds:2,291,116,219
+offsets:0,0,145,219
+hm_lht
+bounds:419,425,45,37
+leg_1_1
+bounds:481,457,29,49
+offsets:6,3,46,54
+leg_1_2
+bounds:254,403,22,61
+offsets:4,3,33,68
+leg_2_1
+bounds:445,452,35,58
+offsets:3,3,42,63
+leg_2_2
+bounds:160,406,30,62
+offsets:5,3,38,68
+shoulder pad_1
+bounds:460,415,26,20
+offsets:6,4,36,30
+shoulder pad_2
+bounds:354,420,33,24
+offsets:4,5,41,33

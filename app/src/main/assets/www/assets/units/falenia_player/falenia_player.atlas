@@ -1,0 +1,94 @@
+falenia_player.webp
+size:256,256
+filter:Linear,Linear
+pma:true
+scale:0.24
+body
+bounds:135,111,47,69
+offsets:11,4,68,77
+chest 1_1
+bounds:13,55,22,24
+offsets:6,6,32,35
+chest 1_2
+bounds:199,151,26,28
+offsets:4,4,34,35
+fire
+bounds:158,181,96,31
+hair_dop
+bounds:2,22,14,232
+offsets:5,0,26,232
+hair_m_pl
+bounds:243,226,9,28
+offsets:2,1,13,31
+hand 2_1
+bounds:222,113,26,66
+offsets:4,3,33,74
+hand 2_2
+bounds:122,53,25,43
+offsets:5,11,33,57
+hand 4_1
+bounds:100,77,20,47
+offsets:5,13,29,63
+hand 4_2
+bounds:208,59,26,37
+offsets:5,4,35,44
+hand 4_3
+bounds:54,97,44,52
+offsets:4,2,50,60
+hand_12pl
+bounds:140,74,28,45
+offsets:3,3,34,51
+head_pl
+bounds:79,217,38,37
+offsets:1,6,41,44
+leg 1_10
+bounds:55,55,20,30
+offsets:4,6,29,41
+leg 1_2
+bounds:16,113,38,74
+offsets:4,3,44,82
+leg 1_30
+bounds:74,175,31,42
+offsets:3,3,37,53
+leg 1_40
+bounds:120,88,20,61
+offsets:4,5,28,69
+leg 2_10
+bounds:74,47,24,22
+offsets:3,3,30,30
+leg 2_2
+bounds:173,114,49,65
+offsets:3,3,56,72
+leg 2_30
+bounds:228,80,26,35
+offsets:4,3,33,42
+leg 2_40
+bounds:172,95,52,20
+offsets:4,18,60,42
+pelvis
+bounds:164,215,47,39
+offsets:21,9,76,105
+pl_at_arm1
+bounds:14,91,48,26
+offsets:1,2,50,30
+pl_at_arm12
+bounds:143,56,32,22
+offsets:3,4,36,27
+pl_at_arm13
+bounds:169,59,42,38
+offsets:4,2,48,41
+pl_at_arm2
+bounds:211,216,36,38
+offsets:2,2,39,41
+pl_at_arm22
+bounds:14,73,40,24
+offsets:1,1,42,26
+pl_at_arm23
+bounds:63,64,46,33
+offsets:2,1,50,35
+wings 1+
+bounds:99,124,63,130
+offsets:4,3,70,136
+wings 2+
+bounds:14,119,85,135
+offsets:3,3,91,141

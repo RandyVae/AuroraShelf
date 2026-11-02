@@ -896,6 +896,11 @@ private fun ComicReader(
     val context = LocalContext.current
     val listState = rememberLazyListState()
 
+    // Reset reader scroll position to top when chapter changes
+    LaunchedEffect(reader.chapterIndex) {
+        listState.scrollToItem(0)
+    }
+
     // Sliding window page prefetch: pre-resolves and warms ahead 3 pages off the main thread
     LaunchedEffect(listState, reader.pages) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
