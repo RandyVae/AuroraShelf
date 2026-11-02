@@ -82,20 +82,14 @@ public struct MainContainerView: View {
             }
             
             if args.contains("--auto-play") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    activeVideoForPlayback = videoRepo.billboardVideo ?? videoRepo.top10Videos.first ?? VideoItem(
-                        id: "local-intro",
-                        title: "极光视界 4K 演示样片",
-                        subtitle: "原生硬件解码 · 0ms 秒播",
-                        coverUrl: "",
-                        playbackUrl: Bundle.main.url(forResource: "intro_film", withExtension: "mp4")?.absoluteString ?? "",
-                        duration: "00:15",
-                        rating: "9.9",
-                        tags: ["本地原生", "4K HDR"],
-                        category: "精选",
-                        sourceName: "本地内置"
-                    )
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
+                    if let realVideo = videoRepo.billboardVideo ?? videoRepo.feedVideos.first {
+                        activeVideoForPlayback = realVideo
+                    }
                 }
+            }
+            if args.contains("--auto-live") {
+                selectedTab = .live
             }
             if args.contains("--open-game") {
                 showGameDirectly = true

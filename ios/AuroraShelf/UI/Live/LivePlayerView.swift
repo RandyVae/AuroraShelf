@@ -1,5 +1,5 @@
 import SwiftUI
-import AVKit
+import WebKit
 
 public struct DanmakuMessage: Identifiable, Sendable {
     public let id = UUID()
@@ -14,19 +14,117 @@ public struct DanmakuMessage: Identifiable, Sendable {
     }
 }
 
+public struct LiveStreamWebViewRepresentable: UIViewRepresentable {
+    public let embedUrl: URL
+    @Binding public var isLoading: Bool
+    
+    public init(embedUrl: URL, isLoading: Binding<Bool>) {
+        self.embedUrl = embedUrl
+        self._isLoading = isLoading
+    }
+    
+    public func makeUIView(context: Context) -> WKWebView {
+        let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        
+        // 注入确认条款与全屏自适应配置
+        let scriptSource = """
+        document.cookie = "agreeterms=1; domain=.chaturbate.com; path=/; max-age=31536000";
+        document.cookie = "isAdult=1; domain=.chaturbate.com; path=/; max-age=31536000";
+        document.cookie = "hasConfirmedAge=1; domain=.chaturbate.com; path=/; max-age=31536000";
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+        var style = document.createElement('style');
+        style.innerHTML = 'body, html { margin:0 !important; padding:0 !important; background:#000 !important; overflow:hidden !important; } .player-holder { width:100% !important; height:100% !important; } .chat-holder, .sidebar, #header, #footer, .top-section, .room-details { display:none !important; } video { width:100vw !important; height:auto !important; max-height:100vh !important; }';
+        document.head.appendChild(style);
+        setTimeout(function() {
+            var btns = document.querySelectorAll('button, a');
+            for (var i = 0; i < btns.length; i++) {
+                var t = (btns[i].innerText || '').toLowerCase();
+                if (t.indexOf('agree') !== -1 || t.indexOf('enter') !== -1 || t.indexOf('confirm') !== -1) {
+                    btns[i].click();
+                }
+            }
+        }, 300);
+        """
+        let userScript = WKUserScript(source: scriptSource, injectionTime: .atDocumentStart, forMainFrameOnly: false)
+        config.userContentController.addUserScript(userScript)
+        
+        let webView = WKWebView(frame: .zero, configuration: config)
+        webView.navigationDelegate = context.coordinator
+        webView.isOpaque = false
+        webView.backgroundColor = .black
+        webView.scrollView.backgroundColor = .black
+        webView.scrollView.bounces = false
+        webView.scrollView.showsVerticalScrollIndicator = false
+        webView.scrollView.showsHorizontalScrollIndicator = false
+        
+        var request = URLRequest(url: embedUrl)
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
+        webView.load(request)
+        
+        return webView
+    }
+    
+    public func updateUIView(_ uiView: WKWebView, context: Context) {
+        context.coordinator.parent = self
+    }
+    
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    public class Coordinator: NSObject, WKNavigationDelegate {
+        var parent: LiveStreamWebViewRepresentable
+        
+        init(_ parent: LiveStreamWebViewRepresentable) {
+            self.parent = parent
+        }
+        
+        public func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                withAnimation {
+                    self.parent.isLoading = false
+                }
+            }
+        }
+        
+        public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            DispatchQueue.main.async {
+                self.parent.isLoading = false
+            }
+        }
+    }
+}
+
 public struct LivePlayerView: View {
     public let stream: LiveStreamItem
     public let onDismiss: () -> Void
     
-    @State private var player: AVPlayer?
     @State private var isDanmakuEnabled: Bool = true
     @State private var danmakus: [DanmakuMessage] = []
     @State private var inputMessage: String = ""
     @State private var showControls: Bool = true
+    @State private var isWebLoading: Bool = true
     
     public init(stream: LiveStreamItem, onDismiss: @escaping () -> Void) {
         self.stream = stream
         self.onDismiss = onDismiss
+    }
+    
+    private var embedUrl: URL {
+        if !stream.username.isEmpty,
+           let url = URL(string: "https://chaturbate.com/embed/\(stream.username)/?bgcolor=black") {
+            return url
+        }
+        if let direct = URL(string: stream.roomUrl) {
+            return direct
+        }
+        return URL(string: "https://chaturbate.com/")!
     }
     
     public var body: some View {
@@ -34,18 +132,41 @@ public struct LivePlayerView: View {
             // 背景纯黑
             Color.black.ignoresSafeArea()
             
-            // 播放器视口
-            if let player = player {
-                VideoPlayer(player: player)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(AuroraTheme.quickSpring) {
-                            showControls.toggle()
+            // 原生 WKWebView 全屏无广告嵌入播放器
+            LiveStreamWebViewRepresentable(embedUrl: embedUrl, isLoading: $isWebLoading)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(AuroraTheme.quickSpring) {
+                        showControls.toggle()
+                    }
+                }
+            
+            // 网页加载中过渡底图与 Spinner
+            if isWebLoading {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    
+                    AsyncImage(url: URL(string: stream.snapshotUrl)) { phase in
+                        if let img = phase.image {
+                            img.resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .ignoresSafeArea()
+                                .opacity(0.35)
+                                .blur(radius: 10)
                         }
                     }
-            } else {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: AuroraTheme.crimson))
+                    
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: AuroraTheme.crimson))
+                            .scaleEffect(1.6)
+                        
+                        Text("正在直连 \(stream.username) 真实直播间...")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.white)
+                    }
+                }
+                .transition(.opacity)
             }
             
             // 4 泳道防碰撞错峰弹幕浮层
@@ -86,8 +207,6 @@ public struct LivePlayerView: View {
                         Button(action: {
                             let impact = UIImpactFeedbackGenerator(style: .medium)
                             impact.impactOccurred()
-                            player?.pause()
-                            player = nil
                             onDismiss()
                         }) {
                             HStack(spacing: 4) {
@@ -203,24 +322,14 @@ public struct LivePlayerView: View {
             }
         }
         .onAppear {
-            setupLivePlayer()
             startDanmakuEmitter()
+            // 2.5 秒兜底淡出加载蒙层，确保画面必定出画
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                withAnimation {
+                    self.isWebLoading = false
+                }
+            }
         }
-    }
-    
-    private func setupLivePlayer() {
-        let playUrl: URL?
-        if let localUrl = Bundle.main.url(forResource: "intro_film", withExtension: "mp4") {
-            playUrl = localUrl
-        } else if let remote = URL(string: stream.roomUrl) {
-            playUrl = remote
-        } else {
-            playUrl = nil
-        }
-        guard let url = playUrl else { return }
-        let player = AVPlayer(url: url)
-        self.player = player
-        player.play()
     }
     
     private func sendDanmaku() {
@@ -235,7 +344,6 @@ public struct LivePlayerView: View {
     }
     
     private func startDanmakuEmitter() {
-        // 初始种子弹幕
         let seeds = [
             "主播真好看！666",
             "打卡打卡，声音太甜了",

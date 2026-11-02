@@ -130,5 +130,12 @@ public struct LiveScreen: View {
                 activeStream = nil
             }
         }
+        .onReceive(repo.$liveStreams) { streams in
+            if CommandLine.arguments.contains("--auto-live") && activeStream == nil, let first = streams.first {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    activeStream = first
+                }
+            }
+        }
     }
 }
