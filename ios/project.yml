@@ -1,0 +1,30 @@
+name: AuroraShelf
+options:
+  bundleIdPrefix: com.aurorashelf
+  deploymentTarget:
+    iOS: "26.4"
+targets:
+  AuroraShelf:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.4"
+    sources:
+      - path: AuroraShelf
+        excludes:
+          - "Resources/www"
+      - path: AuroraShelf/Resources/www
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aurorashelf.app
+        INFOPLIST_FILE: AuroraShelf/Resources/Info.plist
+        SWIFT_VERSION: "6.0"
+        CURRENT_PROJECT_VERSION: 173
+        MARKETING_VERSION: "2.16.0"
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGN_IDENTITY: ""
+        GENERATE_INFOPLIST_FILE: "NO"
+        ENABLE_USER_SCRIPT_SANDBOXING: "NO"
