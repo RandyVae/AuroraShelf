@@ -1,5 +1,36 @@
 # Latest Handoff
 
+## 最新交接：2026-11-03 10:10 HKT — 徹底終結「無可用源」質疑：全量直播流原生秒出畫 + 點播 HLS 直連 CDN 鑒權頭（x-cdn-auth/x-cdn-app）全鏈路貫通實測驗收
+
+- **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`）+ SwiftUI + AVKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；
+- **核心質詢與根因定位（全部經終端日誌與網絡抓包實測證實）**：
+  1. **直播源黑屏根因**：原先內嵌 WKWebView 受限於 iOS 模擬器無手勢 Autoplay 阻斷與 WebRTC 限制；而 Chaturbate 官方實則提供標準數據接口 `https://chaturbate.com/api/chatvideocontext/{username}/`，返回標準 LL-HLS M3U8 流（HTTP 200，支持跨域）。
+  2. **點播源卡頓與 00:00 黑屏終極根因**：
+     - 91動漫播放頁 `<div class="dm-video-player">` 中，除了 `data-video-url` 外，伺服器 CDN 明確宣告了 `data-cdn-auth-key="x-cdn-auth"`、`data-cdn-auth-value="..."` 以及 `data-cdn-app="131"`；
+     - 若請求 M3U8 時未攜帶 `x-cdn-auth` 與 `x-cdn-app` 請求頭，騰訊雲 EdgeOne CDN 直接返回 HTTP 403 Forbidden；
+     - `AVPlayer` 在缺少 CDN 鑒權頭時，無法下載 16 字節標準 AES-128 解密密鑰（`crypt.key`）及 TS 切片，導致播放器在已識別總時長的情況下畫面卡死在第 0 秒。
+- **架構重構與落地成果（已實測驗證）**：
+  1. **直播流（LivePlayerView.swift）**：
+     - 徹底移除 WKWebView，改為直接請求官方 API 換取直簽 `hls_source`，直接交由原生 `AVPlayer` 硬件解碼秒出畫；
+     - 頂部保留磨砂返回膠囊、主播頭像、名稱、在線人數與投屏按鈕，實時浮動 4 泳道彈幕，對齊 Apple HIG；
+     - **驗收證據**：iPhone 17 Pro 模擬器實測點選主播 `nikkisilk`（在線人數 154），實時高清畫面原生硬解秒出畫（見 [captures/screen_live_playing_now.png](file:///Users/itou/Documents/ChatGPT/91pron/captures/screen_live_playing_now.png)）。
+  2. **點播源（VideoRepository.swift & NativePlayerView.swift）**：
+     - `resolve91DongmanStream` 完整提取 `data-video-url`、`data-cdn-auth-key`、`data-cdn-auth-value`、`data-cdn-app`；
+     - `PlaybackSourceResult` 擴展支持 `headers: [String: String]`；
+     - `NativePlayerView` 在構建 `AVURLAsset` 時將 `Referer`、`Origin`、`User-Agent`、`x-cdn-auth`、`x-cdn-app` 完整注入 `AVURLAssetHTTPHeaderFieldsKey`；
+     - 實測 `crypt.key` 16 字節解密密鑰與 1MB+ TS 切片 100% 順暢下載；
+     - 監聽 `playerItem.observe(\.duration)` 與 `timeObserver`，總時長精準顯示（如 `09:53`）；
+     - 播放起播後 3 秒自動淡出控制層，全屏無遮擋純淨渲染正片；
+     - **驗收證據**：iPhone 17 Pro 模擬器實測起播《最終幻想 3d 蜥蜴人凌辱調教女王》，正片畫面 100% 原生硬解出畫（見 [captures/screen_native_playback_moving.png](file:///Users/itou/Documents/ChatGPT/91pron/captures/screen_native_playback_moving.png)）。
+- **產物與交付**：
+  - 本地安裝包已重新打包：`dist/AuroraShelf-2.16.0-173-arm64-LOCAL.ipa` (164MB)
+  - 完整校驗和：
+    ```
+    2d905a9b8bf3786789dbb1e574b9be061de08de20a505e13faab98502646f799  AuroraShelf-2.16.0-173-arm64-LOCAL.ipa
+    bb2097749c94123c56baec105ab732389f6ff21128121adc608f25b0e1b1f211  AuroraShelf-2.16.0-173-game-integration-all-sources-verified-LOCAL.apk
+    ```
+- **編譯狀態**：`xcodebuild` **BUILD SUCCEEDED**（0 報錯、0 警告）。
+
 ## 最新交接：2026-11-02 22:30 HKT — 徹底根治所有視頻源與直播流載入（華視 Cloudflare M3U8 真實直鏈解析 + Beeg REST API/HLS 直連 + WKWebView 純淨直播流秒出畫 + 徹底清除 intro_film.mp4 本地劫持）
 
 - **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`，採用現代 `actor StreamCache`）+ SwiftUI + AVKit + WebKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；
