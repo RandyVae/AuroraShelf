@@ -67,23 +67,12 @@ public struct ComicsScreen: View {
                                 activeComicForReading = comic
                             } label: {
                                 VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                                    AsyncImage(url: URL(string: comic.coverUrl)) { phase in
-                                        switch phase {
-                                        case .success(let image):
-                                            image
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                        default:
-                                            ZStack {
-                                                AuroraColor.surfaceCard
-                                                Image(systemName: "book.pages")
-                                                    .font(.title2)
-                                                    .foregroundStyle(.tertiary)
-                                            }
-                                        }
-                                    }
-                                    .aspectRatio(AuroraMetrics.posterAspect, contentMode: .fit)
-                                    .clipShape(RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
+                                    AuroraCoverImage(
+                                        url: comic.coverUrl,
+                                        aspectRatio: AuroraMetrics.posterAspect,
+                                        contentMode: .fill,
+                                        cornerRadius: AuroraMetrics.cardRadius
+                                    )
                                     .overlay(
                                         RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
                                             .stroke(AuroraColor.hairline, lineWidth: 1)

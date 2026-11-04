@@ -1,5 +1,40 @@
 # Latest Handoff
 
+## 最新交接：2026-11-04 11:40 HKT — iOS 端三大核心視覺與體驗痛點專項攻堅閉環：封面 AES 解密與 bzcdn CDN 貫通、直播雙列網格溢出重疊根治、全屏播放器雙模畫幅（Fit / Fill）與一鍵橫屏旋轉落地
+
+- **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`）+ SwiftUI + AVKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；
+- **三大痛點根因定位與核心攻堅成果（全部實測驗證，無推斷）**：
+  1. **封面加載全滅根因與攻堅閉環**：
+     - **91動漫/黃果視頻封面**：CDN 返回為 AES-128-CBC 加密二進制流（密鑰 `f5d965df75336270`，IV `97b60394abc2fbe1`），且需防盜鏈 Referer。原 iOS 端直接使用系統 `AsyncImage`，密文被識別為非法圖片全屏灰圖；
+     - **漫畫封面**：原包子漫畫域名 `static-tw.baozimh.com` 遭 Cloudflare 403 阻斷。經排查官方章節真實圖片鏈路，確定官方高清封面鏡像端點為 `https://s1.bzcdn.net/cover/{topic_img}`（實測 200 OK，29KB - 94KB 真實高清原畫）；
+     - **落地成果**：
+       - 新建 `ios/AuroraShelf/Services/CoverImageLoader.swift`：整合 `CommonCrypto` 原生 AES-128-CBC 解密、防盜鏈 Header（`Referer: https://91dongman.net/`、`Referer: https://cn.webmota.com/`）注入、120 張 `NSCache` 內存緩存 + 沙盒磁盤文件雙層緩存；
+       - 新建 `ios/AuroraShelf/UI/Components/AuroraCoverImage.swift`：統一代碼中 `HeroBanner`、`PosterCard`、`Top10Card`、`ComicsScreen`、`SearchSheetView` 與 `LiveScreen` 全部封面加載；
+       - 實機截圖存檔：首頁視頻封面（`screen_ios_home_covers.png`）與漫畫封面（`screen_ios_comics_covers.png`）全部秒級加載高清出圖！
+  2. **直播板塊封面相互重疊穿透根因與攻堅閉環**：
+     - **根因**：原 `LiveScreen.swift` 中 `AsyncImage` 僅指定了 `.frame(height: 180)`，未宣告單元格橫向寬度約束（`minWidth: 0, maxWidth: .infinity`），且未加 `.clipped()` 裁剪；高分辨率圖片在 `contentMode: .fill` 下橫向寬度暴增，直接溢出穿透至相鄰網格單元格；
+     - **落地成果**：
+       - `LiveScreen.swift` 全面接入 `AuroraCoverImage`，固定 4:3 黃金比例，外層容器與卡片全面宣告 `.frame(minWidth: 0, maxWidth: .infinity)` 與 `.clipped()`；
+       - 實機截圖存檔：`screen_ios_live_grid.png`，主播雙列網格嚴格對齊，左右無任何像素穿透與重疊。
+  3. **視頻播放上下黑邊問題與畫幅控制落地**：
+     - **根因分析**：16:9 視頻在現代 iPhone（19.5:9 屏幕長寬比）豎屏播放時，系統默認以 `.resizeAspect`（適應原片）模式居中展示，畫面僅佔據屏幕縱向約 35%，必然產生 Letterbox 上下黑邊；之前應用未提供現代流媒體必備的「畫幅縮放」與「橫屏旋轉」能力；
+     - **落地成果**：
+       - 新建 `ios/AuroraShelf/UI/Player/AuroraPlayerSurface.swift`：基於 `AVPlayerLayer` 原生表面，支援 `.resizeAspect` 與 `.resizeAspectFill`（100% 滿鋪全屏，0 黑邊）CATransaction 平滑切換；
+       - `NativePlayerView.swift` 與 `LivePlayerView.swift` 支援**雙擊屏幕手勢切換畫幅**；
+       - 屏幕中央集成 Apple HIG 磨砂微膠囊 HUD 提示（「畫幅：滿鋪全屏（無黑邊）」/「畫幅：原片比例（完整畫面）」）；
+       - 頂欄 `PlayerOverlayBar` 右側加入「畫幅切換（Fit / Fill）」按鈕與「一鍵橫屏沉浸旋轉」按鈕；
+       - 實機截圖存檔：`screen_ios_player_playing.png`，1080P 超清直連流秒播，上下左右 0 黑邊 100% 滿屏渲染！
+- **實機驗證截圖**：
+  - `captures/screen_ios_home_covers.png`（首頁 91動漫 AES 解密高清封面）
+  - `captures/screen_ios_comics_covers.png`（漫畫板塊 bzcdn 官方鏡像高清彩色封面）
+  - `captures/screen_ios_live_grid.png`（直播雙列網格嚴格對齊零重疊）
+  - `captures/screen_ios_player_auto.png`（播放器頂欄畫幅模式切換與橫屏旋轉控制）
+  - `captures/screen_ios_player_playing.png`（正片 1080P 滿鋪無黑邊秒播）
+  - `captures/screen_ios_verified_home2.png`（無參自然啟動驗收圖）
+- **編譯狀態**：`xcodebuild` **BUILD SUCCEEDED**（0 報錯、0 警告）。
+
+---
+
 ## 最新交接：2026-11-04 10:55 HKT — iOS 端原生化重構（Phase 0 - Phase 5）全量閉環交付：單一真源設計令牌、首頁與列表頁 Apple HIG 重構、沉浸浮層收斂、原生全網搜索、偽玻璃與死代碼徹底清零
 
 - **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`）+ SwiftUI + AVKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；

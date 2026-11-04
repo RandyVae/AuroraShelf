@@ -68,7 +68,7 @@ public final class ComicRepository: ObservableObject, @unchecked Sendable {
                         let topicImg = item["topic_img"] as? String ?? ""
                         let typeNames = item["type_names"] as? [String] ?? ["热血"]
                         
-                        let coverUrl = topicImg.isEmpty ? "" : "https://static-tw.baozimh.com/cover/\(topicImg)?w=570&h=750&q=90"
+                        let coverUrl = topicImg.isEmpty ? "" : "https://s1.bzcdn.net/cover/\(topicImg)"
                         
                         results.append(ComicItem(
                             id: comicId,

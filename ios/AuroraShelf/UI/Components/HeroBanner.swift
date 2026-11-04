@@ -20,25 +20,14 @@ public struct HeroBanner: View {
     
     public var body: some View {
         ZStack(alignment: .bottom) {
-            // 背景封面海报，4:5 竖版黄金比例，自适应延伸
-            AsyncImage(url: URL(string: video.coverUrl)) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                default:
-                    ZStack {
-                        AuroraColor.surfaceCard
-                        Image(systemName: "film")
-                            .font(.largeTitle)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
-            .aspectRatio(AuroraMetrics.heroAspect, contentMode: .fit)
+            // 背景封面海报，4:5 竖版黄金比例，自适应延伸（自动解密与双层缓存）
+            AuroraCoverImage(
+                url: video.coverUrl,
+                aspectRatio: AuroraMetrics.heroAspect,
+                contentMode: .fill,
+                cornerRadius: 0
+            )
             .frame(maxWidth: .infinity)
-            .clipped()
             
             // 单一平滑渐变可读性遮罩
             LinearGradient(

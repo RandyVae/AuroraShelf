@@ -31,24 +31,14 @@ public struct Top10Card: View {
                     .frame(width: 64, alignment: .trailing)
                     .zIndex(1)
                 
-                // 海报（自适应宽度 120，高度按 2:3 纵横比）
-                AsyncImage(url: URL(string: video.coverUrl)) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    default:
-                        ZStack {
-                            AuroraColor.surfaceCard
-                            Image(systemName: "film")
-                                .font(.title3)
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                }
+                // 海报（自适应宽度 120，高度按 2:3 纵横比，自动解密与双层缓存）
+                AuroraCoverImage(
+                    url: video.coverUrl,
+                    aspectRatio: AuroraMetrics.posterAspect,
+                    contentMode: .fill,
+                    cornerRadius: AuroraMetrics.cardRadius
+                )
                 .frame(width: 120, height: 180)
-                .clipShape(RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
                         .stroke(AuroraColor.hairline, lineWidth: 1)

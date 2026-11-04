@@ -54,7 +54,7 @@ public struct LiveScreen: View {
                         .padding(.vertical, AuroraMetrics.spacingXS)
                     }
                     
-                    // 主播双列网格
+                    // 主播双列网格（严格防重叠与边界裁切）
                     LazyVGrid(
                         columns: [
                             GridItem(.flexible(), spacing: AuroraMetrics.spacingM),
@@ -68,23 +68,13 @@ public struct LiveScreen: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
                                     ZStack(alignment: .topTrailing) {
-                                        AsyncImage(url: URL(string: item.snapshotUrl)) { phase in
-                                            switch phase {
-                                            case .success(let image):
-                                                image
-                                                    .resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                            default:
-                                                ZStack {
-                                                    AuroraColor.surfaceCard
-                                                    Image(systemName: "video")
-                                                        .font(.title2)
-                                                        .foregroundStyle(.tertiary)
-                                                }
-                                            }
-                                        }
-                                        .frame(height: 180)
-                                        .clipShape(RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
+                                        AuroraCoverImage(
+                                            url: item.snapshotUrl,
+                                            aspectRatio: 4.0 / 3.0,
+                                            contentMode: .fill,
+                                            cornerRadius: AuroraMetrics.cardRadius
+                                        )
+                                        .frame(minWidth: 0, maxWidth: .infinity)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
                                                 .stroke(AuroraColor.hairline, lineWidth: 1)
@@ -109,6 +99,8 @@ public struct LiveScreen: View {
                                         .background(.regularMaterial, in: Capsule())
                                         .padding(AuroraMetrics.spacingS)
                                     }
+                                    .frame(minWidth: 0, maxWidth: .infinity)
+                                    .clipped()
                                     
                                     HStack(spacing: AuroraMetrics.spacingS) {
                                         AsyncImage(url: URL(string: item.avatarUrl)) { phase in
@@ -120,6 +112,7 @@ public struct LiveScreen: View {
                                         }
                                         .frame(width: 24, height: 24)
                                         .clipShape(Circle())
+                                        .clipped()
                                         
                                         Text(item.username)
                                             .font(.subheadline)
@@ -133,6 +126,7 @@ public struct LiveScreen: View {
                                         .foregroundStyle(AuroraColor.textSecondary)
                                         .lineLimit(1)
                                 }
+                                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                             }
                             .buttonStyle(.plain)
                         }

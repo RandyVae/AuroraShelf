@@ -27,6 +27,7 @@ public struct LivePlayerView: View {
     @State private var inputMessage: String = ""
     @State private var showControls: Bool = true
     @State private var itemStatusObserver: NSKeyValueObservation?
+    @State private var isFillMode: Bool = false
     
     public init(stream: LiveStreamItem, onDismiss: @escaping () -> Void) {
         self.stream = stream
@@ -38,15 +39,26 @@ public struct LivePlayerView: View {
             // 背景纯黑
             Color.black.ignoresSafeArea()
             
-            // 原生 AVPlayer 硬件解码直播视口（秒级出画）
+            // 原生 AVPlayer 硬件解码直播视口（秒级出画，支持满铺与自适应）
             if let player = player {
-                VideoPlayer(player: player)
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        withAnimation(AuroraMotion.quick) {
-                            showControls.toggle()
-                        }
+                AuroraPlayerSurface(
+                    player: player,
+                    videoGravity: isFillMode ? .resizeAspectFill : .resizeAspect
+                )
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2) {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    withAnimation(AuroraMotion.smooth) {
+                        isFillMode.toggle()
                     }
+                }
+                .onTapGesture(count: 1) {
+                    withAnimation(AuroraMotion.quick) {
+                        showControls.toggle()
+                    }
+                }
             } else if isLoadingLive {
                 // 加载中过渡底图与 Spinner
                 ZStack {
@@ -143,6 +155,23 @@ public struct LivePlayerView: View {
                         }
                     ) {
                         HStack(spacing: AuroraMetrics.spacingS) {
+                            // 画幅切换（Fit / Fill）
+                            Button(action: {
+                                let impact = UIImpactFeedbackGenerator(style: .medium)
+                                impact.impactOccurred()
+                                withAnimation(AuroraMotion.smooth) {
+                                    isFillMode.toggle()
+                                }
+                            }) {
+                                Image(systemName: isFillMode ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(.white)
+                                    .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                                    .glassEffect(.regular.interactive(), in: .circle)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(isFillMode ? "自适应画幅" : "填满全屏")
+                            
                             AirPlayRoutePicker()
                                 .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
                             

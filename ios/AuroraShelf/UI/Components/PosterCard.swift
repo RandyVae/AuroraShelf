@@ -13,25 +13,14 @@ public struct PosterCard: View {
     public var body: some View {
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                // 封面图片（固定 2:3 纵横比自适应宽度）
+                // 封面图片（固定 2:3 纵横比自适应宽度，自动解密与双层缓存）
                 ZStack(alignment: .topTrailing) {
-                    AsyncImage(url: URL(string: video.coverUrl)) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        default:
-                            ZStack {
-                                AuroraColor.surfaceCard
-                                Image(systemName: "film")
-                                    .font(.title2)
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                    }
-                    .aspectRatio(AuroraMetrics.posterAspect, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
+                    AuroraCoverImage(
+                        url: video.coverUrl,
+                        aspectRatio: AuroraMetrics.posterAspect,
+                        contentMode: .fill,
+                        cornerRadius: AuroraMetrics.cardRadius
+                    )
                     .overlay(
                         RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
                             .stroke(AuroraColor.hairline, lineWidth: 1)

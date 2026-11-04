@@ -1,6 +1,6 @@
 # Project State
 
-Last Updated: 2026-11-04 10:55 HKT
+Last Updated: 2026-11-04 11:40 HKT
 
 ## Project
 
@@ -8,7 +8,11 @@ Last Updated: 2026-11-04 10:55 HKT
 
 ## Current Stage
 
-**iOS 端「原生化重构」全量闭环交付（Phase 0 - Phase 5 全流程完成）+ Android 2.16.0 唯一基线固化**：
+**iOS 端「原生化重构」全量闭环交付 + 三大视觉体验痛点（封面全灭/直播网格重叠/视频上下黑边全屏画幅）专项攻坚完成 + Android 2.16.0 唯一基线固化**：
+- **iOS 三大视觉体验痛点专项攻坚成果（已实测验证）**：
+  1. **封面加载全灭根除**：91动漫 AES-128-CBC 密文图片解密（`CoverImageLoader.swift` + `AuroraCoverImage.swift`）；包子漫画官方图片镜像自动重写至 `https://s1.bzcdn.net/cover/{topic_img}`（实测 200 OK，29KB-94KB 真实高清彩色海报）；双层缓存（120 张内存 NSCache + 沙盒磁盘文件）；
+  2. **直播网格重叠穿透根除**：`LiveScreen.swift` 主播卡片全面接入 `AuroraCoverImage`（4:3 黄金比例），宣告严格的 `frame(minWidth: 0, maxWidth: .infinity)` 约束并加 `.clipped()`，彻底消除相邻网格单元格穿透溢出；
+  3. **视频上下黑边与全屏画幅控制**：研发 `AuroraPlayerSurface.swift`（基于 `AVPlayerLayer`），支持 `.resizeAspect`（原画适应）与 `.resizeAspectFill`（100% 满铺全屏，0 黑边）平滑缩放；支持双击手势快速切换、Apple HIG 磨砂微胶囊 HUD 提示、顶部控制栏画幅模式切换胶囊与一键横屏旋转；
 - **iOS 原生化重构核心成果（已实测验证）**：
   1. **设计令牌单一真源**：建立 `AuroraDesignTokens.swift`（`AuroraColor`、`AuroraMetrics`、`AuroraMotion`），彻底删除旧版 `AuroraTheme.swift`；
   2. **消除所有伪玻璃与手绘 Canvas 顶栏**：删除 `NetflixTopBar`、`NetflixBillboard`、`NetflixPosterCard`、`CategoryPillBar`、`LiquidGlassDock`；

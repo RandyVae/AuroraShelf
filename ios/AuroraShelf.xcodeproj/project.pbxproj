@@ -27,20 +27,24 @@
 		9852D95598FFF9309144A5E7 /* HeroBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335CE5C09D1A36F7F502A73A /* HeroBanner.swift */; };
 		AAFC6C439F783AF3878F198A /* PlayerOverlayBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60EBF848E0C761394D57E83 /* PlayerOverlayBar.swift */; };
 		AB4ABF8FEDB994EDADEF7363 /* ComicSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EB9089AE90738649369BBE6 /* ComicSourceCatalog.swift */; };
+		B5C6670F0F77E93D14F4269F /* CoverImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = C32FF8887EB9DF3C3730C0B6 /* CoverImageLoader.swift */; };
 		BB2002B6BC067E847BCDFBBC /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B37C5E7BEFD0FE3E5D75D5 /* HomeScreen.swift */; };
 		BCA49E85757EB2670186917F /* GameContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB708E9400255802F2C9BA24 /* GameContainerView.swift */; };
+		C558E18B132F737828CB8E44 /* AuroraPlayerSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = B149D48BEF4DE02FF6CBA669 /* AuroraPlayerSurface.swift */; };
 		D00758CC43753672D596DE61 /* LiveScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 613ABA539A826B76628526F3 /* LiveScreen.swift */; };
 		DD173ECB57D1B38AE42A4010 /* ComicsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39AE92C360678C2D65DED50F /* ComicsScreen.swift */; };
 		DE577D3DEB625ED0D4EE45A1 /* intro_film.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D9E292EDDA87816B50371992 /* intro_film.mp4 */; };
 		E7D88E0E821FC94B20F3906F /* ComicRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A044AA1ACDFE914217128012 /* ComicRepository.swift */; };
 		ED75CCED28F037937C0655E2 /* VideoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977FF6686D27110B08DB620B /* VideoRepository.swift */; };
 		F19E208B1968E1C1786A890F /* TabItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90DE75B27AB3DDCCB26A9E57 /* TabItem.swift */; };
+		F439A2A8C363D3A054FAEE7F /* AuroraCoverImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 019581BF19B8D91E6A55A4CD /* AuroraCoverImage.swift */; };
 		F89EA9CBB7C5FE92616FF5A4 /* AirPlayRoutePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 416C023188BD71D379651DCC /* AirPlayRoutePicker.swift */; };
 		FAE55830B6B2D72370C816EA /* AuroraDesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33DE80E0929D56787BD4A46 /* AuroraDesignTokens.swift */; };
 		FFEFAC413FD7E930F7153BA9 /* PosterCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CD62B724AF992483FE0BEF /* PosterCard.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		019581BF19B8D91E6A55A4CD /* AuroraCoverImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuroraCoverImage.swift; sourceTree = "<group>"; };
 		0EEF8FF52166E540D4DD1B38 /* SearchSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSheetView.swift; sourceTree = "<group>"; };
 		10E1F030EDC6388E105F06F0 /* ForumScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumScreen.swift; sourceTree = "<group>"; };
 		13E4CD170412966E1A00AB2C /* www */ = {isa = PBXFileReference; lastKnownFileType = folder; name = www; path = AuroraShelf/Resources/www; sourceTree = SOURCE_ROOT; };
@@ -68,6 +72,8 @@
 		A044AA1ACDFE914217128012 /* ComicRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComicRepository.swift; sourceTree = "<group>"; };
 		A4E540F9D4F1A30ED7650D12 /* PlayerCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCoordinator.swift; sourceTree = "<group>"; };
 		A5D070424247B572DFF04A88 /* AuroraShelf.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AuroraShelf.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B149D48BEF4DE02FF6CBA669 /* AuroraPlayerSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuroraPlayerSurface.swift; sourceTree = "<group>"; };
+		C32FF8887EB9DF3C3730C0B6 /* CoverImageLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoverImageLoader.swift; sourceTree = "<group>"; };
 		C33DE80E0929D56787BD4A46 /* AuroraDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuroraDesignTokens.swift; sourceTree = "<group>"; };
 		D31E97B53BDBAA540B54C92D /* SourceFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFilterBar.swift; sourceTree = "<group>"; };
 		D9E292EDDA87816B50371992 /* intro_film.mp4 */ = {isa = PBXFileReference; path = intro_film.mp4; sourceTree = "<group>"; };
@@ -92,6 +98,7 @@
 				5F78EB6D9471A0E2B94B9A2C /* Data */,
 				AF2EA8CC8CD3744FB2672D42 /* Models */,
 				C71051E0691E49E6B20FAA40 /* Resources */,
+				42AB28931CA744114523D043 /* Services */,
 				773464D71D0EC5FA33C630DC /* UI */,
 			);
 			path = AuroraShelf;
@@ -131,6 +138,14 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		42AB28931CA744114523D043 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				C32FF8887EB9DF3C3730C0B6 /* CoverImageLoader.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
 		48412C708DDD4BEE5F953715 /* Screens */ = {
 			isa = PBXGroup;
 			children = (
@@ -149,6 +164,7 @@
 			isa = PBXGroup;
 			children = (
 				416C023188BD71D379651DCC /* AirPlayRoutePicker.swift */,
+				019581BF19B8D91E6A55A4CD /* AuroraCoverImage.swift */,
 				335CE5C09D1A36F7F502A73A /* HeroBanner.swift */,
 				E60EBF848E0C761394D57E83 /* PlayerOverlayBar.swift */,
 				88CD62B724AF992483FE0BEF /* PosterCard.swift */,
@@ -202,6 +218,7 @@
 				813A04022697BE2BF6124980 /* Forum */,
 				A1EDDC61902FB8DA8EDF54B1 /* Game */,
 				08BC9297B4739AC1749FDEA5 /* Live */,
+				D08D5A45D4163045BFFC505A /* Player */,
 				48412C708DDD4BEE5F953715 /* Screens */,
 				6D4D521E09CAF547CF1FEE1D /* Search */,
 				671838A496B9AD63FFB7703B /* Theme */,
@@ -249,6 +266,14 @@
 				D9E292EDDA87816B50371992 /* intro_film.mp4 */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		D08D5A45D4163045BFFC505A /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				B149D48BEF4DE02FF6CBA669 /* AuroraPlayerSurface.swift */,
+			);
+			path = Player;
 			sourceTree = "<group>";
 		};
 		E93BB65BD63FB3EBA39F26D0 /* Video */ = {
@@ -340,12 +365,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				F89EA9CBB7C5FE92616FF5A4 /* AirPlayRoutePicker.swift in Sources */,
+				F439A2A8C363D3A054FAEE7F /* AuroraCoverImage.swift in Sources */,
 				FAE55830B6B2D72370C816EA /* AuroraDesignTokens.swift in Sources */,
+				C558E18B132F737828CB8E44 /* AuroraPlayerSurface.swift in Sources */,
 				6CB901E2AF1B81A3D025C61A /* AuroraShelfApp.swift in Sources */,
 				90ABA578FB1CE018A17F97F5 /* ComicReaderView.swift in Sources */,
 				E7D88E0E821FC94B20F3906F /* ComicRepository.swift in Sources */,
 				AB4ABF8FEDB994EDADEF7363 /* ComicSourceCatalog.swift in Sources */,
 				DD173ECB57D1B38AE42A4010 /* ComicsScreen.swift in Sources */,
+				B5C6670F0F77E93D14F4269F /* CoverImageLoader.swift in Sources */,
 				76AAAD1613CE62934281E0E1 /* ForumPostDetailView.swift in Sources */,
 				5D5C4FF9088A3B125E97C393 /* ForumScreen.swift in Sources */,
 				0576FB7FB782FD4BD218C97D /* ForumSourceCatalog.swift in Sources */,

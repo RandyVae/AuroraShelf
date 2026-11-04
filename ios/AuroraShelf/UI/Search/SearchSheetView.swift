@@ -39,17 +39,13 @@ public struct SearchSheetView: View {
                                 onDismiss()
                             }) {
                                 HStack(spacing: AuroraMetrics.spacingM) {
-                                    AsyncImage(url: URL(string: item.coverUrl)) { phase in
-                                        if let img = phase.image {
-                                            img.resizable()
-                                                .aspectRatio(contentMode: .fill)
-                                        } else {
-                                            RoundedRectangle(cornerRadius: AuroraMetrics.controlRadius)
-                                                .fill(AuroraColor.surfaceCard)
-                                        }
-                                    }
+                                    AuroraCoverImage(
+                                        url: item.coverUrl,
+                                        aspectRatio: 16.0 / 10.0,
+                                        contentMode: .fill,
+                                        cornerRadius: AuroraMetrics.controlRadius
+                                    )
                                     .frame(width: 120, height: 75)
-                                    .clipShape(RoundedRectangle(cornerRadius: AuroraMetrics.controlRadius, style: .continuous))
                                     
                                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingXS) {
                                         Text(item.title)
