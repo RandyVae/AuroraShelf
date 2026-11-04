@@ -20,37 +20,51 @@ public struct HeroBanner: View {
     
     public var body: some View {
         ZStack(alignment: .bottom) {
-            // 背景封面海报，4:5 竖版黄金比例，自适应延伸（自动解密与双层缓存）
+            // 背景封面海报：适度收敛高度至 410pt，首屏信息层级更舒展完整
             AuroraCoverImage(
                 url: video.coverUrl,
-                aspectRatio: AuroraMetrics.heroAspect,
+                aspectRatio: 16 / 12,
                 contentMode: .fill,
                 cornerRadius: 0
             )
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: 410)
+            .clipped()
             
-            // 单一平滑渐变可读性遮罩
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0.0),
-                    .init(color: AuroraColor.canvas.opacity(0.4), location: 0.45),
-                    .init(color: AuroraColor.canvas.opacity(0.88), location: 0.8),
-                    .init(color: AuroraColor.canvas, location: 1.0)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(maxWidth: .infinity)
+            // 多层渐变可读性遮罩：上部微弱遮罩保护状态栏，下部深度渐变保护标题与按钮
+            VStack(spacing: 0) {
+                LinearGradient(
+                    colors: [Color.black.opacity(0.6), Color.clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 100)
+                
+                Spacer()
+                
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.0),
+                        .init(color: AuroraColor.canvas.opacity(0.7), location: 0.4),
+                        .init(color: AuroraColor.canvas.opacity(0.95), location: 0.75),
+                        .init(color: AuroraColor.canvas, location: 1.0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 240)
+            }
+            .frame(maxWidth: .infinity, maxHeight: 410)
             
             // 底部内容信息与操作区
             VStack(spacing: AuroraMetrics.spacingM) {
-                // 标题（语义样式 .title + .bold，最多 2 行）
+                // 标题（语义样式 .title + .bold，最多 2 行，带柔和阴影确保阅读舒适度）
                 Text(video.title)
-                    .font(.title)
+                    .font(.title2)
                     .fontWeight(.bold)
                     .foregroundStyle(AuroraColor.textPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(2)
+                    .shadow(color: .black.opacity(0.9), radius: 6, x: 0, y: 2)
                     .padding(.horizontal, AuroraMetrics.contentInset)
                 
                 // 元信息行（评分 · 标签 · 来源，单行紧凑）
@@ -75,6 +89,7 @@ public struct HeroBanner: View {
                 }
                 .font(.callout)
                 .lineLimit(1)
+                .shadow(color: .black.opacity(0.8), radius: 4, x: 0, y: 1)
                 
                 // 动作按钮栏（HIG 标准尺寸 ≥ 44pt）
                 HStack(spacing: AuroraMetrics.spacingL) {

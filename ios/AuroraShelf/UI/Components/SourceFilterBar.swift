@@ -37,30 +37,25 @@ private struct SourceFilterChip: View {
     let onSelect: () -> Void
     
     var body: some View {
-        if isSelected {
-            Button(action: onSelect) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(AuroraColor.brand)
-            .clipShape(Capsule())
-            .frame(minHeight: AuroraMetrics.minTouchTarget)
-        } else {
-            Button(action: onSelect) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.regular)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-            .buttonStyle(.bordered)
-            .tint(.secondary)
-            .clipShape(Capsule())
-            .frame(minHeight: AuroraMetrics.minTouchTarget)
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            onSelect()
+        }) {
+            Text(title)
+                .font(.subheadline)
+                .fontWeight(isSelected ? .bold : .medium)
+                .foregroundStyle(isSelected ? .white : AuroraColor.textSecondary)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(isSelected ? AuroraColor.brand : Color.white.opacity(0.08))
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(isSelected ? Color.clear : Color.white.opacity(0.12), lineWidth: 1)
+                )
         }
+        .buttonStyle(.plain)
     }
 }

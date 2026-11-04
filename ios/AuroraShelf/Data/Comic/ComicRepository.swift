@@ -1,5 +1,17 @@
 import Foundation
 
+public enum ComicFetchError: LocalizedError {
+    case networkError(String)
+    case notSupported(String)
+    
+    public var errorDescription: String? {
+        switch self {
+        case .networkError(let msg), .notSupported(let msg):
+            return msg
+        }
+    }
+}
+
 public final class ComicRepository: ObservableObject, @unchecked Sendable {
     public static let shared = ComicRepository()
     
@@ -7,8 +19,10 @@ public final class ComicRepository: ObservableObject, @unchecked Sendable {
     @Published public var comics: [ComicItem] = []
     @Published public var selectedCategory: String = "全部"
     @Published public var isLoading: Bool = false
+    @Published public var errorMessage: String?
     
     private let session: URLSession
+    private var loadTask: Task<Void, Never>?
     
     private init() {
         let config = URLSessionConfiguration.default
@@ -27,11 +41,23 @@ public final class ComicRepository: ObservableObject, @unchecked Sendable {
     }
     
     public func loadComics(for source: ComicSourceDefinition) {
+        loadTask?.cancel()
         self.isLoading = true
-        Task {
-            let loaded = await fetchRealComics(source: source)
+        self.errorMessage = nil
+        loadTask = Task { [weak self] in
+            guard let self else { return }
+            let result = await fetchRealComics(source: source)
+            guard !Task.isCancelled else { return }
             await MainActor.run {
-                self.comics = loaded
+                guard self.currentSource.id == source.id else { return }
+                switch result {
+                case .success(let loaded):
+                    self.comics = loaded
+                    self.errorMessage = loaded.isEmpty ? "此来源暂时没有可显示的内容" : nil
+                case .failure(let error):
+                    self.comics = []
+                    self.errorMessage = error.localizedDescription
+                }
                 self.isLoading = false
             }
         }
@@ -39,13 +65,12 @@ public final class ComicRepository: ObservableObject, @unchecked Sendable {
     
     // MARK: - 真实包子漫画与多源网络抓取
     
-    private func fetchRealComics(source: ComicSourceDefinition) async -> [ComicItem] {
+    private func fetchRealComics(source: ComicSourceDefinition) async -> Result<[ComicItem], ComicFetchError> {
         if source.id == ComicSourceCatalog.baozi.id {
-            return await fetchBaoziList()
+            let items = await fetchBaoziList()
+            return items.isEmpty ? .failure(.networkError("包子漫画暂时无法加载，请稍后重试")) : .success(items)
         }
-        
-        // 禁漫、Komiic 等其他源走对应的真实网络请求
-        return await fetchBaoziList(sourceOverride: source)
+        return .failure(.notSupported("\(source.name) 的 iOS 解析器正在适配中"))
     }
     
     private func fetchBaoziList(sourceOverride: ComicSourceDefinition? = nil) async -> [ComicItem] {
@@ -78,13 +103,8 @@ public final class ComicRepository: ObservableObject, @unchecked Sendable {
                             coverUrl: coverUrl,
                             category: typeNames.first ?? "精选",
                             tags: typeNames,
-                            chapters: [
-                                ComicChapter(id: "0_0", title: "第 1 话"),
-                                ComicChapter(id: "0_1", title: "第 2 话"),
-                                ComicChapter(id: "0_2", title: "第 3 话"),
-                                ComicChapter(id: "0_3", title: "第 4 话")
-                            ],
-                            latestChapterTitle: "第 1 话 · 最新"
+                            chapters: [],
+                            latestChapterTitle: "章节待加载"
                         ))
                     }
                     if !results.isEmpty { return results }
@@ -131,7 +151,6 @@ public final class ComicRepository: ObservableObject, @unchecked Sendable {
             print("Fetch chapter pages error: \(error)")
         }
         
-        // 保底返回封面
-        return ["https://images.unsplash.com/photo-1578632767115-351597cf2477?w=1080&q=85"]
+        return []
     }
 }

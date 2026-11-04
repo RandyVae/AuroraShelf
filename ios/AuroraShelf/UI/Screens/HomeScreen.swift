@@ -24,25 +24,20 @@ public struct HomeScreen: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: AuroraMetrics.spacingXL) {
-                        // 1. 顶部 Hero 聚焦大卡（4:5 竖版黄金比例，延伸至屏幕顶端）
+                        // 1. 顶部 Hero 聚焦大卡（黄金画幅，呼吸感强，首屏自然延展）
                         if let billboard = repo.billboardVideo {
                             HeroBanner(
                                 video: billboard,
                                 onPlay: { onPlayVideo(billboard) },
                                 onDetail: { onPlayVideo(billboard) }
                             )
+                        } else if repo.isLoading {
+                            HeroLoadingPlaceholder()
                         } else {
-                            // 无 HeroBanner 时预留顶部安全边距，避免分类栏顶入状态栏
-                            Spacer().frame(height: 90)
+                            Spacer().frame(height: 80)
                         }
                         
-                        // 2. 原生分类筛选 Chip 条
-                        SourceFilterBar(
-                            categories: repo.currentSource.categories,
-                            selectedCategory: $selectedCategory
-                        )
-                        
-                        // 3. 今日热播 Top 10
+                        // 2. 今日热播 Top 10（大数字紧贴海报左下角）
                         if !repo.top10Videos.isEmpty {
                             VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                                 HStack(spacing: AuroraMetrics.spacingS) {
@@ -71,7 +66,7 @@ public struct HomeScreen: View {
                             }
                         }
                         
-                        // 4. 当前视频源推荐流（双列网格排布）
+                        // 3. 当前视频源推荐流（标题 -> 分类胶囊筛选 -> 双列海报网格）
                         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                             HStack {
                                 HStack(spacing: AuroraMetrics.spacingS) {
@@ -94,16 +89,27 @@ public struct HomeScreen: View {
                                 Spacer()
                                 
                                 Button(action: { showSourcePicker = true }) {
-                                    HStack(spacing: 4) {
-                                        Text("切换视频源 (\(VideoSourceCatalog.allSources.count)源)")
-                                            .font(.subheadline)
-                                        Image(systemName: "chevron.up.chevron.down")
-                                            .font(.caption2)
+                                    HStack(spacing: 5) {
+                                        Text("全量 \(VideoSourceCatalog.allSources.count) 源")
+                                            .font(.footnote)
+                                            .fontWeight(.semibold)
+                                        Image(systemName: "slider.horizontal.3")
+                                            .font(.caption)
                                     }
                                     .foregroundStyle(AuroraColor.brand)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(AuroraColor.brand.opacity(0.12), in: Capsule())
+                                    .overlay(Capsule().stroke(AuroraColor.brand.opacity(0.3), lineWidth: 1))
                                 }
                             }
                             .padding(.horizontal, AuroraMetrics.contentInset)
+                            
+                            // 原生分类筛选 Chip 条：直接贴合在推荐网格上方，联动响应极佳
+                            SourceFilterBar(
+                                categories: repo.currentSource.categories,
+                                selectedCategory: $selectedCategory
+                            )
                             
                             if repo.isLoading {
                                 VStack(spacing: AuroraMetrics.spacingM) {
@@ -172,11 +178,15 @@ public struct HomeScreen: View {
         .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Text("Netgrey")
-                    .font(.title3)
-                    .fontWeight(.heavy)
-                    .foregroundStyle(AuroraColor.brand)
-                    .fixedSize()
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles.tv.fill")
+                        .font(.headline)
+                        .foregroundStyle(AuroraColor.brand)
+                    Text("极光视界")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(AuroraColor.textPrimary)
+                }
             }
             
             ToolbarItem(placement: .topBarTrailing) {
@@ -203,6 +213,13 @@ public struct HomeScreen: View {
         }
         .onChange(of: repo.currentCategory) { _, newCat in
             selectedCategory = newCat
+        }
+        .onReceive(repo.$billboardVideo) { video in
+            if CommandLine.arguments.contains("--auto-play"), let v = video {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    onPlayVideo(v)
+                }
+            }
         }
         .sheet(isPresented: $showSourcePicker) {
             VideoSourcePickerSheet(
@@ -306,6 +323,45 @@ struct VideoSourcePickerSheet: View {
                     }
                     .padding(.bottom, AuroraMetrics.spacingXXL)
                 }
+            }
+        }
+    }
+}
+
+// 顶部 Hero 骨架屏占位（平滑过渡，消除切换时的空白与闪烁）
+private struct HeroLoadingPlaceholder: View {
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.04), Color.white.opacity(0.08), Color.white.opacity(0.02)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 380)
+            
+            VStack(spacing: AuroraMetrics.spacingM) {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.white.opacity(0.1))
+                    .frame(width: 220, height: 28)
+                
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(Color.white.opacity(0.08))
+                    .frame(width: 140, height: 16)
+                
+                HStack(spacing: AuroraMetrics.spacingL) {
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(Color.white.opacity(0.12))
+                        .frame(height: 44)
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(Color.white.opacity(0.08))
+                        .frame(width: 120, height: 44)
+                }
+                .padding(.horizontal, AuroraMetrics.contentInset)
+                .padding(.bottom, AuroraMetrics.spacingL)
             }
         }
     }

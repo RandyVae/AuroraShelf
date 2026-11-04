@@ -44,18 +44,24 @@ public struct PosterCard: View {
                     }
                 }
                 
-                // 标题（语义样式 .subheadline，最多 1 行）
+                // 标题（语义样式 .subheadline，最多 2 行，固定高度确保网格严格水平对齐）
                 Text(video.title)
                     .font(.subheadline)
-                    .fontWeight(.medium)
+                    .fontWeight(.semibold)
                     .foregroundStyle(AuroraColor.textPrimary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .frame(height: 38, alignment: .topLeading)
                 
                 // 来源与时长行
-                HStack {
+                HStack(spacing: 4) {
                     Text(video.sourceName)
-                        .font(.caption)
+                        .font(.caption2)
+                        .fontWeight(.bold)
                         .foregroundStyle(AuroraColor.brand)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(AuroraColor.brand.opacity(0.12), in: Capsule())
                     
                     Spacer()
                     

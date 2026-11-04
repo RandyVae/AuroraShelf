@@ -1,0 +1,176 @@
+{
+  "commit": "3412839b29a01a8be111ef09c161b7255b46750a",
+  "scope": "Committed source only; screenshots and IPA are separately identified, not matched to this commit",
+  "files": [
+    {
+      "path": "ios/AuroraShelf/App/AuroraShelfApp.swift",
+      "sha256": "c101d18da0b719c0241770f16ff037dabc8cec354174e13bc4bf7fa99e66797b",
+      "bytes": 724
+    },
+    {
+      "path": "ios/AuroraShelf/App/PlayerCoordinator.swift",
+      "sha256": "17467bb1ebc652d1ce05b217a5aa0b55d97a03c4ce71078f187a133971d53169",
+      "bytes": 459
+    },
+    {
+      "path": "ios/AuroraShelf/Data/Comic/ComicRepository.swift",
+      "sha256": "f054fcc24aa1c3076e86ad7d18e5b044b325e5f263c16d0dc97cc9cab1bda0d1",
+      "bytes": 6181
+    },
+    {
+      "path": "ios/AuroraShelf/Data/Comic/ComicSourceCatalog.swift",
+      "sha256": "7f934ab73cf1eb97d96038385f1234569a4e69c8035c3cb2e17c350b594065c0",
+      "bytes": 5434
+    },
+    {
+      "path": "ios/AuroraShelf/Data/Forum/ForumSourceCatalog.swift",
+      "sha256": "11b6af3233eb026aa6e294414a28b83669671cbed0ba9f15e49f33b12c8d9a84",
+      "bytes": 6626
+    },
+    {
+      "path": "ios/AuroraShelf/Data/Live/LiveSourceCatalog.swift",
+      "sha256": "605c26e555eda1cd3de080f72d9618b7370ffd0a62e88f1ae0a9cf9d4f63c3a3",
+      "bytes": 5461
+    },
+    {
+      "path": "ios/AuroraShelf/Data/Video/VideoRepository.swift",
+      "sha256": "041205bfeed151aa2fd4f65f9ef6144aa3f54999530a88c691d4122484e729e5",
+      "bytes": 37734
+    },
+    {
+      "path": "ios/AuroraShelf/Data/Video/VideoSourceCatalog.swift",
+      "sha256": "aed3320c6daeb5cbff791ec16d737901998293ef24568ab705bde454ac6402da",
+      "bytes": 8287
+    },
+    {
+      "path": "ios/AuroraShelf/Models/TabItem.swift",
+      "sha256": "3d95bc72ca948e6f9c43e63cd1f8ca42ca89a66165a6e7b8e00fa288d8eb686a",
+      "bytes": 1221
+    },
+    {
+      "path": "ios/AuroraShelf/Models/VideoItem.swift",
+      "sha256": "a53006139572dcc170ef5f7386302aab4c9d914811ded4f068bf2c6529ab4acf",
+      "bytes": 1263
+    },
+    {
+      "path": "ios/AuroraShelf/Resources/Info.plist",
+      "sha256": "ec2602aa73b8e12adf9c74fe6a6700b8473437c06c3e376bb7f7371f3e7c18c1",
+      "bytes": 1635
+    },
+    {
+      "path": "ios/AuroraShelf/Services/CoverImageLoader.swift",
+      "sha256": "4c94821a5d39403b3ec35893f2e123640b0bd5660c6e756399abdc357110db5a",
+      "bytes": 7046
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Comic/ComicReaderView.swift",
+      "sha256": "43235a55d6bdeefd164442c1e2f544c9a6659a6fd60e15d4e6bb5e62f0af88ff",
+      "bytes": 7939
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Components/AirPlayRoutePicker.swift",
+      "sha256": "b1e7f25e601919f759960a4bdd9f87af68229f5a6c6c26a8ed94a315b5f97ac4",
+      "bytes": 591
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Components/AuroraCoverImage.swift",
+      "sha256": "172e6f4f4ae03c6747e9468aec781b16a0b6cfca1e10f7ea62f774464033f948",
+      "bytes": 2570
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Components/HeroBanner.swift",
+      "sha256": "39efcce3cc0bda57df4f61341dcf7f0115cbf1d9ccbabcdfea2ffdacf125e160",
+      "bytes": 4473
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Components/PlayerOverlayBar.swift",
+      "sha256": "4f010721bdd839b7c9feb3536242eeea9dcb48e69f26ec1de403d6a056804da0",
+      "bytes": 2339
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Components/PosterCard.swift",
+      "sha256": "ac02c83f9104c231aa89890abdd18730b4ecec62c7feb249359303d02069c3ac",
+      "bytes": 2904
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Components/SourceFilterBar.swift",
+      "sha256": "914a0bf7adf205c25f5516d0b5ea561438c3f957fdc40b4de26e50d2f8917a69",
+      "bytes": 2156
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Components/Top10Card.swift",
+      "sha256": "933135cd03e7658cdead6d6e48c89799c5f65cfbeb37743ee8d4bc1b6cef0ad4",
+      "bytes": 1932
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Forum/ForumPostDetailView.swift",
+      "sha256": "430a2109f863c7c217a382a898803811b416f063a817582acd7856bbeb06d650",
+      "bytes": 4365
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Game/GameContainerView.swift",
+      "sha256": "37a58cc7f550ac82ad2b2eac25d2eb4ed380b5e64f85949f5b4c41312b6ee6e3",
+      "bytes": 4192
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Live/LivePlayerView.swift",
+      "sha256": "6b2ca169a34988ccf8bca5905a593df70111022c97d8a1131905a02a66ff6dc3",
+      "bytes": 15633
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Player/AuroraPlayerSurface.swift",
+      "sha256": "b2d7d620be75752d4aacbbc8951274c476bbd210c37990105fbea140f6de7965",
+      "bytes": 1360
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Screens/ComicsScreen.swift",
+      "sha256": "2d1fa2c53acc9e7554fb8af05811f9c3e367fe6122e6095daa1eb00b9b5f7ee0",
+      "bytes": 6100
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Screens/ForumScreen.swift",
+      "sha256": "6039234217417ffef56afbdad8b63711905e7d702db296d8c4c58d74be458d0f",
+      "bytes": 5807
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Screens/HomeScreen.swift",
+      "sha256": "9c32fb7b73c59188fbfd62a1c78f8dd8ab82b61933bf7d498580d6404fa073e1",
+      "bytes": 16210
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Screens/LiveScreen.swift",
+      "sha256": "f7148d61684121f192261737e60940bbd8aca8bff80c079ac912357db224941a",
+      "bytes": 8433
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Screens/MainContainerView.swift",
+      "sha256": "0f00a5f4257ab39529e67a78605239dd8ec7c71b8950a641dbfcb002a7c72500",
+      "bytes": 4266
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Screens/NativePlayerView.swift",
+      "sha256": "7cff9f63dc19118506f104da1af11547ede9594861364df070859dcfc4192ae4",
+      "bytes": 20676
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Screens/PersonalScreen.swift",
+      "sha256": "d729701cfd02438da3584f5c4f947f99a3955dcf3d0b3aacec2ff0aa1a62147d",
+      "bytes": 14349
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Search/SearchSheetView.swift",
+      "sha256": "7d4fd407467076e82a586af39beae6aab391a8fd558ea7a837ecda2b48756dd3",
+      "bytes": 5511
+    },
+    {
+      "path": "ios/AuroraShelf/UI/Theme/AuroraDesignTokens.swift",
+      "sha256": "4db662120ccb45ebdd896d1bcc2d09cb4805507332f72c6b9d14cf35cd05ec2b",
+      "bytes": 3333
+    },
+    {
+      "path": "ios/project.yml",
+      "sha256": "82d9ee66a1bf21b972bfdb3a6cbbffb85d714381a7b27a02ebae0874f34f02cb",
+      "bytes": 819
+    }
+  ]
+}

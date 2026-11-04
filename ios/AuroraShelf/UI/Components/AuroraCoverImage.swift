@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 全局封面安全渲染組件（集成 CoverImageLoader 自動 AES 解密與雙層緩存）
+/// 全局封面安全渲染組件（集成 CoverImageLoader 自動 AES 解密、雙層緩存與嚴格防溢出幾何容器）
 public struct AuroraCoverImage: View {
     public let url: String
     public let aspectRatio: CGFloat?
@@ -23,6 +23,41 @@ public struct AuroraCoverImage: View {
     }
     
     public var body: some View {
+        Group {
+            if let ratio = aspectRatio {
+                // 固定比例安全容器：以透明比例基座報告尺寸，overlay 內部完全裁剪，絕對不會推擠或重疊父級網格
+                Color.clear
+                    .aspectRatio(ratio, contentMode: .fit)
+                    .overlay(
+                        GeometryReader { proxy in
+                            contentBody
+                                .frame(width: proxy.size.width, height: proxy.size.height)
+                                .clipped()
+                        }
+                    )
+            } else {
+                contentBody
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .task(id: url) {
+            guard !url.isEmpty else {
+                self.isLoading = false
+                return
+            }
+            self.isLoading = true
+            let img = await CoverImageLoader.shared.loadImage(from: url)
+            await MainActor.run {
+                withAnimation(AuroraMotion.smooth) {
+                    self.loadedImage = img
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var contentBody: some View {
         ZStack {
             if let image = loadedImage {
                 Image(uiImage: image)
@@ -44,37 +79,6 @@ public struct AuroraCoverImage: View {
                         .foregroundStyle(.tertiary)
                 }
             }
-        }
-        .frame(minWidth: 0, maxWidth: .infinity)
-        .ifLet(aspectRatio) { view, ratio in
-            view.aspectRatio(ratio, contentMode: .fit)
-        }
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .task(id: url) {
-            guard !url.isEmpty else {
-                self.isLoading = false
-                return
-            }
-            self.isLoading = true
-            let img = await CoverImageLoader.shared.loadImage(from: url)
-            await MainActor.run {
-                withAnimation(AuroraMotion.smooth) {
-                    self.loadedImage = img
-                    self.isLoading = false
-                }
-            }
-        }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func ifLet<T, Content: View>(_ value: T?, transform: (Self, T) -> Content) -> some View {
-        if let value = value {
-            transform(self, value)
-        } else {
-            self
         }
     }
 }

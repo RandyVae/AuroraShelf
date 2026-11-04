@@ -7,7 +7,24 @@ public struct MainContainerView: View {
     @State private var showSearchSheet: Bool = false
     @State private var showGameDirectly: Bool = false
     
-    public init() {}
+    public init() {
+        let args = ProcessInfo.processInfo.arguments
+        if let idx = args.firstIndex(of: "--tab"), idx + 1 < args.count {
+            let tabArg = args[idx + 1].lowercased()
+            switch tabArg {
+            case "comics", "comic", "manhua":
+                _selectedTab = State(initialValue: .comics)
+            case "live", "zhibo":
+                _selectedTab = State(initialValue: .live)
+            case "forum", "luntan":
+                _selectedTab = State(initialValue: .forum)
+            case "personal", "my", "wode", "profile":
+                _selectedTab = State(initialValue: .profile)
+            default:
+                _selectedTab = State(initialValue: .home)
+            }
+        }
+    }
     
     public var body: some View {
         @Bindable var coordinator = playerCoordinator

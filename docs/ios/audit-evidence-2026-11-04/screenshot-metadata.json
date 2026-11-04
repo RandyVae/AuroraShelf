@@ -1,0 +1,56 @@
+[
+  {
+    "path": "captures/screen_ios_native_homescreen_fixed_title.png",
+    "width": 1206,
+    "height": 2622,
+    "bytes": 580113
+  },
+  {
+    "path": "captures/screen_ios_native_homescreen_scrolled_blur.png",
+    "width": 1206,
+    "height": 2622,
+    "bytes": 342548
+  },
+  {
+    "path": "captures/screen_ios_phase2_comics.png",
+    "width": 1206,
+    "height": 2622,
+    "bytes": 237645
+  },
+  {
+    "path": "captures/screen_ios_phase2_live.png",
+    "width": 1206,
+    "height": 2622,
+    "bytes": 1843812
+  },
+  {
+    "path": "captures/screen_ios_phase2_forum.png",
+    "width": 1206,
+    "height": 2622,
+    "bytes": 421914
+  },
+  {
+    "path": "captures/screen_ios_phase2_profile.png",
+    "width": 1206,
+    "height": 2622,
+    "bytes": 346548
+  },
+  {
+    "path": "captures/screen_ios_phase3_player.png",
+    "width": 1206,
+    "height": 2622,
+    "bytes": 920948
+  },
+  {
+    "path": "captures/screen_ios_phase3_game.png",
+    "width": 1206,
+    "height": 2622,
+    "bytes": 86654
+  },
+  {
+    "path": "captures/screen_ios_phase4_search.png",
+    "width": 1206,
+    "height": 2622,
+    "bytes": 172167
+  }
+]

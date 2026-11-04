@@ -3,9 +3,6 @@ import SwiftUI
 @main
 struct AuroraShelfApp: App {
     init() {
-        // 强制暗色流媒体风格
-        UIView.appearance().overrideUserInterfaceStyle = .dark
-        
         // 支持命令行参数指定初始视频源（便于自动化回归与验收截图）
         let args = ProcessInfo.processInfo.arguments
         if let idx = args.firstIndex(of: "--video-source"), idx + 1 < args.count {
@@ -18,7 +15,6 @@ struct AuroraShelfApp: App {
     var body: some Scene {
         WindowGroup {
             MainContainerView()
-                .preferredColorScheme(.dark)
         }
     }
 }

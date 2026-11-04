@@ -1,0 +1,17 @@
+{
+  "swift_files": 32,
+  "system_size_occurrences": 4,
+  "ultraThinMaterial": 0,
+  "AuroraTheme": 0,
+  "Color(red:": 0,
+  "topSafeAreaHeight": 0,
+  "accessibilityReduceMotion": 0,
+  "isReduceMotionEnabled": 0,
+  "random_rating_expressions": 5,
+  "opaque_srgb_contrast": {
+    "white_on_brand_FF4F7B": 3.155,
+    "white_on_forest_2E7D32": 5.127,
+    "forest_on_surface_141724": 3.477,
+    "tertiary_737373_on_canvas_080A0F": 4.176
+  }
+}

@@ -59,6 +59,10 @@ public final class CoverImageLoader: @unchecked Sendable {
                 request.setValue("https://cn.webmota.com/", forHTTPHeaderField: "Referer")
             } else if normalized.contains("huavod") {
                 request.setValue("https://huavod.com/", forHTTPHeaderField: "Referer")
+            } else if normalized.contains("mmcdn.com") || normalized.contains("chaturbate") || normalized.contains("hornystudents") {
+                request.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
+            } else if normalized.contains("externulls.com") || normalized.contains("beeg.com") {
+                request.setValue("https://beeg.com/", forHTTPHeaderField: "Referer")
             }
             
             let (data, response) = try await session.data(for: request)
@@ -67,15 +71,18 @@ public final class CoverImageLoader: @unchecked Sendable {
             }
             
             var finalData = data
+            var parsedImage: UIImage? = UIImage(data: data)
             
             // 檢查是否為 AES 加密數據（91動漫/黃果二進制加密封面）
-            if isEncryptedData(data, urlString: normalized) {
-                if let decrypted = decryptAES128CBC(data: data, key: aesKey, iv: aesIv) {
+            if parsedImage == nil && (normalized.contains("91dongman") || normalized.contains("drleao.cn") || normalized.contains("huangguo")) {
+                if let decrypted = decryptAES128CBC(data: data, key: aesKey, iv: aesIv),
+                   let decImg = UIImage(data: decrypted) {
+                    parsedImage = decImg
                     finalData = decrypted
                 }
             }
             
-            guard let image = UIImage(data: finalData) else {
+            guard let image = parsedImage else {
                 return nil
             }
             

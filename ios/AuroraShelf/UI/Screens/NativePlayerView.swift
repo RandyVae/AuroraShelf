@@ -187,6 +187,7 @@ public struct NativePlayerView: View {
                                         .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
                                 }
                             }
+                            .padding(.top, isLandscape ? 12 : 46)
                             
                             Spacer()
                             
@@ -254,7 +255,7 @@ public struct NativePlayerView: View {
                                 }
                             }
                             .padding(.horizontal, AuroraMetrics.contentInset)
-                            .padding(.bottom, AuroraMetrics.spacingXL)
+                            .padding(.bottom, isLandscape ? 16 : 42)
                         }
                     }
                     .transition(.opacity)
@@ -267,6 +268,12 @@ public struct NativePlayerView: View {
         }
         .ignoresSafeArea()
         .onAppear {
+            if CommandLine.arguments.contains("--player-landscape") {
+                self.isLandscape = true
+            }
+            if CommandLine.arguments.contains("--player-fill") {
+                self.isFillMode = true
+            }
             startResolveAndPlay()
         }
         .onDisappear {

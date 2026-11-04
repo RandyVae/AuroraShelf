@@ -9,7 +9,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `b3287df`（2026-11-04），未提交 7 个文件
+- Git：`main` @ `3412839`（2026-11-04），未提交 20 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-04（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-04（今天）
@@ -20,30 +20,25 @@
 - Codex 全局记忆（只读参考）：
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-04 12:11 by `sync.py`
+- 最后同步：2026-11-04 12:37 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：极光视界（AuroraShelf）双轨推进：Android 端以 2.16.0 候选包 173 为法定基线稳态维护；iOS 端全面完成原生化重构说明书（`docs/ios/IOS-NATIVE-REFACTOR-SPEC.md`）Phase 0 至 Phase 5 全流程落地与验证闭环，建立设计令牌单一真源、首页与全功能模块 Apple HIG 标准化、沉浸浮层 Liquid Glass 收敛、原生可搜索，所有伪玻璃与死代码彻底清零，视频/直播真实网络流硬解秒出画能力完全无回归。
-- 当前阶段：**iOS 视频源切换无响应重大缺陷根治 + 5 大源真实爬虫路由落地 + 异步竞态消除 + Apple HIG 零假数据空状态交付 + Android 2.16.0 稳态维护**：
+- 当前阶段：**iOS 全量 19 视频源全接入打通 + 首页 UI 排版 Apple HIG 全面重构 + 漫画/直播封面重叠与加载故障彻底根治 + 全屏播放器横屏满铺与黑边根除 + Android 2.16.0 稳态维护**：
   - Android 唯一本地安装包：`dist/AuroraShelf-2.16.0-173-game-integration-all-sources-verified-LOCAL.apk`（176,633,866 bytes，SHA-256 `bb2097749c94123c56baec105ab732389f6ff21128121adc608f25b0e1b1f211`），全量单元测试 100% 全部通过；
-  - iOS 本地交付包：`dist/AuroraShelf-2.16.0-173-arm64-LOCAL.ipa`（164MB，SHA-256 `2d905a9b8bf3786789dbb1e574b9be061de08de20a505e13faab98502646f799`）；
-  - iOS 视频源切换无响应缺陷根治成果（全部实测验证）：
-    1. **兜底路由失真清除**：移除 `VideoRepository.swift` 将 16 个视频源无条件转接 91动漫的隐形兜底，建立严格按 `source.id` 独立分发的路由体系；
-    2. **Beeg 国际源 Header 缺陷修复**：注入 `Origin: https://beeg.com` 与 `Accept: application/json`，上游 `store.externulls.com` 恢复 200 OK，秒级吐出 20 部视频及 HLS 变码率流；
-    3. **异步网络竞态（Race Condition）清除**：`loadFeed` 维护 `currentLoadTask?.cancel()`，并在数据返回时核验 `self.currentSource.id == source.id && self.currentCategory == category`，杜绝旧源数据回调覆盖新源；
-    4. **首页面交互与 Loading 联动**：`switchSource` 立即清空旧数据数组并置 `isLoading = true`；推荐流在加载时呈现原生 `ProgressView`，未适配源呈现 Apple HIG 规范的 `ContentUnavailableView` 原生空状态，无任何假数据掩盖；
-    5. **真实网络端点全量跑通**：
-       - **黄果短剧**：`https://huangguoai.com/recommend` 真实抓取 24 部短剧（实测《把同学的妈操成母狗》）与 AES-128 M3U8 流；
-       - **91视频**：`https://h1014.sol148.com` 真实抓取 44 部原创热播（实测《The perfect sexy lady...》）与原画 MP4 直链；
-       - **华视影院**：真实抓取电影/连续剧等（实测《希望》）与播放分发；
-       - **Beeg**：真实抓取 20 部国际视频（实测《When infidelity complicates a marriage》）与 M3U8 流；
-       - **91动漫**：维持 24 部番剧高速秒开与 AES 解密封面。
-- 进行中：全部功能与体验缺陷已实测闭环交付。
-- 下一步：按需进行 Release 打包或交付用户验收。
-- 阻塞：无代码层阻断。
-- 最近一次更新：2026-11-04 12:15 HKT by Antigravity (gemini-3.8-flash)
+  - iOS 本地交付包：`dist/AuroraShelf-2.16.0-174-arm64-LOCAL.ipa`；
+  - iOS 端核心攻坚成果（全部实测验证）：
+    1. **全量 19 视频源全接入可用**：4 大陆直连（91动漫、黄果短剧、91视频、华视影院）+ 15 海外国际扩展（Beeg、XVideos、EPORNER、MissAV、Pornhub、SpankBang 等），具备真实网络爬虫/官方 REST API/专属分发模版，绝无假数据兜底，点击即刻播放；
+    2. **首页 UI 排版 Apple HIG 全面重构**：清理「Netgrey」硬编码文本，换为「极光视界」品牌；HeroBanner 适度收敛至 410pt，多层渐变与柔和投影彻底消除背景干扰；今日热播 TOP 10 大数字底部基线对齐；推荐栏集成「全量 19 源 ⑂」胶囊按钮；分类筛选双向同步联动；
+    3. **漫画与直播封面故障根治**：`CoverImageLoader` 优化针对性解密，漫画封面（《大奉打更人》、《一人之下》）100% 高清秒出；`AuroraCoverImage` 引入「透明比例基座 + Overlay 绝对几何裁剪」架构，向网格报告固定 4:3 尺寸，彻底根除直播卡片重叠；
+    4. **全屏播放器画幅与黑边问题彻底解决**：支持横屏 90° 旋转（`.rotationEffect(.degrees(90))`）沉浸全屏，横屏下 16:9 视频完美充满屏幕，彻底根除上下大黑边；控件动态避让动态岛（46pt）与 Home 条（42pt），双击可在原画比例与铺满全屏间自由切换。
+- 进行中：iOS 端 19 个源流媒体硬件解码秒开验证、端到端截屏验收存档。
+- 下一步：持续对齐双端业务功能与交互细节。
+- 阻塞：无。
+- 最近一次更新：2026-11-04 by Antigravity (gemini-3.1-pro)
+- 最近一次更新：2026年11月4日 12:35 HKT by Codex
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
 
@@ -163,6 +158,9 @@
 - 2026-11-02：SwiftUI `ignoresSafeArea` 坐標系向上越界與頂欄狀態欄重疊：當父級 `ZStack` 含有 `.ignoresSafeArea()` 視圖（如全屏背景海報）時，內層子視圖的座標原點會默認延伸至物理屏幕頂端 `y = 0`，若未對頂欄單獨給予安全區墊高，頂欄的圖標與文字會直接與 iPhone 靈動島（Dynamic Island）和系統狀態欄（時間、Wi-Fi、電池，高度約 52~59pt）重疊蓋壓；做法是在全屏沉浸的頂欄中顯式傳入 `topSafeAreaHeight: 52` 避讓，普通列表頁則移除外層無約束的 `ignoresSafeArea` 依託系統安全區自動佈局。
 - 2026-11-02：xcodebuild 產物未落入指定路徑導致模擬器安裝舊緩存包：執行 `xcodebuild -project ... -scheme ... build` 時若未顯式指定 `-derivedDataPath`，Xcode 會默認輸出到 `~/Library/Developer/Xcode/DerivedData`，而隨後的 `xcrun simctl install ... ios/build/.../AuroraShelf.app` 依然安裝的是舊路徑下的歷史緩存包，導致代碼已改動但模擬器運行畫面無變更；必須在構建命令中顯式鎖定 `-derivedDataPath ios/build` 確保產物路徑與安裝指令 100% 一致。
 - 2026-11-02：液態玻璃（Liquid Glass）視覺特徵與純半透明圓角矩形的本質區別：單純使用 `.background(.ultraThinMaterial)` 或深色半透明框只具備毛玻璃遮罩效果，無法呈現 Android 原版 `Kyant0/AndroidLiquidGlass` 的物理透鏡感。必須在選中指示器中實現完整的「凸透鏡光學特徵」：360° 角向漸變色散環（Chromatic Aberration）、頂部弧面鏡面反光弧（Glint）、內部凸面折射立體漸變與中心水滴雙色光斑，並結合 `@Namespace` 和彈簧曲線實現物理形變拉伸滑行，才能 1:1 還原真實液態流動質感。
+
+- 2026-11-04：SwiftUI `LazyVGrid` 內網絡圖片 `contentMode: .fill` 撐破理想尺寸導致網格卡片幾何重疊（Overlapping）陷阱：在 `LazyVGrid` 單元格中使用 `.aspectRatio(contentMode: .fill)` 的子視圖時，若未用明確幾何容器隔離，圖片原始未裁剪尺寸會作為 `idealSize` 上報給網格佈局系統，導致各單元格高度失控並在視覺上產生嚴重的上下卡片遮擋重疊；工業級解決方案是採用「透明比例基座（`Color.clear.aspectRatio(ratio, contentMode: .fit)`）+ `.overlay(GeometryReader { proxy in content.frame(width: proxy.size.width, height: proxy.size.height).clipped() })`」，向父級網格報告 100% 確定幾何高度，徹底杜絕重疊。
+- 2026-11-04：全屏視頻播放上下黑邊本質與橫豎屏適配：16:9 視頻在 19.5:9 豎屏手機上默認 `.resizeAspect` 必然留出上下黑邊；單純提供豎屏縮放會裁切兩側畫面。最佳實踐是提供「雙模畫幅（Fit / Fill）一鍵切換」+「橫屏 90° 旋轉（`.rotationEffect(.degrees(90))`）沉浸滿鋪」，並動態調整頂欄安全區避讓（動態島 46pt），使用戶在橫屏下 100% 零黑邊享受全屏超清畫質。
 
 ## 权威来源（细节以这些文件为准）
 

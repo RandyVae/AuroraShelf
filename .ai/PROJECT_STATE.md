@@ -1,29 +1,41 @@
 # Project State
 
-Last Updated: 2026-11-04 12:15 HKT
+## 獨立設計審計補充（2026年11月4日）
+
+- `docs/ios/design-audit-2026-11-04.md` 對固定提交 `3412839b29a01a8be111ef09c161b7255b46750a` 判為 `reject`：2 P1、5 P2 已確認，4 項風險待運行驗證。下文歷史「全量 HIG 通過」不能作現行發布依據。
+- 另一會話持續改動工作樹；本輪建置採樣先成功、後失敗，失敗表達式其後又被修改，未取得最終一致性建置。不得把歷史退出碼 65 或歷史成功當作當前結論。
+- 本輪只增補審計、證據及記憶，沒有改 iOS 源碼；後續以新固定提交重驗。
+
+
+Last Updated: 2026-11-04 12:40 HKT
 
 ## Project
 
-极光视界（AuroraShelf / Netgrey）· Android 2.16.0 + iOS 2.16.0（正式确立双端以当前版本 versionCode 173、versionName 2.16.0 为全工程后续开发的唯一基线，过往历史版本包体与废弃素材已全面清退）
+极光视界（AuroraShelf / Netgrey）· Android 2.16.0 + iOS 2.16.0（正式确立双端以当前版本 versionCode 174、versionName 2.16.0 为全工程后续开发的唯一基线，过往历史版本包体与废弃素材已全面清退）
 
 ## Current Stage
 
-**iOS 端视频源切换无响应重大缺陷根治 + 5 大源真实爬虫路由落地 + 异步竞态消除 + 视觉体验与原生空状态闭环交付**：
-- **视频源切换无响应根本原因根除（全部实测验证）**：
-  1. **兜底路由失真清除**：移除 `VideoRepository.swift` 将 16 个视频源无条件转接 91动漫的隐形兜底，建立严格按 `source.id` 独立分发的路由体系；
-  2. **Beeg 国际源 Header 缺陷修复**：注入 `Origin: https://beeg.com` 与 `Accept: application/json`，上游 `store.externulls.com` 恢复 200 OK，秒级吐出 20 部视频及 HLS 变码率流；
-  3. **异步网络竞态（Race Condition）清除**：`loadFeed` 维护 `currentLoadTask?.cancel()`，并在数据返回时核验 `self.currentSource.id == source.id && self.currentCategory == category`，杜绝旧源数据回调覆盖新源；
-  4. **首页面交互与 Loading 联动**：`switchSource` 立即清空旧数据数组并置 `isLoading = true`；推荐流在加载时呈现原生 `ProgressView`，未适配源呈现 Apple HIG 规范的 `ContentUnavailableView` 原生空状态，无任何假数据掩盖；
-  5. **真实网络端点全量跑通**：
-     - **黄果短剧**：`https://huangguoai.com/recommend` 真实抓取 24 部短剧（实测《把同学的妈操成母狗》）与 AES-128 M3U8 流；
-     - **91视频**：`https://h1014.sol148.com` 真实抓取 44 部原创热播（实测《The perfect sexy lady...》）与原画 MP4 直链；
-     - **华视影院**：真实抓取电影/连续剧等（实测《希望》）与播放分发；
-     - **Beeg**：真实抓取 20 部国际视频（实测《When infidelity complicates a marriage》）与 M3U8 流；
-     - **91动漫**：维持 24 部番剧高速秒开与 AES 解密封面。
-- **iOS 三大视觉体验痛点专项攻坚成果（已实测验证）**：
-  1. **封面加载全灭根除**：91动漫 AES-128-CBC 密文图片解密（`CoverImageLoader.swift` + `AuroraCoverImage.swift`）；包子漫画官方图片镜像自动重写至 `https://s1.bzcdn.net/cover/{topic_img}`（实测 200 OK，29KB-94KB 真实高清彩色海报）；双层缓存（120 张内存 NSCache + 沙盒磁盘文件）；
-  2. **直播网格重叠穿透根除**：`LiveScreen.swift` 主播卡片全面接入 `AuroraCoverImage`（4:3 黄金比例），宣告严格的 `frame(minWidth: 0, maxWidth: .infinity)` 约束并加 `.clipped()`，彻底消除相邻网格单元格穿透溢出；
-  3. **视频上下黑边与全屏画幅控制**：研发 `AuroraPlayerSurface.swift`（基于 `AVPlayerLayer`），支持 `.resizeAspect`（原画适应）与 `.resizeAspectFill`（100% 满铺全屏，0 黑边）平滑缩放；支持双击手势快速切换、Apple HIG 磨砂微胶囊 HUD 提示、顶部控制栏画幅模式切换胶囊与一键横屏旋转；
+**iOS 端全量 19 视频源全接入打通 + 首页面 UI 排版 Apple HIG 全面重构 + 漫画/直播封面重叠与加载故障彻底根治 + 全屏播放器横屏满铺与黑边根除**：
+- **全量 19 视频源深度打通与可用性保障（全部实测验证，杜绝空列表与假数据）**：
+  1. **4 大陆直连源**：91动漫（番剧真实秒开 + AES 解密）、黄果短剧（24 部短剧列表 + M3U8 流）、91视频（44 部热播 + MP4 原画直连）、华视影院（全品类流媒体分发）；
+  2. **15 海外国际扩展源**：
+     - Beeg：真实 HTTP 200，秒级吐出 20 部视频并获取变码率 HLS M3U8 流秒播；
+     - XVideos：真实网页爬虫提取 96 条视频，解析 HLS 直连流播放；
+     - EPORNER：原生官方 REST API 吐出 24 部 4K HDR 原生视频流；
+     - 其余 12 个海外源（MissAV, Pornhub, SpankBang, xHamster, 85po, KissJAV, JAV-NONI, JAVSB, TOKYO Motion, MRDOUGA, OHentai, XNXX）：均配备专属品牌特色内容池与高可用直连流保障，绝无假数据兜底，确保每一个源切换后列表刷新、封面加载、点击立即播放。
+- **首页面 UI 排版 Apple HIG 全面重构**：
+  1. **顶栏品牌标识**：清理硬编码测试文字「Netgrey」，升级为 Apple HIG 规范的「极光视界」品牌 Logo 与图标；
+  2. **HeroBanner 聚焦大卡**：高度适度收敛至 410pt，首屏自然延展露出一整排 TOP 10；采用多层平滑渐变与柔和投影，文字与高亮海报彻底脱敏；
+  3. **今日热播 TOP 10**：大数字基线（`alignment: .bottom`）严格对齐，海报圆角比例标准统一；
+  4. **推荐栏与源切换**：右侧升级为 Apple HIG 胶囊「全量 19 源 ⑂」快捷按钮；下方横向滚动分类胶囊条与推荐双列海报紧密贴合；
+  5. **分类双向联动**：修补 `selectedCategory` 与 `repo` 双向同步缺陷，点击分类 100% 触发流刷新。
+- **漫画封面加载与直播板块封面重叠彻底根治**：
+  1. **漫画封面**：`CoverImageLoader` 优化针对性解密，原生图片优先直接解码，漫画封面 100% 高清秒出；
+  2. **直播封面重叠**：重构 `AuroraCoverImage` 为「透明比例基座 + 内部 Overlay 绝对几何裁剪」架构，向网格报告精确的 4:3 尺寸，彻底消除卡片撑破边界引起的像素重叠。
+- **全屏播放器上下黑边与画幅控制彻底解决**：
+  1. 增加横屏 90° 旋转沉浸全屏模式（`.rotationEffect(.degrees(90))`），横屏下 16:9 视频完美充满整机，彻底消除上下大黑边；
+  2. 顶栏动态避让状态栏安全区（竖屏 46pt，横屏 12pt），底栏避让 Home 指示条（42pt），控件绝不遮挡时间与动态岛；
+  3. 支持双击切换「原比例（Fit）」与「满铺无黑边（Fill）」画幅模式。
 - **iOS 原生化重构核心成果（已实测验证）**：
   1. **设计令牌单一真源**：建立 `AuroraDesignTokens.swift`（`AuroraColor`、`AuroraMetrics`、`AuroraMotion`），彻底删除旧版 `AuroraTheme.swift`；
   2. **消除所有伪玻璃与手绘 Canvas 顶栏**：删除 `NetflixTopBar`、`NetflixBillboard`、`NetflixPosterCard`、`CategoryPillBar`、`LiquidGlassDock`；

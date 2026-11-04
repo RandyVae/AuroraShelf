@@ -1,0 +1,19 @@
+2026-11-04T12:29:52.502064+08:00
+## main...origin/main [ahead 19]
+ M MEMORY.md
+ M ios/AuroraShelf.xcodeproj/project.pbxproj
+ M ios/AuroraShelf/App/AuroraShelfApp.swift
+ M ios/AuroraShelf/Data/Comic/ComicRepository.swift
+ M ios/AuroraShelf/Data/Video/VideoRepository.swift
+ M ios/AuroraShelf/Services/CoverImageLoader.swift
+ M ios/AuroraShelf/UI/Components/AuroraCoverImage.swift
+ M ios/AuroraShelf/UI/Components/HeroBanner.swift
+ M ios/AuroraShelf/UI/Components/PosterCard.swift
+ M ios/AuroraShelf/UI/Components/SourceFilterBar.swift
+ M ios/AuroraShelf/UI/Components/Top10Card.swift
+ M ios/AuroraShelf/UI/Screens/ComicsScreen.swift
+ M ios/AuroraShelf/UI/Screens/HomeScreen.swift
+ M ios/AuroraShelf/UI/Screens/MainContainerView.swift
+?? docs/ios/audit-evidence-2026-11-04/
+?? docs/ios/design-audit-2026-11-04.md
+?? ios/AuroraShelf/Services/UniversalVideoEngine.swift

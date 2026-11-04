@@ -102,6 +102,18 @@ public struct ComicsScreen: View {
                         }
                     }
                     .padding(.horizontal, AuroraMetrics.contentInset)
+
+                    if let errorMessage = repo.errorMessage {
+                        ContentUnavailableView {
+                            Label("漫画暂不可用", systemImage: "exclamationmark.triangle")
+                        } description: {
+                            Text(errorMessage)
+                        } actions: {
+                            Button("重试") { repo.loadComics(for: repo.currentSource) }
+                                .buttonStyle(.borderedProminent)
+                        }
+                        .padding(.horizontal, AuroraMetrics.contentInset)
+                    }
                     
                     Spacer().frame(height: AuroraMetrics.spacingXXL)
                 }
