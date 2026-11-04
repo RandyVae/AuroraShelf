@@ -6,7 +6,11 @@ public struct SearchSheetView: View {
     
     @StateObject private var repo = VideoRepository.shared
     @State private var query: String = ""
-    @FocusState private var isFocused: Bool
+    @FocusState private var isSearchFocused: Bool
+    
+    private var totalSourcesCount: Int {
+        VideoSourceCatalog.allSources.count
+    }
     
     public init(onPlayVideo: @escaping (VideoItem) -> Void, onDismiss: @escaping () -> Void) {
         self.onPlayVideo = onPlayVideo
@@ -14,140 +18,105 @@ public struct SearchSheetView: View {
     }
     
     public var body: some View {
-        ZStack {
-            AuroraTheme.background.ignoresSafeArea()
-            
-            VStack(spacing: 16) {
-                // 搜索顶栏
-                HStack(spacing: 12) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 16))
-                            .foregroundColor(AuroraTheme.textTertiary)
-                        
-                        TextField("全局并发搜索全网 19 个视频源...", text: $query)
-                            .font(.system(size: 14))
-                            .foregroundColor(.white)
-                            .focused($isFocused)
-                            .submitLabel(.search)
-                            .onSubmit {
-                                Task {
-                                    await repo.searchAllSources(query: query)
-                                }
-                            }
-                        
-                        if !query.isEmpty {
-                            Button(action: { query = "" }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.white.opacity(0.4))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .frame(height: 42)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(AuroraTheme.surfaceCard)
-                            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(AuroraTheme.glassBorder, lineWidth: 1))
-                    )
-                    
-                    Button(action: {
-                        onDismiss()
-                    }) {
-                        Text("取消")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(AuroraTheme.crimsonGlow)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                
-                // 搜索状态与结果
+        NavigationStack {
+            Group {
                 if repo.isSearching {
-                    VStack(spacing: 12) {
-                        Spacer()
+                    VStack(spacing: AuroraMetrics.spacingL) {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: AuroraTheme.crimson))
-                        Text("正在向全网 19 个视频源并发检索...")
-                            .font(.system(size: 13))
-                            .foregroundColor(AuroraTheme.textSecondary)
-                        Spacer()
+                            .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
+                            .scaleEffect(1.3)
+                        
+                        Text("正在向全网 \(totalSourcesCount) 个视频源并发检索...")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.secondary)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if !repo.searchResults.isEmpty {
-                    ScrollView(.vertical, showsIndicators: false) {
-                        LazyVStack(spacing: 14) {
-                            ForEach(repo.searchResults) { item in
-                                Button(action: {
-                                    onPlayVideo(item)
-                                    onDismiss()
-                                }) {
-                                    HStack(spacing: 12) {
-                                        AsyncImage(url: URL(string: item.coverUrl)) { phase in
-                                            if let img = phase.image {
-                                                img.resizable().aspectRatio(contentMode: .fill)
-                                            } else {
-                                                RoundedRectangle(cornerRadius: 8).fill(AuroraTheme.surfaceCard)
-                                            }
+                    List {
+                        ForEach(repo.searchResults) { item in
+                            Button(action: {
+                                onPlayVideo(item)
+                                onDismiss()
+                            }) {
+                                HStack(spacing: AuroraMetrics.spacingM) {
+                                    AsyncImage(url: URL(string: item.coverUrl)) { phase in
+                                        if let img = phase.image {
+                                            img.resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                        } else {
+                                            RoundedRectangle(cornerRadius: AuroraMetrics.controlRadius)
+                                                .fill(AuroraColor.surfaceCard)
                                         }
-                                        .frame(width: 120, height: 75)
-                                        .cornerRadius(8)
-                                        
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(item.title)
-                                                .font(.system(size: 14, weight: .bold))
-                                                .foregroundColor(.white)
-                                                .lineLimit(1)
-                                            Text(item.subtitle)
-                                                .font(.system(size: 12))
-                                                .foregroundColor(AuroraTheme.textSecondary)
-                                                .lineLimit(1)
-                                            
-                                            HStack(spacing: 6) {
-                                                Text(item.sourceName)
-                                                    .font(.system(size: 10, weight: .bold))
-                                                    .foregroundColor(AuroraTheme.crimsonGlow)
-                                                    .padding(.horizontal, 6)
-                                                    .padding(.vertical, 2)
-                                                    .background(Capsule().fill(AuroraTheme.crimson.opacity(0.2)))
-                                                
-                                                Text(item.duration)
-                                                    .font(.system(size: 10))
-                                                    .foregroundColor(AuroraTheme.textTertiary)
-                                            }
-                                        }
-                                        
-                                        Spacer()
                                     }
-                                    .padding(8)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(AuroraTheme.surface)
-                                    )
+                                    .frame(width: 120, height: 75)
+                                    .clipShape(RoundedRectangle(cornerRadius: AuroraMetrics.controlRadius, style: .continuous))
+                                    
+                                    VStack(alignment: .leading, spacing: AuroraMetrics.spacingXS) {
+                                        Text(item.title)
+                                            .font(.headline)
+                                            .foregroundStyle(.white)
+                                            .lineLimit(1)
+                                        
+                                        Text(item.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(Color.secondary)
+                                            .lineLimit(1)
+                                        
+                                        HStack(spacing: AuroraMetrics.spacingS) {
+                                            Text(item.sourceName)
+                                                .font(.caption.bold())
+                                                .foregroundStyle(AuroraColor.brand)
+                                                .padding(.horizontal, AuroraMetrics.spacingXS)
+                                                .padding(.vertical, 2)
+                                                .background(AuroraColor.brand.opacity(0.18), in: .capsule)
+                                            
+                                            Text(item.duration)
+                                                .font(.caption2)
+                                                .foregroundStyle(AuroraColor.textTertiary)
+                                        }
+                                    }
+                                    
+                                    Spacer()
                                 }
-                                .buttonStyle(PlainButtonStyle())
-                                .applePressEffect()
+                                .padding(.vertical, AuroraMetrics.spacingXS)
                             }
+                            .listRowBackground(AuroraColor.surfaceCard)
+                            .listRowSeparatorTint(AuroraColor.hairline)
                         }
-                        .padding(.horizontal, 16)
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                } else if !query.isEmpty {
+                    ContentUnavailableView.search(text: query)
                 } else {
-                    VStack(spacing: 16) {
-                        Spacer()
-                        Image(systemName: "sparkle.magnifyingglass")
-                            .font(.system(size: 48))
-                            .foregroundColor(AuroraTheme.crimson.opacity(0.6))
-                        Text("输入关键词，回车搜索全网 19 个视频源")
-                            .font(.system(size: 14))
-                            .foregroundColor(AuroraTheme.textTertiary)
-                        Spacer()
-                    }
+                    ContentUnavailableView(
+                        "全网视频检索",
+                        systemImage: "sparkle.magnifyingglass",
+                        description: Text("支持跨全网 \(totalSourcesCount) 个高可用直连源并发毫秒级检索")
+                    )
                 }
             }
-        }
-        .onAppear {
-            isFocused = true
+            .background(AuroraColor.canvas.ignoresSafeArea())
+            .navigationTitle("全网搜索")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(
+                text: $query,
+                placement: .navigationBarDrawer(displayMode: .always),
+                prompt: "搜索全网 \(totalSourcesCount) 个视频源..."
+            )
+            .onSubmit(of: .search) {
+                Task {
+                    await repo.searchAllSources(query: query)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("完成") {
+                        onDismiss()
+                    }
+                    .foregroundStyle(AuroraColor.brand)
+                }
+            }
         }
     }
 }

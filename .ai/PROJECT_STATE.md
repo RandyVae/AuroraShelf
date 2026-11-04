@@ -1,6 +1,6 @@
 # Project State
 
-Last Updated: 2026-11-02 22:30 HKT
+Last Updated: 2026-11-04 10:55 HKT
 
 ## Project
 
@@ -8,7 +8,35 @@ Last Updated: 2026-11-02 22:30 HKT
 
 ## Current Stage
 
-**双轨并行：Android 2.16.0 唯一基线固化 + iOS 原生工程（SwiftUI + AVKit + WebKit）全源真实流播放与直播出画彻底打通**：
+**iOS 端「原生化重构」全量闭环交付（Phase 0 - Phase 5 全流程完成）+ Android 2.16.0 唯一基线固化**：
+- **iOS 原生化重构核心成果（已实测验证）**：
+  1. **设计令牌单一真源**：建立 `AuroraDesignTokens.swift`（`AuroraColor`、`AuroraMetrics`、`AuroraMotion`），彻底删除旧版 `AuroraTheme.swift`；
+  2. **消除所有伪玻璃与手绘 Canvas 顶栏**：删除 `NetflixTopBar`、`NetflixBillboard`、`NetflixPosterCard`、`CategoryPillBar`、`LiquidGlassDock`；
+  3. **首页面（HomeScreen）**：4:5 竖版黄金比例海报（`HeroBanner`）+ 系统 `.toolbar` 配合 `.onScrollGeometryChange` 动态毛玻璃磨砂（`.regularMaterial`）+ 2:3 推荐网格；
+  4. **全功能模块原生化**：
+     - 漫画（`ComicsScreen`）：系统大标题 + Chip 胶囊筛选 + 双列 2:3 网格；
+     - 直播（`LiveScreen`）：系统大标题 + Chip 胶囊筛选 + 原生 LIVE 徽章卡片流；
+     - 论坛（`ForumScreen`）：系统 Segmented Control + 原生 BBS 卡片流；
+     - 个人中心（`PersonalScreen`）：系统大标题 + Randy PRO 会员徽章 + 19 视频源 / 10 漫画源动态统计 + 分组 List 设置；
+  5. **沉浸式全屏与浮层收敛**：
+     - 新建 `PlayerOverlayBar.swift`，统一采用原生 Liquid Glass（`.glassEffect`）；
+     - `NativePlayerView`：保留 91动漫 CDN 鉴权头（`data-cdn-auth`/`data-cdn-app`）、AES-128 解密密钥（`crypt.key`）真实直签流秒出画；
+     - `LivePlayerView`：保留 Chaturbate API 直签 LL-HLS 原生 AVPlayer 秒播，单行 320pt 错峰防重叠弹幕；
+     - `ComicReaderView`：保留换章置顶核心逻辑（`scrollTo("top_anchor", anchor: .top)`），Liquid Glass 章节指示胶囊；
+     - `GameContainerView`：Liquid Glass 悬浮拖拽返回胶囊；
+  6. **全网搜索（SearchSheetView）**：系统 `NavigationStack` + `.searchable` + `ContentUnavailableView` 原生空状态，动态检索全网视频源；
+  7. **代码卫生全面达标**：
+     - `ultraThinMaterial`：0
+     - `AuroraTheme`：0
+     - `Color(red:`：0
+     - `Color(hex:`：0（令牌文件外）
+     - `topSafeAreaHeight`：0
+     - 孤立死代码 `VideoSourceService`：0
+  8. **构建与验证状态**：`xcodebuild` **BUILD SUCCEEDED**（0 错误，0 警告），产出验证报告 `docs/verification-ios-native-refactor.md`。
+- **交付包状态**：
+  - Android APK：`dist/AuroraShelf-2.16.0-173-game-integration-all-sources-verified-LOCAL.apk`（176,633,866 bytes，SHA-256 `bb2097749c94123c56baec105ab732389f6ff21128121adc608f25b0e1b1f211`）；
+  - iOS IPA：`dist/AuroraShelf-2.16.0-173-arm64-LOCAL.ipa`（164MB，SHA-256 `7baa85127c20689289194d983d568d3ef1be8a8362065c6e1cd03430aa16e22f`）；
+  - 校验文件：`dist/SHA256SUMS.txt` 同步更新。
 - **交付包状态**：
   - Android APK：`dist/AuroraShelf-2.16.0-173-game-integration-all-sources-verified-LOCAL.apk`（176,633,866 bytes，SHA-256 `bb2097749c94123c56baec105ab732389f6ff21128121adc608f25b0e1b1f211`）；
   - iOS IPA：`dist/AuroraShelf-2.16.0-173-arm64-LOCAL.ipa`（164MB，SHA-256 `7baa85127c20689289194d983d568d3ef1be8a8362065c6e1cd03430aa16e22f`）；

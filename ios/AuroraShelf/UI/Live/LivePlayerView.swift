@@ -43,7 +43,7 @@ public struct LivePlayerView: View {
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        withAnimation(AuroraTheme.quickSpring) {
+                        withAnimation(AuroraMotion.quick) {
                             showControls.toggle()
                         }
                     }
@@ -55,65 +55,68 @@ public struct LivePlayerView: View {
                             img.resizable()
                                 .aspectRatio(contentMode: .fill)
                                 .ignoresSafeArea()
-                                .opacity(0.4)
-                                .blur(radius: 12)
+                                .opacity(0.35)
+                                .blur(radius: 16)
                         }
                     }
                     
-                    VStack(spacing: 16) {
+                    VStack(spacing: AuroraMetrics.spacingL) {
                         ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: AuroraTheme.crimson))
-                            .scaleEffect(1.6)
+                            .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
+                            .scaleEffect(1.4)
                         
                         Text("正在直连 \(stream.username) 官方高清直播流...")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
+                            .font(.headline)
+                            .foregroundStyle(.white)
                     }
                 }
             } else if let error = liveError {
                 // 离线或异常提示
-                VStack(spacing: 16) {
+                VStack(spacing: AuroraMetrics.spacingL) {
                     Image(systemName: "tv.slash.fill")
                         .font(.system(size: 40))
-                        .foregroundColor(AuroraTheme.crimson)
+                        .foregroundStyle(AuroraColor.brand)
                     
                     Text("主播暂时离开或正在私密表演")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
+                        .font(.title3.bold())
+                        .foregroundStyle(.white)
                     
                     Text(error)
-                        .font(.system(size: 13, weight: .regular))
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(.horizontal, 32)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, AuroraMetrics.spacingXXXL)
                     
                     Button(action: {
                         fetchAndStartLiveStream()
                     }) {
                         Text("重新连接")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 10)
-                            .background(Capsule().fill(AuroraTheme.crimson))
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, AuroraMetrics.spacingXL)
+                            .padding(.vertical, AuroraMetrics.spacingM)
+                            .background(AuroraColor.brand, in: .capsule)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .buttonStyle(.plain)
                 }
             }
             
-            // 4 泳道防碰撞错峰弹幕浮层
+            // 4 泳道防碰撞错峰弹幕浮层（严格单行、宽度上限 320pt 约束）
             if isDanmakuEnabled {
-                VStack(spacing: 12) {
+                VStack(spacing: AuroraMetrics.spacingM) {
                     ForEach(0..<4, id: \.self) { laneIndex in
                         HStack {
                             let laneDanmakus = danmakus.filter { $0.lane == laneIndex }
                             ForEach(laneDanmakus) { d in
                                 Text(d.text)
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(d.color)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 4)
-                                    .background(Capsule().fill(Color.black.opacity(0.65)))
-                                    .shadow(color: .black, radius: 2)
+                                    .font(.callout.bold())
+                                    .lineLimit(1)
+                                    .frame(maxWidth: 320, alignment: .leading)
+                                    .foregroundStyle(d.color)
+                                    .padding(.horizontal, AuroraMetrics.spacingM)
+                                    .padding(.vertical, AuroraMetrics.spacingXS)
+                                    .background(.regularMaterial, in: .capsule)
+                                    .shadow(color: .black.opacity(0.3), radius: 2)
                                     .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .opacity))
                             }
                             Spacer()
@@ -122,135 +125,84 @@ public struct LivePlayerView: View {
                     }
                     Spacer()
                 }
-                .padding(.top, 90)
-                .padding(.horizontal, 16)
+                .padding(.top, 96)
+                .padding(.horizontal, AuroraMetrics.contentInset)
                 .allowsHitTesting(false)
             }
             
             // 浮动控制栏
             if showControls || isLoadingLive || liveError != nil {
                 VStack {
-                    // 顶栏：主播信息与返回
-                    HStack(spacing: 12) {
-                        Button(action: {
-                            let impact = UIImpactFeedbackGenerator(style: .medium)
-                            impact.impactOccurred()
+                    // 统一顶栏
+                    PlayerOverlayBar(
+                        title: stream.username,
+                        subtitle: "在线人数 \(stream.viewCount)",
+                        onDismiss: {
                             cleanupLivePlayer()
                             onDismiss()
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("返回")
-                                    .font(.system(size: 13, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(
-                                Capsule()
-                                    .fill(.ultraThinMaterial)
-                                    .environment(\.colorScheme, .dark)
-                                    .overlay(Capsule().stroke(AuroraTheme.glassBorder, lineWidth: 1))
-                            )
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        // 主播头像与名称
-                        HStack(spacing: 8) {
-                            AsyncImage(url: URL(string: stream.avatarUrl)) { phase in
-                                if let img = phase.image {
-                                    img.resizable().aspectRatio(contentMode: .fill)
-                                } else {
-                                    Circle().fill(AuroraTheme.surfaceCard)
-                                }
-                            }
-                            .frame(width: 32, height: 32)
-                            .clipShape(Circle())
+                    ) {
+                        HStack(spacing: AuroraMetrics.spacingS) {
+                            AirPlayRoutePicker()
+                                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
                             
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(stream.username)
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundColor(.white)
-                                Text("在线人数 \(stream.viewCount)")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.white.opacity(0.7))
+                            Button(action: {
+                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                impact.impactOccurred()
+                                withAnimation(AuroraMotion.quick) {
+                                    isDanmakuEnabled.toggle()
+                                }
+                            }) {
+                                HStack(spacing: AuroraMetrics.spacingXS) {
+                                    Image(systemName: isDanmakuEnabled ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right")
+                                        .font(.caption)
+                                    Text(isDanmakuEnabled ? "弹幕" : "纯净")
+                                        .font(.caption.bold())
+                                }
+                                .foregroundStyle(isDanmakuEnabled ? AuroraColor.brand : Color.white.opacity(0.75))
+                                .padding(.horizontal, AuroraMetrics.spacingM)
+                                .frame(height: AuroraMetrics.minTouchTarget)
+                                .glassEffect(.regular.interactive(), in: .capsule)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(isDanmakuEnabled ? "关闭弹幕" : "开启弹幕")
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Capsule().fill(Color.black.opacity(0.6)))
-                        
-                        Spacer()
-                        
-                        // 原生 AirPlay
-                        AirPlayRoutePicker()
-                            .frame(width: 32, height: 32)
-                            .padding(.trailing, 4)
-                        
-                        // 弹幕开关胶囊
-                        Button(action: {
-                            let impact = UIImpactFeedbackGenerator(style: .light)
-                            impact.impactOccurred()
-                            withAnimation(AuroraTheme.quickSpring) {
-                                isDanmakuEnabled.toggle()
-                            }
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: isDanmakuEnabled ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right")
-                                    .font(.system(size: 12))
-                                Text(isDanmakuEnabled ? "弹幕开" : "纯净模式")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            .foregroundColor(isDanmakuEnabled ? AuroraTheme.crimsonGlow : .white.opacity(0.6))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .fill(.ultraThinMaterial)
-                                    .environment(\.colorScheme, .dark)
-                                    .overlay(Capsule().stroke(AuroraTheme.glassBorder, lineWidth: 0.8))
-                            )
-                        }
-                        .buttonStyle(PlainButtonStyle())
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
                     
                     Spacer()
                     
                     // 底部弹幕发送栏
-                    HStack(spacing: 10) {
-                        HStack {
+                    HStack(spacing: AuroraMetrics.spacingM) {
+                        HStack(spacing: AuroraMetrics.spacingS) {
                             Image(systemName: "pencil")
-                                .font(.system(size: 12))
-                                .foregroundColor(.white.opacity(0.5))
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
                             TextField("跟主播说点什么吧...", text: $inputMessage)
-                                .font(.system(size: 13))
-                                .foregroundColor(.white)
+                                .font(.subheadline)
+                                .foregroundStyle(.white)
+                                .submitLabel(.send)
+                                .onSubmit {
+                                    sendDanmaku()
+                                }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(.ultraThinMaterial)
-                                .environment(\.colorScheme, .dark)
-                                .overlay(Capsule().stroke(AuroraTheme.glassBorder, lineWidth: 0.8))
-                        )
+                        .padding(.horizontal, AuroraMetrics.spacingL)
+                        .frame(height: AuroraMetrics.minTouchTarget)
+                        .glassEffect(.regular.interactive(), in: .capsule)
                         
                         Button(action: {
                             sendDanmaku()
                         }) {
                             Image(systemName: "paperplane.fill")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white)
-                                .padding(10)
-                                .background(Circle().fill(AuroraTheme.crimson))
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                                .background(AuroraColor.brand, in: .circle)
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("发送弹幕")
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 24)
+                    .padding(.horizontal, AuroraMetrics.contentInset)
+                    .padding(.bottom, AuroraMetrics.spacingXL)
                 }
                 .transition(.opacity)
             }
@@ -336,11 +288,12 @@ public struct LivePlayerView: View {
     }
     
     private func sendDanmaku() {
-        guard !inputMessage.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        let trimmed = inputMessage.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
-        let msg = DanmakuMessage(text: inputMessage, lane: Int.random(in: 0..<4), color: AuroraTheme.crimsonGlow)
-        withAnimation(AuroraTheme.appleSpring) {
+        let msg = DanmakuMessage(text: trimmed, lane: Int.random(in: 0..<4), color: AuroraColor.brand)
+        withAnimation(AuroraMotion.smooth) {
             danmakus.append(msg)
         }
         inputMessage = ""
@@ -356,8 +309,8 @@ public struct LivePlayerView: View {
         ]
         for (i, text) in seeds.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.8) {
-                let msg = DanmakuMessage(text: text, lane: i % 4, color: i == 0 ? AuroraTheme.gold : .white)
-                withAnimation(AuroraTheme.appleSpring) {
+                let msg = DanmakuMessage(text: text, lane: i % 4, color: i == 0 ? AuroraColor.brand : .white)
+                withAnimation(AuroraMotion.smooth) {
                     self.danmakus.append(msg)
                 }
             }

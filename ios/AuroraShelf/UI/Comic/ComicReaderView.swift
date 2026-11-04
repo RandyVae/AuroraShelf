@@ -31,7 +31,7 @@ public struct ComicReaderView: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(spacing: 0) {
-                        // 顶部定位锚点
+                        // 顶部定位锚点（换章置顶核心锚点，杜绝滚动越界）
                         Color.clear.frame(height: 1).id("top_anchor")
                         
                         ForEach(Array(pages.enumerated()), id: \.offset) { index, pageUrl in
@@ -44,22 +44,22 @@ public struct ComicReaderView: View {
                                         .frame(maxWidth: .infinity)
                                 case .failure:
                                     ZStack {
-                                        Color(red: 0.1, green: 0.1, blue: 0.15)
-                                        VStack(spacing: 6) {
+                                        AuroraColor.surfaceCard
+                                        VStack(spacing: AuroraMetrics.spacingS) {
                                             Image(systemName: "photo.badge.exclamationmark")
-                                                .font(.system(size: 28))
-                                                .foregroundColor(.white.opacity(0.3))
+                                                .font(.title2)
+                                                .foregroundStyle(.secondary)
                                             Text("第 \(index + 1) 页加载失败，点击重试")
-                                                .font(.system(size: 11))
-                                                .foregroundColor(.white.opacity(0.5))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
                                         }
                                     }
                                     .frame(height: 480)
                                 default:
                                     ZStack {
-                                        Color(red: 0.08, green: 0.08, blue: 0.12)
+                                        AuroraColor.surface
                                         ProgressView()
-                                            .progressViewStyle(CircularProgressViewStyle(tint: AuroraTheme.crimson))
+                                            .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
                                     }
                                     .frame(height: 480)
                                 }
@@ -67,20 +67,21 @@ public struct ComicReaderView: View {
                         }
                         
                         // 换章操作栏
-                        VStack(spacing: 16) {
-                            HStack(spacing: 20) {
+                        VStack(spacing: AuroraMetrics.spacingL) {
+                            HStack(spacing: AuroraMetrics.spacingXL) {
                                 Button(action: {
                                     if currentChapterIndex > 0 {
                                         switchChapter(to: currentChapterIndex - 1, proxy: proxy)
                                     }
                                 }) {
                                     Text("上一话")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundColor(currentChapterIndex > 0 ? .white : .white.opacity(0.3))
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 10)
-                                        .background(Capsule().fill(AuroraTheme.surfaceCard))
+                                        .font(.headline)
+                                        .foregroundStyle(currentChapterIndex > 0 ? .white : .secondary)
+                                        .padding(.horizontal, AuroraMetrics.spacingXL)
+                                        .frame(height: AuroraMetrics.minTouchTarget)
+                                        .background(AuroraColor.surfaceCard, in: .capsule)
                                 }
+                                .buttonStyle(.plain)
                                 .disabled(currentChapterIndex <= 0)
                                 
                                 Button(action: {
@@ -89,24 +90,25 @@ public struct ComicReaderView: View {
                                     }
                                 }) {
                                     Text("下一话")
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundColor(currentChapterIndex < comic.chapters.count - 1 ? .white : .white.opacity(0.3))
-                                        .padding(.horizontal, 24)
-                                        .padding(.vertical, 10)
-                                        .background(Capsule().fill(AuroraTheme.crimson))
+                                        .font(.headline)
+                                        .foregroundStyle(currentChapterIndex < comic.chapters.count - 1 ? .white : .secondary)
+                                        .padding(.horizontal, AuroraMetrics.spacingXL)
+                                        .frame(height: AuroraMetrics.minTouchTarget)
+                                        .background(AuroraColor.brand, in: .capsule)
                                 }
+                                .buttonStyle(.plain)
                                 .disabled(currentChapterIndex >= comic.chapters.count - 1)
                             }
                             
                             Text("已阅至本话末尾")
-                                .font(.system(size: 12))
-                                .foregroundColor(AuroraTheme.textTertiary)
+                                .font(.footnote)
+                                .foregroundStyle(AuroraColor.textTertiary)
                         }
-                        .padding(.vertical, 32)
+                        .padding(.vertical, AuroraMetrics.spacingXXL)
                     }
                 }
                 .onTapGesture {
-                    withAnimation(AuroraTheme.quickSpring) {
+                    withAnimation(AuroraMotion.quick) {
                         showControls.toggle()
                     }
                 }
@@ -115,63 +117,27 @@ public struct ComicReaderView: View {
             // Apple HIG 浮动控制栏
             if showControls {
                 VStack {
-                    // 顶栏
-                    HStack {
-                        Button(action: {
-                            let impact = UIImpactFeedbackGenerator(style: .medium)
-                            impact.impactOccurred()
+                    // 统一顶栏
+                    PlayerOverlayBar(
+                        title: comic.title,
+                        subtitle: "\(currentChapter.title) · 连载瀑布流",
+                        onDismiss: {
                             onDismiss()
-                        }) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("返回")
-                                    .font(.system(size: 14, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(.ultraThinMaterial)
-                                    .environment(\.colorScheme, .dark)
-                                    .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                            )
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        
-                        Spacer()
-                        
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(comic.title)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                            Text(currentChapter.title)
-                                .font(.system(size: 12))
-                                .foregroundColor(AuroraTheme.crimsonGlow)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    )
                     
                     Spacer()
                     
-                    // 底部当前章节与页码指示
+                    // 底部当前章节指示胶囊（采用原生 Liquid Glass）
                     HStack {
                         Text("\(currentChapter.title) · 连载瀑布流")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.85))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(.ultraThinMaterial)
-                                    .environment(\.colorScheme, .dark)
-                                    .overlay(Capsule().stroke(AuroraTheme.glassBorder, lineWidth: 1))
-                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, AuroraMetrics.spacingL)
+                            .frame(height: AuroraMetrics.minTouchTarget)
+                            .glassEffect(.regular.interactive(), in: .capsule)
                     }
-                    .padding(.bottom, 24)
+                    .padding(.bottom, AuroraMetrics.spacingXL)
                 }
                 .transition(.opacity)
             }
@@ -187,7 +153,7 @@ public struct ComicReaderView: View {
         self.currentChapterIndex = newIndex
         
         // 关键踩坑经验：换章必须自动回顶，杜绝偏移量越界
-        withAnimation(AuroraTheme.appleSpring) {
+        withAnimation(AuroraMotion.smooth) {
             proxy.scrollTo("top_anchor", anchor: .top)
         }
         loadPages()

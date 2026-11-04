@@ -37,7 +37,7 @@ public struct NativePlayerView: View {
                 VideoPlayer(player: player)
                     .ignoresSafeArea()
                     .onTapGesture {
-                        withAnimation(AuroraTheme.quickSpring) {
+                        withAnimation(AuroraMotion.quick) {
                             showControls.toggle()
                         }
                         if showControls {
@@ -46,179 +46,132 @@ public struct NativePlayerView: View {
                     }
             } else if isResolving {
                 // 真实网络流换流加载中状态（Apple HIG 深色质感）
-                VStack(spacing: 20) {
+                VStack(spacing: AuroraMetrics.spacingXL) {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: AuroraTheme.crimson))
-                        .scaleEffect(1.6)
+                        .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
+                        .scaleEffect(1.4)
                     
-                    VStack(spacing: 8) {
+                    VStack(spacing: AuroraMetrics.spacingS) {
                         Text(resolveStatus)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(.white)
+                            .font(.headline)
+                            .foregroundStyle(.white)
                         
                         Text("\(video.sourceName) · \(video.title)")
-                            .font(.system(size: 13, weight: .regular))
-                            .foregroundColor(.white.opacity(0.65))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                             .lineLimit(1)
-                            .padding(.horizontal, 40)
+                            .padding(.horizontal, AuroraMetrics.spacingXXXL)
                     }
                 }
             } else if let error = resolveError {
                 // 错误回退提示
-                VStack(spacing: 16) {
+                VStack(spacing: AuroraMetrics.spacingL) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(.system(size: 40))
-                        .foregroundColor(.yellow)
+                        .foregroundStyle(AuroraColor.warning)
                     
                     Text("播放失败")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(.white)
+                        .font(.title3.bold())
+                        .foregroundStyle(.white)
                     
                     Text(error)
-                        .font(.system(size: 13))
-                        .foregroundColor(AuroraTheme.textSecondary)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
+                        .padding(.horizontal, AuroraMetrics.spacingXXXL)
                     
                     Button(action: {
                         startResolveAndPlay()
                     }) {
                         Text("重新连接")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 24)
-                            .padding(.vertical, 10)
-                            .background(Capsule().fill(AuroraTheme.crimson))
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, AuroraMetrics.spacingXL)
+                            .padding(.vertical, AuroraMetrics.spacingM)
+                            .background(AuroraColor.brand, in: .capsule)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.top, 8)
+                    .buttonStyle(.plain)
+                    .padding(.top, AuroraMetrics.spacingS)
                 }
             }
             
             // Apple HIG 播放控制覆盖层
             if showControls && player != nil {
                 ZStack {
-                    // 顶栏渐变遮罩
+                    // 渐变可读性遮罩
                     VStack {
                         LinearGradient(
-                            colors: [Color.black.opacity(0.85), Color.clear],
+                            colors: [Color.black.opacity(0.8), Color.clear],
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(height: 110)
+                        .frame(height: 120)
                         
                         Spacer()
                         
                         LinearGradient(
-                            colors: [Color.clear, Color.black.opacity(0.85)],
+                            colors: [Color.clear, Color.black.opacity(0.8)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
-                        .frame(height: 130)
+                        .frame(height: 140)
                     }
                     .ignoresSafeArea()
                     
                     // 控件布局
                     VStack {
-                        // 顶部控制栏（包含 Apple HIG 磨砂返回胶囊）
-                        HStack {
-                            Button(action: {
-                                let impact = UIImpactFeedbackGenerator(style: .medium)
-                                impact.impactOccurred()
+                        // 统一顶栏
+                        PlayerOverlayBar(
+                            title: video.title,
+                            subtitle: "\(video.sourceName) · 1080P 超清直连",
+                            onDismiss: {
                                 cleanupPlayer()
                                 onDismiss()
-                            }) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 14, weight: .bold))
-                                    Text("返回")
-                                        .font(.system(size: 14, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(
-                                    Capsule()
-                                        .fill(.ultraThinMaterial)
-                                        .environment(\.colorScheme, .dark)
-                                        .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                                )
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .applePressEffect()
-                            
-                            Spacer()
-                            
-                            // 原生 AirPlay 投屏
+                        ) {
                             AirPlayRoutePicker()
-                                .frame(width: 32, height: 32)
-                                .padding(.trailing, 6)
-                            
-                            // 视频标题与清晰度徽章
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text(video.title)
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                
-                                HStack(spacing: 4) {
-                                    Text(video.sourceName)
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundColor(AuroraTheme.crimsonGlow)
-                                    Text("·")
-                                        .foregroundColor(.white.opacity(0.5))
-                                    Text("1080P 超清直连")
-                                        .font(.system(size: 11, weight: .regular))
-                                        .foregroundColor(.white.opacity(0.7))
-                                }
-                            }
+                                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 16)
                         
                         Spacer()
                         
-                        // 中心播放/暂停大按钮
-                        HStack(spacing: 40) {
+                        // 中心播放/快进控制组
+                        HStack(spacing: AuroraMetrics.spacingXXXL) {
                             Button(action: { seekBy(-15) }) {
                                 Image(systemName: "gobackward.15")
-                                    .font(.system(size: 26, weight: .medium))
-                                    .foregroundColor(.white)
-                                    .padding(12)
-                                    .background(Circle().fill(Color.black.opacity(0.4)))
+                                    .font(.title2)
+                                    .foregroundStyle(.white)
+                                    .frame(width: 48, height: 48)
+                                    .glassEffect(.regular.interactive(), in: .circle)
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .applePressEffect()
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("快退 15 秒")
                             
                             Button(action: { togglePlayPause() }) {
                                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                    .font(.system(size: 34, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 72, height: 72)
-                                    .background(
-                                        Circle()
-                                            .fill(AuroraTheme.crimson.opacity(0.85))
-                                            .shadow(color: AuroraTheme.crimson.opacity(0.5), radius: 16, x: 0, y: 4)
-                                    )
+                                    .font(.title)
+                                    .foregroundStyle(.white)
+                                    .frame(width: 68, height: 68)
+                                    .background(AuroraColor.brand, in: .circle)
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .applePressEffect(scale: 0.92)
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(isPlaying ? "暂停" : "播放")
                             
                             Button(action: { seekBy(15) }) {
                                 Image(systemName: "goforward.15")
-                                    .font(.system(size: 26, weight: .medium))
-                                    .foregroundColor(.white)
-                                    .padding(12)
-                                    .background(Circle().fill(Color.black.opacity(0.4)))
+                                    .font(.title2)
+                                    .foregroundStyle(.white)
+                                    .frame(width: 48, height: 48)
+                                    .glassEffect(.regular.interactive(), in: .circle)
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .applePressEffect()
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("快进 15 秒")
                         }
                         
                         Spacer()
                         
                         // 底部进度条与时间显示
-                        VStack(spacing: 8) {
+                        VStack(spacing: AuroraMetrics.spacingS) {
                             Slider(
                                 value: Binding(
                                     get: { currentTime },
@@ -229,22 +182,24 @@ public struct NativePlayerView: View {
                                 ),
                                 in: 0...max(duration, 1.0)
                             )
-                            .accentColor(AuroraTheme.crimson)
+                            .tint(AuroraColor.brand)
                             
                             HStack {
                                 Text(formatTime(currentTime))
-                                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .font(.footnote)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.white.opacity(0.85))
                                 
                                 Spacer()
                                 
                                 Text(formatDuration(duration))
-                                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                                    .foregroundColor(.white.opacity(0.8))
+                                    .font(.footnote)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.white.opacity(0.85))
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 24)
+                        .padding(.horizontal, AuroraMetrics.contentInset)
+                        .padding(.bottom, AuroraMetrics.spacingXL)
                     }
                 }
                 .transition(.opacity)
@@ -261,7 +216,7 @@ public struct NativePlayerView: View {
     private func scheduleAutoHideControls() {
         hideControlsTask?.cancel()
         let task = DispatchWorkItem {
-            withAnimation(AuroraTheme.quickSpring) {
+            withAnimation(AuroraMotion.quick) {
                 if self.isPlaying {
                     self.showControls = false
                 }

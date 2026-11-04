@@ -3,18 +3,20 @@ import SwiftUI
 public struct MainContainerView: View {
     @StateObject private var videoRepo = VideoRepository.shared
     @State private var selectedTab: MainTab = .home
-    @State private var playerCoordinator = PlayerCoordinator.shared
+    private var playerCoordinator = PlayerCoordinator.shared
     @State private var showSearchSheet: Bool = false
     @State private var showGameDirectly: Bool = false
     
     public init() {}
     
     public var body: some View {
+        @Bindable var coordinator = playerCoordinator
+        
         TabView(selection: $selectedTab) {
             NavigationStack {
                 HomeScreen(
                     onPlayVideo: { video in
-                        playerCoordinator.play(video)
+                        coordinator.play(video)
                     },
                     onOpenSearch: {
                         showSearchSheet = true
@@ -59,15 +61,15 @@ public struct MainContainerView: View {
             .tag(MainTab.profile)
         }
         .tint(AuroraColor.brand)
-        .fullScreenCover(item: $playerCoordinator.activeVideo) { video in
+        .fullScreenCover(item: $coordinator.activeVideo) { video in
             NativePlayerView(video: video) {
-                playerCoordinator.dismiss()
+                coordinator.dismiss()
             }
         }
         .sheet(isPresented: $showSearchSheet) {
             SearchSheetView(
                 onPlayVideo: { video in
-                    playerCoordinator.play(video)
+                    coordinator.play(video)
                 },
                 onDismiss: {
                     showSearchSheet = false
@@ -92,9 +94,15 @@ public struct MainContainerView: View {
             }
             
             if args.contains("--auto-play") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
-                    if let realVideo = videoRepo.billboardVideo ?? videoRepo.feedVideos.first {
-                        playerCoordinator.play(realVideo)
+                Task {
+                    for _ in 0..<25 {
+                        try? await Task.sleep(nanoseconds: 200_000_000)
+                        if let realVideo = videoRepo.billboardVideo ?? videoRepo.feedVideos.first {
+                            await MainActor.run {
+                                coordinator.play(realVideo)
+                            }
+                            break
+                        }
                     }
                 }
             }
@@ -105,7 +113,9 @@ public struct MainContainerView: View {
                 showGameDirectly = true
             }
             if args.contains("--open-search") {
-                showSearchSheet = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showSearchSheet = true
+                }
             }
         }
     }

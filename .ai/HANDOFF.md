@@ -1,5 +1,61 @@
 # Latest Handoff
 
+## 最新交接：2026-11-04 10:55 HKT — iOS 端原生化重構（Phase 0 - Phase 5）全量閉環交付：單一真源設計令牌、首頁與列表頁 Apple HIG 重構、沉浸浮層收斂、原生全網搜索、偽玻璃與死代碼徹底清零
+
+- **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`）+ SwiftUI + AVKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；
+- **落地依據**：嚴格遵循 [docs/ios/IOS-NATIVE-REFACTOR-SPEC.md](file:///Users/itou/Documents/ChatGPT/91pron/docs/ios/IOS-NATIVE-REFACTOR-SPEC.md)（Codex 審查說明書 v1.1）與 [docs/verification-ios-native-refactor.md](file:///Users/itou/Documents/ChatGPT/91pron/docs/verification-ios-native-refactor.md)；
+- **全階段落地閉環成果（已實測驗證，無中間態）**：
+  1. **階段 0（設計令牌與基礎設施）**：
+     - 新建 `UI/Theme/AuroraDesignTokens.swift`，集中管理 `AuroraColor`、`AuroraMetrics`、`AuroraMotion`，收斂顏色、邊距（4/8/12/16/24/32/48）、圓角（12/10）、最小觸控（44pt）；
+     - 徹底消除 `Color(hex:)` 8位/6位歧義，擴充 `init(rgb:)` 與 `init(rgba:)`；
+     - 新建 `App/PlayerCoordinator.swift`（基於現代 `@Observable`），全局唯一持有播放態；
+     - 重構 `MainContainerView.swift`，為 5 個 Tab 分立獨立 `NavigationStack`；
+     - 實測 Xcode 27.2 原生 Liquid Glass（`.glassEffect`）最低可用版本為 iOS 26.0+，完全滿足 iOS 26.4 部署目標，記錄於 `.ai/DECISIONS.md`；
+     - 刪除孤立死代碼 `Services/VideoSourceService.swift`，清除 7 處空實現回調。
+  2. **階段 1（首頁原生化重構）**：
+     - 徹底重寫 `HomeScreen.swift`，移除 `topSafeAreaHeight: 52`、移除偽玻璃頂欄 `NetflixTopBar`；
+     - 新建 `HeroBanner.swift`（固定 4:5 豎版黃金比例海報，單層漸變，原生 `.borderedProminent` 主 CTA）；
+     - 新建 `SourceFilterBar.swift`（Apple HIG 系統 Chip 膠囊條）；
+     - 新建 `PosterCard.swift` 與 `Top10Card.swift`（2:3 自適應海報與白名單立體大數字）；
+     - 引入 `.onScrollGeometryChange` 實現置頂穿透與向下滾動動態毛玻璃磨砂（`.regularMaterial`）折射；
+     - 刪除 `NetflixBillboard.swift`、`NetflixPosterCard.swift`、`CategoryPillBar.swift`、`LiquidGlassDock.swift`。
+  3. **階段 2（列表頁與個人中心標準化）**：
+     - 重構 `ComicsScreen.swift`：系統大標題 + Chip 篩選條 + 2:3 雙列漫畫網格；
+     - 重構 `LiveScreen.swift`：系統大標題 + Chip 篩選條 + 主播卡片流 + 原生 LIVE 標籤；
+     - 重構 `ForumScreen.swift`：系統 Segmented Control（全部 / 91自拍 / 草榴社區）+ 原生 BBS 卡片流；
+     - 重構 `PersonalScreen.swift`：系統大標題 + Randy PRO 徽章 + 動態統計來源數量（19 視頻源 + 10 漫畫源）+ 系統 List 設定分組；
+     - 刪除 `NetflixTopBar.swift`，全工程 Netflix 命名組件歸零。
+  4. **階段 3（沉浸式浮層與全屏播放收斂）**：
+     - 新建 `UI/Components/PlayerOverlayBar.swift`：統一全屏播放器浮層頂欄，包含原生 Liquid Glass 返回圓形膠囊、AirPlay 投屏器與信息展示；
+     - 重構 `NativePlayerView.swift`：保留 91動漫 CDN 鑒權頭（`data-cdn-auth`/`data-cdn-app`）、AES-128 解密密鑰（`crypt.key`）全鏈路直連硬解；重構視覺控件為原生系統層次；
+     - 重構 `LivePlayerView.swift`：保留 Chaturbate API 直簽 LL-HLS 原生 AVPlayer 秒播；彈幕嚴格遵循單行、最大寬度 320pt 限制與錯峰延遲；
+     - 重構 `ComicReaderView.swift`：保留換章置頂核心邏輯（`scrollTo("top_anchor", anchor: .top)`），章節指示器改用原生 Liquid Glass；
+     - 重構 `GameContainerView.swift`：懸浮返回膠囊重構為原生 Liquid Glass 拖拽手勢交互。
+  5. **階段 4（全網搜索與細節標準化）**：
+     - 重構 `SearchSheetView.swift`：系統 `NavigationStack` + `.searchable` + `ContentUnavailableView` 原生空狀態；
+     - 業務數量文案徹底動態化：由 `VideoSourceCatalog.allSources.count` 運行時動態生成，杜絕寫死 19 源；
+     - 重構 `ForumPostDetailView.swift`：改為原生 NavigationStack + inline 標題 + cancellationAction 系統關閉。
+  6. **階段 5（舊主題徹底清除與驗收閉環）**：
+     - 逐一替換全部調用點後，徹底刪除 `UI/Theme/AuroraTheme.swift`；
+     - **代碼衛生實測檢驗**：
+       - `grep -rn "ultraThinMaterial" ios/AuroraShelf` → **0**
+       - `grep -rn "AuroraTheme" ios/AuroraShelf` → **0**
+       - `grep -rn "Color(red:" ios/AuroraShelf` → **0**
+       - `grep -rn "Color(hex:" ios/AuroraShelf | grep -v "AuroraDesignTokens.swift"` → **0**
+       - `grep -rn "topSafeAreaHeight" ios/AuroraShelf` → **0**
+     - 編譯狀態：`xcodebuild` **BUILD SUCCEEDED**（0 errors, 0 warnings）；
+     - 產出驗收報告：`docs/verification-ios-native-refactor.md`。
+- **實機驗收截圖存檔**：
+  - `captures/screen_ios_native_homescreen_fixed_title.png`（首頁 4:5 豎版 Hero Banner）
+  - `captures/screen_ios_native_homescreen_scrolled_blur.png`（首頁動態磨砂頂欄與雙列卡片）
+  - `captures/screen_ios_phase2_comics.png`（漫畫列表）
+  - `captures/screen_ios_phase2_live.png`（直播列表）
+  - `captures/screen_ios_phase2_forum.png`（論壇分段與卡片）
+  - `captures/screen_ios_phase2_profile.png`（個人中心分組 List）
+  - `captures/screen_ios_phase3_player.png`（正片原生硬解秒出畫 + Liquid Glass 頂欄控制）
+  - `captures/screen_ios_phase3_game.png`（小遊戲 Liquid Glass 懸浮返回）
+  - `captures/screen_ios_phase4_search.png`（全網搜索原生 searchable 與空狀態）
+
 ## 最新交接：2026-11-04 10:30 HKT — iOS 端「原生化重構」階段 0 與階段 1 落地實測：建立單一真源設計令牌、首頁 4:5 豎版 Hero 與雙列原生網格重構、死代碼與偽玻璃徹底清除
 
 - **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`）+ SwiftUI + AVKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；

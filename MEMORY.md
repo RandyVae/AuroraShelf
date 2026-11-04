@@ -25,20 +25,27 @@
 
 ## 当前状态（Agent 收工前必须更新）
 
-- 当前目标：极光视界（AuroraShelf）双轨推进：Android 端以 2.16.0 候选包 173 为法定基线稳态维护；iOS 端全面执行原生化重构说明书（`docs/ios/IOS-NATIVE-REFACTOR-SPEC.md`），已完成阶段 0（设计令牌单一真源、播放态唯一持有、死代码与假按钮清理、.glassEffect 验证）与阶段 1（首页 4:5 竖版 Hero、系统 Chip 分类条、2:3 双列网格推荐与动态磨砂顶栏重构），保持视频/直播真实网络流硬解秒出画能力完全无回归。
-- 当前阶段：**iOS 原生化重构阶段 0 与阶段 1 落地闭环 + Android 2.16.0 Candidate 173 基线稳态**：
+- 当前目标：极光视界（AuroraShelf）双轨推进：Android 端以 2.16.0 候选包 173 为法定基线稳态维护；iOS 端全面完成原生化重构说明书（`docs/ios/IOS-NATIVE-REFACTOR-SPEC.md`）Phase 0 至 Phase 5 全流程落地与验证闭环，建立设计令牌单一真源、首页与全功能模块 Apple HIG 标准化、沉浸浮层 Liquid Glass 收敛、原生可搜索，所有伪玻璃与死代码彻底清零，视频/直播真实网络流硬解秒出画能力完全无回归。
+- 当前阶段：**iOS 原生化重构全量闭环交付（Phase 0 - Phase 5 完成）+ Android 2.16.0 Candidate 173 基线稳态**：
   - Android 唯一本地安装包：`dist/AuroraShelf-2.16.0-173-game-integration-all-sources-verified-LOCAL.apk`（176,633,866 bytes，SHA-256 `bb2097749c94123c56baec105ab732389f6ff21128121adc608f25b0e1b1f211`），全量单元测试 100% 全部通过；
   - iOS 本地交付包：`dist/AuroraShelf-2.16.0-173-arm64-LOCAL.ipa`（164MB，SHA-256 `2d905a9b8bf3786789dbb1e574b9be061de08de20a505e13faab98502646f799`）；
   - iOS 原生化重构已验证成果：
-    1. **阶段 0 基础设施与令牌收敛**：建立 `AuroraDesignTokens.swift` 单一真源；`AuroraTheme.swift` 改为纯转发层并修正 `textPrimary` 纯白缺陷；新建 `PlayerCoordinator.swift`（`@Observable`）；`MainContainerView.swift` 拆分为 5 个独立 `NavigationStack`；实测 `.glassEffect` 最低支持 iOS 26.0+（完全覆盖 26.4 部署目标）；彻底消除 `Color(hex:)` 歧义调用；删除死代码 `VideoSourceService.swift`，清理 7 处空回调（3×`onSearch` + 4×`onCast`）；
-    2. **阶段 1 首页原生重构**：新建 `HeroBanner.swift`（4:5 竖版黄金比例，消除魔数尺寸与多重阴影）、`SourceFilterBar.swift`（Apple HIG 系统 Chip，替代伪玻璃 `CategoryPillBar`）、`PosterCard.swift` 与 `Top10Card.swift`（2:3 纵横比自适应推荐网格与排行榜大数字）；`HomeScreen` 引入系统 `.toolbar` 与 `.onScrollGeometryChange` 动态磨砂折射；彻底删除 4 个废弃组件（`NetflixBillboard`、`NetflixPosterCard`、`CategoryPillBar`、`LiquidGlassDock`）；
-    3. **编译与实机走查**：`xcodebuild` 0 报错 0 警告；iPhone 17 Pro 模拟器全量出画并验证视频播放无回归。
-- 进行中：推进阶段 2（列表页与阅读器标准化：ComicsScreen、LiveScreen、ForumScreen、PersonalScreen）。
-- 下一步：按阶段推进后续列表页原生化，或进行交付打包。
+    1. **设计令牌与基础设施（Phase 0）**：建立 `AuroraDesignTokens.swift` 单一真源（`AuroraColor`、`AuroraMetrics`、`AuroraMotion`）；彻底消除 `Color(hex:)` 8/6位歧义，迁移至 `init(rgb:)`/`init(rgba:)`；新建全局播放器协调器 `PlayerCoordinator.swift`（`@Observable`）；`MainContainerView.swift` 为 5 个 Tab 建立独立 `NavigationStack`；实测 `.glassEffect` 原生可用（iOS 26.0+）；清理 7 处空回调与死代码 `VideoSourceService.swift`；
+    2. **首页原生重构（Phase 1）**：新建 `HeroBanner.swift`（4:5 竖版黄金比例，消除魔数尺寸与品牌胶囊）、`SourceFilterBar.swift`（系统 Chip 胶囊条）、`PosterCard.swift` 与 `Top10Card.swift`（2:3 纵横比自适应推荐网格与排行榜大数字）；`HomeScreen` 引入系统 `.toolbar` 与 `.onScrollGeometryChange` 动态磨砂折射；彻底删除 4 个废弃组件（`NetflixBillboard`、`NetflixPosterCard`、`CategoryPillBar`、`LiquidGlassDock`）；
+    3. **列表页与个人中心原生化（Phase 2）**：`ComicsScreen`（系统大标题 + Chip 胶囊 + 2:3 漫画网格）、`LiveScreen`（系统大标题 + Chip 胶囊 + 主播流 + LIVE 胶囊）、`ForumScreen`（系统 Segmented Control + 原生 BBS 卡片流）、`PersonalScreen`（系统大标题 + Randy PRO 徽章 + 19 视频源/10 漫画源动态统计 + 分组 List 设置）；删除 `NetflixTopBar.swift`；
+    4. **沉浸式浮层与播放器工具栏标准收敛（Phase 3）**：新建 `PlayerOverlayBar.swift`，采用原生 Liquid Glass 返回胶囊与 AirPlay 投屏；`NativePlayerView` 保持真实 CDN 鉴权头（`data-cdn-auth`/`data-cdn-app`）与 AES-128 解密秒出画；`LivePlayerView` 保持 Chaturbate 直签硬解，弹幕严格单行 320pt 错峰防重叠；`ComicReaderView` 保留换章置顶（`scrollTo("top_anchor", anchor: .top)`），Liquid Glass 章节指示胶囊；`GameContainerView` 采用 Liquid Glass 悬浮拖拽返回胶囊；
+    5. **全网搜索与细节（Phase 4）**：重构 `SearchSheetView.swift` 为系统 `NavigationStack` + `.searchable` + `ContentUnavailableView` 原生空状态，全网动态检索；重构 `ForumPostDetailView.swift` 为原生 NavigationStack + cancellationAction 按钮；
+    6. **旧主题彻底清除与代码卫生检验（Phase 5）**：彻底删除 `UI/Theme/AuroraTheme.swift`；实测 `ultraThinMaterial`、`AuroraTheme`、`Color(red:`、裸 `Color(hex:`、`topSafeAreaHeight` 均为 0；
+    7. **编译与全量实测验证**：`xcodebuild` 0 报错 0 警告；iPhone 17 Pro 模拟器全量出画验证；产出验收报告 `docs/verification-ios-native-refactor.md`。
+- 进行中：全部重构工作已闭环交付。
+- 下一步：按需进行 Release 打包或交付用户验收。
 - 阻塞：无代码层阻断。
-- 最近一次更新：2026-11-04 10:30 HKT by Antigravity (gemini-3.8-flash)
+- 最近一次更新：2026-11-04 10:55 HKT by Antigravity (gemini-3.8-flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-04：完成 iOS 端「原生化重构」Phase 2 至 Phase 5 全量闭环交付（依据 `docs/ios/IOS-NATIVE-REFACTOR-SPEC.md` v1.1 与 `docs/verification-ios-native-refactor.md`）。(1) Phase 2：重写 `ComicsScreen.swift`、`LiveScreen.swift`、`ForumScreen.swift`、`PersonalScreen.swift` 为 Apple HIG 原生组件；彻底删除 `NetflixTopBar.swift`，全工程 Netflix 命名组件归零；(2) Phase 3：新建 `PlayerOverlayBar.swift` 统一全屏浮层顶栏（原生 Liquid Glass 圆形胶囊 + AirPlayRoutePicker）；`NativePlayerView`、`LivePlayerView`、`ComicReaderView`、`GameContainerView` 统一采用原生 Liquid Glass，彻底废除自绘伪玻璃 `ultraThinMaterial` 与手工描边；保持 91动漫 CDN 鉴权头（`data-cdn-auth`/`data-cdn-app`）、AES-128 密钥解密、Chaturbate LL-HLS 直签秒播与漫画换章置顶核心能力 100% 稳固无回归；(3) Phase 4：重写 `SearchSheetView.swift` 为系统 `NavigationStack` + `.searchable` + `ContentUnavailableView` 原生空状态，视频源数量由 `VideoSourceCatalog` 动态生成；`ForumPostDetailView` 改为原生 NavigationStack + cancellationAction；(4) Phase 5：彻底删除 `UI/Theme/AuroraTheme.swift`，代码卫生指标 `ultraThinMaterial`、`AuroraTheme`、`Color(red:`、`topSafeAreaHeight` 均为 0；(5) iPhone 17 Pro 模拟器实机端到端全量截屏验证通过，产出 `captures/screen_ios_phase2_*.png`、`captures/screen_ios_phase3_*.png`、`captures/screen_ios_phase4_search.png`，产出正式繁体公文验收报告 `docs/verification-ios-native-refactor.md`。
+
 
 - 2026-11-04：执行 iOS 端「原生化重构」阶段 0 与阶段 1 落地闭环（依据 `docs/ios/IOS-NATIVE-REFACTOR-SPEC.md` v1.1）。(1) 阶段 0：建立 `AuroraDesignTokens.swift`（单一真源定义 `AuroraColor`、`AuroraMetrics`、`AuroraMotion`）；`AuroraTheme.swift` 收敛为纯转发层并修正 `textPrimary` 硬编码纯白缺陷；新建 `PlayerCoordinator.swift`（`@Observable`）作为播放态唯一持有者；`MainContainerView.swift` 拆解为每 Tab 独立 `NavigationStack`；实测确认 `.glassEffect` 最低版本为 iOS 26.0+，完全满足 iOS 26.4 部署目标；全面迁移 `Color(hex:)` 至 `init(rgb:)`；删除零引用死代码 `VideoSourceService.swift`，清除 7 处无行为空回调（3×`onSearch` + 4×`onCast`）；(2) 阶段 1：重写 `HomeScreen.swift`，移除 `topSafeAreaHeight: 52` 硬编码与 `NetflixTopBar`；新建 `HeroBanner.swift`（4:5 黄金比例自适应延伸，去除魔数尺寸与品牌胶囊）、`SourceFilterBar.swift`（Apple HIG 系统 Chip 风格，废除伪玻璃 `CategoryPillBar`）、`PosterCard.swift` 与 `Top10Card.swift`（2:3 纵横比自适应推荐网格与排行榜大数字）；采用 `.onScrollGeometryChange` 动态感知滚动，实现置顶完全透明与滚动后半透明系统磨砂材质（`.regularMaterial`）无缝过渡，解决文字截断与穿透重叠；安全删除 4 个废弃历史组件；(3) iPhone 17 Pro 模拟器端到端验证通过，产出 `captures/screen_ios_native_homescreen_fixed_title.png`、`captures/screen_ios_native_homescreen_scrolled_blur.png`、`captures/screen_ios_native_player_verified.png` 与各 Tab 截图，视频硬件解码播放 100% 正常无回归。
 

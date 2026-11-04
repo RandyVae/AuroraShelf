@@ -17,7 +17,7 @@ struct GameWebViewRepresentable: UIViewRepresentable {
         
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
-        webView.backgroundColor = UIColor(red: 0.03, green: 0.04, blue: 0.06, alpha: 1.0)
+        webView.backgroundColor = UIColor(AuroraColor.canvas)
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.bounces = false
         
@@ -47,37 +47,31 @@ public struct GameContainerView: View {
     public var body: some View {
         ZStack(alignment: .topLeading) {
             // 背景纯黑沉浸
-            Color(red: 0.03, green: 0.04, blue: 0.06).ignoresSafeArea()
+            AuroraColor.canvas.ignoresSafeArea()
             
             // 真实 203MB WebGL 游戏视口
             GameWebViewRepresentable()
                 .ignoresSafeArea()
             
-            // Apple HIG 深色磨砂「< 返回视频」悬浮胶囊
+            // Apple HIG 原生 Liquid Glass「< 返回视频」悬浮胶囊
             Button(action: {
                 let impact = UIImpactFeedbackGenerator(style: .medium)
                 impact.impactOccurred()
                 onDismiss()
             }) {
-                HStack(spacing: 6) {
+                HStack(spacing: AuroraMetrics.spacingXS) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.subheadline.bold())
                     Text("返回视频")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.subheadline.bold())
                 }
-                .foregroundColor(.white)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(Color(red: 0.08, green: 0.09, blue: 0.15).opacity(0.85))
-                        .overlay(
-                            Capsule().stroke(Color.white.opacity(0.28), lineWidth: 1)
-                        )
-                )
-                .shadow(color: Color.black.opacity(0.4), radius: 10, x: 0, y: 4)
+                .foregroundStyle(.white)
+                .padding(.horizontal, AuroraMetrics.spacingL)
+                .frame(height: AuroraMetrics.minTouchTarget)
+                .glassEffect(.regular.interactive(), in: .capsule)
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
+            .accessibilityLabel("返回视频")
             .opacity(capsuleOpacity)
             .offset(x: capsuleOffset.width + dragPosition.width + 16,
                     y: capsuleOffset.height + dragPosition.height + 54)

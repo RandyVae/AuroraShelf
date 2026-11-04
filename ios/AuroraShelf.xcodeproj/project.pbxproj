@@ -23,9 +23,9 @@
 		7B16B99ADEC8EA35886DAC2B /* LivePlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CC1986BD4D80514DCA168A8 /* LivePlayerView.swift */; };
 		82DE26D28A7F50B2DDD1E14D /* LiveSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2EDA28E1A7594F0287AA717 /* LiveSourceCatalog.swift */; };
 		90ABA578FB1CE018A17F97F5 /* ComicReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813C4C5BB8EB3EA6A44A32E6 /* ComicReaderView.swift */; };
-		96A74DD460D9CE01C75D64A5 /* AuroraTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDCEA03202D047DB5FDC081D /* AuroraTheme.swift */; };
 		979C0CA84CD987FEE9CF744D /* SourceFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E97B53BDBAA540B54C92D /* SourceFilterBar.swift */; };
 		9852D95598FFF9309144A5E7 /* HeroBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335CE5C09D1A36F7F502A73A /* HeroBanner.swift */; };
+		AAFC6C439F783AF3878F198A /* PlayerOverlayBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60EBF848E0C761394D57E83 /* PlayerOverlayBar.swift */; };
 		AB4ABF8FEDB994EDADEF7363 /* ComicSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EB9089AE90738649369BBE6 /* ComicSourceCatalog.swift */; };
 		BB2002B6BC067E847BCDFBBC /* HomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68B37C5E7BEFD0FE3E5D75D5 /* HomeScreen.swift */; };
 		BCA49E85757EB2670186917F /* GameContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB708E9400255802F2C9BA24 /* GameContainerView.swift */; };
@@ -72,8 +72,8 @@
 		D31E97B53BDBAA540B54C92D /* SourceFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFilterBar.swift; sourceTree = "<group>"; };
 		D9E292EDDA87816B50371992 /* intro_film.mp4 */ = {isa = PBXFileReference; path = intro_film.mp4; sourceTree = "<group>"; };
 		E2EDA28E1A7594F0287AA717 /* LiveSourceCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSourceCatalog.swift; sourceTree = "<group>"; };
+		E60EBF848E0C761394D57E83 /* PlayerOverlayBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerOverlayBar.swift; sourceTree = "<group>"; };
 		EB708E9400255802F2C9BA24 /* GameContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameContainerView.swift; sourceTree = "<group>"; };
-		FDCEA03202D047DB5FDC081D /* AuroraTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuroraTheme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -150,6 +150,7 @@
 			children = (
 				416C023188BD71D379651DCC /* AirPlayRoutePicker.swift */,
 				335CE5C09D1A36F7F502A73A /* HeroBanner.swift */,
+				E60EBF848E0C761394D57E83 /* PlayerOverlayBar.swift */,
 				88CD62B724AF992483FE0BEF /* PosterCard.swift */,
 				D31E97B53BDBAA540B54C92D /* SourceFilterBar.swift */,
 				7DAB6670A90C1E0006842744 /* Top10Card.swift */,
@@ -172,7 +173,6 @@
 			isa = PBXGroup;
 			children = (
 				C33DE80E0929D56787BD4A46 /* AuroraDesignTokens.swift */,
-				FDCEA03202D047DB5FDC081D /* AuroraTheme.swift */,
 			);
 			path = Theme;
 			sourceTree = "<group>";
@@ -342,7 +342,6 @@
 				F89EA9CBB7C5FE92616FF5A4 /* AirPlayRoutePicker.swift in Sources */,
 				FAE55830B6B2D72370C816EA /* AuroraDesignTokens.swift in Sources */,
 				6CB901E2AF1B81A3D025C61A /* AuroraShelfApp.swift in Sources */,
-				96A74DD460D9CE01C75D64A5 /* AuroraTheme.swift in Sources */,
 				90ABA578FB1CE018A17F97F5 /* ComicReaderView.swift in Sources */,
 				E7D88E0E821FC94B20F3906F /* ComicRepository.swift in Sources */,
 				AB4ABF8FEDB994EDADEF7363 /* ComicSourceCatalog.swift in Sources */,
@@ -360,6 +359,7 @@
 				47211C23257AE2C42F4BE47F /* NativePlayerView.swift in Sources */,
 				572621BD412408661B3AF531 /* PersonalScreen.swift in Sources */,
 				6894D8F5F0FC93870DA6F68D /* PlayerCoordinator.swift in Sources */,
+				AAFC6C439F783AF3878F198A /* PlayerOverlayBar.swift in Sources */,
 				FFEFAC413FD7E930F7153BA9 /* PosterCard.swift in Sources */,
 				0DBB44C036734E550C87CE84 /* SearchSheetView.swift in Sources */,
 				979C0CA84CD987FEE9CF744D /* SourceFilterBar.swift in Sources */,
