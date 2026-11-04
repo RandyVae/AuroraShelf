@@ -1,5 +1,32 @@
 # Latest Handoff
 
+## 最新交接：2026-11-04 10:30 HKT — iOS 端「原生化重構」階段 0 與階段 1 落地實測：建立單一真源設計令牌、首頁 4:5 豎版 Hero 與雙列原生網格重構、死代碼與偽玻璃徹底清除
+
+- **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`）+ SwiftUI + AVKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；
+- **落地依據**：嚴格遵循 [docs/ios/IOS-NATIVE-REFACTOR-SPEC.md](file:///Users/itou/Documents/ChatGPT/91pron/docs/ios/IOS-NATIVE-REFACTOR-SPEC.md)（Codex 審查說明書 v1.1）；
+- **核心重構與落地成果（已實測驗證）**：
+  1. **階段 0（設計令牌與基礎設施 100% 落地）**：
+     - **建立單一真源**：新建 `UI/Theme/AuroraDesignTokens.swift`，統一定義 `AuroraColor`、`AuroraMetrics`、`AuroraMotion`，收斂顏色、邊距、圓角（12/10）、最小觸控（44pt）與彈性動效；
+     - **收斂相容層**：重寫 `UI/Theme/AuroraTheme.swift` 為純轉發別名層，修復 `textPrimary` 硬編碼純白缺陷，改為系統語義色 `.primary`；
+     - **全域播放協調器**：新建 `App/PlayerCoordinator.swift`（基於 Swift 現代 `@Observable`），集中持有 `activeVideo: VideoItem?`，消除多頁面重複散落狀態；
+     - **導航棧解耦**：重構 `UI/Screens/MainContainerView.swift`，為 5 個 Tab 各自建立獨立的 `NavigationStack`，支援獨立 push；
+     - **實測驗證原生 Liquid Glass**：經 `swiftc` 實測，`.glassEffect` 簽名在當前 SDK 確定最低可用版本為 iOS 26.0+，本工程部署目標為 iOS 26.4，完全滿足原生條件，無需任何降級，結論落盤至 `.ai/DECISIONS.md`；
+     - **徹底消除 `Color(hex:)` 歧義**：擴充 `init(rgb: UInt32)` 與 `init(rgba: UInt32)`，棄用舊 `hex:`，調用點 `grep -rn "Color(hex:" ios/AuroraShelf` 實測為 0；
+     - **死代碼與假按鈕清理**：徹底刪除零引用死代碼 `Services/VideoSourceService.swift`，清除 7 處無行為空回調（3× `onSearch` + 4× `onCast`），`onCast` 調用已由 `AirPlayRoutePicker` 系統路由替代。
+  2. **階段 1（首頁原生化重構 100% 落地）**：
+     - **重構 `HomeScreen.swift`**：徹底移除手寫狀態欄高度 `topSafeAreaHeight: 52`、移除偽玻璃頂欄 `NetflixTopBar`、移除多重陰影；改用系統 `.toolbar` 與動態材質背景；
+     - **新建 `HeroBanner.swift`**：廢除 `NetflixBillboard.swift`，嚴格採用 4:5 豎版黃金比例自適應延伸（`AuroraMetrics.heroAspect`），精簡元信息行，主按鈕採用系統 `.borderedProminent`（品牌珊瑚紅 tint，44pt 觸控），次按鈕採用 `.bordered`；
+     - **新建 `SourceFilterBar.swift`**：廢除偽玻璃 `CategoryPillBar.swift`，遵循 Apple HIG 規範改為系統 Chip 膠囊條（`.bordered` / `.borderedProminent` + 44pt 觸控）；
+     - **新建 `PosterCard.swift` 與 `Top10Card.swift`**：廢除 `NetflixPosterCard.swift`，嚴格按 2:3 縱橫比排布雙列豎向網格（`LazyVGrid`），Top 10 大立體數字採用 §3.2 白名单規範並加上 `@ScaledMetric`；
+     - **頂部工具欄動態材質過渡**：採用 `.onScrollGeometryChange` 監聽滾動幾何，置頂時完全透明穿透 Hero 畫面，向下滾動超過 60pt 時無縫過渡至半透明 `.regularMaterial` 系統磨砂材質，完美解決文字截斷與穿透碰撞；
+     - **廢棄組件徹底刪除**：已安全刪除 `NetflixBillboard.swift`、`NetflixPosterCard.swift`、`CategoryPillBar.swift`、`LiquidGlassDock.swift` 4 個歷史組件檔案。
+- **驗收證據（已實機實測）**：
+  - **編譯狀態**：`xcodebuild` **BUILD SUCCEEDED**（0 報錯、0 警告）；
+  - **首頁 Hero 與工具欄**：[captures/screen_ios_native_homescreen_fixed_title.png](file:///Users/itou/Documents/ChatGPT/91pron/captures/screen_ios_native_homescreen_fixed_title.png)（Netgrey 標題無截斷、Hero 4:5 比例大卡、立即播放與我的片單原生按鈕、分類 Chip）；
+  - **雙列推薦流與動態磨砂頂欄**：[captures/screen_ios_native_homescreen_scrolled_blur.png](file:///Users/itou/Documents/ChatGPT/91pron/captures/screen_ios_native_homescreen_scrolled_blur.png)（向下滾動後頂欄呈現高級磨砂折射，雙列推薦卡片層次分明）；
+  - **正片播放無回歸**：[captures/screen_ios_native_player_verified.png](file:///Users/itou/Documents/ChatGPT/91pron/captures/screen_ios_native_player_verified.png)（點擊起播後原片硬解正常秒出畫）；
+  - **多 Tab 導航正常**：[captures/screen_ios_native_tab_comics.png](file:///Users/itou/Documents/ChatGPT/91pron/captures/screen_ios_native_tab_comics.png)、[captures/screen_ios_native_tab_live.png](file:///Users/itou/Documents/ChatGPT/91pron/captures/screen_ios_native_tab_live.png)、[captures/screen_ios_native_tab_forum.png](file:///Users/itou/Documents/ChatGPT/91pron/captures/screen_ios_native_tab_forum.png)、[captures/screen_ios_native_tab_profile.png](file:///Users/itou/Documents/ChatGPT/91pron/captures/screen_ios_native_tab_profile.png)。
+
 ## 最新交接：2026-11-03 10:10 HKT — 徹底終結「無可用源」質疑：全量直播流原生秒出畫 + 點播 HLS 直連 CDN 鑒權頭（x-cdn-auth/x-cdn-app）全鏈路貫通實測驗收
 
 - **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`）+ SwiftUI + AVKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；

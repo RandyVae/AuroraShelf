@@ -14,13 +14,7 @@ public struct ComicsScreen: View {
                 // 1:1 对齐 Android 顶栏 NetflixTopBar
                 NetflixTopBar(
                     title: "Netgrey",
-                    searchPlaceholder: "搜索漫画",
-                    onSearch: {
-                        // 搜索漫画
-                    },
-                    onCast: {
-                        // 投屏
-                    }
+                    searchPlaceholder: "搜索漫画"
                 )
                 
                 // 10 大漫画源横向滑动条

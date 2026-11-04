@@ -14,13 +14,7 @@ public struct LiveScreen: View {
                 // 1:1 对齐 Android 顶栏 NetflixTopBar
                 NetflixTopBar(
                     title: "Netgrey",
-                    searchPlaceholder: "搜索主播",
-                    onSearch: {
-                        // 搜索主播
-                    },
-                    onCast: {
-                        // 投屏
-                    }
+                    searchPlaceholder: "搜索主播"
                 )
                 
                 // 分类条

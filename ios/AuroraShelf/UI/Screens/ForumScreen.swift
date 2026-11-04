@@ -15,13 +15,7 @@ public struct ForumScreen: View {
                 // 1:1 对齐 Android 端 NetflixTopBar
                 NetflixTopBar(
                     title: "Netgrey",
-                    searchPlaceholder: "搜索论坛",
-                    onSearch: {
-                        // 预留搜索
-                    },
-                    onCast: {
-                        // 投屏
-                    }
+                    searchPlaceholder: "搜索论坛"
                 )
                 
                 // 论坛板块分类横向胶囊条（1:1 对齐 Android CategoryStrip）
@@ -123,7 +117,7 @@ public struct ForumScreen: View {
                                                 .foregroundColor(AuroraTheme.textTertiary)
                                             Text("\(post.replies)")
                                                 .font(.system(size: 11, weight: .semibold))
-                                                .foregroundColor(Color(hex: 0xFFD6DCE5))
+                                                .foregroundColor(Color(rgb: 0xD6DCE5))
                                         }
                                     }
                                 }

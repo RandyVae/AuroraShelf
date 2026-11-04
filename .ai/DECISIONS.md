@@ -641,3 +641,34 @@ Evidence:
 - JVM 217 tests（213 passed, 4 skipped），0 failed。
 - 模擬器實機走查截圖驗證：四個頁面頂欄右上角均無頭像按鈕；91動漫與 XVideos 視頻封面 100% 正常出畫。
 
+## iOS 原生 Liquid Glass (.glassEffect) 可用性實測與浮層材質分檔策略（iOS 2.16.0 原生化重構階段 0）
+
+Date: 2026-11-04
+
+Status: Implemented and compiler-verified on Xcode 27.2 / iOS 27.2 SDK (deployment target iOS 26.4).
+
+Decision:
+1. **實測確認 `.glassEffect` 簽名與最低可用版本**：
+   - 經 `swiftc` 實測：`.glassEffect(_ glass: Glass = .regular, in: some Shape)` 存在於 SwiftUI 框架，最低可用版本為 **iOS 26.0+**；
+   - 本工程部署目標為 `iOS 26.4`（`26.4 >= 26.0`），因此原生 Liquid Glass API 在當前工程中 **100% 完全可用，無需任何降級或條件編譯**；
+   - 官方推薦簽名 `.glassEffect(.regular.interactive(), in: .capsule)` 在 `arm64-apple-ios26.4-simulator` 目標下編譯通過（0 報錯、0 警告）。
+2. **確立浮層材質分檔策略**：
+   - **第一檔（原生 Liquid Glass 首選）**：`.glassEffect(.regular.interactive(), in: ...)`，用於浮層按鈕、膠囊標籤、播放控制條；
+   - **第二檔（系統單層 Material 兜底）**：`.background(.regularMaterial, in: ...)`，僅在特定不支持 Glass 的容器上下文使用；
+   - **第三檔（高階實色表面）**：`.background(AuroraColor.surfaceHigh, in: ...)`，用於純色不透明浮層。
+   - **嚴格禁止**：全工程徹底廢除 `.fill(.ultraThinMaterial) + .overlay(stroke)` 手工偽玻璃，禁止使用 `Color.black.opacity(...)` 堆疊模擬毛玻璃。
+3. **基礎架構與令牌收斂落地（階段 0）**：
+   - 建立 `AuroraDesignTokens.swift`（`AuroraColor` / `AuroraMetrics` / `AuroraMotion`），建立唯一真源；
+   - `AuroraTheme.swift` 轉為純轉發層，修復 `textPrimary` 硬編碼純白缺陷；
+   - 建立 `PlayerCoordinator.swift` 作為全域播放態唯一持有者；
+   - `MainContainerView.swift` 拆分為 5 個獨立 `NavigationStack`；
+   - 廢除並替換 `Color(hex:)` 歧義調用，全面改為 `init(rgb:)` / `init(rgba:)`；
+   - 刪除死代碼 `VideoSourceService.swift`，清理 7 處無行為空回調（3× `onSearch` + 4× `onCast`）。
+
+Evidence:
+- `xcodebuild -project ios/AuroraShelf.xcodeproj -scheme AuroraShelf -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath ios/build build` BUILD SUCCEEDED（0 errors, 0 warnings）；
+- `grep -rn "Color(hex:" ios/AuroraShelf` 實測為 0；
+- `grep -rn "VideoSourceService" ios/` 實測為 0；
+- `grep -rn "onCast" ios/AuroraShelf` 實測為 0。
+
+

@@ -3,7 +3,7 @@ import SwiftUI
 public struct MainContainerView: View {
     @StateObject private var videoRepo = VideoRepository.shared
     @State private var selectedTab: MainTab = .home
-    @State private var activeVideoForPlayback: VideoItem? = nil
+    @State private var playerCoordinator = PlayerCoordinator.shared
     @State private var showSearchSheet: Bool = false
     @State private var showGameDirectly: Bool = false
     
@@ -11,53 +11,63 @@ public struct MainContainerView: View {
     
     public var body: some View {
         TabView(selection: $selectedTab) {
-            HomeScreen(
-                onPlayVideo: { video in
-                    activeVideoForPlayback = video
-                },
-                onOpenSearch: {
-                    showSearchSheet = true
-                }
-            )
+            NavigationStack {
+                HomeScreen(
+                    onPlayVideo: { video in
+                        playerCoordinator.play(video)
+                    },
+                    onOpenSearch: {
+                        showSearchSheet = true
+                    }
+                )
+            }
             .tabItem {
                 Label(MainTab.home.title, systemImage: selectedTab == .home ? MainTab.home.selectedIconName : MainTab.home.iconName)
             }
             .tag(MainTab.home)
             
-            ComicsScreen()
-                .tabItem {
-                    Label(MainTab.comics.title, systemImage: selectedTab == .comics ? MainTab.comics.selectedIconName : MainTab.comics.iconName)
-                }
-                .tag(MainTab.comics)
+            NavigationStack {
+                ComicsScreen()
+            }
+            .tabItem {
+                Label(MainTab.comics.title, systemImage: selectedTab == .comics ? MainTab.comics.selectedIconName : MainTab.comics.iconName)
+            }
+            .tag(MainTab.comics)
             
-            LiveScreen()
-                .tabItem {
-                    Label(MainTab.live.title, systemImage: selectedTab == .live ? MainTab.live.selectedIconName : MainTab.live.iconName)
-                }
-                .tag(MainTab.live)
+            NavigationStack {
+                LiveScreen()
+            }
+            .tabItem {
+                Label(MainTab.live.title, systemImage: selectedTab == .live ? MainTab.live.selectedIconName : MainTab.live.iconName)
+            }
+            .tag(MainTab.live)
             
-            ForumScreen()
-                .tabItem {
-                    Label(MainTab.forum.title, systemImage: selectedTab == .forum ? MainTab.forum.selectedIconName : MainTab.forum.iconName)
-                }
-                .tag(MainTab.forum)
+            NavigationStack {
+                ForumScreen()
+            }
+            .tabItem {
+                Label(MainTab.forum.title, systemImage: selectedTab == .forum ? MainTab.forum.selectedIconName : MainTab.forum.iconName)
+            }
+            .tag(MainTab.forum)
             
-            PersonalScreen()
-                .tabItem {
-                    Label(MainTab.profile.title, systemImage: selectedTab == .profile ? MainTab.profile.selectedIconName : MainTab.profile.iconName)
-                }
-                .tag(MainTab.profile)
+            NavigationStack {
+                PersonalScreen()
+            }
+            .tabItem {
+                Label(MainTab.profile.title, systemImage: selectedTab == .profile ? MainTab.profile.selectedIconName : MainTab.profile.iconName)
+            }
+            .tag(MainTab.profile)
         }
-        .tint(Color(red: 1.0, green: 0.31, blue: 0.48))
-        .fullScreenCover(item: $activeVideoForPlayback) { video in
+        .tint(AuroraColor.brand)
+        .fullScreenCover(item: $playerCoordinator.activeVideo) { video in
             NativePlayerView(video: video) {
-                activeVideoForPlayback = nil
+                playerCoordinator.dismiss()
             }
         }
         .sheet(isPresented: $showSearchSheet) {
             SearchSheetView(
                 onPlayVideo: { video in
-                    activeVideoForPlayback = video
+                    playerCoordinator.play(video)
                 },
                 onDismiss: {
                     showSearchSheet = false
@@ -84,7 +94,7 @@ public struct MainContainerView: View {
             if args.contains("--auto-play") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.8) {
                     if let realVideo = videoRepo.billboardVideo ?? videoRepo.feedVideos.first {
-                        activeVideoForPlayback = realVideo
+                        playerCoordinator.play(realVideo)
                     }
                 }
             }

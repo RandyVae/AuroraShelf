@@ -2,12 +2,12 @@ import SwiftUI
 
 /// 1:1 对齐 Android 端 NetflixNLogo（AppComponents.kt #698）
 public struct NetflixNLogo: View {
-    public var redColor: Color = Color(hex: 0xFF4F7B) // AuroraCoral #FF4F7B
-    public var darkRedColor: Color = Color(hex: 0xB20A14) // AuroraBrandAccentDeep #B20A14
+    public var redColor: Color = Color(rgb: 0xFF4F7B) // AuroraCoral #FF4F7B
+    public var darkRedColor: Color = Color(rgb: 0xB20A14) // AuroraBrandAccentDeep #B20A14
     
     public init(
-        redColor: Color = Color(hex: 0xFF4F7B),
-        darkRedColor: Color = Color(hex: 0xB20A14)
+        redColor: Color = Color(rgb: 0xFF4F7B),
+        darkRedColor: Color = Color(rgb: 0xB20A14)
     ) {
         self.redColor = redColor
         self.darkRedColor = darkRedColor
@@ -51,7 +51,6 @@ public struct NetflixTopBar: View {
     public var sourceName: String?
     public var onSourcePicker: (() -> Void)?
     public var onSearch: (() -> Void)?
-    public var onCast: (() -> Void)?
     public var topSafeAreaHeight: CGFloat
     
     public init(
@@ -60,7 +59,6 @@ public struct NetflixTopBar: View {
         sourceName: String? = nil,
         onSourcePicker: (() -> Void)? = nil,
         onSearch: (() -> Void)? = nil,
-        onCast: (() -> Void)? = nil,
         topSafeAreaHeight: CGFloat = 0
     ) {
         self.title = title
@@ -68,7 +66,6 @@ public struct NetflixTopBar: View {
         self.sourceName = sourceName
         self.onSourcePicker = onSourcePicker
         self.onSearch = onSearch
-        self.onCast = onCast
         self.topSafeAreaHeight = topSafeAreaHeight
     }
     
@@ -86,7 +83,7 @@ public struct NetflixTopBar: View {
                 // Netgrey 珊瑚红品牌大字
                 Text(title)
                     .font(.system(size: 22, weight: .heavy))
-                    .foregroundColor(Color(hex: 0xFF4F7B)) // AuroraCoral
+                    .foregroundColor(Color(rgb: 0xFF4F7B)) // AuroraCoral
                     .tracking(-0.5)
                 
                 // 可选视频源/切换胶囊
@@ -102,7 +99,7 @@ public struct NetflixTopBar: View {
                                 .foregroundColor(.white)
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(Color(hex: 0xFF4F7B))
+                                .foregroundColor(Color(rgb: 0xFF4F7B))
                         }
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
