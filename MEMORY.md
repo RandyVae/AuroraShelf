@@ -9,18 +9,18 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `d829f5e`（2026-11-03），未提交 2 个文件
+- Git：`main` @ `aee3b5b`（2026-11-03），未提交 0 个文件
 - 权威记忆文件：
-  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-02（今天）
+  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-02（1 天前）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-03（今天）
-  - `.ai/TASKS.md` — 任务清单，最后更新 2026-10-27（6 天前）
-  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-10-27（6 天前）
-  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（8 天前）
-  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-10-27（6 天前）
+  - `.ai/TASKS.md` — 任务清单，最后更新 2026-10-27（7 天前）
+  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-10-27（7 天前）
+  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（9 天前）
+  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-10-27（7 天前）
 - Codex 全局记忆（只读参考）：
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-03 10:09 by `sync.py`
+- 最后同步：2026-11-04 09:15 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
@@ -39,6 +39,8 @@
 - 最近一次更新：2026-11-03 10:10 HKT by Antigravity (gemini-3.8-flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-04：完成 iOS 端「原生化重构」审查并落盘可执行说明书 v1.1（`docs/ios/IOS-NATIVE-REFACTOR-SPEC.md`，752 行）。响应用户「苹果软件做得很烂」的质询，Codex 代码级审查确认 7 条根因：(1) 视觉体系三套并存（系统 TabView + Android/Netflix 仿制顶栏 + 自定义卡片）；(2) 把「视觉复刻」误当「产品迁移」（139 处魔数尺寸、`Netflix*` 命名）；(3) 布局硬编码 `topSafeAreaHeight: 52` 猜状态栏高度；(4) 首页信息密度失控（无主操作）；(5) 无语义字体（139 处 `.system(size:)`，Dynamic Type 失效）；(6) 伪玻璃（8 处 `.ultraThinMaterial` + 手工描边，违反自家 `docs/ui/design-system.md:19`）；(7) 验收只到「能编译能出画」，无 Dynamic Type/VoiceOver/横竖屏/iPad/浅色/Reduce Motion 证据。本次通读后追加 v1.1 补丁，填补原说明书的执行空白：§3.5 浮层材质三档降级方案（`.glassEffect` → `.regularMaterial` → 纯色，避免删伪玻璃后无处安放导致根因 6 复发）；§3.1.1 令牌收敛顺序（禁止「别名中间态」，Step1/2 同提交，Step3 迁完即删 `AuroraTheme`，并修正 `textPrimary` 硬编码纯白）；§5.1 实测清理项（7 处空回调 3×`onSearch`+4×`onCast` 全为无行为死路径、2 处写死「19 源」文案、10 处令牌外裸色、`Color(hex:)` 8/6 位语义歧义陷阱、死代码 `VideoSourceService.swift`）；阶段 0 扩为 8 项；`.system(size:)` 计数修正 150+→139；`.black` 白名单补徽章类；Hero 比例定死 4:5。说明书内全部 `file:line` 引用已逐条实测核对通过。本次仅改说明书文档，**未改动任何 iOS 源码**，已验收的播放/鉴权成果无回归。
 
 - 2026-11-03：彻底攻克 iOS 端直播与点播「无可用播放源」致命缺陷，全链路贯通 CDN 鉴权与官方 LL-HLS 原生播放。响应用户「我看到了 但是所有的源都没能正常加载尤其是视频和直播」「你是不是有幻想 根本没有可以正常播放的任何源」之严正质询：(1) 定位直播播放根因：WKWebView 内嵌网页在 iOS 模拟器环境受限于无手势 Autoplay 与 WebRTC 阻断；直接调用 Chaturbate 官方数据接口 `https://chaturbate.com/api/chatvideocontext/{username}/`，实测 200ms 返回官方直签 LL-HLS M3U8，直接交付原生 `AVPlayer` 硬解播放，彻底消除白边、滚动条与加载黑屏；(2) 定位点播 HLS 卡死根因：91动漫播放页 `<div class="dm-video-player">` 明确包含腾讯云 EdgeOne CDN 鉴权头 `data-cdn-auth-key="x-cdn-auth"`、`data-cdn-auth-value` 与 `data-cdn-app="131"`；若仅传 Referer，CDN 严正阻断返回 HTTP 403 Forbidden，导致 `AVPlayer` 无法获取 16 字节 AES-128 密钥及分片数据。在 `VideoRepository.swift` 与 `NativePlayerView.swift` 中将全部鉴权头完整注入 `AVURLAssetHTTPHeaderFieldsKey`，实现正片切片秒下秒解密；(3) 在 iPhone 17 Pro 模拟器（`85A543BE-30D6-41D8-8898-4FC2FE05872B`）全量实机验证通过：主播 `nikkisilk` 直播实时流秒出画；《最终幻想 3d 蜥蜴人凌辱调教女王》（全长 09:53）真实正片画面 100% 原生硬解出画并持续平稳播放；截取高清验收截屏保存至 `captures/`；更新 iOS 交付包 `dist/AuroraShelf-2.16.0-173-arm64-LOCAL.ipa` 与 `dist/SHA256SUMS.txt`。
 
