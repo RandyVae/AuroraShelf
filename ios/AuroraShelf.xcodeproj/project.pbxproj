@@ -10,7 +10,6 @@
 		03A49E92E288CD637E04D863 /* VideoItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 822C80DCD96DD9F417AB46C0 /* VideoItem.swift */; };
 		0576FB7FB782FD4BD218C97D /* ForumSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9419F5E948230A796D311355 /* ForumSourceCatalog.swift */; };
 		0DBB44C036734E550C87CE84 /* SearchSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EEF8FF52166E540D4DD1B38 /* SearchSheetView.swift */; };
-		3112558039214FBA667A2E22 /* NetflixTopBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E042372131BC766BE051D351 /* NetflixTopBar.swift */; };
 		3BAF2994714155B634531B9B /* VideoSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92FFBE07F719CB94824F5732 /* VideoSourceCatalog.swift */; };
 		47211C23257AE2C42F4BE47F /* NativePlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D351B928F72127D63EF0E49 /* NativePlayerView.swift */; };
 		4FEE940CBCC8498A756873F8 /* www in Resources */ = {isa = PBXBuildFile; fileRef = 13E4CD170412966E1A00AB2C /* www */; };
@@ -72,7 +71,6 @@
 		C33DE80E0929D56787BD4A46 /* AuroraDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuroraDesignTokens.swift; sourceTree = "<group>"; };
 		D31E97B53BDBAA540B54C92D /* SourceFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFilterBar.swift; sourceTree = "<group>"; };
 		D9E292EDDA87816B50371992 /* intro_film.mp4 */ = {isa = PBXFileReference; path = intro_film.mp4; sourceTree = "<group>"; };
-		E042372131BC766BE051D351 /* NetflixTopBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetflixTopBar.swift; sourceTree = "<group>"; };
 		E2EDA28E1A7594F0287AA717 /* LiveSourceCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSourceCatalog.swift; sourceTree = "<group>"; };
 		EB708E9400255802F2C9BA24 /* GameContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameContainerView.swift; sourceTree = "<group>"; };
 		FDCEA03202D047DB5FDC081D /* AuroraTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuroraTheme.swift; sourceTree = "<group>"; };
@@ -152,7 +150,6 @@
 			children = (
 				416C023188BD71D379651DCC /* AirPlayRoutePicker.swift */,
 				335CE5C09D1A36F7F502A73A /* HeroBanner.swift */,
-				E042372131BC766BE051D351 /* NetflixTopBar.swift */,
 				88CD62B724AF992483FE0BEF /* PosterCard.swift */,
 				D31E97B53BDBAA540B54C92D /* SourceFilterBar.swift */,
 				7DAB6670A90C1E0006842744 /* Top10Card.swift */,
@@ -361,7 +358,6 @@
 				82DE26D28A7F50B2DDD1E14D /* LiveSourceCatalog.swift in Sources */,
 				5257C1C716C4B07209A2998C /* MainContainerView.swift in Sources */,
 				47211C23257AE2C42F4BE47F /* NativePlayerView.swift in Sources */,
-				3112558039214FBA667A2E22 /* NetflixTopBar.swift in Sources */,
 				572621BD412408661B3AF531 /* PersonalScreen.swift in Sources */,
 				6894D8F5F0FC93870DA6F68D /* PlayerCoordinator.swift in Sources */,
 				FFEFAC413FD7E930F7153BA9 /* PosterCard.swift in Sources */,

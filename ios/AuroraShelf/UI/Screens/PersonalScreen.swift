@@ -12,144 +12,163 @@ public struct PersonalScreen: View {
     
     public var body: some View {
         ZStack {
-            AuroraTheme.background.ignoresSafeArea()
+            AuroraColor.canvas.ignoresSafeArea()
             
             ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 20) {
-                    // 系统状态栏顶部安全间隙（避开 8:20 及灵动岛）
-                    Color.clear.frame(height: 44)
-                    
+                VStack(spacing: AuroraMetrics.spacingXL) {
                     // 1. 用户头像与会员卡
-                    HStack(spacing: 16) {
+                    HStack(spacing: AuroraMetrics.spacingL) {
                         ZStack {
                             Circle()
-                                .fill(AuroraTheme.crimson)
+                                .fill(AuroraColor.brand)
                                 .frame(width: 56, height: 56)
+                            // 头像单字母（§3.2 白名单允许 .black）
                             Text("R")
                                 .font(.system(size: 24, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
+                                .foregroundStyle(.white)
                         }
                         
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 6) {
                                 Text("Randy")
-                                    .font(.system(size: 19, weight: .bold))
-                                    .foregroundColor(AuroraTheme.textPrimary)
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundStyle(AuroraColor.textPrimary)
                                 
+                                // PRO 徽章（§3.2 白名单允许 .black）
                                 Text("PRO")
-                                    .font(.system(size: 10, weight: .black))
-                                    .foregroundColor(.black)
+                                    .font(.caption2)
+                                    .fontWeight(.black)
+                                    .foregroundStyle(.black)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(Capsule().fill(AuroraTheme.gold))
+                                    .background(Capsule().fill(Color.yellow))
                             }
                             
-                            Text("已同步香港节点 · 全量 19 视频源 + 10 漫画源就绪")
-                                .font(.system(size: 12))
-                                .foregroundColor(AuroraTheme.textSecondary)
+                            Text("已同步香港节点 · 全量 \(VideoSourceCatalog.allSources.count) 视频源 + \(ComicSourceCatalog.allSources.count) 漫画源就绪")
+                                .font(.footnote)
+                                .foregroundStyle(AuroraColor.textSecondary)
                         }
                         
                         Spacer()
                     }
-                    .padding(16)
+                    .padding(AuroraMetrics.spacingL)
                     .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(AuroraTheme.surface)
-                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(AuroraTheme.glassBorder, lineWidth: 1))
+                        RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                            .fill(AuroraColor.surface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                                    .stroke(AuroraColor.hairline, lineWidth: 1)
+                            )
                     )
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
+                    .padding(.horizontal, AuroraMetrics.contentInset)
+                    .padding(.top, AuroraMetrics.spacingS)
                     
                     // 2. 娱乐板块（战术 RPG 离线单机游戏接入）
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                         Text("娱乐 · 游戏")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AuroraTheme.textSecondary)
-                            .padding(.horizontal, 4)
+                            .font(.headline)
+                            .foregroundStyle(AuroraColor.textSecondary)
+                            .padding(.horizontal, AuroraMetrics.spacingXS)
                         
-                        Button(action: {
-                            let impact = UIImpactFeedbackGenerator(style: .heavy)
-                            impact.impactOccurred()
+                        Button {
                             showGame = true
-                        }) {
-                            HStack(spacing: 14) {
+                        } label: {
+                            HStack(spacing: AuroraMetrics.spacingL) {
                                 ZStack {
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(AuroraTheme.crimson.opacity(0.2))
+                                    RoundedRectangle(cornerRadius: AuroraMetrics.controlRadius, style: .continuous)
+                                        .fill(AuroraColor.brand.opacity(0.18))
                                         .frame(width: 44, height: 44)
                                     Image(systemName: "gamecontroller.fill")
-                                        .font(.system(size: 22))
-                                        .foregroundColor(AuroraTheme.crimsonGlow)
+                                        .font(.title3)
+                                        .foregroundStyle(AuroraColor.brand)
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 3) {
                                     HStack(spacing: 6) {
                                         Text("欲望女神 · 战术 RPG")
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundColor(.white)
+                                            .font(.headline)
+                                            .foregroundStyle(AuroraColor.textPrimary)
                                         Text("v2.16.0")
-                                            .font(.system(size: 10, weight: .bold))
-                                            .foregroundColor(AuroraTheme.crimsonGlow)
+                                            .font(.caption2)
+                                            .fontWeight(.bold)
+                                            .foregroundStyle(AuroraColor.brand)
                                     }
                                     Text("策略战棋 · 原生硬件加速与沉浸视口")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(AuroraTheme.textTertiary)
+                                        .font(.caption)
+                                        .foregroundStyle(AuroraColor.textSecondary)
                                 }
                                 
                                 Spacer()
                                 
                                 HStack(spacing: 4) {
                                     Text("启动")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(AuroraTheme.crimsonGlow)
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(AuroraColor.brand)
                                     Image(systemName: "play.circle.fill")
-                                        .font(.system(size: 16))
-                                        .foregroundColor(AuroraTheme.crimsonGlow)
+                                        .font(.body)
+                                        .foregroundStyle(AuroraColor.brand)
                                 }
                             }
-                            .padding(12)
+                            .padding(AuroraMetrics.spacingM)
                             .background(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .fill(AuroraTheme.surface)
+                                RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                                    .fill(AuroraColor.surface)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                            .stroke(AuroraTheme.crimson.opacity(0.35), lineWidth: 1)
+                                        RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                                            .stroke(AuroraColor.brand.opacity(0.35), lineWidth: 1)
                                     )
                             )
                         }
-                        .buttonStyle(PlainButtonStyle())
-                        .applePressEffect()
+                        .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, AuroraMetrics.contentInset)
                     
                     // 3. 源管理与设置列表
                     VStack(spacing: 1) {
-                        Button(action: { showVideoSourcePicker = true }) {
-                            settingRow(icon: "server.rack", title: "当前视频源", value: "\(videoRepo.currentSource.name) (共 19 源)")
+                        Button {
+                            showVideoSourcePicker = true
+                        } label: {
+                            settingRow(
+                                icon: "server.rack",
+                                title: "当前视频源",
+                                value: "\(videoRepo.currentSource.name) (共 \(VideoSourceCatalog.allSources.count) 源)"
+                            )
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
                         
-                        Button(action: { showComicSourcePicker = true }) {
-                            settingRow(icon: "books.vertical", title: "当前漫画源", value: "\(comicRepo.currentSource.name) (共 10 源)")
+                        Button {
+                            showComicSourcePicker = true
+                        } label: {
+                            settingRow(
+                                icon: "books.vertical",
+                                title: "当前漫画源",
+                                value: "\(comicRepo.currentSource.name) (共 \(ComicSourceCatalog.allSources.count) 源)"
+                            )
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
                         
-                        settingRow(icon: "antenna.radiowaves.left.and.right", title: "直播源", value: "HornyStudents / Stripchat")
+                        settingRow(icon: "antenna.radiowaves.left.and.right", title: "直播源", value: "Chaturbate / LL-HLS")
                         settingRow(icon: "tv", title: "AirPlay 投屏", value: "就绪 (原生)")
                         settingRow(icon: "arrow.down.circle", title: "离线缓存管理", value: "741 KB 已用")
                         settingRow(icon: "info.circle", title: "版本基线", value: "2.16.0 (Build 173)")
                     }
                     .background(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(AuroraTheme.surface)
-                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(AuroraTheme.glassBorder, lineWidth: 1))
+                        RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                            .fill(AuroraColor.surface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                                    .stroke(AuroraColor.hairline, lineWidth: 1)
+                            )
                     )
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, AuroraMetrics.contentInset)
                     
-                    Spacer().frame(height: 24) // 底部原生呼吸间隙（原生 TabBar 自动接管 SafeArea）
+                    Spacer().frame(height: AuroraMetrics.spacingXXL)
                 }
             }
         }
+        .navigationTitle("我的")
         .fullScreenCover(isPresented: $showGame) {
             GameContainerView {
                 showGame = false
@@ -170,32 +189,32 @@ public struct PersonalScreen: View {
     }
     
     private func settingRow(icon: String, title: String, value: String) -> some View {
-        HStack(spacing: 12) {
+        HStack(spacing: AuroraMetrics.spacingM) {
             Image(systemName: icon)
-                .font(.system(size: 16))
-                .foregroundColor(AuroraTheme.crimsonGlow)
+                .font(.body)
+                .foregroundStyle(AuroraColor.brand)
                 .frame(width: 24)
             
             Text(title)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(AuroraTheme.textPrimary)
+                .font(.body)
+                .foregroundStyle(AuroraColor.textPrimary)
             
             Spacer()
             
             Text(value)
-                .font(.system(size: 13))
-                .foregroundColor(AuroraTheme.textSecondary)
+                .font(.subheadline)
+                .foregroundStyle(AuroraColor.textSecondary)
             
             Image(systemName: "chevron.right")
-                .font(.system(size: 12))
-                .foregroundColor(AuroraTheme.textTertiary)
+                .font(.caption2)
+                .foregroundStyle(AuroraColor.textTertiary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 14)
+        .padding(.horizontal, AuroraMetrics.spacingL)
+        .padding(.vertical, AuroraMetrics.spacingM)
     }
 }
 
-// 10 大漫画源切换面板
+// 漫画源切换面板
 struct ComicSourcePickerSheet: View {
     let selectedSource: ComicSourceDefinition
     let onSelect: (ComicSourceDefinition) -> Void
@@ -203,60 +222,63 @@ struct ComicSourcePickerSheet: View {
     
     var body: some View {
         ZStack {
-            AuroraTheme.background.ignoresSafeArea()
+            AuroraColor.canvas.ignoresSafeArea()
             
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: AuroraMetrics.spacingL) {
                 HStack {
-                    Text("10 大漫画源切换")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
+                    Text("全网 \(ComicSourceCatalog.allSources.count) 大漫画源切换")
+                        .font(.headline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(AuroraColor.textPrimary)
                     Spacer()
                     Button(action: { dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white.opacity(0.4))
+                            .font(.title3)
+                            .foregroundStyle(AuroraColor.textSecondary)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+                .padding(.horizontal, AuroraMetrics.contentInset)
+                .padding(.top, AuroraMetrics.spacingL)
                 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 10) {
+                    VStack(spacing: AuroraMetrics.spacingM) {
                         ForEach(ComicSourceCatalog.allSources) { src in
                             let isSelected = src.id == selectedSource.id
                             Button(action: { onSelect(src) }) {
-                                HStack(spacing: 12) {
+                                HStack(spacing: AuroraMetrics.spacingM) {
                                     VStack(alignment: .leading, spacing: 3) {
                                         Text(src.name)
-                                            .font(.system(size: 15, weight: .semibold))
-                                            .foregroundColor(isSelected ? AuroraTheme.crimsonGlow : .white)
+                                            .font(.body)
+                                            .fontWeight(.semibold)
+                                            .foregroundStyle(isSelected ? AuroraColor.brand : AuroraColor.textPrimary)
                                         Text(src.description)
-                                            .font(.system(size: 11))
-                                            .foregroundColor(AuroraTheme.textTertiary)
+                                            .font(.caption)
+                                            .foregroundStyle(AuroraColor.textSecondary)
                                     }
                                     Spacer()
                                     if isSelected {
                                         Image(systemName: "checkmark")
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundColor(AuroraTheme.crimson)
+                                            .font(.headline)
+                                            .fontWeight(.bold)
+                                            .foregroundStyle(AuroraColor.brand)
                                     }
                                 }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 12)
+                                .padding(.horizontal, AuroraMetrics.spacingL)
+                                .padding(.vertical, AuroraMetrics.spacingM)
                                 .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(isSelected ? AuroraTheme.crimson.opacity(0.12) : AuroraTheme.surface)
+                                    RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                                        .fill(isSelected ? AuroraColor.brand.opacity(0.12) : AuroraColor.surface)
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .stroke(isSelected ? AuroraTheme.crimson.opacity(0.4) : AuroraTheme.glassBorder, lineWidth: 1)
+                                            RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                                                .stroke(isSelected ? AuroraColor.brand.opacity(0.4) : AuroraColor.hairline, lineWidth: 1)
                                         )
                                 )
                             }
-                            .buttonStyle(PlainButtonStyle())
+                            .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 24)
+                    .padding(.horizontal, AuroraMetrics.contentInset)
+                    .padding(.bottom, AuroraMetrics.spacingXXL)
                 }
             }
         }

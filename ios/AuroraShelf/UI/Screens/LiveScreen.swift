@@ -8,115 +8,147 @@ public struct LiveScreen: View {
     
     public var body: some View {
         ZStack {
-            AuroraTheme.background.ignoresSafeArea()
+            AuroraColor.canvas.ignoresSafeArea()
             
-            VStack(spacing: 0) {
-                // 1:1 对齐 Android 顶栏 NetflixTopBar
-                NetflixTopBar(
-                    title: "Netgrey",
-                    searchPlaceholder: "搜索主播"
-                )
-                
-                // 分类条
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(repo.categories, id: \.self) { cat in
-                            let isSelected = cat == repo.selectedGender
-                            Button(action: {
-                                withAnimation(AuroraTheme.appleSpring) {
-                                    repo.selectedGender = cat
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: AuroraMetrics.spacingL) {
+                    // 分类 Chip 条
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: AuroraMetrics.spacingS) {
+                            ForEach(repo.categories, id: \.self) { cat in
+                                let isSelected = cat == repo.selectedGender
+                                if isSelected {
+                                    Button {
+                                        withAnimation(AuroraMotion.quick) {
+                                            repo.selectedGender = cat
+                                        }
+                                    } label: {
+                                        Text(cat)
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                            .lineLimit(1)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(AuroraColor.brand)
+                                    .clipShape(Capsule())
+                                    .frame(minHeight: AuroraMetrics.minTouchTarget)
+                                } else {
+                                    Button {
+                                        withAnimation(AuroraMotion.quick) {
+                                            repo.selectedGender = cat
+                                        }
+                                    } label: {
+                                        Text(cat)
+                                            .font(.subheadline)
+                                            .fontWeight(.regular)
+                                            .lineLimit(1)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(.secondary)
+                                    .clipShape(Capsule())
+                                    .frame(minHeight: AuroraMetrics.minTouchTarget)
                                 }
-                            }) {
-                                Text(cat)
-                                    .font(.system(size: 12, weight: isSelected ? .bold : .medium))
-                                    .foregroundColor(isSelected ? .white : AuroraTheme.textSecondary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(
-                                        Capsule()
-                                            .fill(isSelected ? AuroraTheme.crimson : AuroraTheme.surfaceCard)
-                                            .overlay(Capsule().stroke(isSelected ? AuroraTheme.crimson : AuroraTheme.glassBorder, lineWidth: 0.8))
-                                    )
                             }
-                            .buttonStyle(PlainButtonStyle())
                         }
+                        .padding(.horizontal, AuroraMetrics.contentInset)
+                        .padding(.vertical, AuroraMetrics.spacingXS)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
-                }
-                
-                // 直播主播双列网格
-                ScrollView(.vertical, showsIndicators: false) {
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 14), GridItem(.flexible(), spacing: 14)], spacing: 16) {
+                    
+                    // 主播双列网格
+                    LazyVGrid(
+                        columns: [
+                            GridItem(.flexible(), spacing: AuroraMetrics.spacingM),
+                            GridItem(.flexible(), spacing: AuroraMetrics.spacingM)
+                        ],
+                        spacing: AuroraMetrics.spacingL
+                    ) {
                         ForEach(repo.liveStreams) { item in
-                            Button(action: {
-                                let impact = UIImpactFeedbackGenerator(style: .heavy)
-                                impact.impactOccurred()
+                            Button {
                                 activeStream = item
-                            }) {
-                                VStack(alignment: .leading, spacing: 6) {
+                            } label: {
+                                VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
                                     ZStack(alignment: .topTrailing) {
                                         AsyncImage(url: URL(string: item.snapshotUrl)) { phase in
-                                            if let img = phase.image {
-                                                img.resizable().aspectRatio(contentMode: .fill)
-                                            } else {
-                                                RoundedRectangle(cornerRadius: 12).fill(AuroraTheme.surfaceCard)
+                                            switch phase {
+                                            case .success(let image):
+                                                image
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fill)
+                                            default:
+                                                ZStack {
+                                                    AuroraColor.surfaceCard
+                                                    Image(systemName: "video")
+                                                        .font(.title2)
+                                                        .foregroundStyle(.tertiary)
+                                                }
                                             }
                                         }
                                         .frame(height: 180)
-                                        .cornerRadius(12)
+                                        .clipShape(RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
                                         .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(AuroraTheme.glassBorder, lineWidth: 0.8)
+                                            RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                                                .stroke(AuroraColor.hairline, lineWidth: 1)
                                         )
                                         
-                                        // LIVE 浮动指示标
+                                        // LIVE 浮动指示标（系统 Material 材质胶囊）
                                         HStack(spacing: 4) {
-                                            Circle().fill(Color.red).frame(width: 6, height: 6)
+                                            Circle()
+                                                .fill(Color.red)
+                                                .frame(width: 6, height: 6)
                                             Text("LIVE")
-                                                .font(.system(size: 9, weight: .black))
-                                                .foregroundColor(.white)
+                                                .font(.caption2)
+                                                .fontWeight(.black)
+                                                .foregroundStyle(.primary)
                                             Text("\(item.viewCount)")
-                                                .font(.system(size: 9, weight: .bold))
-                                                .foregroundColor(.white.opacity(0.8))
+                                                .font(.caption2)
+                                                .fontWeight(.bold)
+                                                .foregroundStyle(.secondary)
                                         }
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 3)
-                                        .background(Capsule().fill(Color.black.opacity(0.7)))
-                                        .padding(8)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(.regularMaterial, in: Capsule())
+                                        .padding(AuroraMetrics.spacingS)
                                     }
                                     
-                                    HStack(spacing: 6) {
+                                    HStack(spacing: AuroraMetrics.spacingS) {
                                         AsyncImage(url: URL(string: item.avatarUrl)) { phase in
                                             if let img = phase.image {
                                                 img.resizable().aspectRatio(contentMode: .fill)
                                             } else {
-                                                Circle().fill(AuroraTheme.surfaceCard)
+                                                Circle().fill(AuroraColor.surfaceCard)
                                             }
                                         }
                                         .frame(width: 24, height: 24)
                                         .clipShape(Circle())
                                         
                                         Text(item.username)
-                                            .font(.system(size: 13, weight: .bold))
-                                            .foregroundColor(.white)
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                            .foregroundStyle(AuroraColor.textPrimary)
                                             .lineLimit(1)
                                     }
                                     
                                     Text(item.title)
-                                        .font(.system(size: 11))
-                                        .foregroundColor(AuroraTheme.textSecondary)
+                                        .font(.caption)
+                                        .foregroundStyle(AuroraColor.textSecondary)
                                         .lineLimit(1)
                                 }
                             }
-                            .buttonStyle(PlainButtonStyle())
-                            .applePressEffect()
+                            .buttonStyle(.plain)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 24) // 底部原生呼吸间距（原生 TabBar 自动接管 SafeArea）
+                    .padding(.horizontal, AuroraMetrics.contentInset)
+                    
+                    Spacer().frame(height: AuroraMetrics.spacingXXL)
                 }
+                .padding(.top, AuroraMetrics.spacingS)
+            }
+        }
+        .navigationTitle("直播")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                AirPlayRoutePicker()
+                    .frame(width: 32, height: 32)
             }
         }
         .fullScreenCover(item: $activeStream) { stream in
