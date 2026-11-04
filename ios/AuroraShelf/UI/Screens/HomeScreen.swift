@@ -31,6 +31,9 @@ public struct HomeScreen: View {
                                 onPlay: { onPlayVideo(billboard) },
                                 onDetail: { onPlayVideo(billboard) }
                             )
+                        } else {
+                            // 无 HeroBanner 时预留顶部安全边距，避免分类栏顶入状态栏
+                            Spacer().frame(height: 90)
                         }
                         
                         // 2. 原生分类筛选 Chip 条
@@ -102,20 +105,46 @@ public struct HomeScreen: View {
                             }
                             .padding(.horizontal, AuroraMetrics.contentInset)
                             
-                            LazyVGrid(
-                                columns: [
-                                    GridItem(.flexible(), spacing: AuroraMetrics.spacingM),
-                                    GridItem(.flexible(), spacing: AuroraMetrics.spacingM)
-                                ],
-                                spacing: AuroraMetrics.spacingL
-                            ) {
-                                ForEach(repo.feedVideos) { video in
-                                    PosterCard(video: video) {
-                                        onPlayVideo(video)
+                            if repo.isLoading {
+                                VStack(spacing: AuroraMetrics.spacingM) {
+                                    ProgressView()
+                                        .controlSize(.regular)
+                                        .tint(AuroraColor.brand)
+                                    Text("正在连接 \(repo.currentSource.name)...")
+                                        .font(.subheadline)
+                                        .foregroundStyle(AuroraColor.textSecondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 60)
+                            } else if repo.feedVideos.isEmpty {
+                                ContentUnavailableView {
+                                    Label("暂无视频内容", systemImage: "film.stack")
+                                } description: {
+                                    Text("「\(repo.currentSource.name)」当前分类暂未检索到内容。")
+                                } actions: {
+                                    Button("切换至 91动漫") {
+                                        repo.switchSource(to: VideoSourceCatalog.dongman91)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(AuroraColor.brand)
+                                }
+                                .padding(.vertical, 40)
+                            } else {
+                                LazyVGrid(
+                                    columns: [
+                                        GridItem(.flexible(), spacing: AuroraMetrics.spacingM),
+                                        GridItem(.flexible(), spacing: AuroraMetrics.spacingM)
+                                    ],
+                                    spacing: AuroraMetrics.spacingL
+                                ) {
+                                    ForEach(repo.feedVideos) { video in
+                                        PosterCard(video: video) {
+                                            onPlayVideo(video)
+                                        }
                                     }
                                 }
+                                .padding(.horizontal, AuroraMetrics.contentInset)
                             }
-                            .padding(.horizontal, AuroraMetrics.contentInset)
                         }
                         .id("recommendSection")
                         
@@ -139,7 +168,7 @@ public struct HomeScreen: View {
                 }
             }
         }
-        .toolbarBackground(isScrolled ? .visible : .hidden, for: .navigationBar)
+        .toolbarBackground((isScrolled || repo.billboardVideo == nil) ? .visible : .hidden, for: .navigationBar)
         .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
@@ -164,17 +193,23 @@ public struct HomeScreen: View {
                 }
             }
         }
-        .onChange(of: selectedCategory) { _, newCat in
-            repo.switchCategory(to: newCat)
+        .onAppear {
+            selectedCategory = repo.currentCategory
         }
-        .onChange(of: repo.currentSource.id) { _, _ in
-            selectedCategory = repo.currentSource.categories.first ?? "全部"
+        .onChange(of: selectedCategory) { _, newCat in
+            if newCat != repo.currentCategory {
+                repo.switchCategory(to: newCat)
+            }
+        }
+        .onChange(of: repo.currentCategory) { _, newCat in
+            selectedCategory = newCat
         }
         .sheet(isPresented: $showSourcePicker) {
             VideoSourcePickerSheet(
                 selectedSource: repo.currentSource,
                 onSelect: { source in
                     repo.switchSource(to: source)
+                    selectedCategory = repo.currentCategory
                     showSourcePicker = false
                 }
             )
@@ -221,6 +256,7 @@ struct VideoSourcePickerSheet: View {
                                 ForEach(VideoSourceCatalog.allSources.filter { $0.group == group }) { src in
                                     let isSelected = src.id == selectedSource.id
                                     Button(action: {
+                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                                         onSelect(src)
                                     }) {
                                         HStack(spacing: AuroraMetrics.spacingM) {

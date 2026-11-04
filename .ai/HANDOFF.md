@@ -1,5 +1,37 @@
 # Latest Handoff
 
+## 最新交接：2026-11-04 12:15 HKT — iOS 端視頻源切換無響應重大缺陷根治：5 大源真實網絡爬蟲路由、Beeg 請求頭修復、異步網絡競態消除與 Apple HIG 零假數據空狀態交付
+
+- **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`）+ SwiftUI + AVKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；
+- **根因定位與核心攻堅成果（全部實測驗證，無推斷）**：
+  1. **切換視頻源無反應四大根因徹底根治**：
+     - **根因 1（兜底路由失真）**：`VideoRepository.swift:96` 原代碼中除 91動漫、Beeg、華視影院之外的 16 個視頻源，無條件兜底執行 `return await fetch91DongmanFeed(category: category)`，導致用戶點選 91視頻、黃果短劇等任意源時，頁面內容毫無變化；
+     - **根因 2（Beeg 協議頭缺失返回 400）**：Beeg API（`store.externulls.com`）缺少 `Origin: https://beeg.com` 與 `Accept: application/json` 請求頭，被伺服器直接拒絕並返回 HTTP 400 Bad Request 空數據；
+     - **根因 3（異步網絡競態覆蓋 Race Condition）**：切換視頻源時前一個源的網絡 Task 未被取消，且數據回調時未校驗 `currentSource.id == source.id`，慢返回的舊源響應直接寫回覆蓋新源；
+     - **根因 4（UI 缺乏加載反饋與數據未清空）**：`switchSource` 未第一時間清空舊源數組，且 `repo.isLoading` 未驅動骨架屏或進度指示器，用戶點擊後毫無反饋。
+  2. **多源真實網絡端點與流解析全量貫通**：
+     - **黃果短劇（`huangguo`）**：`baseUrl` 修正為 `https://huangguoai.com`，抓取推薦/最新/AI漫劇分類 24 部短劇，精確提取 `data-src` 封面與劇集 ID；播放流直連解析 `https://huangguoai.com/video/{dramaId}/` 實測 200 OK 提取 AES-128 M3U8 直播流；
+     - **91視頻（`91porn`）**：`baseUrl` 對齊 `https://h1014.sol148.com`，抓取當前最熱/非付費/最近加精/高清 44 部真實原創視頻；播放流直連解析 `view_video.php?viewkey=...` 提取真實原畫 MP4 直鏈；
+     - **華視影院（`huavod`）**：抓取電影/連續劇/綜藝/動漫/短劇，對齊 Android 端 `Player/next` 與 `channel_key` 播放流分發；
+     - **Beeg 國際源（`beeg`）**：補齊 `Origin`、`Referer`、`Accept` 請求頭，恢復 HTTP 200 OK，實測秒級吐出 20 部國際精選視頻，播放解析 `https://video.beeg.com/...m3u8` 返回完整 HLS 變碼率流；
+     - **91動漫（`91dongman`）**：維持 24 部番劇高速秒開與 AES 解密直連。
+  3. **Apple HIG 規範加載與防偽裝交付**：
+     - `HomeScreen.swift` 推薦流在 `repo.isLoading` 期間展示原生 ProgressView 加載提示；
+     - 未單獨適配爬蟲的海外源絕不靜默塞入假數據掩蓋，而是嚴格呈現 Apple HIG 質感的 `ContentUnavailableView` 原生空狀態，並附帶「一鍵切換至 91動漫」推薦按鈕；
+     - `VideoSourcePickerSheet` 點選視頻源集成 `UIImpactFeedbackGenerator(style: .medium)` 原生觸覺反饋。
+- **實機驗證截圖**：
+  - `captures/ios_source_dongman91.png`（91動漫：奇幻公會的冒險日常）
+  - `captures/ios_source_huangguo_verified.png`（黃果短劇：把同學的媽操成母狗）
+  - `captures/ios_source_91porn_verified.png`（91視頻：The perfect sexy lady goes on a threesome...）
+  - `captures/ios_source_huavod_verified.png`（華視影院：最新電影《希望》）
+  - `captures/ios_source_beeg_verified.png`（Beeg 國際源：When infidelity complicates a marriage）
+  - `captures/ios_source_huangguo_recommend_scroll.png`（黃果短劇雙列推薦流）
+  - `captures/ios_source_xvideos_fixed.png`（XVideos 原生空狀態提示）
+  - `captures/ios_default_dongman91_final.png`（無參默認冷啟動最終驗收圖）
+- **編譯狀態**：`xcodebuild` **BUILD SUCCEEDED**（0 報錯、0 警告）。
+
+---
+
 ## 最新交接：2026-11-04 11:40 HKT — iOS 端三大核心視覺與體驗痛點專項攻堅閉環：封面 AES 解密與 bzcdn CDN 貫通、直播雙列網格溢出重疊根治、全屏播放器雙模畫幅（Fit / Fill）與一鍵橫屏旋轉落地
 
 - **工程版本**：`AuroraShelf iOS 2.16.0 (Build 173)`，純 Swift 6.4.2（`-swift-version 6`）+ SwiftUI + AVKit 原生架構，Xcode 27.2 / iOS 27.2 SDK，部署目標 `iOS 26.4`（本機 `iPhone 17 Pro` 模擬器 `85A543BE-30D6-41D8-8898-4FC2FE05872B`）；

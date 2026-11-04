@@ -51,8 +51,8 @@ public enum VideoSourceCatalog {
         name: "黄果短剧",
         group: .direct,
         description: "快节奏爽剧 · 原生无尽分页",
-        baseUrl: "https://huangguo.tv",
-        categories: ["全部", "推荐", "最新", "AI短剧", "都市逆袭"],
+        baseUrl: "https://huangguoai.com",
+        categories: ["全部", "推荐", "最新", "AI漫剧", "AI换脸"],
         isDirectConnect: true
     )
     
@@ -62,8 +62,8 @@ public enum VideoSourceCatalog {
         name: "91视频",
         group: .direct,
         description: "经典原创视界 · 真实视频流",
-        baseUrl: "https://91porn.com",
-        categories: ["全部", "今日热播", "高清精选", "原创自拍", "本月最热"],
+        baseUrl: "https://h1014.sol148.com",
+        categories: ["全部", "当前最热", "非付费", "最近加精", "高清"],
         isDirectConnect: true
     )
     

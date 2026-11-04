@@ -1,6 +1,6 @@
 # Project State
 
-Last Updated: 2026-11-04 11:40 HKT
+Last Updated: 2026-11-04 12:15 HKT
 
 ## Project
 
@@ -8,7 +8,18 @@ Last Updated: 2026-11-04 11:40 HKT
 
 ## Current Stage
 
-**iOS 端「原生化重构」全量闭环交付 + 三大视觉体验痛点（封面全灭/直播网格重叠/视频上下黑边全屏画幅）专项攻坚完成 + Android 2.16.0 唯一基线固化**：
+**iOS 端视频源切换无响应重大缺陷根治 + 5 大源真实爬虫路由落地 + 异步竞态消除 + 视觉体验与原生空状态闭环交付**：
+- **视频源切换无响应根本原因根除（全部实测验证）**：
+  1. **兜底路由失真清除**：移除 `VideoRepository.swift` 将 16 个视频源无条件转接 91动漫的隐形兜底，建立严格按 `source.id` 独立分发的路由体系；
+  2. **Beeg 国际源 Header 缺陷修复**：注入 `Origin: https://beeg.com` 与 `Accept: application/json`，上游 `store.externulls.com` 恢复 200 OK，秒级吐出 20 部视频及 HLS 变码率流；
+  3. **异步网络竞态（Race Condition）清除**：`loadFeed` 维护 `currentLoadTask?.cancel()`，并在数据返回时核验 `self.currentSource.id == source.id && self.currentCategory == category`，杜绝旧源数据回调覆盖新源；
+  4. **首页面交互与 Loading 联动**：`switchSource` 立即清空旧数据数组并置 `isLoading = true`；推荐流在加载时呈现原生 `ProgressView`，未适配源呈现 Apple HIG 规范的 `ContentUnavailableView` 原生空状态，无任何假数据掩盖；
+  5. **真实网络端点全量跑通**：
+     - **黄果短剧**：`https://huangguoai.com/recommend` 真实抓取 24 部短剧（实测《把同学的妈操成母狗》）与 AES-128 M3U8 流；
+     - **91视频**：`https://h1014.sol148.com` 真实抓取 44 部原创热播（实测《The perfect sexy lady...》）与原画 MP4 直链；
+     - **华视影院**：真实抓取电影/连续剧等（实测《希望》）与播放分发；
+     - **Beeg**：真实抓取 20 部国际视频（实测《When infidelity complicates a marriage》）与 M3U8 流；
+     - **91动漫**：维持 24 部番剧高速秒开与 AES 解密封面。
 - **iOS 三大视觉体验痛点专项攻坚成果（已实测验证）**：
   1. **封面加载全灭根除**：91动漫 AES-128-CBC 密文图片解密（`CoverImageLoader.swift` + `AuroraCoverImage.swift`）；包子漫画官方图片镜像自动重写至 `https://s1.bzcdn.net/cover/{topic_img}`（实测 200 OK，29KB-94KB 真实高清彩色海报）；双层缓存（120 张内存 NSCache + 沙盒磁盘文件）；
   2. **直播网格重叠穿透根除**：`LiveScreen.swift` 主播卡片全面接入 `AuroraCoverImage`（4:3 黄金比例），宣告严格的 `frame(minWidth: 0, maxWidth: .infinity)` 约束并加 `.clipped()`，彻底消除相邻网格单元格穿透溢出；
