@@ -18,7 +18,11 @@ import org.jsoup.nodes.Document
 class ForumRepository internal constructor(
     private val sources: List<ForumSource>,
 ) {
-    constructor() : this(listOf(T66yForumSource(), T906ForumSource()))
+    constructor() : this(listOf(
+        T66yForumSource(fid = 7, id = "t66y", name = "草榴社区"),
+        T66yForumSource(fid = 16, id = "t66y_16", name = "达盖尔的旗帜"),
+        T906ForumSource(),
+    ))
 
     /** Existing all-at-once API, kept for compatibility and existing tests. */
     suspend fun load(page: Int): ForumPage = coroutineScope {
@@ -84,6 +88,7 @@ class ForumRepository internal constructor(
     private fun mergePage(outcomes: List<SourceOutcome>): ForumPage {
         val ordered = outcomes.sortedBy { it.index }
         val posts = ordered.flatMap { it.posts.getOrDefault(emptyList()) }
+            .filterNot { ForumNoiseFilter.isNoisePost(it.title) }
             .distinctBy { it.sourceId to it.id }
             .sortedWith(
                 compareByDescending<ForumPost> { it.updatedEpochSeconds }

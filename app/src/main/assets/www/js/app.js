@@ -2,11 +2,81 @@
 (function () {
   'use strict';
 
+  // 原生 iOS / Android 触觉与生命周期桥梁
+  const NativeBridge = {
+    haptic(style) {
+      try {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.NativeBridge) {
+          window.webkit.messageHandlers.NativeBridge.postMessage({ type: 'haptic', style: style || 'medium' });
+        } else if (window.AndroidNative && window.AndroidNative.haptic) {
+          window.AndroidNative.haptic(style || 'medium');
+        }
+      } catch (_) {}
+    },
+    exitGame() {
+      try {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.NativeBridge) {
+          window.webkit.messageHandlers.NativeBridge.postMessage({ type: 'exitGame' });
+        } else if (window.AndroidNative && window.AndroidNative.exitGame) {
+          window.AndroidNative.exitGame();
+        }
+      } catch (_) {}
+    },
+    toast(msg) {
+      try {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.NativeBridge) {
+          window.webkit.messageHandlers.NativeBridge.postMessage({ type: 'toast', message: msg });
+        } else if (window.AndroidNative && window.AndroidNative.toast) {
+          window.AndroidNative.toast(msg);
+        }
+      } catch (_) {}
+    }
+  };
+  window.NativeBridge = NativeBridge;
+
+  window.setAppMuted = function (muted) {
+    if (window.LGAudio) {
+      if (muted) LGAudio.stopBgm();
+      else if (APP && APP.screen) {
+        const bgm = { title: 'title', hub: 'hub', campaign: 'campaign', story: 'story', battle: 'battle', gacha: 'gacha', slots: 'gacha' }[APP.screen];
+        if (bgm) LGAudio.playBgm(bgm);
+      }
+    }
+  };
+
+  // 检测宿主是否为原生 iOS/Android App，若是则隐藏网页内置胶囊以避免双重渲染
+  if ((window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.NativeBridge) || window.AndroidNative) {
+    document.body.classList.add('native-app');
+  }
+
+  // 绑定纯网页端小程序胶囊交互
+  document.addEventListener('DOMContentLoaded', () => {
+    const mpClose = document.getElementById('mp-btn-close');
+    if (mpClose) {
+      mpClose.addEventListener('click', () => {
+        NativeBridge.exitGame();
+        try { window.close(); } catch (_) {}
+      });
+    }
+    const mpMenu = document.getElementById('mp-btn-menu');
+    if (mpMenu) {
+      mpMenu.addEventListener('click', () => {
+        const isMuted = Boolean(window.LGAudio && window.LGAudio.isMuted);
+        window.setAppMuted(!isMuted);
+        if (window.UI && window.UI.toast) {
+          window.UI.toast(!isMuted ? '🔇 已静音' : '🔊 已开启音效');
+        }
+      });
+    }
+  });
+
   const $ = (s, r) => (r || document).querySelector(s);
   const $$ = (s, r) => [...(r || document).querySelectorAll(s)];
   const APP = {
     state: null, data: null, screen: 'boot',
     battle: null, raf: 0, story: null,
+    gamePaused: false,
+    resultSettled: false,
   };
   window.APP = APP;
 
@@ -18,16 +88,67 @@
       if (node) node.classList.toggle('active', s === name);
     });
     APP.screen = name;
+    if (name !== 'battle' && APP.battle && APP.battle.running) APP.battle.stop();
+    if (name !== 'slots' && window.SlotsUI && SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
     if (APP.stages && name !== 'hub' && APP.stages.hub) APP.stages.hub.stop();
+    if (name !== 'battle' && APP.battle && APP.battle.running) {
+      APP.battle.stop();
+    }
     if (name === 'slots' && window.SlotsUI && SlotsUI.resumeMascot) {
       SlotsUI.resumeMascot();
-    } else if (name !== 'slots' && window.SlotsUI && SlotsUI.pauseMascot) {
-      SlotsUI.pauseMascot();
+    } else if (name !== 'slots' && window.SlotsUI) {
+      if (SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
+      if (SlotsUI.pauseMascot) SlotsUI.pauseMascot();
     }
     const bgm = { title: 'title', hub: 'hub', campaign: 'campaign', story: 'story', battle: 'battle', gacha: 'gacha', slots: 'gacha' }[name];
     if (bgm) LGAudio.playBgm(bgm);
   }
   APP.show = show;
+  APP.openSlots = function () {
+    show('slots');
+    if (window.SlotsUI) {
+      SlotsUI.render();
+      if (SlotsUI.initMascot) SlotsUI.initMascot();
+    }
+  };
+
+  // Shared lifecycle boundary for Android WebView, iOS WKWebView and browser
+  // visibility changes. It stops active work without clearing saved progress.
+  APP.pauseGame = function () {
+    APP.gamePaused = true;
+    if (APP.battle) APP.battle.running = false;
+    if (window.SlotsUI && SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
+    if (window.LGAudio && LGAudio.stopBgm) LGAudio.stopBgm();
+  };
+
+  APP.resumeGame = function () {
+    APP.gamePaused = false;
+    if (APP.screen === 'battle' && APP.battle && !APP.battle.ended) APP.battle.running = true;
+  };
+
+  APP.destroyGame = function () {
+    APP.pauseGame();
+    cancelAnimationFrame(APP.raf);
+    if (APP.battle) APP.battle.stop();
+    if (window.SlotsUI && typeof SlotsUI.destroy === 'function') SlotsUI.destroy();
+    if (APP._cmdKeyHandler) {
+      window.removeEventListener('keydown', APP._cmdKeyHandler);
+      APP._cmdKeyHandler = null;
+    }
+    if (APP.stages) {
+      Object.values(APP.stages).forEach((stage) => {
+        if (stage && typeof stage.stop === 'function') {
+          try { stage.stop(); } catch (e) {}
+        }
+      });
+    }
+  };
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) APP.pauseGame();
+    else APP.resumeGame();
+  });
+  window.addEventListener('pagehide', () => APP.destroyGame());
 
   function save() { LGSave.persist(APP.state); }
 
@@ -35,7 +156,7 @@
     if (!window.SpineStage) return;
     if (APP.state && APP.state.settings && APP.state.settings.reduceMotion) return;
     APP.stages = {
-      hub: new SpineStage($('#hub-canvas'), { heightRatio: 0.96, yRatio: 0.02, xRatio: 0.55 }),
+      hub: new SpineStage($('#hub-canvas'), { heightRatio: 0.94, yRatio: 0.06, xRatio: 0.5 }),
       detail: new SpineStage($('#detail-canvas'), { heightRatio: 1.05, yRatio: 0.02, xRatio: 0.5 }),
       gacha: new SpineStage($('#gacha-canvas'), { heightRatio: 0.94, yRatio: 0.04, xRatio: 0.5 }),
     };
@@ -77,7 +198,7 @@
   }
 
   async function loadData() {
-    const files = ['heroes', 'enemies', 'chapters', 'gacha', 'shop', 'constants', 'strings', 'videos', 'battle', 'skills', 'equipment', 'missions', 'slots'];
+    const files = ['heroes', 'enemies', 'chapters', 'gacha', 'shop', 'constants', 'strings', 'videos', 'cgs', 'battle', 'skills', 'equipment', 'missions', 'slots'];
     const out = {};
     for (let i = 0; i < files.length; i++) {
       const r = await fetch('data/' + files[i] + '.json', { cache: 'no-store' });
@@ -263,6 +384,7 @@
 
   async function runBattle(chapter, stage, fromPrologue) {
     const st = APP.state;
+    APP.resultSettled = false;
     // Prepare squad heroes with progression stats
     const heroes = st.squad.map((key, i) => {
       const h = heroFor(key);
@@ -275,7 +397,9 @@
     }).filter(Boolean);
 
     const enemies = (stage.enemy || []).filter((e) => e && e.unit);
-    $('#battle-field').style.backgroundImage = 'url(assets/bg/battle.webp)';
+    const chapId = (chapter && chapter.id) || (stage && stage.id && parseInt(stage.id.split('-')[0], 10)) || 1;
+    const bgFile = (chapId >= 1 && chapId <= 8) ? `ch${chapId}.webp` : 'battle.webp';
+    $('#battle-field').style.backgroundImage = `url(assets/bg/${bgFile})`;
     show('battle');
     const canvas = $('#battle-canvas');
 
@@ -283,7 +407,9 @@
     APP.currentStage = stage;
     APP.currentHeroes = heroes;
 
-    if (!APP.battle) {
+    if (APP.battle) {
+      APP.battle.stop();
+    } else {
       const playerLevel = Math.min(30, 1 + Math.floor(Object.keys(st.cleared).length / 2));
       APP.battle = new Battle({
         field: $('#battle-field'), canvas,
@@ -338,9 +464,20 @@
     b.start(stage, heroes, enemies);
     LGAudio.playBgm('battle');
 
-    // 挂载案例式战术网格与教程反馈 (TacticalHud)
-    if (window.TacticalHud) {
-      APP.tacticalHud = new TacticalHud(b);
+    // 严格限制教学引导：仅在 1-1 且未完成教学时挂载，后续关卡（1-2、第2章、第3章等）永久静默
+    const isFirstStage = stage && (stage.id === '1-1' || stage.id === '1');
+    const tutorialDone = APP.state && APP.state.tutorialCompleted;
+    if (window.TacticalHud && isFirstStage && !tutorialDone) {
+      APP.tacticalHud = new TacticalHud(b, {
+        onComplete: () => {
+          if (APP.state) {
+            APP.state.tutorialCompleted = true;
+            save();
+          }
+        }
+      });
+    } else {
+      APP.tacticalHud = null;
     }
 
     // 戰鬥入場 Spine 骨骼特寫展示：序章已完整演繹時不再冗餘阻斷，非序章時展示短特寫
@@ -375,7 +512,7 @@
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       const scaled = dt * (b.speed || 1);
-      b.step(scaled);
+      if (!APP.gamePaused) b.step(scaled);
       b.spine.update(scaled);
       b.spine.draw();
       if (!b.ended) APP.raf = requestAnimationFrame(loop);
@@ -411,8 +548,11 @@
     };
     window.addEventListener('keydown', APP._cmdKeyHandler);
   }
+  window.runBattleDirect = runBattle;
 
   function endBattle(chapter, stage, r, heroes) {
+    if (APP.resultSettled) return;
+    APP.resultSettled = true;
     if (APP._cmdKeyHandler) {
       window.removeEventListener('keydown', APP._cmdKeyHandler);
       APP._cmdKeyHandler = null;
@@ -426,7 +566,16 @@
       if (stage.rewardKeys) { st.keys += stage.rewardKeys; rewards.push(['契约钥匙', stage.rewardKeys]); }
       if (stage.rewardShards) { st.shards += stage.rewardShards; rewards.push(['突破碎片', stage.rewardShards]); }
 
+      // 新手蜜月期高爽额外首通空投
+      const isRookie = (stage.id === '1-1' || stage.id === '1-2' || stage.id === '1-3');
+      if (isRookie) {
+        st.gold += stage.rewardGold;
+        st.keys = (st.keys || 0) + 2;
+        rewards.push(['先锋特惠空投', '金币翻倍 + 契约钥匙 +2']);
+      }
+
       st.cleared[stage.id] = true;
+      if (stage.id === '1-1') st.tutorialCompleted = true;
       st.stars[stage.id] = Math.max(st.stars[stage.id] || 0, r.stars);
       st.stats.wins = (st.stats.wins || 0) + 1;
 
@@ -440,8 +589,88 @@
 
       save();
       LGAudio.playSfx('win');
+      if (window.NativeBridge) NativeBridge.haptic('success');
+
+      // 充值诱导：通关第 1 章关键战役节点，弹出 SSR Esther 首充神级礼包
+      if ((stage.id === '1-3' || stage.id === '1-5') && !st.firstBattleRecharge) {
+        const rechModal = $('#modal-battle-recharge');
+        if (rechModal) {
+          rechModal.hidden = false;
+          $('#btn-battle-recharge-close').onclick = () => { rechModal.hidden = true; };
+          $('#btn-battle-recharge-pay').onclick = () => {
+            st.firstBattleRecharge = true;
+            st.energy = (st.energy || 0) + 200;
+            st.keys = (st.keys || 0) + 10;
+            st.gold = (st.gold || 0) + 2000;
+            st.owned = st.owned || [];
+            if (!st.owned.includes('esther')) {
+              st.owned.push('esther');
+              st.roster['esther'] = LGSave.createHeroInstance('esther', { level: 35, stars: 5, skillLevel: 10 });
+            }
+            save();
+            rechModal.hidden = true;
+            if (window.NativeBridge) NativeBridge.haptic('bigWin');
+            UI.toast('👑 SSR 顶级战神 Esther 已加入作战特勤！行动力 +200，金钥匙 +10！');
+          };
+        }
+      }
     } else {
       LGAudio.playSfx('lose');
+      if (window.NativeBridge) NativeBridge.haptic('defeat');
+
+      const renderDefeatResult = () => {
+        $('#result-title').textContent = '战斗失败';
+        $('#result-stars').textContent = '☆☆☆';
+        $('#result-sub').textContent = '用时 ' + Math.round(r.time) + ' 秒 · 存活 ' + r.alive + ' / 3';
+        const box = $('#result-rewards');
+        box.innerHTML = '';
+        box.appendChild(UI.el('div', { class: 'rr' }, [UI.el('span', { text: '战术建议' }), UI.el('b', { text: '前往单位详情强化等级、突破星级或穿戴战术装备' })]));
+        $('#btn-result-next').textContent = '重试';
+        $('#btn-result-next').onclick = () => {
+          if (APP.isTransitioning) return;
+          APP.isTransitioning = true;
+          setTimeout(() => { APP.isTransitioning = false; }, 600);
+          runBattle(chapter, stage);
+        };
+        show('result');
+        UI.renderHud(st);
+      };
+
+      // 绝地救援协议：全队濒危时仅首次弹出急救血清
+      if (!APP.battle || !APP.battle._reviveUsed) {
+        const reviveModal = $('#modal-battle-revive');
+        if (reviveModal) {
+          reviveModal.hidden = false;
+          $('#btn-battle-revive-ok').onclick = () => {
+            if (APP.battle && APP.battle._reviving) return;
+            if (APP.battle) APP.battle._reviving = true;
+            reviveModal.hidden = true;
+            if (APP.battle) {
+              APP.resultSettled = false;
+              APP.battle.ended = false;
+              APP.battle.isSettling = false;
+              APP.battle.running = true;
+              APP.battle._reviveUsed = true;
+              APP.battle.triggerReviveProtocol();
+              APP.raf = requestAnimationFrame(function loop() {
+                if (APP.battle && APP.battle.running) {
+                  APP.battle.step(0.016);
+                  APP.raf = requestAnimationFrame(loop);
+                } else if (APP.battle) {
+                  APP.battle._reviving = false;
+                }
+              });
+            }
+          };
+          $('#btn-battle-revive-cancel').onclick = () => {
+            reviveModal.hidden = true;
+            renderDefeatResult();
+          };
+          return;
+        }
+      }
+      renderDefeatResult();
+      return;
     }
 
     $('#result-title').textContent = r.win ? '战斗胜利' : '战斗失败';
@@ -461,16 +690,29 @@
     if (r.win && nextStage) {
       $('#btn-result-next').textContent = '下一关 (' + nextStage.stage + ')';
       $('#btn-result-next').onclick = () => {
+        if (APP.isTransitioning) return;
+        APP.isTransitioning = true;
+        setTimeout(() => { APP.isTransitioning = false; }, 600);
         APP.startStage(chapter, nextStage);
       };
     } else {
       $('#btn-result-next').textContent = r.win ? '返回战役' : '重试';
       $('#btn-result-next').onclick = () => {
+        if (APP.isTransitioning) return;
+        APP.isTransitioning = true;
+        setTimeout(() => { APP.isTransitioning = false; }, 600);
         if (r.win) { show('campaign'); UI.renderCampaign(st, APP.data); UI.openChapter(st, APP.data, chapter.id); }
         else { runBattle(chapter, stage); }
       };
     }
-    $('#btn-result-back').onclick = () => { show('campaign'); UI.renderCampaign(st, APP.data); UI.openChapter(st, APP.data, chapter.id); };
+    $('#btn-result-back').onclick = () => {
+      if (APP.isTransitioning) return;
+      APP.isTransitioning = true;
+      setTimeout(() => { APP.isTransitioning = false; }, 600);
+      show('campaign');
+      UI.renderCampaign(st, APP.data);
+      UI.openChapter(st, APP.data, chapter.id);
+    };
 
     const showSummary = () => {
       // 檢查關卡或章節是否有專屬 CG 動畫穿插播放 (章節通關或特定 BOSS 關)
@@ -492,17 +734,24 @@
       UI.renderHud(st);
     };
 
-    // 戰鬥勝利凱旋特寫 (非跳過時展示，跳過時直接結算進入結果頁)
+    // 戰鬥勝利凱旋特寫 (非跳過時展示，跳過時直接結算進入結果頁；支援點擊即時跳過)
     const victoryBox = $('#battle-victory-cutin');
     if (r.win && victoryBox && !r.skipped) {
       victoryBox.hidden = false;
       $('#victory-stars').textContent = UI.starsText(r.stars);
       const leader = (heroes && heroes[0]) || (APP.state && APP.state.squad && heroFor(APP.state.squad[0]));
       if (leader) $('#victory-name').textContent = leader.name + ' & 作战特勤队';
-      setTimeout(() => {
+      let cutinDone = false;
+      const finishCutin = () => {
+        if (cutinDone) return;
+        cutinDone = true;
+        clearTimeout(cutinTimer);
         victoryBox.hidden = true;
+        victoryBox.onclick = null;
         showSummary();
-      }, 2200);
+      };
+      victoryBox.onclick = finishCutin;
+      const cutinTimer = setTimeout(finishCutin, 2200);
       return;
     }
 
@@ -518,16 +767,23 @@
     overlay.hidden = false;
     video.src = src;
     video.currentTime = 0;
+    let finished = false;
     const finish = () => {
-      video.pause();
+      if (finished) return;
+      finished = true;
+      clearTimeout(safetyTimer);
+      try { video.pause(); } catch (_) {}
       overlay.hidden = true;
       video.onended = null;
-      skipBtn.onclick = null;
+      video.onerror = null;
+      if (skipBtn) skipBtn.onclick = null;
       if (onComplete) onComplete();
     };
 
+    const safetyTimer = setTimeout(finish, 8000);
     video.onended = finish;
-    skipBtn.onclick = finish;
+    video.onerror = finish;
+    if (skipBtn) skipBtn.onclick = finish;
     video.play().catch(() => {});
   }
 
@@ -662,7 +918,7 @@
         save();
         UI.renderHud(st);
         if (APP.screen === 'hub') UI.renderHub(st, APP.data);
-        toast('🎉 全 55 名特勤英雄已解锁！金币/钥匙/体力/碎片已全部拉满！');
+        toast('🎉 全 ' + (APP.data.heroes ? APP.data.heroes.length : 58) + ' 名特勤英雄已解锁！金币/钥匙/体力/碎片已全部拉满！');
       };
     }
     $('#btn-export').onclick = async () => {
@@ -719,7 +975,7 @@
     };
     $('#btn-reveal-close').onclick = closeReveal;
     $('#btn-reveal-ok').onclick = closeReveal;
-    $('#btn-cg').onclick = () => UI.renderCg(APP.data.videos);
+    $('#btn-cg').onclick = () => UI.renderCg(APP.data.videos, APP.data.cgs);
     $('#btn-cg-close').onclick = () => $('#cg-sheet').classList.remove('open');
     $('#cg-sheet').addEventListener('click', (e) => { if (e.target.id === 'cg-sheet') $('#cg-sheet').classList.remove('open'); });
     $('#btn-pull1').onclick = () => APP.doPull(1);
@@ -748,9 +1004,22 @@
   function finishBoot() {
     regenEnergy();
     if (window.Missions) Missions.checkDailyReset(APP.state);
+    const params = new URLSearchParams(window.location.search);
+    const heroParam = params.get('hero');
+    if (heroParam) {
+      APP.state.squad = [heroParam];
+    }
     UI.setProgress(1);
     UI.renderHub(APP.state, APP.data);
-    show('hub');
+    if (window.__AUTO_SLOTS__) {
+      show('slots');
+      if (window.SlotsUI) {
+        SlotsUI.render();
+        if (SlotsUI.initMascot) SlotsUI.initMascot();
+      }
+    } else {
+      show('hub');
+    }
     if ($('#hub-art') && $('#hub-art').decode) $('#hub-art').decode().catch(() => {});
   }
 
@@ -759,7 +1028,7 @@
     UI.setProgress(0.04);
     try {
       APP.data = await loadData();
-      // QA Auto-Boost: Unlock all 55 heroes, max out all resources (Gold, Keys, Energy, Shards, Equipment)
+      // QA Auto-Boost: Unlock all heroes, max out all resources (Gold, Keys, Energy, Shards, Equipment)
       LGSave.applyQAFullTestResources(APP.state, APP.data.heroes, APP.data.equipment);
       save();
     } catch (e) {
@@ -769,7 +1038,7 @@
     UI.setProgress(0.92);
     initStages();
     if (window.SlotsUI) SlotsUI.init().catch((e) => console.warn('Slots init failed:', e));
-    $('#title-art').style.backgroundImage = 'url(assets/bg/hub.webp)';
+    $('#title-art').style.backgroundImage = 'url(assets/bg/title_rea.webp)';
     const hasSave = Object.keys(APP.state.cleared || {}).length > 0 || (APP.state.owned && APP.state.owned.length > LGSave.STARTERS.length);
     $('#btn-start').textContent = hasSave ? '进入游戏' : '开始游戏';
     $('#btn-continue').hidden = !hasSave;
@@ -778,6 +1047,25 @@
     UI.setProgress(1);
     show('title');
     bindNav();
+    if (window.location.hash === '#battle' || window.location.search.includes('battle')) {
+      finishBoot();
+      setTimeout(() => {
+        if (APP.data && APP.data.chapters && APP.data.chapters[0]) {
+          const chap = APP.data.chapters[0];
+          const stg = chap.stages[0];
+          runBattle(chap, stg);
+        }
+      }, 350);
+    } else if (window.location.hash === '#slots' || window.location.search.includes('slots') || window.__AUTO_SLOTS__) {
+      finishBoot();
+      setTimeout(() => {
+        show('slots');
+        if (window.SlotsUI) {
+          SlotsUI.render();
+          if (SlotsUI.initMascot) SlotsUI.initMascot();
+        }
+      }, 350);
+    }
   }
 
   boot();

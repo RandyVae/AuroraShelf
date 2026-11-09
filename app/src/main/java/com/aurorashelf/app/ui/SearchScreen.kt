@@ -163,6 +163,7 @@ import com.aurorashelf.app.ui.theme.AuroraCoral
 import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
 import com.aurorashelf.app.ui.theme.AuroraMediaLabel
 import com.aurorashelf.app.ui.theme.AuroraMediaMuted
+import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -202,6 +203,15 @@ internal fun SearchScreen(
             }
         }
     }
+    var selectedSourceFilter by rememberSaveable { mutableStateOf("全部") }
+    val availableSources = remember(matches) {
+        if (matches.isEmpty()) listOf("全部")
+        else listOf("全部") + matches.map { it.author.ifBlank { "华视影院" } }.distinct().sorted()
+    }
+    val filteredMatches = remember(matches, selectedSourceFilter) {
+        if (selectedSourceFilter == "全部") matches
+        else matches.filter { (it.author.ifBlank { "华视影院" }) == selectedSourceFilter }
+    }
     val prefetchContext = LocalContext.current
     // task-17: warm the first screen of results (bytes + decode) after the list settles.
     LaunchedEffect(matches) {
@@ -237,16 +247,155 @@ internal fun SearchScreen(
             }
             message?.let { status -> item { StatusBanner(status, onSearch) } }
             if (matches.isEmpty() && !isSearching && message == null) {
-                item {
-                    EmptyState(
-                        message = if (query.isBlank()) "输入关键词全局搜索所有视频源" else "点击搜索按钮开始查找",
-                        icon = Icons.Outlined.Search,
-                        actionLabel = if (query.isNotBlank() && !isSearching) "开始搜索" else null,
-                        onAction = onSearch,
-                    )
+                if (query.isBlank()) {
+                    item {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                        ) {
+                            Text(
+                                text = "热门探索",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White,
+                            )
+                            val trending = listOf(
+                                "4K 超清", "最新电影", "热门连续剧", "经典港片",
+                                "热血动漫", "高分综艺", "悬疑惊悚", "科幻大片"
+                            )
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                            ) {
+                                trending.forEach { keyword ->
+                                    Surface(
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = AuroraMediaSurfaceVariant,
+                                        border = BorderStroke(1.dp, Color(0xFF333333)),
+                                        modifier = Modifier.applePressEffect {
+                                            onQuery(keyword)
+                                            onSearch()
+                                        },
+                                    ) {
+                                        Text(
+                                            text = keyword,
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
+                                            color = AuroraMediaLabel,
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            EmptyState(
+                                message = "输入关键词全局搜索所有视频源",
+                                icon = Icons.Outlined.Search,
+                                actionLabel = null,
+                                onAction = null,
+                            )
+                        }
+                    }
+                } else {
+                    item {
+                        EmptyState(
+                            message = "点击搜索按钮开始查找",
+                            icon = Icons.Outlined.Search,
+                            actionLabel = if (!isSearching) "开始搜索" else null,
+                            onAction = onSearch,
+                        )
+                    }
                 }
             } else {
-                items(matches, key = VideoItem::id) { video ->
+                // 1. 顶部分源过滤栏
+                if (availableSources.size > 2) {
+                    item(key = "source-filter-bar") {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                        ) {
+                            availableSources.forEach { src ->
+                                val isSelected = selectedSourceFilter == src
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = if (isSelected) AuroraCoral else AuroraMediaSurfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) AuroraCoral else Color(0xFF333333)),
+                                    modifier = Modifier.applePressEffect {
+                                        selectedSourceFilter = src
+                                    },
+                                ) {
+                                    val count = if (src == "全部") matches.size else matches.count { (it.author.ifBlank { "华视影院" }) == src }
+                                    Text(
+                                        text = "$src ($count)",
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        ),
+                                        color = if (isSelected) Color.White else AuroraMediaLabel,
+                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. Apple TV 热门最佳匹配横向货架（前 4 部精选）
+                val topMatches = filteredMatches.take(4)
+                if (topMatches.isNotEmpty()) {
+                    item(key = "top-matches-shelf") {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "热门匹配",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White,
+                                )
+                                Text(
+                                    text = "精选 ${topMatches.size} 部",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = AuroraCoral,
+                                )
+                            }
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                            ) {
+                                topMatches.forEach { video ->
+                                    NetflixPosterShelfCard(
+                                        video = video,
+                                        onClick = { onVideo(video) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. 全部结果流
+                item(key = "all-results-header") {
+                    Text(
+                        text = "全部检索结果 (${filteredMatches.size})",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+
+                items(filteredMatches, key = VideoItem::id) { video ->
                     VideoListRow(
                         video = video,
                         isFavorite = video.id in favoriteIds,

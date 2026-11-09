@@ -1,0 +1,111 @@
+/* Tabs */
+"tab.home" = "Trang chủ";
+"tab.comics" = "Truyện tranh";
+"tab.live" = "Trực tiếp";
+"tab.forum" = "Cộng đồng";
+"tab.library" = "Thư viện";
+
+/* Home Screen */
+"home.today_top_hits" = "Thịnh hành hôm nay";
+"home.top10" = "TOP 10 HÔM NAY";
+"home.up_next" = "Tiếp theo";
+"home.channels" = "Kênh";
+"home.connecting" = "Đang kết nối %@...";
+"home.loading_recommendations" = "Đang tải đề xuất...";
+"home.loading_more" = "Đang tải thêm…";
+"home.all_loaded" = "Đã tải xong toàn bộ";
+"home.play" = "Phát";
+"home.watchlist" = "Danh sách";
+"home.details" = "Chi tiết";
+"home.related" = "Liên quan";
+"home.all" = "Tất cả";
+
+/* Search */
+"search.placeholder" = "Tìm video, anime, truyện tranh hoặc mã số";
+"search.concurrent_hint" = "Tìm kiếm đồng thời trên 19 nguồn video";
+"search.no_results" = "Không tìm thấy kết quả";
+"search.searching" = "Đang tìm kiếm…";
+"search.history" = "Lịch sử tìm kiếm";
+"search.clear_history" = "Xóa lịch sử";
+"search.cancel" = "Hủy";
+
+/* Comics */
+"comics.title" = "Truyện tranh";
+"comics.featured" = "Nổi bật";
+"comics.loading" = "Đang tải truyện tranh…";
+"comics.loading_more" = "Đang tải thêm truyện…";
+"comics.all_loaded" = "Đã tải xong toàn bộ truyện";
+"comics.select_source" = "Chọn nguồn truyện tranh";
+"comics.unconfigured" = "Chưa cấu hình thông tin đăng nhập";
+"comics.unconfigured_hint" = "Vui lòng cấu hình thông tin xác thực trong cài đặt để truy cập";
+
+/* Reader */
+"reader.chapter" = "Chương %d";
+"reader.page" = "Trang %d/%d";
+"reader.prev_chapter" = "Chương trước";
+"reader.next_chapter" = "Chương sau";
+"reader.loading_image" = "Đang tải ảnh…";
+
+/* Live */
+"live.title" = "Trực tiếp";
+"live.featured" = "Đề xuất";
+"live.female" = "Nữ";
+"live.male" = "Nam";
+"live.couples" = "Cặp đôi";
+"live.trans" = "Chuyển giới";
+"live.loading" = "Đang tải danh sách streamer…";
+"live.viewers" = "%@ Người xem";
+"live.online" = "Trực tuyến";
+"live.offline" = "Ngoại tuyến";
+"live.select_source" = "Chọn nguồn trực tiếp";
+"live.chat" = "Trò chuyện trực tiếp";
+
+/* Forum */
+"forum.title" = "Cộng đồng";
+"forum.all" = "Tất cả";
+"forum.cl" = "Diễn đàn CL";
+"forum.91" = "Diễn đàn 91";
+"forum.loading" = "Đang tải bài viết…";
+"forum.replies" = "%d phản hồi";
+"forum.original_post" = "Xem bài gốc";
+
+/* Player / Detail / Watchlist / InSight */
+"player.play" = "Phát";
+"player.pause" = "Tạm dừng";
+"player.aspect_fit" = "Vừa màn hình";
+"player.aspect_fill" = "Tràn viền";
+"player.airplay" = "AirPlay";
+"player.episodes" = "Tập phim";
+"detail.synopsis" = "Tóm tắt";
+"detail.more_like_this" = "Nội dung tương tự";
+"watchlist.add" = "Thêm vào danh sách";
+"watchlist.in_list" = "Đã trong danh sách";
+"watchlist.remove" = "Xóa khỏi danh sách";
+"watchlist.title" = "Danh sách của tôi";
+"watchlist.empty" = "Danh sách xem trống";
+"watchlist.count" = "%d mục";
+
+/* Library / Settings */
+"library.title" = "Thư viện";
+"settings.language" = "Ngôn ngữ";
+"settings.language_title" = "Chọn ngôn ngữ";
+"settings.follow_system" = "Theo hệ thống";
+"settings.game" = "Giải trí · Trò chơi";
+"settings.game_title" = "Nữ Thần Dục Vọng · Chiến Thuật RPG";
+"settings.game_desc" = "RPG Chiến thuật · Tăng tốc phần cứng";
+"settings.launch" = "Khởi chạy";
+"settings.video_source" = "Nguồn video hiện tại";
+"settings.comic_source" = "Nguồn truyện tranh hiện tại";
+"settings.live_source" = "Nguồn phát trực tiếp hiện tại";
+"settings.offline_download" = "Tải xuống ngoại tuyến";
+"settings.not_available" = "Chưa hỗ trợ trong phiên bản này";
+"settings.version" = "Thông tin phiên bản";
+"settings.airplay_title" = "Phát qua AirPlay";
+"settings.airplay_select" = "Chọn thiết bị";
+"settings.select_live_source" = "Chọn nguồn trực tiếp";
+
+/* Common Actions */
+"common.done" = "Xong";
+"common.cancel" = "Hủy";
+"common.close" = "Đóng";
+"common.ok" = "Đồng ý";

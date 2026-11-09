@@ -1,0 +1,10 @@
+2026-11-06 15:26:33.731 F  AuroraShelf[69017:a09043] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set
+2026-11-06 15:26:34.337 F  AuroraShelf[69017:a09043] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set
+2026-11-06 15:26:34.350 F  AuroraShelf[69017:a09043] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set
+2026-11-06 15:26:34.406 F  AuroraShelf[69017:a09043] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set
+2026-11-06 15:27:24.947 F  AuroraShelf[69275:a098d5] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set
+2026-11-06 15:27:25.501 F  AuroraShelf[69275:a098d5] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set
+2026-11-06 15:27:25.548 F  AuroraShelf[69275:a098d5] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set
+2026-11-06 15:28:34.229 F  AuroraShelf[69595:a0a428] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set
+2026-11-06 15:28:34.748 F  AuroraShelf[69595:a0a428] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set
+2026-11-06 15:28:34.763 F  AuroraShelf[69595:a0a428] [com.apple.SwiftUI:Invalid Configuration] No symbol named 'bolt.horizontal.tv.fill' found in system symbol set

@@ -1,0 +1,33 @@
+ios/AuroraShelf/Services/ComicPageImageLoader.swift:26:13: warning: capture of 'memCache' with non-Sendable type 'NSCache<NSString, UIImage>' in a '@Sendable' closure [#SendableClosureCaptures]
+ios/AuroraShelf/UI/Screens/LiveScreen.swift:114:135: warning: 'appendInterpolation' is deprecated: Localized string interpolation produces an unlocalized, debug description for this type of value. Use a type supported by LocalizedStringKey.StringInterpolation or initialize a LocalizedStringResource instead with an interpolated value that conforms to CustomLocalizedStringResourceConvertible. [#DeprecatedDeclaration]
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:478:20: warning: main actor-isolated property 'isSeeking' can not be referenced from a Sendable closure
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:479:18: warning: main actor-isolated property 'currentTime' can not be mutated from a Sendable closure
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:482:48: warning: main actor-isolated property 'duration' can not be referenced from a nonisolated autoclosure
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:483:26: warning: main actor-isolated property 'duration' can not be mutated from a Sendable closure
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:487:25: warning: main actor-isolated property 'currentTime' can not be referenced from a Sendable closure
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:487:55: warning: main actor-isolated property 'duration' can not be referenced from a nonisolated autoclosure
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:488:46: warning: call to main actor-isolated instance method 'updateProgress(video:positionMs:durationMs:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:488:39: warning: main actor-isolated static property 'shared' can not be referenced from a Sendable closure
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:490:44: warning: main actor-isolated property 'currentTime' can not be referenced from a Sendable closure
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:491:44: warning: main actor-isolated property 'duration' can not be referenced from a Sendable closure
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:570:19: warning: value 'player' was defined but never used; consider replacing with boolean test [#NoUsage]
+ios/AuroraShelf/UI/Screens/NativePlayerView.swift:641:20: warning: 'preferredControlTintColor' was deprecated in iOS 26.0: Tinting the controls interferes with background effects that the system provides. [#DeprecatedDeclaration]
+ios/AuroraShelf/UI/Components/HeroBanner.swift:15:31: warning: 'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context. [#DeprecatedDeclaration]
+ios/AuroraShelf/UI/Components/HeroBanner.swift:20:32: warning: 'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context. [#DeprecatedDeclaration]
+ios/AuroraShelf/UI/Screens/HomeScreen.swift:229:39: warning: 'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context. [#DeprecatedDeclaration]
+ios/AuroraShelf/UI/Live/LiveChatSheet.swift:150:25: warning: call to main actor-isolated instance method 'evaluateJavaScript(_:completionHandler:)' in a synchronous nonisolated context [#ActorIsolatedCall]
+ios/AuroraShelf/UI/Components/UpNextCard.swift:132:31: warning: 'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context. [#DeprecatedDeclaration]
+ios/AuroraShelf/UI/Screens/VideoDetailSheet.swift:18:31: warning: 'main' was deprecated in iOS 26.0: Use a UIScreen instance found through context instead (i.e, view.window.windowScene.screen), or for properties like UIScreen.scale with trait equivalents, use a traitCollection found through context. [#DeprecatedDeclaration]
+ios/AuroraShelf/UI/Theme/DeviceLayoutProfile.swift:59:17: warning: 'init(validatingUTF8:)' is deprecated: replaced by 'String.init(validatingCString:)' [#DeprecatedDeclaration]
+ios/AuroraShelf/UI/Game/GameContainerView.swift:104:27: warning: main actor-isolated property 'reduceMotion' can not be referenced from a Sendable closure
+ios/AuroraShelf/UI/Game/GameContainerView.swift:105:17: warning: main actor-isolated property 'capsuleOpacity' can not be mutated from a nonisolated context
+ios/AuroraShelf/Services/ComicPageImageLoader.swift:26:13: warning: capture of 'memCache' with non-Sendable type 'NSCache<NSString, UIImage>' in a '@Sendable' closure [#SendableClosureCaptures]
+ios/AuroraShelf/Data/Comic/ComicProtocolSecrets.swift:75:17: warning: 'CC_MD5' was deprecated in iOS 13.0: This function is cryptographically broken and should not be used in security contexts. Clients should migrate to SHA256 (or stronger). [#DeprecatedDeclaration]
+ios/AuroraShelfTests/PlaybackProgressStoreTests.swift:11:9: warning: main actor-isolated property 'suiteName' can not be mutated from a nonisolated context
+ios/AuroraShelfTests/PlaybackProgressStoreTests.swift:12:9: warning: main actor-isolated property 'testDefaults' can not be mutated from a nonisolated context
+ios/AuroraShelfTests/PlaybackProgressStoreTests.swift:12:48: warning: main actor-isolated property 'suiteName' can not be referenced from a nonisolated context
+ios/AuroraShelfTests/PlaybackProgressStoreTests.swift:13:9: warning: main actor-isolated property 'testDefaults' can not be referenced from a nonisolated context
+ios/AuroraShelfTests/PlaybackProgressStoreTests.swift:13:54: warning: main actor-isolated property 'suiteName' can not be referenced from a nonisolated context
+ios/AuroraShelfTests/PlaybackProgressStoreTests.swift:17:9: warning: main actor-isolated property 'testDefaults' can not be referenced from a nonisolated context
+ios/AuroraShelfTests/PlaybackProgressStoreTests.swift:17:54: warning: main actor-isolated property 'suiteName' can not be referenced from a nonisolated context
+ios/AuroraShelfTests/LiveVideoSourceAuditTests.swift:71:144: warning: will never be executed

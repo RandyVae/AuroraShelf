@@ -5,10 +5,34 @@ public struct ComicChapter: Identifiable, Hashable, Sendable {
     public let title: String
     public let pageCount: Int
     
-    public init(id: String, title: String, pageCount: Int = 20) {
+    public init(id: String, title: String, pageCount: Int = 0) {
         self.id = id
         self.title = title
         self.pageCount = pageCount
+    }
+}
+
+public struct ComicPage: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let imageUrl: String
+    public let referer: String?
+    public let headers: [String: String]
+    public let resolutionUrl: String?
+    public let verticalSegments: Int
+
+    public init(
+        imageUrl: String,
+        referer: String? = nil,
+        headers: [String: String] = [:],
+        resolutionUrl: String? = nil,
+        verticalSegments: Int = 0
+    ) {
+        self.id = resolutionUrl ?? imageUrl
+        self.imageUrl = imageUrl
+        self.referer = referer
+        self.headers = headers
+        self.resolutionUrl = resolutionUrl
+        self.verticalSegments = verticalSegments
     }
 }
 
@@ -22,6 +46,14 @@ public struct ComicItem: Identifiable, Hashable, Sendable {
     public let tags: [String]
     public let chapters: [ComicChapter]
     public let latestChapterTitle: String
+
+    public var coverBaseURL: URL? {
+        ComicSourceCatalog.allSources.first(where: { $0.id == sourceId }).flatMap { URL(string: $0.baseUrl) }
+    }
+
+    public var sourceName: String {
+        ComicSourceCatalog.allSources.first(where: { $0.id == sourceId })?.name ?? sourceId
+    }
     
     public init(
         id: String,
@@ -29,10 +61,10 @@ public struct ComicItem: Identifiable, Hashable, Sendable {
         title: String,
         author: String,
         coverUrl: String,
-        category: String = "热血",
-        tags: [String] = ["全彩", "连载中"],
+        category: String = "",
+        tags: [String] = [],
         chapters: [ComicChapter] = [],
-        latestChapterTitle: String = "第 1 话"
+        latestChapterTitle: String = ""
     ) {
         self.id = id
         self.sourceId = sourceId
@@ -96,7 +128,7 @@ public enum ComicSourceCatalog {
         name: "Komiic 漫画",
         description: "GraphQL Schema 适配 · 高清全彩",
         baseUrl: "https://komiic.com",
-        categories: ["全部", "热门连载", "完结经典", "冒险", "奇幻"]
+        categories: ["全部", "爱情", "冒险", "魔幻", "科幻", "热血", "恐怖", "百合"]
     )
     
     // 5. 91动漫漫画端
@@ -113,7 +145,7 @@ public enum ComicSourceCatalog {
         id: "8muses",
         name: "8Muses",
         description: "Next.js 结构 · 官方媒体路由直连",
-        baseUrl: "https://comics.8muses.com",
+        baseUrl: "https://8muses.io",
         categories: ["全部", "Popular", "New", "Classics"]
     )
     
@@ -128,10 +160,10 @@ public enum ComicSourceCatalog {
     
     // 8. 拷贝漫画（CopyComic）
     public static let copycomic = ComicSourceDefinition(
-        id: "copycomic",
+        id: "copy",
         name: "拷贝漫画",
         description: "优质汉化 · 热门连载日更",
-        baseUrl: "https://www.copymanga.tv",
+        baseUrl: "https://api.2024manga.com/api/v3",
         categories: ["全部", "日漫", "韩漫", "美漫"]
     )
     
@@ -140,7 +172,7 @@ public enum ComicSourceCatalog {
         id: "ikmmh",
         name: "爱看漫画",
         description: "极速缓存 · 轻量阅读",
-        baseUrl: "https://www.ikmmh.com",
+        baseUrl: "https://ymcdnyfqdapp.ikmmh.com",
         categories: ["全部", "都市", "悬疑", "玄幻"]
     )
     
@@ -158,8 +190,22 @@ public enum ComicSourceCatalog {
         baozi, jm, picacg, komiic, dongman91,
         eightMuses, gedeComix, copycomic, ikmmh, ehentai
     ]
+
+    /// Explicit adapters exist for all entries; JM and Picacg still require credentials/config.
+    public static let supportedSourceIDs: Set<String> = [
+        baozi.id, jm.id, picacg.id, komiic.id, dongman91.id,
+        eightMuses.id, gedeComix.id, copycomic.id, ikmmh.id, ehentai.id
+    ]
+
+    public static var supportedSources: [ComicSourceDefinition] {
+        allSources.filter { supportedSourceIDs.contains($0.id) }
+    }
+
+    public static func isSupported(_ source: ComicSourceDefinition) -> Bool {
+        supportedSourceIDs.contains(source.id)
+    }
     
     public static func find(by id: String) -> ComicSourceDefinition {
-        allSources.first(where: { $0.id == id }) ?? baozi
+        allSources.first(where: { $0.id == id }) ?? jm
     }
 }

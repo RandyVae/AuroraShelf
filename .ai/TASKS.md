@@ -1,5 +1,41 @@
 # Active
 
+- [x] 确立双端持续交付与服务器零老版本磁盘防爆铁律：在全局准则（`~/.gemini/config/plugins/agent-memory/rules/AGENTS.md` 2.5 节）与项目 `AGENTS.md` 写入核心强制规范，明确无论是 iOS 还是 Android 修改后必须打包上传最新包；服务器严禁保留老版本，执行同名原子覆盖并即时清理临时碎片，保障磁盘空间健康 — 2026-11-06。
+
+- [x] 官方下载站全面升级为 iOS + Android 双平台无线发布中心：重新编译并上架 Android 2.16.0 正式版 APK（168.45 MB），落地 Segmented Control 智能平台自适应切换、直链秒级下载与 Nginx 专属 MIME 支持 — 2026-11-06。
+
+- [x] 确立 iPhone 与 iPad 双端同步修复全局铁律：在全局准则（`~/.gemini/config/plugins/agent-memory/rules/AGENTS.md` 2.4 节）与项目 `AGENTS.md` 写入核心强制规范，修复 iPhone 软件缺陷时必须同步排查并修复 iPad 对应实现，严禁割裂交付，确保双端同权同质 — 2026-11-06。
+
+- [x] 建立 iOS 持续交付与 OTA 自动发布规范（核心流程）：后续只要完成新的功能开发、UI 打磨或缺陷修复，必须立即执行 `./scripts/publish_ota.sh Release`，自动使用苹果开发者账号（Team ID: `U4MXHLA3GF`）进行签名归档，并上传同步至日本服务器 `/var/www/netgrey/Netgrey.ipa`，确保用户通过 `https://bananarey.us:8443` 下载到的永远是最新编译版本 — 2026-11-06。
+
+- [x] iOS 全面接入 12 大語種多語言國際化架構與即時無縫切換閉環：在 `AuroraShelf/Resources/` 落地 12 套 `.lproj/Localizable.strings`（繁體中文、簡體中文、英、日、韓、泰、德、法、西、馬來、印尼、越），全面覆蓋底欄 Tab、主頁、漫畫、直播、論壇、播放器、片單、搜尋、資料庫及設定；封裝 `@unchecked Sendable` + `NSLock` 的 `LocalizationManager`，解決 Swift 6 併發隔離與 `String.localized` / `L10n` 調用問題；在 `PersonalScreen` 新增「語言」行與 `LanguagePickerSheet`；新增 `LocalizationManagerTests` 5 項單測，全量 106 項單元測試 100% 全部通過（0 failures, 5 skipped，耗時 4.999 秒）；iPhone 17 Pro 模擬器（PID 80501）實機驗收截屏存盤（`captures/screen_ios_tab_library_multilingual.png` 與 `captures/screen_ios_tab_home_multilingual.png`），`git diff --check` 0 警告 — 2026-11-06。
+
+- [x] iOS 2.16.0 缺陷審計（三線並行只讀 + 主審實測）：合計 76 項技術缺陷（P0×1、P1×15、P2×43、P3×17）＋1 項流程風險。P0＝當前工作樹不可建置（`LocalizationManager` 以 `@MainActor` 單例被 `String.localized`／`L10n` 等 nonisolated 宣告同步呼叫，6 個 Swift 6 併發錯誤；15:41 與 15:47 兩次 `xcodebuild` 均 exit 65）。主審另實測：15:36 指紋下 101 項測試 96 passed／5 skipped／0 failed、Release 可建置（48 條 app-target 警告）；模擬器啟動出畫正常但運行時檢出 2 個無效 SF Symbol；全部 9 個測試檔與 29 個源碼檔未入 Git；`SourceSecrets.plist` 隨 bundle 分發；`dist/` IPA 為 build 173 且不含憑據與 12 套在地化資源，其 SHA-256 與 `PROJECT_STATE.md` 記載不符。報告：[`docs/ios/audit-2026-11-06/AUDIT-REPORT.md`](../docs/ios/audit-2026-11-06/AUDIT-REPORT.md)，三線片段同目錄。未修改任何源碼 — 2026-11-06。
+
+- [x] iOS 全項目 12 項代碼缺陷與隱患地毯式排查與全量修復閉環：排查修復 4 項高危（`NativePlayerView` 跨線程競爭/退出刷盤、`PlaybackProgressStore` 5s防抖+10s節流、`VideoRepository` 升級 `@MainActor` 嚴格隔離）、5 項中危（Comic/Forum/XVideos/Live 4 源硬編碼截斷清零、`MainContainerView` 輪詢 Task 生命週期管控、`SearchSheetView` 單例語義）、3 項低危（`CoverImageLoader` 與 `ComicPageImageLoader` 升級 actor 任務去重防擊穿、`ForumScreen` 複合唯一鍵 `fid:id`、正則表達式預編譯優化）；全量 96 項單元測試 100% 全部通過（0 failures, 5 skipped），iPhone 17 Pro 模擬器部署運行截屏存盤（`captures/screen_ios_tab_home_after_bugfix.png`），`git diff --check` 0 警告 — 2026-11-06。
+
+- [x] 全面打通漫畫板塊全源動態分頁與無限滾動加載：在 `ComicRepository.swift` 聲明 `currentPage: Int = 1`、`canLoadMore: Bool = true`、`isLoadingNextPage: Bool = false` 及 `loadNextPage() async` 異步追加與 `Set(comics.map(\.id))` 去重；打通包子漫畫（`amp_comic_list?page=\(p)&limit=36`）、拷貝漫畫（`offset=\((p-1)*24)`）、Komiic（GraphQL offset: `(p-1)*24`）、禁漫天堂（`filter?page=\(p)`）、嗶咔漫畫（`comics?page=\(p)`）、91動漫漫畫及 HTML 漫畫源全部分頁路由；在 `ComicsScreen.swift` 網格末端掛載 `onAppear` 觸底偵測與 Apple HIG 原生 `ProgressView("正在加載更多漫畫…")` / `Text("已加載全部內容")`；新增 2 項單元測試，全量 83 項測試 100% 通過（0 failures），iPhone 17 Pro 模擬器實機截屏存盤驗證（`captures/screen_ios_tab_comics_pagination_verified.png`），`git diff --check` 0 警告 — 2026-11-06。
+
+- [x] 徹底根除全視頻源固定數量截斷缺陷、全量貫通觸底動態分頁加載與實機驗證：移除 `parseHuavodHtml`、`parseHuangguoHtml`、`parse91PornHtml`、`parse91DongmanHtml` 硬編碼 `count >= 20/24` 截斷；華視影院升級官方全量分頁路由 `/vodshow/\(typeId)/page/\(p).html`（每頁 76 卡片）；91 視頻透傳 `&page=\(p)`、Beeg 透傳 `offset=\((p-1)*20)`、HTML 適配器動態頁碼透傳；在 `VideoRepository.swift` 實現 `currentPage`、`canLoadMore`、`isLoadingNextPage` 與 `loadNextPage()` 去重追加；`HomeScreen.swift` 網格末端掛載 `onAppear` 觸底與 Apple HIG 原生 `ProgressView` / `Text("已加載全部內容")`；新增 3 項單測，`UniversalVideoEngineTests` 全量 39 項單測 100% 全部通過；iPhone 17 Pro 模擬器安裝實機截屏驗證通過，`git diff --check` 0 警告 — 2026-11-06。
+
+- [x] 承接 Codex 遺留工作全量閉環、嗶咔協議邏輯漏洞修復、論壇實測容差加固與在線源實測：修復 `ComicProtocolSecrets.swift` 判定字面量空值 bug（`!value($0).isEmpty`）；`ComicsScreen.swift` 增加未配置協議時原生 `ContentUnavailableView` 空狀態指引；加固 `ForumRepositoryTests.swift` 短文字圖片貼斷言；在線實測驗證 5 核心視頻源（kissjav, eporner, huavod, 91dongman, beeg）、2 漫畫源（JM, 包子）、2 直播源（Chaturbate, Stripchat）與 6 論壇版塊雙頁；新增 1 項單測，全量 87 項單測 100% 全部通過（0 failures, 4 skipped），iPhone 17 Pro 模擬器截屏存盤 — 2026-11-06。
+
+- [x] iOS 历史遗留三大源分页缺陷与全视频源第二页路由加固攻坚：根除 JAVSB 第 2 页为空问题（重构 MacCMS 路径分页与分类映射）；实测根治 91 动漫漫画分页 404 缺陷（`/manga/\(id)/\(page)/`）；打通包子漫画搜索 HTML 解析与 `ComicRepository.searchComics` 全源搜索分发；地毯式重构全视频源 Path/Query 分页路由与中文字幕匹配；新增 4 项单元测试，全量 85 项测试 100% 全部通过（0 failures），模拟器实机截图存盘验证 — 2026-11-06。
+
+- [x] iOS 全项目地毯式缺陷排查与清零：清除 `ComicRepository.swift` 全部 14 处 `URL(string: ...)!` 强拆包隐患，长列表阅读器加入 80MB 限制、真实 Cost 上报、`autoreleasepool` 防爆内存与切章即时清空；论坛原帖扩展多协议泛域名并升级为应用内 `SourceWebsiteSheet`（`SFSafariViewController`）浏览；个人中心接入动态直播源与切换弹窗，片单增加 `dynamicTypeSize.isAccessibilitySize` 宽屏自适应；全量 81 项测试 100% 通过，iPhone 17 Pro 模拟器全 Tab 截屏验证闭环 — 2026-11-06。
+
+- [x] 恢复 iOS 品牌为 Netgrey：移除不匹配的 `sparkles.tv.fill` 顶栏图标，将标题改用系统导航栏，更新显示名称并完成模拟器截图复核 — 2026-11-05。
+
+- [x] 攻克 iOS 禁漫天堂（JM Comic）源全链路：解决参数探测盲区、修复 `id`/`sort` 数字类型解包吞数据严重缺陷、补齐 Referer，实测通过在线列表（80部）、封面、章节（6话）、正片（136页）及动态反混淆分段计算；79/79 单元测试全部通过 — 2026-11-05。
+
+- [x] 攻克 iOS 19 视频源中 7 个失败源协议头、反爬策略与流解析链路（Pornhub/OHentai 封面解码、91视频 strencode2/CDN77 解密与死链绕过、EPORNER 动态重定向流、JAVSB XOR 签名换 m3u8、MissAV 镜像与 packed eval 解包、JAV-NONI 嵌入式流与 UA/Referer 校验）；76/76 单元测试全部通过 — 2026-11-05。
+
+- [x] 攻克 iOS 包子漫画（Baozi）章节页图 404 与 CDN 阻断：锁定 `div#chapter-items` 正序完整目录避开 VIP 占位章节、URLComponents 完整保留 Query 与 Path 切换至 `cn.twbzmg.com`、支持 AMP 图床标签与 JSON 提取、`ComicPageImageLoader` 建立 `static-tw.baozimh.com` CDN 容灾自动回退，实测在线 1.48s 获取 36 本漫画、首部《剑尊归来》、第 1 话、50 页正片图片，第一页 690x690 UIImage 秒级解码成功 — 2026-11-05。
+
+- [x] 直播弹幕、评论与年龄门禁端到端打通与横屏沉浸体验：在 `LiveChatSheet` 与 `StripchatLiveWebView` 注入条款 Cookie 与脚本穿透年龄门禁，轮询间隔调优至 3 秒；`LivePlayerView` 完整接入 90° 横屏沉浸旋转（`isLandscape`）与画幅切换；为漫画、直播卡片及播放器控件全量补齐语义化 VoiceOver 标签与提示；全量 81 项单元测试 100% 全部通过 — 2026-11-05。
+
+- [ ] iOS 哔咔协议凭据接入、VoiceOver/多设备真机矩阵长效走查。Android 暂不处理。
+
 - 整理并提交本地工作区 150～169 版本改动，确认是否推送远程分支与发布 GitHub Releases。
 
 ## 169 已完成（2026-10-27）
@@ -11,9 +47,9 @@
 
 # Blocked
 
+- iOS：VoiceOver/Switch Control 逐屏人工走查；iPad、横屏、分屏适配验证；带字幕/多音轨播放器样片验证；真机证据。
 - TalkBack / Switch Control 逐屏人工走查（需人工）。
 - OEM 自有高对比文字开关无法被 AOSP Settings 键检测（平台限制，已声明）。
-- 字幕 UI 切换器（当前仅自动优选文本轨）。
 
 # Planned
 
@@ -23,6 +59,8 @@
 
 # Completed
 
+- [x] iOS 设计审计修复（Build 174 工作树）：真实内容/状态、持久化片单、列表错误恢复与请求竞态保护、论坛 push、对比度/Reduce Motion/动态字级、播放器 VoiceOver/字幕音轨、包子漫画章节详情链接；XcodeGen + 模拟器测试 9/9，首页/漫画最大辅助字号抽查 — 2026-11-04。未提交；VoiceOver、iPad/方向、真实字幕音轨及真机仍待验证。
+- [x] iOS 封面加载稳健性与直播评论原生面板：来源相对 URL、图床重写、Referer、稳定缓存键、漫画页图解密尝试/重试、聊天室 DOM 轮询与原生状态视图 — 2026-11-05。Build PASS；封面 URL 单测 2/2；全量测试 22 passed、1 cancelled（runner 卡在 worker materialization）；聊天室及逐源在线加载仍待 E2E。
 - [x] 168 播放器詳情頁操作按鈕視覺 Bug 修復（`forceDark = true` 磨砂暗黑高對比）、8Muses/GEDE Comix/91動漫三大漫畫源深度接入、91動漫視頻源獨立接入（5 大分類映射與 HLS 硬解出畫）— 2026-10-27。
 - [x] 167 XVideos 視頻源接入並設為全應用預設源（5 大分類擴展最新/熱門/自拍/亞洲/認證）、全網視頻源統一併發搜索與輪詢交織算法混排、HornyStudents 直播源深度接入（RSS 2.0 在線主播解析、四大性別分類過濾、雙直播源切換）— 2026-10-27。
 - [x] 166 Beeg（beeg.com）官方視頻源深度接入、REST API 解析、多態分類導航、聯網搜索與 ExoPlayer 原生硬解播放 — 2026-10-27。
@@ -53,3 +91,8 @@
 - [x] 164 全量预设视频源深度修复、43 分类 100% Playback 探针通过、线路属性感知分组、Apple HIG 状态胶囊与首页自愈回退：排查修复 85po（正則適配 `.html` 後綴）、JAV-NONI（域名輪換至 `javnoni.com`，防回溯棧溢出改寫，解包器線性化，外鏈白名單補齊 `luluvido.com`）、MissAV（失效 403 路由 `/ja/popular` 映射至有效發布路徑 `/ja/release`）、OHentai（卡片選擇器限定 `.videobrick` 過濾無效死鏈），全量 16 源 43 分類 100% 通過 Playback 探針；視頻源設置頁按 `isDirectDomestic` 劃分為「精選推薦（大陸直連穩定）」與「擴展視頻源（海外/國際線路）」，卡片標題右側標註綠色「直連」與天藍「海外」Apple HIG 微型膠囊；首頁加載失敗空狀態提供「一鍵切回默認直連視頻源」自愈按鈕；通過 185 項 JVM 單測（100% 通過）；構建 Release 正式包 `dist/AuroraShelf-2.15.0-164-video-sources-repaired-LOCAL.apk`（4,396,412 bytes，SHA-256 `7128fe104fa4cadf99e6640fcc34d079fde11c2a49c90159bbea665947b8881c`）並完成模擬器端到端實測 — 2026-10-27。
 - [x] 165 華視影院（huavod.com）官方視頻源深度接入、五大分類多態映射、ArtPlayer/BunnyCDN 簽名解析、236 集自動識別、ExoPlayer 原生硬解播放與 Release 打包驗收：逆向分析華視影院客戶端（huavod_64.apk）與官方站點（huavod.com），註冊直連視頻源 `huavod` 並劃入「精選推薦（大陸直連）」；頂部分類動態映射至「電影 / 電視劇 / 綜藝 / 動漫 / 短劇」；列表解析器抽取 `.public-list-box` 卡片並智能剝離「封面圖」多餘後綴；聯網搜索對接 `/vodsearch/` 路由；在 `PlaybackResolver` 實現 `parseHuavodEpisodes`（精準提取 236+ 集劇集並按序編排）與 `resolveHuavod`（模擬官方 EcPlayer 協議鏈路：異步請求 `/Player/next` 獲取廣告令牌 `mt`，計時對沖後向 `/Player/resolveUrl` 換取帶 BunnyCDN HMAC 簽名的 `.m3u8` 直播/點播清單）；集成 `huavodTokenCache` 預加載機制，瀏覽時後台消化倒計時，點擊秒播；通過 185 項 JVM 單測（100% 通過）；構建 Release 正式包 `dist/AuroraShelf-2.15.0-165-huavod-source-LOCAL.apk`（4,401,829 bytes，SHA-256 `3ffd93f8da424a11154fd3e92facf101366da6a67b989864fd43969fc554b10f`）並完成模擬器端到端實測（136+ 影片渲染、236 集識別、ExoPlayer 播放 1h06m 喜劇之王單口季出畫）— 2026-10-27。
 - [x] 166 Beeg（beeg.com）官方視頻源深度接入、REST API 解析、多態分類導航、聯網搜索與 ExoPlayer 原生硬解播放：逆向分析 Beeg SPA 與底層 REST API 服務（store.externulls.com），註冊海外視頻源 `beeg` 並劃入「擴展視頻源（海外/國際線路）」配 Apple HIG 天藍色微型膠囊；頂部分類動態映射至「精選 / 自拍 / 日本 / 熟女 / 亞洲」；列表解析器對接 `/tag/videos/{tag}` 路由並支持分頁加載；在 `AuroraViewModel.kt` 支持聯網搜索；在 `PlaybackResolver` 實現 `resolveBeeg` 對接 `/video/play_url/{fileId}` 由 ExoPlayer 原生硬解播放 M3U8 清單，首幀 1.04 秒出畫；通過 191 項 JVM 單測（100% 通過）；構建 Release 正式包 `dist/AuroraShelf-2.15.0-166-beeg-source-LOCAL.apk`（4,401,829 bytes，SHA-256 `c560c1f4191c6a5b6f0651e835f976d7a654dc188d10ec6cde5bc3994ae5f816`）並完成模擬器端到端實測 — 2026-10-27。
+# 已完成（2026-11-05）
+
+- [x] 修复华视影院播放解析：绕过失效 `channel_key`，使用实时 `mt` 令牌换取签名代理 M3U8，并验证清单/分片可达。
+- [x] 修复视频卡片交互：封面整块点击播放，标题保留播放入口，叠加评分不拦截点击。
+- [x] 增加华视响应形状回归测试；iOS 测试 51 项通过。

@@ -39,7 +39,7 @@ public enum VideoSourceCatalog {
         id: "huavod",
         name: "华视影院",
         group: .direct,
-        description: "大陆直连 · 4K 高清电影/连续剧/短剧",
+        description: "影视分类列表 · 原站详情页解析",
         baseUrl: "https://huavod.com",
         categories: ["全部", "电影", "电视剧", "综艺", "动漫", "短剧"],
         isDirectConnect: true
@@ -50,7 +50,7 @@ public enum VideoSourceCatalog {
         id: "huangguo",
         name: "黄果短剧",
         group: .direct,
-        description: "快节奏爽剧 · 原生无尽分页",
+        description: "短剧分类列表 · 原站详情页解析",
         baseUrl: "https://huangguoai.com",
         categories: ["全部", "推荐", "最新", "AI漫剧", "AI换脸"],
         isDirectConnect: true
@@ -61,7 +61,7 @@ public enum VideoSourceCatalog {
         id: "91porn",
         name: "91视频",
         group: .direct,
-        description: "经典原创视界 · 真实视频流",
+        description: "视频分类列表 · 原站播放页解析",
         baseUrl: "https://h1014.sol148.com",
         categories: ["全部", "当前最热", "非付费", "最近加精", "高清"],
         isDirectConnect: true
@@ -72,7 +72,7 @@ public enum VideoSourceCatalog {
         id: "91dongman",
         name: "91动漫",
         group: .direct,
-        description: "高清番剧 · AES 解密封面直连",
+        description: "番剧分类列表 · 支持加密封面解码",
         baseUrl: "https://91dongman.net",
         categories: ["全部", "连载番剧", "剧场版", "完结经典", "里番特区"],
         isDirectConnect: true
@@ -83,7 +83,7 @@ public enum VideoSourceCatalog {
         id: "beeg",
         name: "Beeg",
         group: .overseas,
-        description: "国际精选 · REST API 高清流",
+        description: "REST API 视频列表 · 原站播放信息",
         baseUrl: "https://beeg.com",
         categories: ["全部", "精选", "日本", "自拍", "亚洲", "欧美"],
         isDirectConnect: false
@@ -94,7 +94,7 @@ public enum VideoSourceCatalog {
         id: "xvideos",
         name: "XVideos",
         group: .overseas,
-        description: "全球最大视频源之一 · 41 全量分类",
+        description: "站点分类列表 · 视频详情页解析",
         baseUrl: "https://www.xvideos.com",
         categories: ["全部", "热播", "最佳", "自拍", "日本", "亚洲", "4K超清"],
         isDirectConnect: false
@@ -105,8 +105,8 @@ public enum VideoSourceCatalog {
         id: "missav",
         name: "MissAV",
         group: .overseas,
-        description: "高清中字 · 每日同步最新发售",
-        baseUrl: "https://missav.ai",
+        description: "站点检索列表 · 原站详情页解析",
+        baseUrl: "https://missav123.com",
         categories: ["全部", "最新发布", "热门中字", "无码流出", "VR专区"],
         isDirectConnect: false
     )
@@ -115,8 +115,8 @@ public enum VideoSourceCatalog {
         id: "kissjav",
         name: "KissJAV",
         group: .overseas,
-        description: "超清无码 · 完整版流媒体",
-        baseUrl: "https://kissjav.com",
+        description: "站点检索列表 · 原站详情页解析",
+        baseUrl: "https://kissjav.li",
         categories: ["全部", "热门", "新片", "无码", "中文字幕"],
         isDirectConnect: false
     )
@@ -125,8 +125,8 @@ public enum VideoSourceCatalog {
         id: "85po",
         name: "85po",
         group: .overseas,
-        description: "轻量高速 · 简洁列表",
-        baseUrl: "https://85po.com",
+        description: "日文列表与搜索 · 原站详情页解析",
+        baseUrl: "https://www.85po.com",
         categories: ["全部", "最近更新", "精选热播", "高清画质"],
         isDirectConnect: false
     )
@@ -135,8 +135,8 @@ public enum VideoSourceCatalog {
         id: "pornhub",
         name: "Pornhub",
         group: .overseas,
-        description: "全球头部平台 · 认证创作者流",
-        baseUrl: "https://www.pornhub.com",
+        description: "区域站点列表与搜索 · 原站详情页解析",
+        baseUrl: "https://jp.pornhub.com",
         categories: ["全部", "认证精选", "热门榜单", "4K超清", "中文字幕"],
         isDirectConnect: false
     )
@@ -145,7 +145,7 @@ public enum VideoSourceCatalog {
         id: "javnoni",
         name: "JAV-NONI",
         group: .overseas,
-        description: "多线路极速解包 · 线性扫描",
+        description: "站点分类与搜索列表 · 原站详情页解析",
         baseUrl: "https://javnoni.com",
         categories: ["全部", "最新上线", "中文字幕", "素人企划"],
         isDirectConnect: false
@@ -155,8 +155,8 @@ public enum VideoSourceCatalog {
         id: "javsb",
         name: "JAVSB",
         group: .overseas,
-        description: "无水印超清在线",
-        baseUrl: "https://javsb.net",
+        description: "榜单与搜索列表 · 原站详情页解析",
+        baseUrl: "https://jav.sb",
         categories: ["全部", "精选", "排行", "最新"],
         isDirectConnect: false
     )
@@ -165,7 +165,7 @@ public enum VideoSourceCatalog {
         id: "tokyomotion",
         name: "TOKYO Motion",
         group: .overseas,
-        description: "东京潮流 · 原创短片社区",
+        description: "视频列表与搜索 · 原站详情页解析",
         baseUrl: "https://www.tokyomotion.net",
         categories: ["全部", "最新", "最高评分", "最多收藏"],
         isDirectConnect: false
@@ -175,8 +175,8 @@ public enum VideoSourceCatalog {
         id: "spankbang",
         name: "SpankBang",
         group: .overseas,
-        description: "4K 60fps 高帧率流媒体",
-        baseUrl: "https://spankbang.com",
+        description: "站点搜索与分类 · 原站详情页解析",
+        baseUrl: "https://www.spankbang.com",
         categories: ["全部", "4K 60FPS", "当下热门", "精选特辑"],
         isDirectConnect: false
     )
@@ -185,7 +185,7 @@ public enum VideoSourceCatalog {
         id: "xhamster",
         name: "xHamster",
         group: .overseas,
-        description: "老牌国际巨擘 · 极速分发",
+        description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://xhamster.com",
         categories: ["全部", "最佳视频", "最新发布", "本地精选"],
         isDirectConnect: false
@@ -195,7 +195,7 @@ public enum VideoSourceCatalog {
         id: "eporner",
         name: "EPORNER",
         group: .overseas,
-        description: "原生真 4K HDR 码率流",
+        description: "JSON API 视频列表与搜索",
         baseUrl: "https://www.eporner.com",
         categories: ["全部", "4K 超清", "最受喜爱", "本周热门"],
         isDirectConnect: false
@@ -205,7 +205,7 @@ public enum VideoSourceCatalog {
         id: "mrdouga",
         name: "MRDOUGA",
         group: .overseas,
-        description: "日韩精选影视短视频",
+        description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://mrdouga.com",
         categories: ["全部", "推荐", "热门", "新番"],
         isDirectConnect: false
@@ -215,7 +215,7 @@ public enum VideoSourceCatalog {
         id: "ohentai",
         name: "OHentai",
         group: .overseas,
-        description: "精美二次元动漫影视",
+        description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://ohentai.org",
         categories: ["全部", "人气推荐", "新番速递", "全集连载"],
         isDirectConnect: false
@@ -225,9 +225,9 @@ public enum VideoSourceCatalog {
         id: "xnxx",
         name: "XNXX",
         group: .overseas,
-        description: "经典高速多码率直链",
+        description: "官方榜单列表 · 原站详情页解析",
         baseUrl: "https://www.xnxx.com",
-        categories: ["全部", "热门精选", "最新更新", "高清特区"],
+        categories: ["全部"],
         isDirectConnect: false
     )
     
@@ -239,6 +239,36 @@ public enum VideoSourceCatalog {
         tokyomotion, spankbang, xhamster,
         eporner, mrdouga, ohentai, xnxx
     ]
+
+    /// Sources with a dedicated repository flow (including the two structured API adapters).
+    public static let dedicatedAdapterSourceIDs: Set<String> = [
+        huavod.id, huangguo.id, porn91.id, dongman91.id, beeg.id, xvideos.id, eporner.id
+    ]
+
+    /// Sources routed through the shared HTML list/detail parser.
+    public static let htmlAdapterSourceIDs: Set<String> = [
+        missav.id, kissjav.id, po85.id, pornhub.id, javnoni.id, javsb.id,
+        tokyomotion.id, spankbang.id, xhamster.id, mrdouga.id, ohentai.id, xnxx.id
+    ]
+
+    /// Registration is explicit so adding a catalogue item cannot silently mark it integrated.
+    public static let supportedSourceIDs = dedicatedAdapterSourceIDs.union(htmlAdapterSourceIDs)
+
+    /// Full-text search is implemented only when the upstream exposes a search route.
+    /// Beeg's current adapter provides tag feeds, not a verified keyword-search API.
+    public static let searchableSourceIDs = supportedSourceIDs.subtracting([beeg.id])
+
+    public static var supportedSources: [VideoSourceDefinition] {
+        allSources.filter { supportedSourceIDs.contains($0.id) }
+    }
+
+    public static var searchableSources: [VideoSourceDefinition] {
+        allSources.filter { searchableSourceIDs.contains($0.id) }
+    }
+
+    public static func isSupported(_ source: VideoSourceDefinition) -> Bool {
+        supportedSourceIDs.contains(source.id)
+    }
     
     public static func find(by id: String) -> VideoSourceDefinition {
         allSources.first(where: { $0.id == id }) ?? huavod

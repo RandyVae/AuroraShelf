@@ -36,6 +36,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -82,6 +85,7 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -94,6 +98,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -152,6 +157,8 @@ import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
 import com.aurorashelf.app.ui.theme.AuroraMediaRankFill
 import com.aurorashelf.app.ui.theme.AuroraMediaRankOutline
 import com.aurorashelf.app.ui.theme.AuroraMediaSurface
+import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
+import com.aurorashelf.app.ui.theme.AuroraMediaMeta
 import java.io.ByteArrayInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -170,6 +177,7 @@ internal fun LiveScreen(
     onVideoOrientationChange: (Boolean) -> Unit = {},
     onCategory: (LiveCategory) -> Unit,
     onSelectSource: (String) -> Unit = {},
+    onSearch: () -> Unit = {},
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onOpen: (LiveItem) -> Unit,
@@ -192,6 +200,7 @@ internal fun LiveScreen(
                 bottomPadding = bottomPadding,
                 onCategory = onCategory,
                 onSelectSource = onSelectSource,
+                onSearch = onSearch,
                 onRefresh = onRefresh,
                 onLoadMore = onLoadMore,
                 onOpen = onOpen,
@@ -217,6 +226,7 @@ private fun LiveFeed(
     bottomPadding: Dp,
     onCategory: (LiveCategory) -> Unit,
     onSelectSource: (String) -> Unit,
+    onSearch: () -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onOpen: (LiveItem) -> Unit,
@@ -226,6 +236,11 @@ private fun LiveFeed(
     // C3: with >=150% system font the artwork columns widen with the font scale (capped),
     // so the adaptive grid collapses to one column instead of clipping card text.
     val gridState = rememberLazyGridState()
+    val isScrolled by remember {
+        derivedStateOf {
+            gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 40
+        }
+    }
     val prefetchContext = LocalContext.current
     // task-17: warm the first screen's previews (bytes + decode) without touching card layout.
     LaunchedEffect(state.items) {
@@ -245,102 +260,189 @@ private fun LiveFeed(
         }
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(minSize = scaledAdaptiveMinSize(164.dp, fontScale)),
-        state = gridState,
-        contentPadding = PaddingValues(start = 18.dp, top = 20.dp, end = 18.dp, bottom = bottomPadding + 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxSize().statusBarsPadding().testTag("live-grid"),
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AuroraImmersiveBackground),
     ) {
-        item(span = { GridItemSpan(maxLineSpan) }) {
-            LiveHeader(onRefresh = onRefresh, onSettings = onSettings)
-        }
-        stickyHeader(key = "live-pinned-categories") {
-            CategoryStrip(testTag = "live-category-bar") {
-                LiveCategory.entries.forEach { category ->
-                    NetflixCategoryChip(
-                        selected = state.selectedCategory == category,
-                        onClick = { onCategory(category) },
-                        label = category.label,
-                    )
-                }
-            }
-        }
-
-        if (state.isLoading && state.items.isEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().height(320.dp)) {
-                    CircularProgressIndicator(color = AuroraCoral)
-                }
-            }
-        } else if (state.error != null && state.items.isEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                LiveError(message = state.error, onRetry = onRefresh)
-            }
-        } else if (state.items.isEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().height(260.dp)) {
-                    Text("当前分类没有公开直播", color = AuroraMediaMuted)
-                }
-            }
-        } else {
-            // Netflix Live Hero Billboard
-            val heroItem = state.items.first()
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                NetflixLiveHeroBillboard(
-                    item = heroItem,
-                    onOpen = { onOpen(heroItem) },
-                )
-            }
-
-            // Top 10 Live Performers Shelf
-            if (state.items.size >= 5) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(minSize = scaledAdaptiveMinSize(164.dp, fontScale)),
+            state = gridState,
+            contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = bottomPadding + 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxSize().testTag("live-grid"),
+        ) {
+            if (state.isLoading && state.items.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    NetflixSectionHeader(
-                        title = "人气主播 TOP 10",
-                        badgeText = "TOP 10",
-                    )
+                    Spacer(Modifier.height(130.dp))
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxWidth(),
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().height(260.dp)) {
+                        CircularProgressIndicator(color = AuroraCoral)
+                    }
+                }
+            } else if (state.error != null && state.items.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Spacer(Modifier.height(130.dp))
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    val altSourceId = if (state.selectedSourceId == LiveSourceCatalog.STRIPCHAT.id) {
+                        LiveSourceCatalog.HORNYSTUDENTS.id
+                    } else {
+                        LiveSourceCatalog.STRIPCHAT.id
+                    }
+                    val altSourceName = LiveSourceCatalog.find(altSourceId).name
+                    LiveError(
+                        message = state.error,
+                        onRetry = onRefresh,
+                        onSwitchSource = { onSelectSource(altSourceId) },
+                        switchSourceLabel = "切换至 $altSourceName 备用源",
+                    )
+                }
+            } else if (state.items.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Spacer(Modifier.height(130.dp))
+                }
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    val altSourceId = if (state.selectedSourceId == LiveSourceCatalog.STRIPCHAT.id) {
+                        LiveSourceCatalog.HORNYSTUDENTS.id
+                    } else {
+                        LiveSourceCatalog.STRIPCHAT.id
+                    }
+                    val altSourceName = LiveSourceCatalog.find(altSourceId).name
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth().height(260.dp),
                     ) {
-                        val topPerformers = state.items.take(10)
-                        itemsIndexed(topPerformers) { index, item ->
-                            NetflixLiveTop10Card(
-                                rank = index + 1,
-                                item = item,
-                                onClick = { onOpen(item) },
+                        Text("当前分类没有公开直播", color = AuroraMediaMuted)
+                        OutlinedButton(onClick = { onSelectSource(altSourceId) }) {
+                            Text("切换至 $altSourceName")
+                        }
+                    }
+                }
+            } else {
+                // 1. Netflix Live Hero Billboard at item 0 (full screen bleed)
+                val heroItem = state.items.first()
+                item(key = "hero-billboard", span = { GridItemSpan(maxLineSpan) }) {
+                    NetflixLiveHeroBillboard(
+                        item = heroItem,
+                        onOpen = { onOpen(heroItem) },
+                    )
+                }
+
+                // 2. Pinned Categories Strip with Source Selection
+                item(key = "live-pinned-categories", span = { GridItemSpan(maxLineSpan) }) {
+                    CategoryStrip(
+                        testTag = "live-category-bar",
+                        isScrolled = isScrolled,
+                        applyBackground = false,
+                    ) {
+                        // 直播平台源切换 (Stripchat / HornyStudents)
+                        LiveSourceCatalog.sources.forEach { src ->
+                            NetflixCategoryChip(
+                                selected = state.selectedSourceId == src.id,
+                                onClick = { onSelectSource(src.id) },
+                                label = "源: ${src.name}",
+                            )
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        LiveCategory.entries.forEach { category ->
+                            NetflixCategoryChip(
+                                selected = state.selectedCategory == category,
+                                onClick = { onCategory(category) },
+                                label = category.label,
                             )
                         }
                     }
                 }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    NetflixSectionHeader(
-                        title = "正在直播",
-                    )
+
+                // 3. Featured Live Streamers Shelf (Apple TV 4:3 native ratio)
+                if (state.items.size >= 5) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        NetflixSectionHeader(
+                            title = "热门推荐 FEATURED",
+                            subtitle = "热门实时直播",
+                        )
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            val topPerformers = state.items.take(10)
+                            items(topPerformers, key = { "live-featured-${it.id}" }) { item ->
+                                LiveFeaturedCard(
+                                    item = item,
+                                    onClick = { onOpen(item) },
+                                )
+                            }
+                        }
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        NetflixSectionHeader(
+                            title = "正在直播",
+                        )
+                    }
+                }
+
+                items(state.items.drop(1), key = LiveItem::id) { item ->
+                    LiveCard(item = item, onClick = { onOpen(item) })
                 }
             }
 
-            items(state.items, key = LiveItem::id) { item ->
-                LiveCard(item = item, onClick = { onOpen(item) })
+            if (state.isLoadingMore) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(18.dp)) {
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                    }
+                }
+            } else if (state.error != null && state.items.isNotEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    TextButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
+                        Text("加载更多失败，点击重试")
+                    }
+                }
             }
         }
 
-        if (state.isLoadingMore) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(18.dp)) {
-                    CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
-                }
-            }
-        } else if (state.error != null && state.items.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                TextButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
-                    Text("加载更多失败，点击重试")
-                }
+        val headerModifier = if (isScrolled) {
+            Modifier
+                .background(Color(0xFF000000).copy(alpha = 0.96f))
+                .border(BorderStroke(0.5.dp, Color(0xFF222222)), RectangleShape)
+        } else {
+            Modifier.background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.Black.copy(alpha = 0.85f),
+                        Color.Black.copy(alpha = 0.40f),
+                        Color.Transparent,
+                    ),
+                ),
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .then(headerModifier)
+                .windowInsetsPadding(WindowInsets.statusBars),
+        ) {
+            LiveHeader(
+                onSearch = onSearch,
+                onSettings = onSettings,
+            )
+            if (state.isLoading) {
+                LinearProgressIndicator(
+                    color = AuroraCoral,
+                    trackColor = Color.Transparent,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(2.dp),
+                )
             }
         }
     }
@@ -348,23 +450,14 @@ private fun LiveFeed(
 
 @Composable
 private fun LiveHeader(
-    onRefresh: () -> Unit,
+    onSearch: () -> Unit,
     onSettings: () -> Unit = {},
 ) {
-    NetflixTopBar(
-        modifier = Modifier.padding(bottom = 6.dp),
-    ) {
-        IconButton(
-            onClick = onRefresh,
-            modifier = Modifier.size(40.dp),
-        ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = "刷新直播列表",
-                tint = Color.White,
-                modifier = Modifier.size(22.dp),
-            )
-        }
+    NetflixTopBar {
+        NetflixSearchCapsule(
+            label = "搜索直播",
+            onClick = onSearch,
+        )
     }
 }
 
@@ -394,8 +487,7 @@ private fun NetflixLiveHeroBillboard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(410.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .height(460.dp)
             .clickable(role = Role.Button, onClick = onOpen),
     ) {
         AsyncImage(
@@ -452,7 +544,6 @@ private fun NetflixLiveHeroBillboard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                NetflixNLogo(modifier = Modifier.size(width = 12.dp, height = 18.dp))
                 NetflixBadge(text = "● LIVE 直播中", backgroundColor = AuroraCoral)
                 if (item.isHd) {
                     NetflixBadge(text = "1080P 高清", backgroundColor = Color(0xFF262626))
@@ -521,17 +612,12 @@ private fun NetflixLiveHeroBillboard(
 }
 
 @Composable
-private fun NetflixLiveTop10Card(
-    rank: Int,
+private fun LiveFeaturedCard(
     item: LiveItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
-    val rankOffset = if (rank >= 10) 56.dp else 42.dp
-    val totalWidth = rankOffset + 120.dp
-
     val previewBytes by produceState<ByteArray?>(initialValue = null, key1 = item.thumbnailUrl) {
         value = withContext(Dispatchers.IO) {
             CoverImageLoader.load(item.thumbnailUrl, liveReferer(item))
@@ -546,57 +632,94 @@ private fun NetflixLiveTop10Card(
         }
     }
 
-    Box(
+    Column(
         modifier = modifier
-            .width(totalWidth)
-            .height(168.dp)
-            .applePressEffect(onClick = onClick),
+            .width(180.dp)
+            .clickable(role = Role.Button, onClick = onClick),
     ) {
-        NetflixRankNumber(
-            rank = rank,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .offset(x = (-4).dp, y = 8.dp),
-        )
-
+        // 4:3 Live video aspect ratio (180x135 dp)
         Surface(
-            shape = RoundedCornerShape(4.dp),
+            shape = RoundedCornerShape(10.dp),
             color = AuroraMediaPlaceholder,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .width(120.dp)
-                .height(158.dp),
+                .width(180.dp)
+                .height(135.dp),
+            shadowElevation = 4.dp,
         ) {
             Box(Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = previewRequest,
+                    contentDescription = item.username,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+                // Top-right ● LIVE & viewers capsule
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(10.dp))
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .background(Color(0xFFFF3B30), CircleShape),
+                    )
+                    Text(
+                        text = "LIVE",
+                        color = Color.White,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    if (item.viewersCount > 0) {
+                        Text(
+                            text = "· ${formatViewerCount(item.viewersCount)}",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(6.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = AuroraMediaSurfaceVariant,
+                modifier = Modifier.size(24.dp),
+            ) {
                 AsyncImage(
                     model = previewRequest,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .background(AuroraCoral, RoundedCornerShape(bottomEnd = 4.dp))
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                ) {
-                    Text(
-                        text = "TOP 10",
-                        color = Color.White,
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                    )
-                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "${formatViewerCount(item.viewersCount)} 人",
+                    text = "${countryFlag(item.countryCode)} ${item.username}",
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    ),
                     color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(4.dp)
-                        .background(AuroraImmersiveBackground.copy(alpha = 0.78f), RoundedCornerShape(3.dp))
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = if (item.isHd) "1080P 超清直播" else "实时公开直播",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = AuroraMediaMeta,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -622,25 +745,23 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
         }
     }
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(8.dp),
         color = AuroraMediaSurface,
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
-            .applePressEffect(onClick = onClick)
             .semantics { contentDescription = "观看 ${item.username} 的公开直播" }
             .testTag("live-card"),
     ) {
         Column {
             Box {
-                val isHs = item.playerUrl.contains("hornystudents.com")
                 AsyncImage(
                     model = previewRequest,
                     contentDescription = "${item.username} 直播预览",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .aspectRatio(if (isHs) 4f / 3f else 16 / 10f),
+                        .aspectRatio(4f / 3f),
                 )
                 DarkModeArtworkScrim()
                 Surface(
@@ -679,6 +800,7 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
             Text(
                 text = "$flag ${item.username}",
                 maxLines = 1,
+                minLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
                 color = Color.White,
@@ -695,6 +817,7 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
                     color = AuroraMediaMuted,
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                     maxLines = 1,
+                    minLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -703,7 +826,12 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
 }
 
 @Composable
-private fun LiveError(message: String, onRetry: () -> Unit) {
+private fun LiveError(
+    message: String,
+    onRetry: () -> Unit,
+    onSwitchSource: (() -> Unit)? = null,
+    switchSourceLabel: String? = null,
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -711,7 +839,17 @@ private fun LiveError(message: String, onRetry: () -> Unit) {
     ) {
         Icon(Icons.Default.LiveTv, contentDescription = null, modifier = Modifier.size(42.dp))
         Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = onRetry) { Text("重试") }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Button(onClick = onRetry) { Text("重试") }
+            if (onSwitchSource != null && switchSourceLabel != null) {
+                OutlinedButton(onClick = onSwitchSource) {
+                    Text(switchSourceLabel)
+                }
+            }
+        }
     }
 }
 
@@ -967,43 +1105,13 @@ private fun LivePlayerScreen(
             }
         }
     }
-    Column(modifier = Modifier.fillMaxSize().background(AuroraImmersiveBackground).testTag("live-player")) {
-        if (!isFullscreen) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .height(48.dp)
-                    .padding(horizontal = 8.dp),
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回直播列表",
-                        tint = Color.White,
-                    )
-                }
-                Text(
-                    item.username,
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = openInBrowser) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.OpenInNew,
-                        contentDescription = "在系统浏览器中打开",
-                        tint = Color.LightGray,
-                        modifier = Modifier.size(18.dp),
-                    )
-                }
-                val siteName = if (item.playerUrl.contains("hornystudents.com")) "HornyStudents" else "Stripchat"
-                Text(siteName, color = Color.LightGray, style = MaterialTheme.typography.labelSmall)
-            }
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AuroraImmersiveBackground)
+            .auroraSwipeBack(enabled = !isFullscreen, onDismiss = onBack)
+            .testTag("live-player"),
+    ) {
         val playerModifier = if (isFullscreen) {
             Modifier.fillMaxSize()
         } else {
@@ -1546,7 +1654,7 @@ private fun EmbeddedLivePlayer(
         fullscreenView?.let { view ->
             AndroidView(factory = { view }, modifier = Modifier.fillMaxSize().background(AuroraImmersiveBackground))
         }
-        if (isFullscreen && isPlayerReady) {
+        if (isPlayerReady) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1607,101 +1715,99 @@ private fun EmbeddedLivePlayer(
             }
         }
 
-        // Top Bar in Fullscreen
-        if (isFullscreen) {
-            AnimatedVisibility(
-                visible = controlsVisible,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier.align(Alignment.TopCenter),
+        // Top Bar in Inline and Fullscreen
+        AnimatedVisibility(
+            visible = !isFullscreen || controlsVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent),
+                        ),
+                    )
+                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent),
-                            ),
-                        )
-                        .statusBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                ) {
-                    IconButton(onClick = onBack) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color.Black.copy(alpha = 0.55f),
-                            modifier = Modifier.size(36.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "退出全屏",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
-                        }
-                    }
-                    item?.let {
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = it.username,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Surface(
-                            color = AuroraCoral,
-                            shape = RoundedCornerShape(3.dp),
-                        ) {
-                            Text(
-                                "LIVE",
-                                color = Color.White,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                            )
-                        }
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "${formatViewerCount(it.viewersCount)} 人",
-                            color = Color.LightGray,
-                            fontSize = 12.sp,
-                        )
-                    }
-                    Spacer(Modifier.weight(1f))
-                    // Danmaku mode switch pill
+                IconButton(onClick = onBack) {
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (isDanmakuEnabled) AuroraCoral.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.65f),
-                        border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color.White.copy(alpha = 0.35f)),
-                        onClick = {
-                            isDanmakuEnabled = !isDanmakuEnabled
-                            feedbackMessage = if (isDanmakuEnabled) "已开启弹幕浮层" else "已开启纯净观看模式（评论已关闭）"
-                        },
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.55f),
+                        modifier = Modifier.size(36.dp),
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        ) {
+                        Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                imageVector = if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
-                                contentDescription = null,
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = if (isFullscreen) "退出全屏" else "返回直播列表",
                                 tint = Color.White,
-                                modifier = Modifier.size(15.dp),
-                            )
-                            Text(
-                                text = if (isDanmakuEnabled) "弹幕 开" else "纯净模式",
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.size(18.dp),
                             )
                         }
+                    }
+                }
+                item?.let {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = it.username,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Surface(
+                        color = AuroraCoral,
+                        shape = RoundedCornerShape(3.dp),
+                    ) {
+                        Text(
+                            "LIVE",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "${formatViewerCount(it.viewersCount)} 人",
+                        color = Color.LightGray,
+                        fontSize = 12.sp,
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                // Danmaku mode switch pill
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isDanmakuEnabled) AuroraCoral.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.65f),
+                    border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color.White.copy(alpha = 0.35f)),
+                    onClick = {
+                        isDanmakuEnabled = !isDanmakuEnabled
+                        feedbackMessage = if (isDanmakuEnabled) "已开启弹幕浮层" else "已开启纯净观看模式（评论已关闭）"
+                    },
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Text(
+                            text = if (isDanmakuEnabled) "弹幕 开" else "纯净模式",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
             }

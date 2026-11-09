@@ -1,0 +1,114 @@
+[
+  {
+    "id": "cg_3rd_anni",
+    "title": "諸神降臨 · 三週年盛典",
+    "char": "全體特勤",
+    "src": "assets/cg/cg_3rd_anni.webp",
+    "thumb": "assets/cg/cg_3rd_anni_thumb.webp"
+  },
+  {
+    "id": "cg_3half_anni",
+    "title": "愛欲狂潮 · 3.5週年慶",
+    "char": "全體特勤",
+    "src": "assets/cg/cg_3half_anni.webp",
+    "thumb": "assets/cg/cg_3half_anni_thumb.webp"
+  },
+  {
+    "id": "cg_kart_police",
+    "title": "制服特警 · 戒嚴執勤",
+    "char": "Cartilla 卡蒂拉",
+    "src": "assets/cg/cg_kart_police.webp",
+    "thumb": "assets/cg/cg_kart_police_thumb.webp"
+  },
+  {
+    "id": "cg_kart_jeans",
+    "title": "街頭便裝 · 假日巡警",
+    "char": "Cartilla 卡蒂拉",
+    "src": "assets/cg/cg_kart_jeans.webp",
+    "thumb": "assets/cg/cg_kart_jeans_thumb.webp"
+  },
+  {
+    "id": "cg_ines_teacher",
+    "title": "學院教師 · 嚴格受導",
+    "char": "Ines 伊涅絲",
+    "src": "assets/cg/cg_ines_teacher.webp",
+    "thumb": "assets/cg/cg_ines_teacher_thumb.webp"
+  },
+  {
+    "id": "cg_luf_yoga",
+    "title": "熱力瑜伽 · 靈動姿態",
+    "char": "Luf 露菲",
+    "src": "assets/cg/cg_luf_yoga.webp",
+    "thumb": "assets/cg/cg_luf_yoga_thumb.webp"
+  },
+  {
+    "id": "cg_luf_sweater",
+    "title": "居家毛衣 · 晨光微曦",
+    "char": "Luf 露菲",
+    "src": "assets/cg/cg_luf_sweater.webp",
+    "thumb": "assets/cg/cg_luf_sweater_thumb.webp"
+  },
+  {
+    "id": "cg_misa_prisoner",
+    "title": "重犯禁錮 · 破枷死鬥",
+    "char": "Misaki 美咲",
+    "src": "assets/cg/cg_misa_prisoner.webp",
+    "thumb": "assets/cg/cg_misa_prisoner_thumb.webp"
+  },
+  {
+    "id": "cg_erin_succubus",
+    "title": "夜色魅魔 · 緋紅迷夢",
+    "char": "Erin 艾琳",
+    "src": "assets/cg/cg_erin_succubus.webp",
+    "thumb": "assets/cg/cg_erin_succubus_thumb.webp"
+  },
+  {
+    "id": "cg_fen_nurse",
+    "title": "白衣天使 · 特殊診療",
+    "char": "Fen 芬妮",
+    "src": "assets/cg/cg_fen_nurse.webp",
+    "thumb": "assets/cg/cg_fen_nurse_thumb.webp"
+  },
+  {
+    "id": "cg_miri_nurse",
+    "title": "急救護理 · 貼身救護",
+    "char": "Miri 米莉",
+    "src": "assets/cg/cg_miri_nurse.webp",
+    "thumb": "assets/cg/cg_miri_nurse_thumb.webp"
+  },
+  {
+    "id": "cg_sera_sailor",
+    "title": "水手蔚藍 · 海風微瀾",
+    "char": "Sera 塞拉",
+    "src": "assets/cg/cg_sera_sailor.webp",
+    "thumb": "assets/cg/cg_sera_sailor_thumb.webp"
+  },
+  {
+    "id": "cg_lynn_dancer",
+    "title": "暗夜舞姬 · 幽魅旋律",
+    "char": "Lynn 琳恩",
+    "src": "assets/cg/cg_lynn_dancer.webp",
+    "thumb": "assets/cg/cg_lynn_dancer_thumb.webp"
+  },
+  {
+    "id": "cg_lynn_stewardess",
+    "title": "雲端空乘 · 專屬座艙",
+    "char": "Lynn 琳恩",
+    "src": "assets/cg/cg_lynn_stewardess.webp",
+    "thumb": "assets/cg/cg_lynn_stewardess_thumb.webp"
+  },
+  {
+    "id": "cg_rana_newyear",
+    "title": "新春盛裝 · 金絲錦緞",
+    "char": "Rana 蕾娜",
+    "src": "assets/cg/cg_rana_newyear.webp",
+    "thumb": "assets/cg/cg_rana_newyear_thumb.webp"
+  },
+  {
+    "id": "cg_rana_cow",
+    "title": "純真萌態 · 萌趣玩伴",
+    "char": "Rana 蕾娜",
+    "src": "assets/cg/cg_rana_cow.webp",
+    "thumb": "assets/cg/cg_rana_cow_thumb.webp"
+  }
+]

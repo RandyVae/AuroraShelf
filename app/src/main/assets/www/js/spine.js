@@ -101,7 +101,9 @@
     for (const slot of skel.slots) {
       if (slot.boneData && slot.boneData.name === 'FLOOR' && slot.attachment) slot.attachment = null;
     }
-    const state = new spine.AnimationState(new spine.AnimationStateData(data));
+    const stateData = new spine.AnimationStateData(data);
+    stateData.defaultMix = 0.22; // 220ms 平滑骨骼混合过渡，彻底消除动作生硬抽搐与单帧硬切
+    const state = new spine.AnimationState(stateData);
     const idle = data.animations.find((a) => a.name === 'idle') ? 'idle' : (data.animations[0] && data.animations[0].name);
     if (idle) state.setAnimation(0, idle, true);
     const wantH = opts.heightPx || 180;
@@ -110,8 +112,10 @@
     skel.scaleY = scale;
     const view = {
       unitName, data, skeleton: skel, state, scale,
+      baseScale: scale,
       x: opts.x || 0, y: opts.y || 0, flip: !!opts.flip,
-      animationUntil: 0, alpha: 1,
+      animationUntil: 0, alpha: 1, hitFlash: 0,
+      squashTimer: 0, squashDur: 0.16, targetSquashX: 1, targetSquashY: 1,
     };
     this.position(view, view.x, view.y);
     this.units.push(view);
@@ -143,7 +147,12 @@
       name = anim.name;
     }
     view.state.setAnimation(0, name, loop !== false);
-    if (holdSeconds) view.animationUntil = performance.now() + holdSeconds * 1000;
+    if (loop === false) {
+      const idleAnim = view.data.animations.find((a) => a.name === 'idle') || view.data.animations[0];
+      if (idleAnim) {
+        view.state.addAnimation(0, idleAnim.name, true, 0);
+      }
+    }
     return true;
   };
 
@@ -158,12 +167,35 @@
     if (i >= 0) this.units.splice(i, 1);
   };
 
+  SpineField.prototype.clear = function () {
+    if (this.units) {
+      this.units.forEach((u) => {
+        try { if (u && u.state) u.state.clearTracks(); } catch (_) {}
+      });
+      this.units = [];
+    }
+    if (this.ctx && this.ctx.gl) {
+      try {
+        this.ctx.gl.clearColor(0, 0, 0, 0);
+        this.ctx.gl.clear(this.ctx.gl.COLOR_BUFFER_BIT);
+      } catch (_) {}
+    }
+  };
+
   SpineField.prototype.project = function (x, y) {
     if (!this.renderer) return { x, y: this.H ? this.H - y : y, z: 0 };
     const v = new spine.Vector3();
     v.x = x; v.y = y; v.z = 0;
     this.renderer.camera.worldToScreen(v, this.W, this.H);
     return v;
+  };
+
+  SpineField.prototype.squash = function (view, sqX, sqY, duration) {
+    if (!view || !view.skeleton) return;
+    view.targetSquashX = sqX;
+    view.targetSquashY = sqY;
+    view.squashDur = Math.max(0.06, duration || 0.16);
+    view.squashTimer = view.squashDur;
   };
 
   SpineField.prototype.update = function (dt) {
@@ -182,6 +214,31 @@
       if (v.animationUntil && performance.now() > v.animationUntil) {
         v.animationUntil = 0;
         this.resumeIdle(v);
+      }
+      // 骨骼弹性形变 (Squash & Stretch) 物理质感阻尼回弹与翻转锁死
+      if (!isReduce && v.squashTimer > 0) {
+        v.squashTimer = Math.max(0, v.squashTimer - dt);
+        const progress = v.squashTimer / v.squashDur;
+        const factor = Math.sin(progress * Math.PI);
+        const curSquashX = 1 + (v.targetSquashX - 1) * factor;
+        const curSquashY = 1 + (v.targetSquashY - 1) * factor;
+        v.skeleton.scaleX = (v.baseScale || v.scale) * (v.flip ? -1 : 1) * curSquashX;
+        v.skeleton.scaleY = (v.baseScale || v.scale) * curSquashY;
+      } else {
+        v.skeleton.scaleX = (v.baseScale || v.scale) * (v.flip ? -1 : 1);
+        v.skeleton.scaleY = (v.baseScale || v.scale);
+      }
+      // 受击高能闪白衰减
+      if (v.hitFlash > 0) {
+        v.hitFlash = Math.max(0, v.hitFlash - dt);
+        const flashLevel = 1 + (v.hitFlash / 0.08) * 1.8;
+        v.skeleton.color.r = flashLevel;
+        v.skeleton.color.g = flashLevel;
+        v.skeleton.color.b = flashLevel;
+      } else if (v.skeleton.color.r !== 1) {
+        v.skeleton.color.r = 1;
+        v.skeleton.color.g = 1;
+        v.skeleton.color.b = 1;
       }
     }
   };

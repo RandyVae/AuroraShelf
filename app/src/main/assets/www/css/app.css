@@ -118,6 +118,57 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   background: var(--bg-base);
 }
 
+/* ---------- 微信 / iOS 小程序规范右上角浮动胶囊按键（纯网页环境） ---------- */
+.mini-program-capsule {
+  position: fixed;
+  top: calc(var(--safe-t, 0px) + 10px);
+  right: calc(var(--safe-r, 0px) + 14px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  background: rgba(18, 22, 34, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 0.8px solid rgba(255, 255, 255, 0.22);
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  user-select: none;
+}
+/* 在原生 iOS / Android App 宿主环境已有原生胶囊时隐藏 Web 兜底胶囊 */
+.native-app .mini-program-capsule {
+  display: none !important;
+}
+.mp-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  width: 42px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  transition: opacity 120ms ease;
+  padding: 0;
+}
+.mp-btn:active {
+  opacity: 0.55;
+}
+.mp-divider {
+  width: 0.8px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Slots 物理侧边拉杆彻底隐藏，杜绝手机端横向溢出 */
+.cabinet-side-lever {
+  display: none !important;
+}
+
 .stage {
   position: relative;
   width: min(100vw, 560px);

@@ -1,257 +1,416 @@
 import SwiftUI
 import AVKit
 
-public struct DanmakuMessage: Identifiable, Sendable {
-    public let id = UUID()
-    public let text: String
-    public let lane: Int
-    public let color: Color
-    
-    public init(text: String, lane: Int, color: Color = .white) {
-        self.text = text
-        self.lane = lane
-        self.color = color
-    }
-}
-
 public struct LivePlayerView: View {
     public let stream: LiveStreamItem
+    @Binding public var isFullScreen: Bool
+    @Binding public var isLandscape: Bool
+    @Binding public var isFillMode: Bool
+    public var topSafeArea: CGFloat = 0
     public let onDismiss: () -> Void
-    
+    public var onToggleHUD: ((String) -> Void)?
+    public var onComment: ((LiveComment) -> Void)?
+
     @State private var player: AVPlayer?
     @State private var isPlaying: Bool = false
     @State private var isLoadingLive: Bool = true
     @State private var liveError: String?
-    @State private var isDanmakuEnabled: Bool = true
-    @State private var danmakus: [DanmakuMessage] = []
-    @State private var inputMessage: String = ""
     @State private var showControls: Bool = true
+    @State private var hideControlsTask: DispatchWorkItem?
     @State private var itemStatusObserver: NSKeyValueObservation?
-    @State private var isFillMode: Bool = false
-    
-    public init(stream: LiveStreamItem, onDismiss: @escaping () -> Void) {
+    @State private var presentationSizeObserver: NSKeyValueObservation?
+    @State private var isPortraitStream: Bool = false
+    @State private var streamRequestTask: Task<Void, Never>?
+    @State private var activeStreamRequestID = UUID()
+    private static var streamContextCache: [String: (url: URL, timestamp: Date)] = [:]
+    @State private var showRoomChat = false
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    public init(
+        stream: LiveStreamItem,
+        isFullScreen: Binding<Bool> = .constant(false),
+        isLandscape: Binding<Bool> = .constant(false),
+        isFillMode: Binding<Bool> = .constant(false),
+        topSafeArea: CGFloat = 0,
+        onDismiss: @escaping () -> Void,
+        onToggleHUD: ((String) -> Void)? = nil,
+        onComment: ((LiveComment) -> Void)? = nil
+    ) {
         self.stream = stream
+        self._isFullScreen = isFullScreen
+        self._isLandscape = isLandscape
+        self._isFillMode = isFillMode
+        self.topSafeArea = topSafeArea
         self.onDismiss = onDismiss
+        self.onToggleHUD = onToggleHUD
+        self.onComment = onComment
     }
-    
+
     public var body: some View {
-        ZStack {
-            // 背景纯黑
-            Color.black.ignoresSafeArea()
-            
-            // 原生 AVPlayer 硬件解码直播视口（秒级出画，支持满铺与自适应）
-            if let player = player {
-                AuroraPlayerSurface(
-                    player: player,
-                    videoGravity: isFillMode ? .resizeAspectFill : .resizeAspect
-                )
-                .ignoresSafeArea()
-                .contentShape(Rectangle())
-                .onTapGesture(count: 2) {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    withAnimation(AuroraMotion.smooth) {
-                        isFillMode.toggle()
+        GeometryReader { geo in
+            let safeTop = max(topSafeArea, DeviceLayout.safeAreaTop(in: geo.size))
+            let needsTopOffset = !isFullScreen && !isLandscape
+
+            ZStack(alignment: .top) {
+                // 背景纯黑
+                Color.black
+
+                VStack(spacing: 0) {
+                    // 非全屏竖屏嵌入态：顶部垫入 safeTop 高度的纯黑安全区隔离底衬，使视频物理起始于灵动岛/状态栏下方，彻底杜绝向上位移
+                    if needsTopOffset {
+                        Color.black.frame(height: safeTop)
                     }
-                }
-                .onTapGesture(count: 1) {
-                    withAnimation(AuroraMotion.quick) {
-                        showControls.toggle()
-                    }
-                }
-            } else if isLoadingLive {
-                // 加载中过渡底图与 Spinner
-                ZStack {
-                    AsyncImage(url: URL(string: stream.snapshotUrl)) { phase in
-                        if let img = phase.image {
-                            img.resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .ignoresSafeArea()
-                                .opacity(0.35)
-                                .blur(radius: 16)
-                        }
-                    }
-                    
-                    VStack(spacing: AuroraMetrics.spacingL) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
-                            .scaleEffect(1.4)
-                        
-                        Text("正在直连 \(stream.username) 官方高清直播流...")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                    }
-                }
-            } else if let error = liveError {
-                // 离线或异常提示
-                VStack(spacing: AuroraMetrics.spacingL) {
-                    Image(systemName: "tv.slash.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(AuroraColor.brand)
-                    
-                    Text("主播暂时离开或正在私密表演")
-                        .font(.title3.bold())
-                        .foregroundStyle(.white)
-                    
-                    Text(error)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, AuroraMetrics.spacingXXXL)
-                    
-                    Button(action: {
-                        fetchAndStartLiveStream()
-                    }) {
-                        Text("重新连接")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, AuroraMetrics.spacingXL)
-                            .padding(.vertical, AuroraMetrics.spacingM)
-                            .background(AuroraColor.brand, in: .capsule)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            
-            // 4 泳道防碰撞错峰弹幕浮层（严格单行、宽度上限 320pt 约束）
-            if isDanmakuEnabled {
-                VStack(spacing: AuroraMetrics.spacingM) {
-                    ForEach(0..<4, id: \.self) { laneIndex in
-                        HStack {
-                            let laneDanmakus = danmakus.filter { $0.lane == laneIndex }
-                            ForEach(laneDanmakus) { d in
-                                Text(d.text)
-                                    .font(.callout.bold())
-                                    .lineLimit(1)
-                                    .frame(maxWidth: 320, alignment: .leading)
-                                    .foregroundStyle(d.color)
-                                    .padding(.horizontal, AuroraMetrics.spacingM)
-                                    .padding(.vertical, AuroraMetrics.spacingXS)
-                                    .background(.regularMaterial, in: .capsule)
-                                    .shadow(color: .black.opacity(0.3), radius: 2)
-                                    .transition(.asymmetric(insertion: .move(edge: .trailing), removal: .opacity))
-                            }
-                            Spacer()
-                        }
-                        .frame(height: 28)
-                    }
-                    Spacer()
-                }
-                .padding(.top, 96)
-                .padding(.horizontal, AuroraMetrics.contentInset)
-                .allowsHitTesting(false)
-            }
-            
-            // 浮动控制栏
-            if showControls || isLoadingLive || liveError != nil {
-                VStack {
-                    // 统一顶栏
-                    PlayerOverlayBar(
-                        title: stream.username,
-                        subtitle: "在线人数 \(stream.viewCount)",
-                        onDismiss: {
-                            cleanupLivePlayer()
-                            onDismiss()
-                        }
-                    ) {
-                        HStack(spacing: AuroraMetrics.spacingS) {
-                            // 画幅切换（Fit / Fill）
-                            Button(action: {
-                                let impact = UIImpactFeedbackGenerator(style: .medium)
-                                impact.impactOccurred()
-                                withAnimation(AuroraMotion.smooth) {
-                                    isFillMode.toggle()
+
+                    ZStack {
+                        // 核心播放视口层：优先采用原生 AVPlayer 硬件解码秒开（0.3s 直连）
+                        if let player = player {
+                            AuroraPlayerSurface(
+                                player: player,
+                                videoGravity: isFillMode ? .resizeAspectFill : .resizeAspect
+                            )
+                        } else if stream.sourceID == LiveSourceCatalog.stripchatID {
+                            // Stripchat 纯净无头视口注入兜底
+                            StripchatLiveWebView(
+                                roomURL: URL(string: stream.roomUrl) ?? URL(string: "https://zh.stripchat.com/\(stream.username)")!,
+                                isFillMode: isFillMode,
+                                isPlaying: $isPlaying,
+                                isLoading: $isLoadingLive,
+                                errorMessage: $liveError,
+                                onComment: onComment,
+                                onVideoDimension: { size in
+                                    if size.width > 0 && size.height > 0 {
+                                        isPortraitStream = (size.height > size.width)
+                                    }
                                 }
-                            }) {
-                                Image(systemName: isFillMode ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
-                                    .font(.subheadline.bold())
+                            )
+                        }
+
+                        // 原生手势感知层（双击切换画幅、单击唤出控制栏）
+                        if liveError == nil {
+                            Color.clear
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 2) {
+                                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                                    impact.impactOccurred()
+                                    withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                                        isFillMode.toggle()
+                                    }
+                                    onToggleHUD?(isFillMode ? "已切换为填满全屏（无黑边）" : "已切换为自适应画幅（原片比例）")
+                                }
+                                .onTapGesture(count: 1) {
+                                    withAnimation(reduceMotion ? nil : AuroraMotion.quick) {
+                                        showControls.toggle()
+                                    }
+                                    if showControls {
+                                        scheduleHideControls()
+                                    }
+                                }
+                        }
+
+                        // 加载中过渡底图与 Spinner（视频起播后平滑淡出）
+                        if isLoadingLive && liveError == nil {
+                            ZStack {
+                                AuroraCoverImage(url: stream.snapshotUrl, aspectRatio: nil, contentMode: .fill, cornerRadius: 0)
+                                    .opacity(0.35)
+                                    .blur(radius: 16)
+
+                                VStack(spacing: AuroraMetrics.spacingL) {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
+                                        .scaleEffect(1.4)
+
+                                    Text("正在连接 \(stream.username) 的直播流…")
+                                        .font(.headline)
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .transition(.opacity)
+                            .allowsHitTesting(false)
+                        }
+
+                        // 错误提示状态层
+                        if let error = liveError {
+                            VStack(spacing: AuroraMetrics.spacingL) {
+                                Image(systemName: "tv.slash.fill")
+                                    .font(.system(size: 40))
+                                    .foregroundStyle(AuroraColor.brand)
+
+                                Text("直播暂不可用")
+                                    .font(.title3.bold())
                                     .foregroundStyle(.white)
-                                    .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                    .glassEffect(.regular.interactive(), in: .circle)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(isFillMode ? "自适应画幅" : "填满全屏")
-                            
-                            AirPlayRoutePicker()
-                                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                            
-                            Button(action: {
-                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                impact.impactOccurred()
-                                withAnimation(AuroraMotion.quick) {
-                                    isDanmakuEnabled.toggle()
+
+                                Text(error)
+                                    .font(.callout)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, AuroraMetrics.spacingXXXL)
+
+                                Button(action: {
+                                    fetchAndStartLiveStream()
+                                }) {
+                                    Text("重新连接")
+                                        .font(.headline)
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, AuroraMetrics.spacingXL)
+                                        .padding(.vertical, AuroraMetrics.spacingM)
+                                        .background(AuroraColor.brand, in: .capsule)
                                 }
-                            }) {
-                                HStack(spacing: AuroraMetrics.spacingXS) {
-                                    Image(systemName: isDanmakuEnabled ? "bubble.left.and.bubble.right.fill" : "bubble.left.and.bubble.right")
-                                        .font(.caption)
-                                    Text(isDanmakuEnabled ? "弹幕" : "纯净")
-                                        .font(.caption.bold())
-                                }
-                                .foregroundStyle(isDanmakuEnabled ? AuroraColor.brand : Color.white.opacity(0.75))
-                                .padding(.horizontal, AuroraMetrics.spacingM)
-                                .frame(height: AuroraMetrics.minTouchTarget)
-                                .glassEffect(.regular.interactive(), in: .capsule)
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("重新连接直播流")
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(isDanmakuEnabled ? "关闭弹幕" : "开启弹幕")
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(Color.black.opacity(0.85))
                         }
                     }
-                    
-                    Spacer()
-                    
-                    // 底部弹幕发送栏
-                    HStack(spacing: AuroraMetrics.spacingM) {
-                        HStack(spacing: AuroraMetrics.spacingS) {
-                            Image(systemName: "pencil")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                            TextField("跟主播说点什么吧...", text: $inputMessage)
-                                .font(.subheadline)
-                                .foregroundStyle(.white)
-                                .submitLabel(.send)
-                                .onSubmit {
-                                    sendDanmaku()
-                                }
-                        }
-                        .padding(.horizontal, AuroraMetrics.spacingL)
-                        .frame(height: AuroraMetrics.minTouchTarget)
-                        .glassEffect(.regular.interactive(), in: .capsule)
-                        
-                        Button(action: {
-                            sendDanmaku()
-                        }) {
-                            Image(systemName: "paperplane.fill")
-                                .font(.headline)
-                                .foregroundStyle(.white)
-                                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                .background(AuroraColor.brand, in: .circle)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("发送弹幕")
-                    }
-                    .padding(.horizontal, AuroraMetrics.contentInset)
-                    .padding(.bottom, AuroraMetrics.spacingXL)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .transition(.opacity)
+
+                // 浮动控制栏（带磨砂与柔和暗调渐变避让）
+                if showControls || isLoadingLive || liveError != nil {
+                    topControlsBar(in: geo)
+                        .transition(.opacity)
+                        .zIndex(20)
+                }
             }
+            .clipped()
         }
+        .clipped()
         .onAppear {
             fetchAndStartLiveStream()
-            startDanmakuEmitter()
         }
         .onDisappear {
             cleanupLivePlayer()
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
+        .onChange(of: showRoomChat) { _, isShowing in
+            if isShowing {
+                player?.pause()
+            } else if isPlaying {
+                player?.play()
+            }
+        }
+        .sheet(isPresented: $showRoomChat) {
+            LiveChatSheet(stream: stream)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
-    
-    // MARK: - 真实获取官方 LL-HLS 直播直链并硬件秒播
-    
+
+    // MARK: - 顶部控制栏
+    @ViewBuilder
+    private func topControlsBar(in geo: GeometryProxy) -> some View {
+        let safeTop = max(topSafeArea, DeviceLayout.safeAreaTop(in: geo.size))
+        let topPadding: CGFloat = isLandscape ? 16 : (safeTop + 6)
+        let gradientHeight: CGFloat = max(topPadding + 64, 130)
+
+        ZStack(alignment: .top) {
+            // 暗调渐变底，确保强对比度与清晰度
+            LinearGradient(
+                colors: [Color.black.opacity(0.85), Color.black.opacity(0.35), Color.clear],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: gradientHeight)
+            .allowsHitTesting(false)
+
+            HStack(spacing: AuroraMetrics.spacingM) {
+                // 左侧：返回 / 退出全屏按钮
+                Button(action: {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    if isFullScreen {
+                        toggleAdaptiveFullscreen(in: geo)
+                    } else {
+                        cleanupLivePlayer()
+                        onDismiss()
+                        dismiss()
+                    }
+                }) {
+                    Image(systemName: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "chevron.left")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 38, height: 38)
+                        .background(Color.black.opacity(0.45), in: Circle())
+                        .glassEffect(.regular.interactive(), in: .circle)
+                        .contentShape(Rectangle())
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .accessibilityLabel(isFullScreen ? "退出全屏" : "返回")
+
+                // 主播信息与 LIVE 状态（严格单行、杜绝换行挤压）
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(stream.username)
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+
+                        HStack(spacing: 3) {
+                            Circle().fill(Color.red).frame(width: 5, height: 5)
+                            Text("LIVE")
+                                .font(.system(size: 9, weight: .black))
+                                .foregroundStyle(.white)
+                        }
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.red.opacity(0.85), in: Capsule())
+                    }
+
+                    HStack(spacing: 4) {
+                        Text(stream.sourceID == LiveSourceCatalog.stripchatID ? "Stripchat" : "HornyStudents")
+                            .font(.caption2.bold())
+                            .foregroundStyle(AuroraColor.brandLabel)
+                            .lineLimit(1)
+
+                        Text("•")
+                            .font(.caption2)
+                            .foregroundStyle(Color.white.opacity(0.5))
+
+                        Text("在线 \(stream.viewCount)")
+                            .font(.caption2)
+                            .foregroundStyle(Color.white.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: 160, alignment: .leading)
+                .layoutPriority(1)
+
+                Spacer()
+
+                // 右侧功能键区
+                HStack(spacing: 6) {
+                    // 1. 聊天室按钮
+                    controlCircleButton(systemImage: "bubble.left.and.bubble.right", label: "打开聊天室") {
+                        showRoomChat = true
+                    }
+
+                    // 2. 画幅切换（Fit / Fill）
+                    controlCircleButton(
+                        systemImage: isFillMode ? "arrow.down.forward.and.arrow.up.backward" : "arrow.up.left.and.arrow.down.right",
+                        label: isFillMode ? "自适应画幅" : "填满全屏"
+                    ) {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                            isFillMode.toggle()
+                        }
+                        onToggleHUD?(isFillMode ? "已切换为填满全屏（无黑边）" : "已切换为自适应画幅（原片比例）")
+                    }
+
+                    // 3. 全屏模式下的横竖屏手动微调旋转
+                    if isFullScreen {
+                        controlCircleButton(
+                            systemImage: isLandscape ? "iphone.portrait" : "iphone.landscape",
+                            label: isLandscape ? "切换竖屏" : "切换横屏"
+                        ) {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                isLandscape.toggle()
+                            }
+                            onToggleHUD?(isLandscape ? "已切换为横屏沉浸" : "已切换为竖屏模式")
+                        }
+                    }
+
+                    // 4. 自适应全屏按钮（纵向流纵向全屏，横向流横向全屏）
+                    controlCircleButton(
+                        systemImage: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "viewfinder",
+                        label: isFullScreen ? "退出全屏" : "自适应全屏"
+                    ) {
+                        toggleAdaptiveFullscreen(in: geo)
+                    }
+
+                    // 5. AirPlay 原生投屏
+                    AirPlayRoutePicker()
+                        .frame(width: 38, height: 38)
+                        .background(Color.black.opacity(0.45), in: Circle())
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, topPadding)
+        }
+    }
+
+    private func toggleAdaptiveFullscreen(in geo: GeometryProxy) {
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            if isFullScreen {
+                isFullScreen = false
+                isLandscape = false
+                onToggleHUD?("已退出全屏")
+            } else {
+                isFullScreen = true
+                if isPortraitStream {
+                    // 纵向直播流：自适应纵向全屏，不旋转
+                    isLandscape = false
+                    onToggleHUD?("自适应全屏 · 纵向铺满")
+                } else {
+                    // 横向直播流：如果是在手机竖屏下，自动横向全屏；若在 iPad 或横握时无需强制旋转
+                    let isPhonePortrait = geo.size.width < geo.size.height
+                    isLandscape = isPhonePortrait
+                    onToggleHUD?(isLandscape ? "自适应全屏 · 横屏沉浸" : "自适应全屏 · 铺满")
+                }
+            }
+        }
+    }
+
+    private func controlCircleButton(systemImage: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(Color.black.opacity(0.45), in: Circle())
+                .glassEffect(.regular.interactive(), in: .circle)
+                .contentShape(Rectangle())
+                .frame(minWidth: 44, minHeight: 44)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .accessibilityLabel(label)
+    }
+
+    private func scheduleHideControls() {
+        hideControlsTask?.cancel()
+        let task = DispatchWorkItem {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                self.showControls = false
+            }
+        }
+        hideControlsTask = task
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0, execute: task)
+    }
+
+    // MARK: - 官方直播流拉取与原生硬件秒播
+
     private func fetchAndStartLiveStream() {
+        streamRequestTask?.cancel()
+        streamRequestTask = nil
+        let requestID = UUID()
+        activeStreamRequestID = requestID
         self.isLoadingLive = true
         self.liveError = nil
-        cleanupLivePlayer()
-        
+        cleanupLivePlayer(cancelRequest: false)
+
+        if stream.sourceID == LiveSourceCatalog.stripchatID {
+            if let hlsStr = stream.hlsStreamUrl, let hlsUrl = URL(string: hlsStr) {
+                startNativePlayback(hlsUrl: hlsUrl, requestID: requestID)
+            } else {
+                UIApplication.shared.isIdleTimerDisabled = true
+            }
+        } else {
+            startChaturbatePlayback(requestID: requestID)
+        }
+    }
+
+    private func startChaturbatePlayback(requestID: UUID) {
         let username = stream.username
         guard !username.isEmpty,
               let apiUrl = URL(string: "https://chaturbate.com/api/chatvideocontext/\(username)/") else {
@@ -259,90 +418,108 @@ public struct LivePlayerView: View {
             self.liveError = "无效的主播用户名"
             return
         }
-        
-        Task {
+
+        // 10 秒短生命周期内存缓存拦截：避免切房重复建立流解析往返
+        if let cached = Self.streamContextCache[username], Date().timeIntervalSince(cached.timestamp) < 10.0 {
+            startNativePlayback(hlsUrl: cached.url, requestID: requestID)
+            return
+        }
+
+        streamRequestTask = Task { @MainActor in
+            defer {
+                if activeStreamRequestID == requestID {
+                    streamRequestTask = nil
+                }
+            }
+
             do {
                 var request = URLRequest(url: apiUrl)
                 request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
                 request.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
-                
+
                 let (data, response) = try await URLSession.shared.data(for: request)
+                try Task.checkCancellation()
+                guard activeStreamRequestID == requestID else { return }
                 guard let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                     throw NSError(domain: "LivePlayer", code: 502, userInfo: [NSLocalizedDescriptionKey: "获取主播直播流状态失败"])
                 }
-                
+
                 guard let hlsSource = json["hls_source"] as? String, !hlsSource.isEmpty,
                       let hlsUrl = URL(string: hlsSource) else {
                     let roomStatus = json["room_status"] as? String ?? "offline"
                     throw NSError(domain: "LivePlayer", code: 404, userInfo: [NSLocalizedDescriptionKey: "主播当前状态: \(roomStatus)"])
                 }
-                
-                await MainActor.run {
-                    self.startNativePlayback(hlsUrl: hlsUrl)
-                }
+
+                Self.streamContextCache[username] = (hlsUrl, Date())
+                startNativePlayback(hlsUrl: hlsUrl, requestID: requestID)
             } catch {
-                await MainActor.run {
-                    self.isLoadingLive = false
-                    self.liveError = error.localizedDescription
-                }
+                guard !Task.isCancelled, activeStreamRequestID == requestID else { return }
+                isLoadingLive = false
+                isPlaying = false
+                liveError = error.localizedDescription
             }
         }
     }
-    
-    private func startNativePlayback(hlsUrl: URL) {
+
+    private func startNativePlayback(hlsUrl: URL, requestID: UUID) {
+        guard activeStreamRequestID == requestID else { return }
         let playerItem = AVPlayerItem(url: hlsUrl)
         let avPlayer = AVPlayer(playerItem: playerItem)
         self.player = avPlayer
-        
+
         itemStatusObserver = playerItem.observe(\.status, options: [.new, .initial]) { item, _ in
             DispatchQueue.main.async {
+                guard self.player?.currentItem === item else { return }
                 if item.status == .readyToPlay {
                     self.isLoadingLive = false
                     self.isPlaying = true
+                    let size = item.presentationSize
+                    if size.width > 0 && size.height > 0 {
+                        self.isPortraitStream = (size.height > size.width)
+                    }
+                    UIApplication.shared.isIdleTimerDisabled = true
                     avPlayer.play()
+                    self.scheduleHideControls()
                 } else if item.status == .failed {
-                    self.isLoadingLive = false
-                    self.liveError = item.error?.localizedDescription ?? "直播流解码失败"
+                    if self.stream.sourceID == LiveSourceCatalog.stripchatID {
+                        // HLS 回调失败时平滑降级至 StripchatLiveWebView
+                        self.player = nil
+                        self.isLoadingLive = true
+                    } else {
+                        self.isLoadingLive = false
+                        self.isPlaying = false
+                        self.player = nil
+                        self.liveError = item.error?.localizedDescription ?? "直播流解码失败"
+                        UIApplication.shared.isIdleTimerDisabled = false
+                    }
+                }
+            }
+        }
+
+        presentationSizeObserver = playerItem.observe(\.presentationSize, options: [.new]) { item, _ in
+            DispatchQueue.main.async {
+                let size = item.presentationSize
+                if size.width > 0 && size.height > 0 {
+                    self.isPortraitStream = (size.height > size.width)
                 }
             }
         }
     }
-    
-    private func cleanupLivePlayer() {
+
+    private func cleanupLivePlayer(cancelRequest: Bool = true) {
+        UIApplication.shared.isIdleTimerDisabled = false
+        if cancelRequest {
+            streamRequestTask?.cancel()
+            streamRequestTask = nil
+            activeStreamRequestID = UUID()
+        }
         itemStatusObserver?.invalidate()
         itemStatusObserver = nil
+        presentationSizeObserver?.invalidate()
+        presentationSizeObserver = nil
         player?.pause()
         player = nil
-    }
-    
-    private func sendDanmaku() {
-        let trimmed = inputMessage.trimmingCharacters(in: .whitespaces)
-        guard !trimmed.isEmpty else { return }
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
-        let msg = DanmakuMessage(text: trimmed, lane: Int.random(in: 0..<4), color: AuroraColor.brand)
-        withAnimation(AuroraMotion.smooth) {
-            danmakus.append(msg)
-        }
-        inputMessage = ""
-    }
-    
-    private func startDanmakuEmitter() {
-        let seeds = [
-            "主播真好看！666",
-            "打卡打卡，画质太清晰了",
-            "这是哪里呀？",
-            "极光视界原生硬解秒出画！",
-            "好高清啊，爱了爱了"
-        ]
-        for (i, text) in seeds.enumerated() {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.8) {
-                let msg = DanmakuMessage(text: text, lane: i % 4, color: i == 0 ? AuroraColor.brand : .white)
-                withAnimation(AuroraMotion.smooth) {
-                    self.danmakus.append(msg)
-                }
-            }
-        }
+        isPlaying = false
     }
 }

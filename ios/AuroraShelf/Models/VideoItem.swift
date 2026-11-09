@@ -1,6 +1,6 @@
 import Foundation
 
-public struct VideoItem: Identifiable, Hashable, Sendable {
+public struct VideoItem: Identifiable, Hashable, Codable, Sendable {
     public let id: String
     public let title: String
     public let subtitle: String
@@ -13,6 +13,10 @@ public struct VideoItem: Identifiable, Hashable, Sendable {
     public let isTop10: Bool
     public let rankNumber: Int?
     public let sourceName: String
+
+    public var coverBaseURL: URL? {
+        VideoSourceCatalog.allSources.first(where: { $0.name == sourceName }).flatMap { URL(string: $0.baseUrl) }
+    }
     
     public init(
         id: String,
@@ -20,9 +24,9 @@ public struct VideoItem: Identifiable, Hashable, Sendable {
         subtitle: String,
         coverUrl: String,
         playbackUrl: String,
-        duration: String = "1080P",
-        rating: String = "9.8",
-        tags: [String] = ["4K HDR", "官方原源"],
+        duration: String = "",
+        rating: String = "",
+        tags: [String] = [],
         category: String = "精选推荐",
         isTop10: Bool = false,
         rankNumber: Int? = nil,

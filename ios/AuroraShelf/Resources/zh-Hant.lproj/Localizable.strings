@@ -1,0 +1,111 @@
+/* Tabs */
+"tab.home" = "主頁";
+"tab.comics" = "漫畫";
+"tab.live" = "直播";
+"tab.forum" = "社區";
+"tab.library" = "資料庫";
+
+/* Home Screen */
+"home.today_top_hits" = "今日熱播";
+"home.top10" = "今日熱播 TOP 10";
+"home.up_next" = "接著播放";
+"home.channels" = "流媒體頻道";
+"home.connecting" = "正在連接 %@...";
+"home.loading_recommendations" = "正在加載推薦內容...";
+"home.loading_more" = "正在加載更多內容…";
+"home.all_loaded" = "已加載全部內容";
+"home.play" = "播放";
+"home.watchlist" = "片單";
+"home.details" = "詳情";
+"home.related" = "相關推薦";
+"home.all" = "全部";
+
+/* Search */
+"search.placeholder" = "搜尋影視、動漫、漫畫或番號";
+"search.concurrent_hint" = "在 19 個視頻源並發搜尋";
+"search.no_results" = "無搜尋結果";
+"search.searching" = "正在搜尋…";
+"search.history" = "搜尋歷史";
+"search.clear_history" = "清空歷史";
+"search.cancel" = "取消";
+
+/* Comics */
+"comics.title" = "漫畫";
+"comics.featured" = "精選推薦";
+"comics.loading" = "正在加載漫畫…";
+"comics.loading_more" = "正在加載更多漫畫…";
+"comics.all_loaded" = "已加載全部漫畫";
+"comics.select_source" = "選擇漫畫來源";
+"comics.unconfigured" = "未配置協議憑據";
+"comics.unconfigured_hint" = "需在配置文件中配置憑據後訪問";
+
+/* Reader */
+"reader.chapter" = "第 %d 話";
+"reader.page" = "第 %d/%d 頁";
+"reader.prev_chapter" = "上一話";
+"reader.next_chapter" = "下一話";
+"reader.loading_image" = "正在加載圖片…";
+
+/* Live */
+"live.title" = "直播";
+"live.featured" = "精選推薦";
+"live.female" = "女性主播";
+"live.male" = "男性主播";
+"live.couples" = "情侶雙人";
+"live.trans" = "跨性別";
+"live.loading" = "正在加載主播列表…";
+"live.viewers" = "觀眾 %@";
+"live.online" = "在線";
+"live.offline" = "離線";
+"live.select_source" = "選擇直播來源";
+"live.chat" = "實時聊天";
+
+/* Forum */
+"forum.title" = "社區";
+"forum.all" = "全部";
+"forum.cl" = "草榴社區";
+"forum.91" = "91自拍論壇";
+"forum.loading" = "正在加載帖子…";
+"forum.replies" = "回帖 %d";
+"forum.original_post" = "查看原帖";
+
+/* Player / Detail / Watchlist / InSight */
+"player.play" = "播放";
+"player.pause" = "暫停";
+"player.aspect_fit" = "原始畫幅";
+"player.aspect_fill" = "滿屏填充";
+"player.airplay" = "AirPlay 投屏";
+"player.episodes" = "選集";
+"detail.synopsis" = "劇情簡介";
+"detail.more_like_this" = "同類精彩推薦";
+"watchlist.add" = "加入片單";
+"watchlist.in_list" = "已加入片單";
+"watchlist.remove" = "從片單移除";
+"watchlist.title" = "我的片單";
+"watchlist.empty" = "片單為空";
+"watchlist.count" = "%d 部";
+
+/* Library / Settings */
+"library.title" = "資料庫";
+"settings.language" = "語言";
+"settings.language_title" = "選擇語言";
+"settings.follow_system" = "跟隨系統";
+"settings.game" = "娛樂 · 遊戲";
+"settings.game_title" = "慾望女神 · 戰術 RPG";
+"settings.game_desc" = "策略戰棋 · 原生硬件加速與沉浸視口";
+"settings.launch" = "啟動";
+"settings.video_source" = "當前視頻源";
+"settings.comic_source" = "當前漫畫源";
+"settings.live_source" = "當前直播源";
+"settings.offline_download" = "視頻離線下載";
+"settings.not_available" = "當前版本未提供";
+"settings.version" = "版本信息";
+"settings.airplay_title" = "AirPlay 投屏";
+"settings.airplay_select" = "選擇設備";
+"settings.select_live_source" = "選擇直播來源";
+
+/* Common Actions */
+"common.done" = "完成";
+"common.cancel" = "取消";
+"common.close" = "關閉";
+"common.ok" = "確定";

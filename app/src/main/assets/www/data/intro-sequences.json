@@ -199,18 +199,18 @@
           },
           "actors": [
             {
-              "key": "drone_enemy",
-              "name": "巡航侦测无人机",
-              "role": "敌方先哨",
-              "unit": "drone_enemy",
+              "key": "zoe_enemy",
+              "name": "叛变特勤 Zoe",
+              "role": "敌方先锋",
+              "unit": "zoe_enemy",
               "type": "spine",
               "animation": "idle",
               "size": {
-                "heightRatio": 0.58,
-                "yRatio": 0.15,
+                "heightRatio": 0.65,
+                "yRatio": 0.12,
                 "xRatio": 0.72
               },
-              "badge": "敌军警报",
+              "badge": "特勤警报",
               "targetLock": true
             }
           ],

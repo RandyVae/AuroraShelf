@@ -5,32 +5,33 @@
 (function () {
   'use strict';
 
-  function TacticalHud(battle) {
+  function TacticalHud(battle, opts) {
     this.battle = battle;
+    this.opts = opts || {};
     this.el = battle.el;
     this.selectedUnit = null;
     this.currentStep = 0;
     this.steps = [
       {
         id: 'step_intro',
-        title: '敌方情报侦测',
-        text: '敌人拥有 4 攻击力和 3 生命值。战术雷达已锁定敌方先遣队。',
+        title: '特勤战术侦测',
+        text: '战术雷达已锁定敌方阵位。战线准备就绪。',
         targetLane: 1,
         targetSide: 'enemy',
         action: 'tap_continue'
       },
       {
         id: 'step_select_unit',
-        title: '选中我方特勤队员',
-        text: '点击我方左侧突击队员，确认作战战位与攻击范围。',
+        title: '先锋突进指令',
+        text: '点击我方先锋特勤，确认战术攻击范围。',
         targetLane: 0,
         targetSide: 'ally',
         action: 'select_ally'
       },
       {
         id: 'step_move_or_target',
-        title: '锁定攻击目标',
-        text: '以队员攻击力 3 指向正前方敌方单位，发起战术突刺！',
+        title: '锁定敌阵目标',
+        text: '发起正面战术交火，压制敌方阵型！',
         targetLane: 0,
         targetSide: 'enemy',
         action: 'attack_target'
@@ -79,13 +80,24 @@
     this.bubble.className = 'tactical-tutorial-bubble tactical-hud-el';
     this.bubble.innerHTML = `
       <div class="tutor-bubble-box">
-        <div class="tutor-title" id="tutor-step-title">战术指令</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+          <div class="tutor-title" id="tutor-step-title">战术指令</div>
+          <button type="button" class="tutor-skip-btn" id="tutor-btn-skip" style="font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);color:#94a3b8;cursor:pointer;">跳过教程 ✕</button>
+        </div>
         <div class="tutor-desc" id="tutor-step-desc">正在分析战术网格…</div>
         <div class="tutor-tap-hint" id="tutor-tap-hint">轻触继续 ▸</div>
       </div>
       <div class="tutor-avatar"></div>
     `;
     this.el.appendChild(this.bubble);
+
+    const skipBtn = this.bubble.querySelector('#tutor-btn-skip');
+    if (skipBtn) {
+      skipBtn.onclick = (e) => {
+        e.stopPropagation();
+        this.finishTutorial();
+      };
+    }
 
     this.bindEvents();
     this.renderStep(0);
@@ -217,10 +229,18 @@
     if (this.currentStep + 1 < this.steps.length) {
       this.renderStep(this.currentStep + 1);
     } else {
-      // 教程结束，关闭气泡与指针，进入全速战术交火
-      if (this.bubble) this.bubble.hidden = true;
-      if (this.handPointer) this.handPointer.hidden = true;
-      if (this.inspector) this.inspector.hidden = true;
+      this.finishTutorial();
+    }
+  };
+
+  TacticalHud.prototype.finishTutorial = function () {
+    // 教程结束，关闭所有教程元素
+    if (this.bubble) this.bubble.hidden = true;
+    if (this.handPointer) this.handPointer.hidden = true;
+    if (this.inspector) this.inspector.hidden = true;
+    if (this.lanesOverlay) this.lanesOverlay.innerHTML = '';
+    if (this.opts && typeof this.opts.onComplete === 'function') {
+      try { this.opts.onComplete(); } catch (e) {}
     }
   };
 

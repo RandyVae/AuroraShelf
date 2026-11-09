@@ -4,32 +4,60 @@ public struct HomeScreen: View {
     @ObservedObject public var repo = VideoRepository.shared
     public let onPlayVideo: (VideoItem) -> Void
     public let onOpenSearch: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     @State private var showSourcePicker: Bool = false
     @State private var selectedCategory: String = "全部"
     @State private var isScrolled: Bool = false
+    @State private var pullOffsetY: CGFloat = 0
+    @State private var selectedDetailVideo: VideoItem? = nil
+    @State private var selectedCategoryForDetail: String? = nil
+    @State private var activePlaybackVideo: VideoItem? = nil
+    @State private var playerCoordinator = PlayerCoordinator.shared
     
+    private func playVideo(_ video: VideoItem) {
+        activePlaybackVideo = video
+        onPlayVideo(video)
+    }
+
+    public var onOpenSearchWithKeyword: ((String) -> Void)? = nil
+
+    private var spotlightVideos: [VideoItem] {
+        guard let billboard = repo.billboardVideo else { return [] }
+        var list = [billboard]
+        for v in repo.feedVideos where v.id != billboard.id {
+            list.append(v)
+            if list.count >= 4 { break }
+        }
+        return list
+    }
+
     public init(
         onPlayVideo: @escaping (VideoItem) -> Void,
-        onOpenSearch: @escaping () -> Void
+        onOpenSearch: @escaping () -> Void,
+        onOpenSearchWithKeyword: ((String) -> Void)? = nil
     ) {
         self.onPlayVideo = onPlayVideo
         self.onOpenSearch = onOpenSearch
+        self.onOpenSearchWithKeyword = onOpenSearchWithKeyword
     }
-    
+
     public var body: some View {
         ZStack {
             AuroraColor.canvas.ignoresSafeArea()
-            
+
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: AuroraMetrics.spacingXL) {
-                        // 1. 顶部 Hero 聚焦大卡（黄金画幅，呼吸感强，首屏自然延展）
-                        if let billboard = repo.billboardVideo {
+                        // 1. 顶部 Hero 聚焦大卡（Apple TV 4部聚光灯热门作品轮播画廊，长条微光展开胶囊指示点）
+                        let spotlights = spotlightVideos
+                        if !spotlights.isEmpty {
                             HeroBanner(
-                                video: billboard,
-                                onPlay: { onPlayVideo(billboard) },
-                                onDetail: { onPlayVideo(billboard) }
+                                videos: spotlights,
+                                pullOffset: pullOffsetY,
+                                onPlay: { v in playVideo(v) },
+                                onDetail: { v in selectedDetailVideo = v }
                             )
                         } else if repo.isLoading {
                             HeroLoadingPlaceholder()
@@ -37,174 +65,217 @@ public struct HomeScreen: View {
                             Spacer().frame(height: 80)
                         }
                         
-                        // 2. 今日热播 Top 10（大数字紧贴海报左下角）
+                        // Apple TV 核心层级：接着播放（Up Next 货架）
+                        UpNextShelf(
+                            onPlayVideo: playVideo,
+                            onDetail: { selectedDetailVideo = $0 }
+                        )
+
+                        // Apple TV 核心层级：流媒体频道与 19 视频源（Channels）
+                        ChannelsShelf(
+                            onOpenSourcePicker: { showSourcePicker = true }
+                        )
+
+                        // 2. 今日热播 Top 10（Apple TV 风格精致半透明数字，重心回归海报）
                         if !repo.top10Videos.isEmpty {
                             VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                                 HStack(spacing: AuroraMetrics.spacingS) {
-                                    Text("今日热播")
+                                    Text("home.today_top_hits".localized)
                                         .font(.title2)
                                         .fontWeight(.bold)
                                         .foregroundStyle(AuroraColor.textPrimary)
-                                    
+
                                     Text("TOP 10")
-                                        .font(.headline)
+                                        .font(.caption2)
                                         .fontWeight(.black)
                                         .foregroundStyle(AuroraColor.accentRed)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(AuroraColor.accentRed.opacity(0.12), in: Capsule())
                                 }
                                 .padding(.horizontal, AuroraMetrics.contentInset)
                                 
                                 ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: AuroraMetrics.spacingL) {
+                                    LazyHStack(alignment: .top, spacing: AuroraMetrics.spacingL) {
                                         ForEach(Array(repo.top10Videos.enumerated()), id: \.element.id) { index, video in
-                                            Top10Card(video: video, rank: index + 1) {
-                                                onPlayVideo(video)
-                                            }
+                                            Top10Card(
+                                                video: video,
+                                                rank: index + 1,
+                                                onSelect: { playVideo(video) },
+                                                onDetail: { selectedDetailVideo = video }
+                                            )
                                         }
                                     }
                                     .padding(.horizontal, AuroraMetrics.contentInset)
                                 }
                             }
+                            .id("top10Section")
                         }
                         
-                        // 3. 当前视频源推荐流（标题 -> 分类胶囊筛选 -> 双列海报网格）
-                        VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-                            HStack {
-                                HStack(spacing: AuroraMetrics.spacingS) {
-                                    Text("为你推荐 · \(repo.currentSource.name)")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundStyle(AuroraColor.textPrimary)
-                                    
-                                    if repo.currentSource.isDirectConnect {
-                                        Text("直连")
-                                            .font(.caption2)
-                                            .fontWeight(.black)
-                                            .foregroundStyle(.white)
-                                            .padding(.horizontal, 6)
-                                            .padding(.vertical, 2)
-                                            .background(Capsule().fill(AuroraColor.forestGreen))
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                Button(action: { showSourcePicker = true }) {
-                                    HStack(spacing: 5) {
-                                        Text("全量 \(VideoSourceCatalog.allSources.count) 源")
-                                            .font(.footnote)
-                                            .fontWeight(.semibold)
-                                        Image(systemName: "slider.horizontal.3")
-                                            .font(.caption)
-                                    }
-                                    .foregroundStyle(AuroraColor.brand)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
-                                    .background(AuroraColor.brand.opacity(0.12), in: Capsule())
-                                    .overlay(Capsule().stroke(AuroraColor.brand.opacity(0.3), lineWidth: 1))
-                                }
-                            }
-                            .padding(.horizontal, AuroraMetrics.contentInset)
-                            
-                            // 原生分类筛选 Chip 条：直接贴合在推荐网格上方，联动响应极佳
-                            SourceFilterBar(
-                                categories: repo.currentSource.categories,
-                                selectedCategory: $selectedCategory
-                            )
-                            
-                            if repo.isLoading {
-                                VStack(spacing: AuroraMetrics.spacingM) {
-                                    ProgressView()
-                                        .controlSize(.regular)
-                                        .tint(AuroraColor.brand)
-                                    Text("正在连接 \(repo.currentSource.name)...")
-                                        .font(.subheadline)
-                                        .foregroundStyle(AuroraColor.textSecondary)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 60)
-                            } else if repo.feedVideos.isEmpty {
+                        // 3. Apple TV 核心层级：横向分类货架流（一个板块一个标题，向左滑动浏览更多，点击标题进入二级专区）
+                        VStack(spacing: AuroraMetrics.spacingXL) {
+                            if (repo.categoryShelves.isEmpty || repo.categoryShelves.allSatisfy { $0.videos.isEmpty }) && repo.feedVideos.isEmpty, let feedError = repo.feedError {
                                 ContentUnavailableView {
-                                    Label("暂无视频内容", systemImage: "film.stack")
+                                    Label("无法加载视频", systemImage: "wifi.exclamationmark")
                                 } description: {
-                                    Text("「\(repo.currentSource.name)」当前分类暂未检索到内容。")
+                                    Text(feedError)
                                 } actions: {
-                                    Button("切换至 91动漫") {
-                                        repo.switchSource(to: VideoSourceCatalog.dongman91)
+                                    Button("重试", systemImage: "arrow.clockwise") {
+                                        repo.loadFeed(for: repo.currentSource, category: repo.currentCategory)
                                     }
                                     .buttonStyle(.borderedProminent)
                                     .tint(AuroraColor.brand)
                                 }
                                 .padding(.vertical, 40)
-                            } else {
-                                LazyVGrid(
-                                    columns: [
-                                        GridItem(.flexible(), spacing: AuroraMetrics.spacingM),
-                                        GridItem(.flexible(), spacing: AuroraMetrics.spacingM)
-                                    ],
-                                    spacing: AuroraMetrics.spacingL
-                                ) {
-                                    ForEach(repo.feedVideos) { video in
-                                        PosterCard(video: video) {
-                                            onPlayVideo(video)
-                                        }
-                                    }
+                            } else if (repo.categoryShelves.isEmpty || repo.categoryShelves.allSatisfy { $0.videos.isEmpty }) && repo.feedVideos.isEmpty && repo.isLoading {
+                                VStack(spacing: AuroraMetrics.spacingM) {
+                                    ProgressView()
+                                        .controlSize(.regular)
+                                        .tint(AuroraColor.brand)
+                                    Text("home.connecting".localized(repo.currentSource.name))
+                                        .font(.subheadline)
+                                        .foregroundStyle(AuroraColor.textSecondary)
                                 }
-                                .padding(.horizontal, AuroraMetrics.contentInset)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 40)
+                            } else {
+                                ForEach(repo.categoryShelves) { shelf in
+                                    CategoryShelfView(
+                                        shelf: shelf,
+                                        onSeeAll: { cat in
+                                            selectedCategoryForDetail = cat
+                                        },
+                                        onSelectVideo: { video in
+                                            playVideo(video)
+                                        },
+                                        onDetailVideo: { video in
+                                            selectedDetailVideo = video
+                                        }
+                                    )
+                                }
+
+                                // 4. 全量双列海报探索网格（确保所有视频作品完整呈现）
+                                if !repo.feedVideos.isEmpty {
+                                    VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
+                                        HStack {
+                                            Text("全部作品")
+                                                .font(.title2)
+                                                .fontWeight(.bold)
+                                                .foregroundStyle(AuroraColor.textPrimary)
+                                            Spacer()
+                                            Text("\(repo.feedVideos.count) 部影片")
+                                                .font(.footnote)
+                                                .foregroundStyle(AuroraColor.textSecondary)
+                                        }
+                                        .padding(.horizontal, AuroraMetrics.contentInset)
+
+                                        LazyVGrid(
+                                            columns: [
+                                                GridItem(.flexible(), spacing: AuroraMetrics.spacingM),
+                                                GridItem(.flexible(), spacing: AuroraMetrics.spacingM)
+                                            ],
+                                            spacing: AuroraMetrics.spacingL
+                                        ) {
+                                            ForEach(repo.feedVideos.dropFirst(repo.top10Videos.isEmpty ? 1 : 11)) { video in
+                                                PosterCard(
+                                                    video: video,
+                                                    onSelect: { playVideo(video) },
+                                                    onDetail: { selectedDetailVideo = video }
+                                                )
+                                            }
+                                        }
+                                        .padding(.horizontal, AuroraMetrics.contentInset)
+                                    }
+                                    .padding(.top, AuroraMetrics.spacingM)
+                                }
                             }
                         }
                         .id("recommendSection")
                         
-                        Spacer().frame(height: AuroraMetrics.spacingXXL)
+                        // Keep the final recommendation row clear of the floating tab bar.
+                        Spacer().frame(height: max(AuroraMetrics.spacingXXL, 96))
                     }
                 }
                 .ignoresSafeArea(edges: .top)
                 .onScrollGeometryChange(for: Bool.self) { geo in
                     geo.contentOffset.y > 60
                 } action: { _, newValue in
-                    isScrolled = newValue
+                    if isScrolled != newValue {
+                        isScrolled = newValue
+                    }
+                }
+                .onScrollGeometryChange(for: CGFloat.self) { geo in
+                    // 仅在真实下拉橡皮筋时返回正向位移；正常向上滑动时恒返回 0，杜绝每像素触发全屏重组
+                    geo.contentOffset.y < 0 ? -geo.contentOffset.y : 0
+                } action: { oldValue, newValue in
+                    if oldValue != newValue {
+                        pullOffsetY = newValue
+                    }
                 }
                 .onAppear {
                     if CommandLine.arguments.contains("--scroll-recommend") {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                            withAnimation(AuroraMotion.smooth) {
+                            withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
                                 proxy.scrollTo("recommendSection", anchor: .top)
+                            }
+                        }
+                    } else if CommandLine.arguments.contains("--scroll-top10") {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                            withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                                proxy.scrollTo("top10Section", anchor: UnitPoint(x: 0, y: 0.15))
                             }
                         }
                     }
                 }
             }
         }
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground((isScrolled || repo.billboardVideo == nil) ? .visible : .hidden, for: .navigationBar)
         .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles.tv.fill")
-                        .font(.headline)
-                        .foregroundStyle(AuroraColor.brand)
-                    Text("极光视界")
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundStyle(AuroraColor.textPrimary)
-                }
+                // 纯粹单个 3D 折叠丝带 N 标（彻底拔除文字，杜绝「大 N 紧贴小 N」的双 N 现象）
+                NetgreyMarkView(width: 20, height: 28)
             }
-            
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: AuroraMetrics.spacingM) {
-                    AirPlayRoutePicker()
-                        .frame(width: 32, height: 32)
-                    
-                    Button(action: onOpenSearch) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.body)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.primary)
-                    }
+                Button(action: onOpenSearch) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
                 }
+                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                .contentShape(Rectangle())
+                .hoverEffect(.highlight)
+                .accessibilityLabel("搜索视频")
             }
         }
         .onAppear {
             selectedCategory = repo.currentCategory
+            if let idx = CommandLine.arguments.firstIndex(of: "--category"), idx + 1 < CommandLine.arguments.count {
+                let targetCategory = CommandLine.arguments[idx + 1]
+                selectedCategory = targetCategory
+                repo.switchCategory(to: targetCategory)
+            }
+            if CommandLine.arguments.contains("--play-first") {
+                Task {
+                    for _ in 0..<30 {
+                        try? await Task.sleep(nanoseconds: 300_000_000)
+                        if let first = repo.feedVideos.first(where: { $0.id != repo.billboardVideo?.id }) ?? repo.feedVideos.first {
+                            await MainActor.run {
+                                playVideo(first)
+                            }
+                            break
+                        }
+                    }
+                }
+            }
+            if CommandLine.arguments.contains("--open-source-picker") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    showSourcePicker = true
+                }
+            }
         }
         .onChange(of: selectedCategory) { _, newCat in
             if newCat != repo.currentCategory {
@@ -212,12 +283,28 @@ public struct HomeScreen: View {
             }
         }
         .onChange(of: repo.currentCategory) { _, newCat in
-            selectedCategory = newCat
+            if selectedCategory != newCat {
+                selectedCategory = newCat
+            }
+        }
+        .onChange(of: repo.feedVideos) { _, newVideos in
+            // 仅对首部精选视频做轻量后台预热，杜绝全量并发雪崩与死锁
+            if let first = newVideos.first {
+                VideoPreloadManager.shared.prewarm(video: first)
+            }
         }
         .onReceive(repo.$billboardVideo) { video in
+            if let v = video {
+                VideoPreloadManager.shared.prewarm(video: v)
+            }
             if CommandLine.arguments.contains("--auto-play"), let v = video {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    onPlayVideo(v)
+                    playVideo(v)
+                }
+            }
+            if CommandLine.arguments.contains("--open-detail"), let v = video {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    selectedDetailVideo = v
                 }
             }
         }
@@ -225,11 +312,60 @@ public struct HomeScreen: View {
             VideoSourcePickerSheet(
                 selectedSource: repo.currentSource,
                 onSelect: { source in
+                    selectedCategory = source.categories.first ?? "全部"
                     repo.switchSource(to: source)
-                    selectedCategory = repo.currentCategory
                     showSourcePicker = false
                 }
             )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $selectedDetailVideo) { video in
+            VideoDetailSheet(
+                video: video,
+                onPlay: playVideo,
+                onDismiss: {
+                    selectedDetailVideo = nil
+                },
+                onSearchKeyword: { keyword in
+                    selectedDetailVideo = nil
+                    if let onKeyword = onOpenSearchWithKeyword {
+                        onKeyword(keyword)
+                    } else {
+                        onOpenSearch()
+                    }
+                }
+            )
+        }
+        .navigationDestination(isPresented: Binding(
+            get: { selectedCategoryForDetail != nil },
+            set: { if !$0 { selectedCategoryForDetail = nil } }
+        )) {
+            if let cat = selectedCategoryForDetail {
+                CategoryDetailScreen(
+                    source: repo.currentSource,
+                    initialCategory: cat,
+                    onPlayVideo: playVideo,
+                    onOpenDetail: { video in
+                        selectedDetailVideo = video
+                    }
+                )
+            }
+        }
+        .navigationDestination(item: $activePlaybackVideo) { video in
+            VideoDetailPlaybackScreen(video: video) {
+                activePlaybackVideo = nil
+                playerCoordinator.dismiss()
+            }
+            .toolbar(.hidden, for: .tabBar)
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationBarHidden(true)
+            .navigationBarBackButtonHidden(true)
+        }
+        .onChange(of: playerCoordinator.activeVideo) { _, newVideo in
+            if let v = newVideo, activePlaybackVideo != v {
+                activePlaybackVideo = v
+            }
         }
     }
 }
@@ -239,98 +375,96 @@ struct VideoSourcePickerSheet: View {
     let selectedSource: VideoSourceDefinition
     let onSelect: (VideoSourceDefinition) -> Void
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
-        ZStack {
-            AuroraColor.canvas.ignoresSafeArea()
-            
-            VStack(alignment: .leading, spacing: AuroraMetrics.spacingL) {
-                HStack {
-                    Text("全网 \(VideoSourceCatalog.allSources.count) 个视频源切换")
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundStyle(AuroraColor.textPrimary)
-                    Spacer()
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(AuroraColor.textSecondary)
-                    }
-                }
-                .padding(.horizontal, AuroraMetrics.contentInset)
-                .padding(.top, AuroraMetrics.spacingL)
-                
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
-                        ForEach(VideoSourceGroup.allCases, id: \.self) { group in
-                            VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                                Text(group.rawValue)
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(AuroraColor.textSecondary)
-                                    .padding(.horizontal, AuroraMetrics.contentInset)
-                                
-                                ForEach(VideoSourceCatalog.allSources.filter { $0.group == group }) { src in
-                                    let isSelected = src.id == selectedSource.id
-                                    Button(action: {
-                                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                        onSelect(src)
-                                    }) {
-                                        HStack(spacing: AuroraMetrics.spacingM) {
-                                            VStack(alignment: .leading, spacing: 3) {
-                                                HStack(spacing: 6) {
-                                                    Text(src.name)
-                                                        .font(.body)
-                                                        .fontWeight(.semibold)
-                                                        .foregroundStyle(isSelected ? AuroraColor.brand : AuroraColor.textPrimary)
-                                                    if src.isDirectConnect {
-                                                        Text("大陆直连")
-                                                            .font(.caption2)
-                                                            .fontWeight(.bold)
-                                                            .foregroundStyle(AuroraColor.forestGreen)
-                                                    }
-                                                }
-                                                Text(src.description)
-                                                    .font(.caption)
-                                                    .foregroundStyle(AuroraColor.textSecondary)
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            if isSelected {
-                                                Image(systemName: "checkmark")
-                                                    .font(.headline)
-                                                    .fontWeight(.bold)
-                                                    .foregroundStyle(AuroraColor.brand)
-                                            }
-                                        }
-                                        .padding(.horizontal, AuroraMetrics.spacingL)
-                                        .padding(.vertical, AuroraMetrics.spacingM)
-                                        .background(
-                                            RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
-                                                .fill(isSelected ? AuroraColor.brand.opacity(0.12) : AuroraColor.surface)
-                                                .overlay(
-                                                    RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
-                                                        .stroke(isSelected ? AuroraColor.brand.opacity(0.4) : AuroraColor.hairline, lineWidth: 1)
-                                                )
-                                        )
-                                    }
-                                    .buttonStyle(.plain)
-                                    .padding(.horizontal, AuroraMetrics.contentInset)
-                                }
-                            }
+        NavigationStack {
+            List {
+                ForEach(VideoSourceGroup.allCases, id: \.self) { group in
+                    Section(group.rawValue) {
+                        ForEach(VideoSourceCatalog.allSources.filter { $0.group == group }) { source in
+                            sourceRow(source)
                         }
                     }
-                    .padding(.bottom, AuroraMetrics.spacingXXL)
                 }
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(AuroraColor.canvas)
+            .navigationTitle("视频源")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("已配置适配 \(VideoSourceCatalog.supportedSources.count)/\(VideoSourceCatalog.allSources.count)")
+                        .font(.headline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Text("站点可用性受网络、地区和站点策略影响。")
+                    .font(.footnote)
+                    .foregroundStyle(AuroraColor.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, AuroraMetrics.contentInset)
+                    .padding(.vertical, AuroraMetrics.spacingS)
+                    .background(.regularMaterial)
+            }
         }
+        .tint(AuroraColor.brand)
+    }
+
+    @ViewBuilder
+    private func sourceRow(_ source: VideoSourceDefinition) -> some View {
+        let isSupported = VideoSourceCatalog.isSupported(source)
+        let isSelected = source.id == selectedSource.id
+        Button {
+            guard isSupported else { return }
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            onSelect(source)
+        } label: {
+            HStack(spacing: AuroraMetrics.spacingM) {
+                VStack(alignment: .leading, spacing: AuroraMetrics.spacingXS) {
+                    HStack(spacing: AuroraMetrics.spacingS) {
+                        Text(source.name)
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(isSelected ? AuroraColor.brand : AuroraColor.textPrimary)
+                        if source.isDirectConnect {
+                            Text("大陆直连")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(AuroraColor.forestGreen)
+                        }
+                    }
+                    Text(isSupported ? source.description : "iOS 解析器尚未接入")
+                        .font(.caption)
+                        .foregroundStyle(AuroraColor.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: AuroraMetrics.spacingS)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(AuroraColor.brand)
+                        .accessibilityHidden(true)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!isSupported)
+        .accessibilityLabel("\(source.name), \(isSupported ? source.description : "尚未接入")")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
 // 顶部 Hero 骨架屏占位（平滑过渡，消除切换时的空白与闪烁）
-private struct HeroLoadingPlaceholder: View {
-    var body: some View {
+public struct HeroLoadingPlaceholder: View {
+    public init() {}
+
+    public var body: some View {
         ZStack(alignment: .bottom) {
             Rectangle()
                 .fill(

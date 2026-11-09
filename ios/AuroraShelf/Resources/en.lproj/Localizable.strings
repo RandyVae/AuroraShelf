@@ -1,0 +1,111 @@
+/* Tabs */
+"tab.home" = "Home";
+"tab.comics" = "Comics";
+"tab.live" = "Live";
+"tab.forum" = "Community";
+"tab.library" = "Library";
+
+/* Home Screen */
+"home.today_top_hits" = "Today's Top Hits";
+"home.top10" = "TOP 10 TODAY";
+"home.up_next" = "Up Next";
+"home.channels" = "Channels";
+"home.connecting" = "Connecting to %@...";
+"home.loading_recommendations" = "Loading recommendations...";
+"home.loading_more" = "Loading more...";
+"home.all_loaded" = "All content loaded";
+"home.play" = "Play";
+"home.watchlist" = "Watchlist";
+"home.details" = "Details";
+"home.related" = "Related";
+"home.all" = "All";
+
+/* Search */
+"search.placeholder" = "Search videos, anime, comics or codes";
+"search.concurrent_hint" = "Search across 19 video sources concurrently";
+"search.no_results" = "No Results Found";
+"search.searching" = "Searching...";
+"search.history" = "Search History";
+"search.clear_history" = "Clear History";
+"search.cancel" = "Cancel";
+
+/* Comics */
+"comics.title" = "Comics";
+"comics.featured" = "Featured";
+"comics.loading" = "Loading comics...";
+"comics.loading_more" = "Loading more comics...";
+"comics.all_loaded" = "All comics loaded";
+"comics.select_source" = "Select Comic Source";
+"comics.unconfigured" = "Credentials Not Configured";
+"comics.unconfigured_hint" = "Configure credentials in settings to access";
+
+/* Reader */
+"reader.chapter" = "Chapter %d";
+"reader.page" = "Page %d of %d";
+"reader.prev_chapter" = "Previous";
+"reader.next_chapter" = "Next";
+"reader.loading_image" = "Loading image...";
+
+/* Live */
+"live.title" = "Live";
+"live.featured" = "Featured";
+"live.female" = "Female";
+"live.male" = "Male";
+"live.couples" = "Couples";
+"live.trans" = "Trans";
+"live.loading" = "Loading streamers...";
+"live.viewers" = "%@ Viewers";
+"live.online" = "Online";
+"live.offline" = "Offline";
+"live.select_source" = "Select Live Source";
+"live.chat" = "Live Chat";
+
+/* Forum */
+"forum.title" = "Community";
+"forum.all" = "All";
+"forum.cl" = "CL Community";
+"forum.91" = "91 Forum";
+"forum.loading" = "Loading posts...";
+"forum.replies" = "%d replies";
+"forum.original_post" = "View Original";
+
+/* Player / Detail / Watchlist / InSight */
+"player.play" = "Play";
+"player.pause" = "Pause";
+"player.aspect_fit" = "Fit Screen";
+"player.aspect_fill" = "Fill Screen";
+"player.airplay" = "AirPlay";
+"player.episodes" = "Episodes";
+"detail.synopsis" = "Synopsis";
+"detail.more_like_this" = "More Like This";
+"watchlist.add" = "Add to Watchlist";
+"watchlist.in_list" = "In Watchlist";
+"watchlist.remove" = "Remove";
+"watchlist.title" = "My Watchlist";
+"watchlist.empty" = "Watchlist is empty";
+"watchlist.count" = "%d items";
+
+/* Library / Settings */
+"library.title" = "Library";
+"settings.language" = "Language";
+"settings.language_title" = "Select Language";
+"settings.follow_system" = "Follow System";
+"settings.game" = "Entertainment · Game";
+"settings.game_title" = "Lust Goddess · Tactical RPG";
+"settings.game_desc" = "Strategy RPG · Native hardware acceleration";
+"settings.launch" = "Launch";
+"settings.video_source" = "Current Video Source";
+"settings.comic_source" = "Current Comic Source";
+"settings.live_source" = "Current Live Source";
+"settings.offline_download" = "Offline Video Download";
+"settings.not_available" = "Not available in this version";
+"settings.version" = "Version Info";
+"settings.airplay_title" = "AirPlay Cast";
+"settings.airplay_select" = "Choose Device";
+"settings.select_live_source" = "Select Live Source";
+
+/* Common Actions */
+"common.done" = "Done";
+"common.cancel" = "Cancel";
+"common.close" = "Close";
+"common.ok" = "OK";

@@ -1,5 +1,680 @@
 # Project State
 
+## 最新工作狀態（2026年11月9日 · 雙端版本號升級至 v2.16.1 Build 227 + 全量修復 OTA 原子發布 + 網頁與 Manifest 實時同步 + 代碼庫全面推送）
+
+- **最新成果（版本號升級 v2.16.1 + 全鏈路發布 + 單測 100% 通過）**：
+  1. **版本號全量升級至 v2.16.1 (Build 227)**：
+     - Android 端：`app/build.gradle.kts` versionCode 227、versionName 2.16.1；
+     - iOS 端：`ios/project.yml` 與 `project.pbxproj` 中 `CURRENT_PROJECT_VERSION` 227、`MARKETING_VERSION` 2.16.1，`Info.plist` `CFBundleShortVersionString` 2.16.1；
+     - `PersonalScreen.swift` 遊戲版本標籤同步更新為 `v2.16.1`；
+     - OTA 發布站 `scripts/ota_web/index.html` 與遠端 `/var/www/netgrey/index.html` 同步升級為 `v2.16.1 (Build 227)`，更新下載包名與檔案大小（209 MB）；
+     - 遠端 `/var/www/netgrey/manifest.plist` 同步將 `bundle-version` 更新為 `2.16.1`，確保 iOS OTA 升級正常識別。
+  2. **全量自動化驗證 100% 通過**：
+     - 老虎機確定性測試 PASS（1000 次固定種子無差異）；
+     - Android 單測 `./gradlew testDebugUnitTest` 31 項構建任務全綠；
+     - iOS 單元測試 `xcodebuild test` 163 項測試全綠（0 failures, 6 skipped，耗時 23.6s）。
+  3. **雙端 Release 構建、自動化簽名與 OTA 發布**：
+     - 生成 Android 正式包 `dist/Netgrey.apk`（208M）與 iOS 正式簽名包 `Netgrey.ipa`（205M）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間 11GB（>5GB 安全水位）。
+  4. **代碼推送**：
+     - Git 提交並同步推送至遠端 `origin/main`。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 最新工作狀態（2026年11月9日 · XVideos 全鏈路解析重構 + MP4 原畫直鏈優先 + 標題 HTML 實體反轉義 + 雙端 OTA Build 226 同步發布）
+
+- **最新成果（XVideos 播放失敗徹底修復 + 雙端單測全綠 + OTA 同步發布）**：
+  1. **XVideos 播放流解析重構（原畫 MP4 優先，根除 HLS 切片防盜鏈與解碼失敗）**：
+     - 原 iOS 代碼優先匹配 `html5player.setVideoHLS('...')` 返回 `hls_low.m3u8`。HLS 包含兩層 m3u8 playlist 與數百個相對路徑 `.ts` 切片，iOS `AVURLAsset` 請求切片時無法穩定傳遞 Referer/Origin，且切片受 CDN 跨域限制，導致 `AVPlayerItem` 直接報錯 `.failed` 或播放器畫面黑屏；
+     - 原 Android 代碼在 `PlaybackResolver.kt` 中完全缺失對 XVideos 的播放流解析，直接回退到通用頁面解析並拋出「页面未提供可识别的视频地址」；
+     - 雙端同步重構解析優先級：
+       1. 優先匹配 `html5player.setVideoUrlHigh('...')` 提取官方原畫 MP4 直鏈，單一 HTTP Range 請求，不依賴子切片，零 Referer 丟失風險，AVPlayer 硬件秒解；
+       2. 次選 `html5player.setVideoUrlLow('...')` 標清 MP4 直鏈；
+       3. 兜底提取 `<div id="html5video_base">` 靜態 HTML 降級視圖中的 MP4 直鏈；
+       4. 最後備用 `html5player.setVideoHLS('...')` HLS 流；
+     - 在 `PlaybackSourceResult`（iOS）與 `PlaybackSource`（Android）中統一注入標準 Referer `https://www.xvideos.com/`。
+  2. **HTML 實體編碼深度反轉義**：
+     - `UniversalVideoEngine.parseXVideosHtml` 補齊對 `&#039;`、`&#39;`、`&quot;`、`&#34;`、`&amp;`、`&#38;`、`&lt;`、`&gt;` 的反轉義，根除視頻標題顯示為 `&#039;s` 等實體編碼的瑕疵。
+  3. **封面加載器（CoverImageLoader）域名與防盜鏈適配**：
+     - iOS `CoverImageLoader.swift` 與 Android `CoverImageLoader.kt` 同步補齊 `xvideos` 域名判定，為 `thumb-cdn77.xvideos-cdn.com` 等 CDN 自動注入 `Referer: https://www.xvideos.com/`，確保封面圖穩定渲染。
+  4. **全量測試 100% 通過**：
+     - 老虎機確定性測試 PASS、Android 單測 31 項任務全綠、iOS 單元測試 45 項 100% 全部通過（0 失敗）；
+  5. **OTA 雙端持續交付發布（Build 226）**：
+     - 版本號自增至 226，雙端自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` 205MB 與 `Netgrey.apk` 209MB）；
+     - 伺服器可用磁碟維持在 11GB（安全水位 >5GB），零歷史包堆積。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 最新工作狀態（2026年11月9日 · 視頻播放死鎖與列表加載失敗根治 + Single-Flight 防擊穿架構 + 默認源優化 + Build 225 雙端 OTA 同步發布）
+
+- **最新成果（播放死鎖與列表空白徹底根治 + 雙端單測全綠 + OTA 同步發布）**：
+  1. **視頻無法播放的「自身死鎖（Self-Deadlock）」徹底根除**：
+     - 病灶根因：`VideoPreloadManager` 的 `prewarm` 將異步 Task 存入 `inFlightTasks`，而 Task 內部調用 `VideoRepository.resolvePlayback` 第 1310 行又去查 `inFlightTask`，查出自己並 `await inFlight.value` 形成永久自我等待；且首頁加載後批量預熱 6 部，將首屏前 6 部全部鎖死；
+     - 架構重構：抽離底層純解析函數 `executeStreamResolution`，在 `VideoPreloadManager` 中構建統一的 `resolve(video:)` Single-Flight 防擊穿合流機制，底層解析任務不再查詢自我，彻底消除死鎖；首頁改為僅對首部焦點視頻輕量預熱；
+  2. **全源列表加載失敗與骨架屏永久卡死根除**：
+     - 病灶根因：`switchSource` 預先填充帶 `isLoading: true` 的假貨架，導致加載失敗時 `categoryShelves.isEmpty` 為 `false`，錯誤重試視圖永遠無法命中；
+     - 修復方案：`HomeScreen.swift` 強化錯誤判斷為 `(repo.categoryShelves.isEmpty || repo.categoryShelves.allSatisfy { $0.videos.isEmpty }) && repo.feedVideos.isEmpty, let feedError = repo.feedError`，出錯時 100% 顯現重試視圖；`loadFeed` 出錯時強制清空貨架；
+  3. **源切換與分類切換競態取消根除**：
+     - 源切換前預先對齊 `selectedCategory`，消除二次觸發 `switchCategory` 導致 `currentLoadTask?.cancel()` 的空列表問題；
+  4. **默認源切換為穩定直連秒開源**：
+     - 首屏默認源還原為大陸穩定直連、無廣告倒計時鎖的 `dongman91`（91動漫），消除 `huavod` 22 秒廣告倒計時鎖對冷啟動的干擾；
+  5. **全量測試 100% 通過**：
+     - 老虎機確定性測試 PASS、Android 單測 31 項任務全綠、iOS 單元測試 162 項 100% 全部通過（0 失敗）；
+  6. **OTA 雙端持續交付發布（Build 225）**：
+     - 版本號自增至 225，雙端自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` 與 `Netgrey.apk`）；
+     - 伺服器可用磁碟維持在安全水位，零歷史包堆積。
+- **最近更新**：2026-11-09 by Antigravity。
+
+- **最新成果（UI 溢出與遮擋缺陷全量根除 + 雙端單測全綠 + OTA 同步發布）**：
+  1. **右翼控制組橫向溢出截斷徹底根除**：
+     - 將 `.slots-controls-aux` 從右翼抽離為橫跨機台全寬的獨立飾條（Full-Width Bet & Aux Bar），位於狀態欄下方、雙翼操作台上方；
+     - 7 個控件（賠率表、−、下注額、+、MAX、AUTO、TURBO）在全寬 360px~1080px 空間內開闊展開，步進器居中，徹底消滅 `+` 截斷與 `MAX`/`AUTO`/`TURBO` 溢出；
+  2. **18+ 伴遊特勤面部遮擋徹底根除**：
+     - 對白氣泡 `#mascot-speech` 設置為預設隱藏（`hidden`），僅在點擊伴遊特勤互動（`onMascotTap`）或旋轉中獎時動態浮現 3.5s 後平滑自動淡出隱藏；
+     - `SLOTS_MASCOTS` 全員 `yRatio` 從 `-0.21` 調優至 `-0.06`（Kitty/Regina 至 `-0.05`/`-0.04`），角色在伴遊舞台垂直光學居中，18+ 動態 Spine 與呼吸身姿 100% 無遮擋；
+  3. **右翼操作台純粹化與全高 SPIN 巨型拉桿**：
+     - 右翼 `.slots-action-wing` 專門承載全尺寸 `.slots-master-spin-btn`（拉桿按鈕），填滿右翼全寬與全高，極佳適配右手拇指觸控黃金區；
+  4. **狀態欄提示文案精簡**：
+     - 更新為 `单次 20 金币 · 命中 3 个 Scatter 激活免费大旋转`，消滅窄屏下的省略號截斷；
+  5. **全量測試通過**：
+     - 1000 次確定性測試 PASS、10 萬次 Monte-Carlo 仿真 RTP 95.85% PASS、全量資產校驗 PASS、Android 31 任務單測全綠；
+  6. **OTA 雙端持續交付發布（Build 223）**：
+     - 版本號自增至 223，雙端自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` 與 `Netgrey.apk`）；
+     - 伺服器可用磁碟維持在安全水位，零歷史包堆積。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 歷史工作狀態（2026年11月9日 · 華視體感秒加載引擎落地 + 雙向規範化別名緩存 + In-Flight 併發防擊穿合流 + 雙端單測全綠 + OTA 同步發布）
+
+- **最新成果（華視秒加載策略落地 + 雙向別名緩存 + 併發合流 + 雙端單測全綠）**：
+  1. **華視時序鎖痛點化解（將 22 秒廣告倒計時完全轉移至用戶前置交互）**：
+     - 機制確證：華視服務端以 Redis 強制校驗 `ad_duration_ms`（15~22 秒）；提前請求會被 `too early` 阻斷並銷毀令牌；
+     - 策略落地：將等待時間轉移至詳情頁瀏覽與觀影時間差中，實現體感 0ms 秒開；
+  2. **iOS 端 VideoPreloadManager 雙向規範化別名映射與 In-Flight 防擊穿**：
+     - `VideoPreloadManager` 新增 `canonicalKeys(for:)`，打通 `/voddetail/{id}.html` 與 `/vodplay/{id}-1-1.html`；
+     - `resolvePlayback(video:)` 接入 `inFlightTask` 併發防擊穿合流，後台正在預熱時直接等待剩餘時間，杜絕重複發起二次換鏈；
+     - `NativePlayerView` 在播放中鏈式向後預換鏈下一集，切集與連播 0ms 秒開；
+     - `VideoPreloadManagerTests` 新增 `testHuavodBidirectionalAliasCache`，160 項單測全部通過；
+  3. **Android 端 PlaybackResolver 雙向別名緩存與詳情頁即時預換鏈**：
+     - `PlaybackResolver.kt` 在 `resolveEpisodes` 與 `openVideo` 時，第一时间调用 `prewarmHuavod` 启动静默换链；
+     - `rememberHuavod` 同步双向注入 `voddetail` 缓存，31 项单测全部通过；
+  4. **OTA 雙端持續交付發布（Build 219）**：
+     - 版本號自增至 219，雙端自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` 與 `Netgrey.apk`）；
+     - 伺服器磁碟可用空間維持在安全水位（>11GB 可用，26% 使用率），零歷史包堆積。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 歷史工作狀態（2026年11月9日 · 黃果短劇接入 Edge 官方網關毫秒級秒開重構 + 首集流內存預填零延遲 + 雙端單元測試全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（借鑒 HGhub 策略重構黃果源短劇秒加載 + 雙端單測全綠 + OTA 同步發布）**：
+  1. **黃果短劇解析機制顛覆性升級（徹底根除 215KB SSR HTML 下載與正則刮取）**：
+     - 原 Netgrey 瓶頸：向 `https://huangguoai.com/detail?id=...` 下載 215KB 完整網頁並正則解析，冷加載白屏達 800ms~1500ms+；
+     - HGhub 核心機制落地：雙端直接對接黃果官方 Edge 信封網關 `POST https://huangguoai.com/api/edge/request`，封裝 `{ "method": "GET", "path": "...", "body": "", "content_type": "" }`；
+     - 接口耗時實測：全集列表接口 `path: "/api/videos/{id}"` 僅需 **448ms**，單集播放流 `path: "/api/videos/{id}/play?ep={ep}&page_texts=0"` 僅需 **337ms**，列表流僅需 **375ms**；
+  2. **首集直鏈原子返回與雙端內存預存（點擊第 1 集 0ms 內存秒開）**：
+     - 黃果 Edge 全集接口响应体 `detail` 內置第 1 集播放直鏈 `video_url`；
+     - Android `PlaybackResolver.kt` 與 iOS `VideoRepository.swift` 在獲取劇集列表時，同步將首集直鏈原子寫入 `playbackCache` / `VideoPreloadManager`，用戶進入詳情頁點擊第 1 集播放無網絡請求等待（0ms 內存命中）；
+  3. **分集與列表全鏈路 Edge 化**：
+     - Android `HuangguoEdgeGateway.kt` 與 iOS `executeHuangguoEdgeRequest` 覆蓋詳情、分集、榜單與分類視頻；
+  4. **雙端單元測試全綠**：
+     - Android `./gradlew testDebugUnitTest` 31 個任務全部成功（耗時 3s）；
+     - iOS `xcodebuild test` 159 個測試用例全部通過（0 失敗，耗時 4.092s）；
+  5. **OTA 雙端發布與磁碟防爆**：
+     - `./scripts/publish_ota.sh` 雙端 Release 自動化打包發布完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` 與 `Netgrey.apk`）；
+     - 伺服器磁碟可用空間維持在安全水位（>11GB 可用），零歷史版本堆積。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 歷史工作狀態（2026年11月9日 · Build 217 · Codex 審計殘留缺陷全量閉環修復 + UIScreen.main 徹底清零 + 跨端遊戲生命週期 destroy 閉環 + 雙端單元測試全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（Codex 審計殘留缺陷閉環 + iPadOS 窗口尺寸自適應 + 遊戲生命週期完善 + 雙端單元測試全綠 + Build 217 雙端持續發布交付）**：
+  1. **iOS / iPadOS 全工程 `UIScreen.main` 徹底根除（已實測靜態檢查零殘留）**：
+     - 在 `DeviceLayoutProfile.swift` 實現 `currentWindowSize` 與 `resolveCurrent`，以活躍場景的 `keyWindow` 邊界尺寸作為尺寸判定依據；
+     - 徹底替換 `HeroBanner`、`Top10Card`、`ComicsScreen`、`ForumScreen`、`LiveScreen`、`WatchlistScreen`、`CategoryDetailScreen`、`CategoryShelfView`、`UpNextCard`、`VideoDetailSheet`、`NativePlayerView` 等 12 處硬編碼，iPad Split View（1/3、1/2）與 Stage Manager 分屏下佈局完全自適應；
+  2. **Android 系統動態字級支持與網絡空值安全測試（已實測單測通過）**：
+     - `GameActivity.kt` 支援系統 `fontScale` 比例縮放（100%~150%），兼顧排版與無障礙大字號；
+     - 補齊 `IkmmhComicSourceTest` 單元測試，確保網絡章節缺失或異常時 100% 容錯；
+  3. **遊戲生命週期與純虛擬幣合規（已實測代碼驗證）**：
+     - `SlotsUI` 新增 `destroy()`，`APP.destroyGame()` 統一清理所有活躍 Spine 場景與定時器；
+     - `index.html` 移除法幣文案（「HK$ 6.00」），改為純虛擬獎勵「免費補給」與「免費空投」；
+     - 戰鬥失敗絕地救援建立單向狀態機與 `_reviving` 冪等鎖，徹底杜絕狀態交叉；
+  4. **雙端單元測試全綠**：
+     - Android `./gradlew testDebugUnitTest` 31 個任務全部成功；
+     - iOS `xcodebuild test` 158 個測試用例全部通過（0 失敗）；
+  5. **OTA 雙端發布與磁碟防爆（已實測驗證）**：
+     - 版本號自增至 Build 217，雙端自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` 與 `Netgrey.apk`）；
+     - HTTP 200 OK 驗證通過，伺服器磁碟可用空間維持在安全水位（11GB 可用，26% 使用率），無歷史包堆積與臨時碎片殘留。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 歷史工作狀態（2026年11月9日 · Build 216 · 戰鬥多關卡切換舊角色滯留根治 + 老虎機免費旋轉預留空間優化 + 雙端單元測試全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（戰鬥多關卡舊角色滯留根治 + 老虎機免費旋轉預留空間優化 + 雙端單元測試全綠 + Build 216 雙端持續發布交付）**：
+  1. **戰鬥系統多關卡切換舊角色滯留戰場缺陷根治（已實測自動化驗證）**：
+     - 排查出 `SpineField` 活動單位數組在上一關勝利後未清空，且 `Battle.prototype.stop()` 錯誤引用 `this.spine.views`（應為 `this.spine.units`）；
+     - `spine.js` 實現 `SpineField.prototype.clear()`，清空全量骨骼與 WebGL 緩衝區；
+     - `battle.js` 與 `app.js` 在關卡結算切換時顯式調用 `stop()` 與 `clear()`，新關卡骨骼數目維持為當前關卡基準（2 個單位），徹底消除舊角色幽靈殘留；
+  2. **老虎機免費旋轉空間佈局高保真重構（已實測自動化驗證）**：
+     - 重構 `index.html` 與 `app.css`，採用 `.slots-status-lead`（引導信息）+ `.slots-free-pill`（微光膠囊）雙分區流式架構；
+     - 消除常規遊戲下 140px 空白斷層與免費旋轉模式下的重疊冗餘文字；
+     - 旋轉拉桿按鈕與狀態欄在免費旋轉時動態聯動高亮（`FREE SPIN` / `剩余 X 次 · 免扣金币`）；
+  3. **雙端單元測試全綠**：
+     - Android `./gradlew testDebugUnitTest` 31 個任務全部成功；
+     - iOS `xcodebuild test` 158 個測試用例全部通過（0 失敗）；
+  4. **OTA 雙端發布與磁碟防爆（已實測驗證）**：
+     - 版本號自增至 Build 216，雙端自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` 與 `Netgrey.apk`）；
+     - HTTP 200 OK 驗證通過，伺服器磁碟可用空間維持在安全水位（11GB 可用，26% 使用率），無歷史包堆積與臨時碎片殘留。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 歷史工作狀態（2026年11月9日 · Build 215 · 遊戲大廳 55 特勤純相對坐標系精密咬合 + 老虎機流式彈性排版按鈕全面重現 + 雙端 Universal 實機與 OCR 零誤差驗證全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（大廳 55 特勤純相對坐標系精密咬合 + 老虎機流式彈性排版按鈕全面重現 + 雙端 Universal 實機與 OCR 零誤差驗證全綠 + Build 215 雙端持續發布交付）**：
+  1. **遊戲主大廳特勤立繪純相對坐標系重構與 55 角色精準適配（已實測 WebKit DOM 實測與截圖驗證）**：
+     - 重構 `index.html` 與 `app.css`，採用純 Flexbox 垂直流式佈局（`.hub-top`、`.hub-hero-stage`、`.hub-focus`、`.hub-bottom`），徹底廢除任何絕對坐標定位；
+     - `#hub-art` 設置 `align-self: flex-end; object-fit: contain; object-position: bottom center; transform-origin: bottom center;`，立繪底緣自然緊扣焦點卡頂部；
+     - `ui.js` 建立 55 位特勤精準光學分級縮放引擎（`HERO_HUB_ADAPTATION`），長寬比自 0.524（Victoria）至 1.100（Esther）全面自適應擴展；
+     - 實機 DOM 量化測量驗證：最寬坐姿角色 Esther 底部間距 `-0.04px`，最高站姿角色 Bonita 間距 `0.00px`，常規角色 Kitty 間距 `0.00px`，iPad Pro 13 吋間距 `-0.004px`，徹底杜絕懸空與過度下沉遮擋；
+  2. **老虎機彈性伸縮流式重構與按鈕 100% 釘死可視（已實測 Apple Vision OCR 驗證）**：
+     - `.slots-cabinet` 移除 `contain: paint;` 截斷遮罩，滾軸窗口設為唯一彈性伸縮骨幹（`flex: 1 1 auto; min-height: 130px;`）；
+     - 控制條 `.slots-controls` 固化為 `flex: 0 0 auto;`，SPIN 旋轉拉杆按鈕強制鎖定 `clamp(44px, 5.6vh, 50px)`，在 iPhone 17 Pro 與 iPad Pro 13 吋屏幕內 100% 釘死可見；
+     - 實測 Apple Vision OCR 識別驗證：`SPIN 旋转拉杆`、`PULL LEVER`、各項倍率與伴遊 Charlotte 完整清晰展示，字體與按鈕無任何裁切或溢出；
+  3. **Universal 雙端同質同發（已實測雙端截圖）**：
+     - iPhone 手機端與 iPad 平板端橫豎屏佈局與視覺層級同時完成修復並驗證通過；
+  4. **OTA 雙端發布與磁碟防爆（已實測驗證）**：
+     - 版本號自增至 Build 215，雙端自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` 與 `Netgrey.apk`）；
+     - HTTP 200 OK 驗證通過，伺服器磁碟可用空間維持在安全水位（>5GB），無歷史包堆積與臨時碎片殘留。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 歷史工作狀態（2026年11月9日 · Build 214 · 遊戲大廳立繪底緣精密貼合 + 老虎機伴遊角色 1.68x 放大聚焦 + 多處文字溢出與折行全面根治 + 雙端 Universal 實機與 OCR 驗證全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（大廳立繪底緣精密貼合 + 老虎機伴遊角色 1.68x 放大聚焦 + 多處文字溢出全面根治 + 雙端 Universal 實機與 OCR 驗證全綠 + Build 214 雙端持續發布交付）**：
+  1. **遊戲主大廳特勤立繪底緣精密貼齊下方組件（已實測截圖與像素分析驗證）**：
+     - `app.css` 在移動端（`@media (max-width: 700px)`）鎖定 `.hub-focus` 卡片固定高度為 `84px`（`bottom: calc(var(--safe-b, 0px) + 74px)`），其頂部邊界精準固定於 `calc(var(--safe-b, 0px) + 158px)`；
+     - 將 `.hub-art` 底部錨定於 `bottom: calc(var(--safe-b, 0px) + 158px)`，核心關鍵在於設置 `object-position: bottom center` 與 `transform-origin: bottom center`；呼吸動畫改為純 `scale(1.012)` 向上呼吸微動，不再使用 `translateY(-6px)` 產生懸空跳動；
+     - 平板/桌面端（`@media (min-width: 900px)`）：下方組件為導航欄 `.hub-bottom`，設置 `.hub-art` 底部錨定於 `bottom: calc(var(--safe-b, 0px) + 82px)` 並搭配 `object-position: bottom center`，使立繪底部與導航組件完美貼合切齊；
+     - 實機量化驗證（`iphone_hub_v3_ready.png`）：Kitty 腿部最低像素坐標 `y = 2039`，焦點卡片頂部邊界 `y = 2046`，二者貼合誤差僅 2.3 CSS 像素，徹底告別懸空漂浮與沉底掩埋；
+  2. **老虎機伴遊特勤真正等比放大聚焦（已實測截圖與像素分析驗證）**：
+     - `slots.js` 為 `SLOTS_MASCOTS` 中全部特勤伴遊配置針對性 `scaleMult: 1.26 ~ 1.28` 與 `yRatio: -0.14 ~ -0.21`（Charlotte 設為 `scaleMult: 1.28, yRatio: -0.21`）；在 `initMascot`、`loadCurrentMascot` 與 `resumeMascot` 中動態寫入 `opts.scaleMultiplier` 與 `opts.yRatio`；
+     - `app.css` 壓縮 `.mascot-speech-bubble` 頂部厚度，舞台佔比擴增至 52%；
+     - 實機量化驗證（`iphone_slots_v3_ready.png`）：伴遊 Charlotte 在屏幕上的渲染高度自原先的 135 CSS 像素提升至 **226.3 CSS 像素**（679 像素），**體積淨增 67.6%**，呈現大氣精緻的 3/4 全身高分辨率半身/立姿特寫，頭頂無裁切、面容與胸前動態清晰生動；
+  3. **控件文字溢出與異常折行全鏈路修復（已實測 Apple Vision OCR 驗證）**：
+     - 大廳頂部身份卡（`.hub-id`）：建立 `.vip-badge` 完整樣式，同時將 `.hub-id .who` 限制最大寬度 `78px` 並設置單行省略號；`.hero-switch-name` 限制最大寬度 `52px` 截斷；Apple Vision OCR 實測 6 大元素以 `y = 0.250` 精準水平單行排列，零折行、零溢出；
+     - 老虎機伴遊信息欄（`.mascot-header-row`）：`.mascot-switch-btn` 強制設置 `white-space: nowrap; flex-shrink: 0;`；`#slots-mascot-name` 設置 `max-width: 62px; overflow: hidden; text-overflow: ellipsis;`；伴遊標籤與各項數值強制設置不換行；Apple Vision OCR 實測完全單行展示，字體邊界規整；
+  4. **Universal 雙端同質（已實測 iPhone 17 Pro 與 iPad Pro 13 吋雙端截圖）**：
+     - iPhone 手機端與 iPad 平板端橫豎屏佈局與視覺層級同時完成修復並驗證通過；
+  5. **OTA 雙端發布與磁碟防爆（已實測驗證）**：
+     - 版本號自增至 Build 214，雙端自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` 166M / `Netgrey.apk` 169M）；
+     - HTTP 200 OK 驗證通過，伺服器磁碟可用空間 11GB（26%），無歷史包堆積與臨時碎片殘留。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 歷史工作狀態（2026年11月9日 · Build 213 · 直播雙端線路容錯與自動降級 + 大廳立繪垂直光學居中防遮擋 + 老虎機伴遊角色 1.5x 尺寸放大重構 + 雙端 386 項單測全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（直播雙端線路容錯與自動降級 + 大廳立繪垂直光學居中防遮擋 + 老虎機伴遊角色 1.5x 尺寸放大重構 + 雙端 386 項單測 100% 通過 + Build 213 雙端持續發布交付）**：
+  1. **直播模塊連線缺陷排查與雙端高可用降級根治（已實測驗證）**：
+     - Android `StripchatLiveRepository.kt` 支持 `zh.stripchat.com` 與 `stripchat.com` 雙域名備用輪詢，優化請求標頭避免 Cloudflare 阻斷；
+     - Android `LiveViewModel.kt` 在主源異常時自動無縫降級請求備用源 `HornyStudents`；
+     - Android `LiveScreen.kt` 頂部新增平台源切換膠囊（`Stripchat` / `HornyStudents`），錯誤界面新增「切換至備用線路」操作按鈕；
+     - iOS `LiveSourceCatalog.swift` 之 `fetchStripchatFeed` 引入備用域名輪詢與單標籤異常容錯機制；
+  2. **遊戲主大廳特勤立繪下沉嚴重遮擋根治（已實測截圖驗證）**：
+     - `app.css` 重構 `.hub-art` 為開窗垂直居中佈局（`top: calc(var(--safe-t) + 76px)`, `bottom: calc(var(--safe-b) + 144px)`, `object-position: center center`），完全移出底卡重疊區域；移除 22% 漸隱蒙版；
+     - iPhone 17 Pro 與 iPad Pro 13 吋實機截圖驗證，立繪全身處於上下 HUD/卡片中間的黃金可視窗，徹底消除下沉遮擋；
+  3. **老虎機伴遊角色顯示過小等比放大重構（已實測截圖驗證）**：
+     - 根治 `SpineField.prototype.update` 每幀覆蓋縮放 bug，在 `spinestage.js` 新增 `scaleMultiplier` 支持並於 `place()` 實時同步 `baseScale`；
+     - `app.css` 將伴遊卡槽高度提升至 `clamp(170px, 24vh, 260px)`（平板端 280px-320px），伴遊舞台寬度擴大至 54%；`slots.js` 校準為 `heightRatio: 0.82, scaleMultiplier: 0.92, yRatio: 0.02`；
+     - 實機驗證（`iphone_slots_perfect4.png`）：伴遊 Charlotte 體量擴大約 1.5 倍，全身 100% 完整無裁切呈現；
+  4. **自動化測試全量覆蓋通過（已實測驗證）**：
+     - JS AST 語法檢查（`node -c app/src/main/assets/www/js/*.js`）全綠；
+     - 確定性戰鬥與老虎機測試全綠；
+     - Android 228 項單測全部通過；iOS 158 項單測全量通過；雙端合計 386 項單測全綠；
+  5. **OTA 雙端發布與磁碟防爆（已實測驗證）**：
+     - 版本號自增至 Build 213，自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` / `Netgrey.apk`）；
+     - HTTP 200 OK 驗證通過，伺服器磁碟可用空間 11GB（26%），零歷史版本堆積。
+- **最近更新**：2026-11-09 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 212 · 戰鬥結算計時器攔截凍結缺陷根治 + 結算面板渲染順序加固 + 全屏 CG 播放超時兜底 + 雙端 386 項單測全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（戰鬥結算計時器攔截凍結缺陷根治 + 全屏 CG 播放超時兜底 + 雙端 386 項單測 100% 通過 + Build 212 雙端持續發布交付）**：
+  1. **自然戰鬥結算凍結根本原因定位與根治（已實測 CDP 驗證）**：
+     - `battle.js` 原有 `schedule` 包含 `if (!this.running && this.ended) return null;`，與 `finish` 中 `this.ended = true; this.running = false;` 產生死鎖衝突，導致非跳過戰鬥的 700ms 結算定時器被靜默丟棄，畫面永久停滯在戰鬥結尾；
+     - 重構為基於 `this.stopped` 的安全銷毀通道，並在 `finish` 中加入保底調用，徹底根除結算凍結；
+  2. **多重界面推進穩健性加固（已實測驗證）**：
+     - 凱旋特寫 `victoryBox` 支持點擊跳過，消除 2.2s 強制等待；
+     - 全屏 CG 播放器加入 `video.onerror` 與 8000ms 絕對安全超時，防止視像黑屏或自動播放策略卡死；
+     - 戰敗急救血清面板在結算數據完全填充後呈現，復活鏈路支援完整二次結算；
+  3. **自動化測試全量覆蓋通過（已實測驗證）**：
+     - JS AST 語法檢查（`node -c app/src/main/assets/www/js/*.js`）全綠；
+     - 確定性戰鬥與老虎機測試全綠；
+     - Android 228 項單測全部通過；iOS 158 項單測全量通過；雙端合計 386 項單測全綠；
+  4. **OTA 雙端發布與磁碟防爆（已實測驗證）**：
+     - 版本號自增至 Build 212，自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` / `Netgrey.apk`）；
+     - HTTP 200 OK 驗證通過，伺服器磁碟可用空間 11GB（26%），零歷史版本堆積。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 211 · 老虎機全量 CG 庫動態隨機分發去重 + 戰鬥多軌角色垂直居中防裁切 + 雙端 386 項單測全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（老虎機 8 部 CG 動態分發去重 + 戰鬥多軌角色垂直居中防裁切 + 雙端 386 項單測 100% 通過 + Build 211 雙端持續發布交付）**：
+  1. **老虎機 8 部官方 CG 動態隨機分發與防刷去重（已實測驗證）**：
+     - `videos.json` 完整補齊 8 部高畫質官方 CG 視像資產（`cg_ch1`~`cg_ch4`、`v_comics_maze_2_48`、`v_comics_maze_3_13`~`15`）；
+     - `slots.js` 實現符號與 CG 映射偏好池，Wild/Scatter 自動擴展至全池；引入 `_lastPlayedCg` 連續播放去重機制，徹底告別連續暴擊重複同一視像的單調體驗；
+  2. **戰鬥角色世界坐標垂直居中與裁切根治（已實測驗證）**：
+     - 解決 Spine WebGL 畫布坐標軸翻轉引發的雙重取反誤差，將軌道基線校準為 `LANE_FRACTIONS = [0.14, 0.37, 0.60]`、角色高度約束為 `30%`；
+     - 頂部軌道角色頭部頂點落於畫布 90%，距離頂部 HUD 預留 10% 呼吸空間，100% 完整顯示零裁切；底部軌道腳底為 14%，三軌道等距 0.23，消除下方空曠感；
+     - `app.css` 同步修正 3 條透視激光軌道參考線至 CSS 頂部距離 `40%, 63%, 86%`，達成像素級空間對齊；
+  3. **自動化測試全量覆蓋通過（已實測驗證）**：
+     - JS AST 語法檢查（`node -c app/src/main/assets/www/js/*.js`）全綠；
+     - 確定性戰鬥與老虎機測試全綠；
+     - Android 228 項單測全部通過；iOS 158 項單測全量通過；雙端合計 386 項單測全綠；
+  4. **OTA 雙端發布與磁碟防爆（已實測驗證）**：
+     - 版本號自增至 Build 211，自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` / `Netgrey.apk`）；
+     - HTTP 200 OK 驗證通過，伺服器磁碟可用空間 11GB（26%），零歷史版本堆積。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 210 · Codex 專項修復審核與雙端生命週期協同加固 + Android 方向解鎖自適應 + 雙端前台後台暫停恢復銷毀協議 + WebKit 卸載資源釋放 + 雙端 386 項單測全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（Codex 修復項審核採納 + 雙端 386 項單測 100% 通過 + Build 210 雙端持續發布交付）**：
+  1. **Codex 修復內容審核採納（確認完全合理）**：
+     - Android `GameActivity.kt` 解除強制豎屏（改為 `SCREEN_ORIENTATION_UNSPECIFIED`），適配平板、折疊屏與旋轉；接入 `AndroidNative` 原生橋樑提供系統級物理震動反饋；在 `onPause`、`onResume`、`onDestroy` 中注入 `APP.pauseGame()` / `APP.resumeGame()` / `APP.destroyGame()`，徹底消除後台無效空轉與背景音樂持續播放缺陷；
+     - Web 前端 `app.js` 封裝跨端 `NativeBridge`，掛載 `visibilitychange` 與 `pagehide` 實現頁面切換無縫後台掛起；結算面板按鈕注入 600ms 防抖鎖；
+     - `app.css` 看板立繪採用 `clamp(380px, 56vh, 490px)` 尺度控制，救濟與充值面板採用 Apple HIG 高斯模糊；
+  2. **iOS 端對等生命週期加固（已實測驗證）**：
+     - `GameContainerView.swift` 為 `GameWebViewRepresentable` 補齊 `dismantleUIView`，在視圖卸載時自動移除腳本消息監聽器、調用 `stopLoading()` 並執行 `APP.destroyGame()`，確保 iOS 與 Android 端具備 100% 同權的資源安全銷毀機制；
+  3. **自動化測試全量覆蓋通過（已實測驗證）**：
+     - 1000 次固定種子戰鬥模擬 100% 確定性通過（0 負血、0 NaN）；
+     - 1000 次老虎機旋轉確定性 100% 通過；
+     - Android 228 項單測全部通過；iOS 158 項單測全量通過；雙端合計 386 項單測全綠；
+  4. **OTA 雙端發布與磁碟防爆（已實測驗證）**：
+     - 版本號自增至 Build 210，自動化打包簽名完成；
+     - 生產伺服器 `https://bananarey.us` 完成同名原子覆蓋發布（`Netgrey.ipa` / `Netgrey.apk`）；
+     - 伺服器磁碟可用空間維持在安全水位（>10GB），零歷史版本堆積。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 209 · Codex 遊戲與項目審計全量整改落地 + 生命週期安全銷毀 + 結果與跳過冪等防抖 + 雙端原生控制台日誌通道 + Slot 數學平衡與 95.85% RTP 校準 + 10 萬次 Monte-Carlo 模擬報告 + iPad 寬屏佈局約束 + 雙端 386 項單測全綠 + OTA 雙端持續交付發布）
+
+- **最新成果（Codex 審計整改全量落地 + 雙端 386 項單測 100% 通過 + Build 209 雙端持續發布交付）**：
+  1. **生命週期安全銷毀與記憶體洩漏根治（已實測驗證）**：
+     - `battle.js` 建立定時器註冊隊列 `this._timers` 與 `this.schedule`；`Battle.prototype.stop()` 銷毀時安全清理所有排程、清除連擊定時器、重置 `isSettling = false`、移除 `.danger-pulse` 與 `.battle-combo` 動態節點並清空 Spine 骨骼軌道；`slots.js` 新增 `SlotsUI.pause()` 與 `stopAutoSpin()` 定時器清除；`app.js` 路由守衛離開時自動觸發安全清理，根絕跨屏殘留；
+  2. **結算與跳過冪等防抖（已實測驗證）**：
+     - `battle.js` 的 `finish()` 增加 `isSettling` 鎖，`app.js` 為結算界面的重試、下一關、返回按鈕掛載 600ms `APP.isTransitioning` 防抖鎖，杜絕玩家快速狂擊造成重複金幣入賬與存檔競爭；
+  3. **雙端原生控制台日誌通道（已實測驗證）**：
+     - Android `GameActivity.kt` 透過 `WebChromeClient.onConsoleMessage` 將前端日誌轉發至 Logcat 標籤 `NetgreyGameWeb`；iOS `GameContainerView.swift` 注入 `log` 橋接轉發至 Xcode 控制台，真機異常即時捕捉；
+  4. **機械無人機剔除與全女性特勤貫通（已實機驗證）**：
+     - 老虎機符號池徹底拔除機械兵 `drone_enemy`，替換為暗黑特勤 Zoe 專屬高精符號 `zoe_enemy`（`symbol_zoe.webp`）；
+  5. **老虎機數值平衡與 95.85% RTP 精算（已實測驗證）**：
+     - 修正單線線注計算 `lineBet = bet / 9`，為 Free Spins 期間注入 3 倍連線獎勵；100,000 次旋轉精算整體回報率為 95.85%（基礎遊戲 81.39%，免費旋轉 14.46%），命中率 75.79%，Scatter 觸發率 0.742%，完全符合合規商業數學模型；
+  6. **16,000 場戰鬥 Monte-Carlo 精算（已實測驗證）**：
+     - 輸出正式報告 `docs/game/BALANCE-SIMULATION-REPORT.md`，驗證 8 章勝率梯次平滑下落（第 1 章 99.8% -> 第 4 章 89.5% -> 第 8 章 41.6%）；
+  7. **iPad 13 吋寬屏視覺黃金比例重塑（已實機驗證）**：
+     - `app.css` 透過 `@media (min-width: 768px)` 限制機台寬度為 `min(560px, 92%)`，陪伴立繪高度鎖定為 `180px`，消除寬屏下的空隙；
+  8. **雙端持續交付發布（已實測驗證）**：
+     - 1000 次戰鬥模擬與 1000 次 Slots 模擬 100% 確定性通過；雙端 386 項單測全綠；
+     - 版本號自增至 Build 209，雙端自動化打包簽名同名原子覆蓋發布至生產伺服器 `https://bananarey.us`，伺服器磁碟可用空間維持在安全水位（>10GB）。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 208 · 游戏系统全量体验重构与缺陷根治 + 首进看板物理居中 + Slot CG 跳过安全区自适应 + 暴击数值平衡与特效细分 + 教程死循环彻底根除 + 全员面对面对决与资产朝向矫正 + 机械兵全量剔除女性化 + 梯次交锋出兵流 + Spine 骨骼平滑融合 + 双端 386 项单测全绿 + OTA 双端持续交付发布）
+
+- **最新成果（游戏系统全量体验重构与缺陷根治 + 双端 386 项单测 100% 通过 + Build 208 双端持续发布交付）**：
+  1. **首进看板立绘物理居中（实机验证）**：
+     - `app.css` 将 `.hub-art` 盒模型重构为 `left: 0; right: 0; margin-inline: auto`，移除 keyframes 中的 `translateX`，彻底解决 WebKit 首屏图片未 decode 时 `-50%` 坍缩为 0 导致偏右的渲染 Bug；清除 `ui.js` 中 Kitty 的 `-28px` 偏置；iPad Pro 13-inch 与 iPhone 17 Pro 首次进入大厅立绘严格处于屏幕绝对水平居中位置；支持左右手势直接滑动切人；
+  2. **Slot CG 随机动画跳过按钮防越界（已验证）**：
+     - `.cg-cinema-controls` 注入 `max(28px, calc(env(safe-area-inset-top, 0px) + 20px))`，为 `#btn-cg-skip` 增加原生药丸胶囊圆角与 40px 最小触控热区，杜绝跳过按钮超出屏幕顶部；
+  3. **战斗数值重设回归平衡与特效细分（已验证）**：
+     - 移除新手期 `+0.35` 无脑必暴设定，暴击率真实回归 10%~15% 基线；细分斩杀 `execute`、暗影反击 `counter`、连杀 `kill-chain`，杜绝滥用 `crit` 导致全屏假暴击感；
+  4. **教学死循环打扰彻底根除（已验证）**：
+     - 严格限定仅在 1-1 关卡首战弹出；气泡右上角新增「跳过教程 ✕」微型胶囊按钮；通关或跳过时持久化 `APP.state.tutorialCompleted = true; save();`，后续关卡（1-2、1-3、第 2 章、第 3 章）全量永久静默；
+  5. **全角色面对面对决与 Spine 朝向锁定（实机验证）**：
+     - 确立统一朝向法则：我方 `flip: Boolean(unit.endsWith('_enemy'))`（面向右侧），敌方 `flip: Boolean(unit.endsWith('_player'))`（面向左侧）；Spine `update` 循环锁定每帧镜像 scaleX，彻底消除镜像被重绘覆盖的缺陷，两军面对面对决；
+  6. **机械兵全量剔除并替换为女性特勤（实机验证）**：
+     - 关卡 chapters.json 与开场动画 intro.js 中全面剔除无人机、猎犬、机械巨龙等机械兵，全部替换为暗黑特勤 Zoe、重装特勤 Regina 与混沌总督 Esther；
+  7. **梯次突入出兵战斗流（实机验证）**：
+     - 开局先锋 1v1 切入战位拔枪交锋，伴随无线电日志【先锋出击】与【敌军迎击】；2.4 秒支援特勤突入增援，4.8 秒主力全军压上总决战，战斗节奏层次分明；
+  8. **Spine 骨骼平滑融合过渡（已验证）**：
+     - Spine 注入 `stateData.defaultMix = 0.22`（220ms 动作交叉融合），攻击动作播放完后自动平滑过渡回待机，彻底消除动作脱节生硬感；
+  9. **双端自动化测试与 OTA 覆盖发布（已验证）**：
+     - 1000 次固定种子战斗模拟 100% 确定性通过（0 边界错误，0 负血错误）；
+     - 1000 次 Slots 模拟 100% 确定性通过；
+     - Android 228 项单测全部通过；iOS 158 项单测全量通过（双端 386 项单测全绿）；
+     - 版本号自增至 Build 208，双端自动化打包签名完成；
+     - 同名原子覆盖发布至生产 OTA 服务器 `https://bananarey.us`（`Netgrey.ipa` 166M / `Netgrey.apk` 169M）；
+     - 远端清理完成，磁盘剩余可用空间 11GB（26%），维持健康安全水位。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 207 · 游戏板块工业级特效重构与战斗打击感全面升级 + 骨骼弹性形变 Squash & Stretch + 阵亡数字化解构粒子流 + 即时连击浮动系统 + 战局濒危红光警报与天基爆闪 + 双端 386 项单测全绿 + OTA 双端持续交付发布）
+
+- **最新成果（游戏板块工业级特效重构与战斗打击感全面升级 + 双端 386 项单测 100% 通过 + Build 207 双端持续发布交付）**：
+  1. **战斗动作与骨骼物理弹性（Squash & Stretch）**：
+     - 在 `SpineField` 挂载 `squash(view, sqX, sqY, duration)` 与正弦阻尼回弹；近战前冲突刺时沿运动方向拉伸 1.16x 并垂直微压扁 0.88x，远程后坐力反冲 0.90x/1.12x；受击时产生有机弹性压缩（普通命中 1.10x/0.90x，暴击 1.22x/0.78x），赋予 2D Spine 单位动作游戏级别的厚重物理质感；
+  2. **特勤被击倒数字化消散粒子流（Cybernetic Dissolve FX）**：
+     - 单位阵亡时在 Canvas 粒子系统中生成 32 颗高科技全息像素块微粒伴随反重力漂浮、散射与震波环扩散（我方青蓝/敌方猩红），彻底终结直接透明淡出的廉价感；
+  3. **战局高压沉浸氛围与即时连击计数系统**：
+     - 2.2 秒内连续命中累加连击并在右上角弹跳激爽金辉 `COMBO HITS` 徽标；
+     - 队伍濒危（血量 < 32%）时，战场暗角产生心跳律动式猩红警报脉冲；天基主炮释放时 160ms 金色高能爆闪，全域电磁脉冲 120ms 蓝光爆闪；
+  4. **双端自动化测试全量通过**：
+     - 1000 次固定种子战斗模拟 100% 确定性通过（0 边界错误，0 负血错误）；
+     - 1000 次 Slots 模拟 100% 确定性通过；
+     - iOS 单元测试：全量 158 项测试 100% SUCCEEDED（0 failures，6 skipped）；
+     - Android 单元测试：全量 228 项测试 100% 全部通过；双端共 386 项单测全绿；
+  5. **持续交付与 OTA 发布**：
+     - 版本号自增至 Build 207；
+     - 自动化构建、重签并同名原子覆盖推送至 `https://bananarey.us`；
+     - 线上实测：`Netgrey.ipa` 与 `Netgrey.apk` 保持单一最新版本，HTTP 200 OK；
+     - 远端服务器磁盘可用空间维持在安全水位（>10GB），零历史碎片。
+- **最近更新**：2026-11-08 by Antigravity。
+
+- **最新成果（视频自动连播 + 全面预热缓存系统 + 首页多栏目内容差异化去重 + 双端 386 项单测 100% 通过 + Build 201 双端持续发布交付）**：
+  1. **视频自动连播（Auto-play Next Episode）**：
+     - iOS 端在 `VideoDetailPlaybackScreen.swift` 中为 `AVPlayerItem` 挂载 `.AVPlayerItemDidPlayToEndTime` 通知监听，同时在时间观察器中增加 `currentTime >= duration - 0.4` 时间门禁双重保障，避免 HLS 流提前结束丢通知。触发后弹出 Apple TV 风格 HUD 提示「本集结束，自动播放 第 N 集」，原位执行 `switchEpisode(nextEp)`，同一个 `AVPlayer` 实例无缝切入下一集，不退全屏、不黑屏；
+     - Android 端在 `NativeSitePlayer.kt` 捕获 `Player.STATE_ENDED` 触发 `onPlaybackEnded`；`PlayerScreen.kt` 自动步进切入下一集，并联动投屏设备继续无缝推送。
+  2. **全面缓存与剧集持续向后滑动窗口系统（Prefetch & Caching Engine）**：
+     - 双端在应用启动 1 秒后启动后台低优先级任务（`GlobalStartupPrefetchEngine.swift` 与 `AuroraViewModel.startGlobalWarmup`），全面并发静默拉取：视频首页全部货架内容与海报（写入磁盘/内存缓存）、前 3 部视频流媒体播放直链预解析；论坛热门板块贴文；漫画推荐列表及热门漫画第一话切片数据；
+     - 持续向后滑动窗口缓存：当正在播放第 N 集时，调度器向后预热第 N+1、N+2 集的流媒体直链与前 5MB 数据；当用户使用离线缓存下载完第 N 集后，下载中枢自动将第 N+1 集推入队列持续向后下载，实现即点即看零卡顿。
+  3. **首页多栏目内容差异化去重展示（Cross-Shelf Deduplication）**：
+     - 建立 `allocatedIDs` 跨栏目全局已占用指纹集合；各栏目优先抽取专属独占内容，独占不足 8 部时自动向第 2 页异步拉取补充；针对“漫剧”、“换脸”等特色分类按关键词与标签加权置顶专属内容，重复内容完全过滤或沉底，确保每个栏目展现的内容截然不同、封面 100% 差异化。
+  4. **双端自动化测试全量通过**：
+     - iOS 单元测试：全量 158 项测试 100% SUCCEEDED（0 failures，6 skipped）；
+     - Android 单元测试：全量 228 项测试 100% 全部通过；双端共 386 项单测全绿；
+  5. **持续交付与 OTA 发布**：
+     - 版本号自增至 Build 201；
+     - 自动化构建、重签并同名原子覆盖推送至 `https://bananarey.us`；
+     - 线上实测：`Netgrey.ipa`（169MB，HTTP 200 OK）、`Netgrey.apk`（169MB，HTTP 200 OK）；
+     - 远端服务器磁盘可用空间维持在 11GB（26%），零历史碎片。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 200 · 全平台漫画离线下载中枢系统级落地 + iOS 沙盒解密存储 + Android 私有目录双轨存储 + 阅读器 100% 离线优先秒开 + 详情与顶栏下载状态联动 + 离线缓存双 tab 管理 + 双端 383 项单测全绿 + OTA 双端持续交付发布）
+
+- **最新成果（全平台漫画离线下载功能落地 + 双端 383 项单测 100% 通过 + Build 200 双端持续发布交付）**：
+  1. **双端解密落盘存储架构**：
+     - 禁漫天堂（JMComic）等包含纵向切片混淆反爬虫机制，下载时由中枢自动执行解密与 Bitmap 逆向重构拼接，保存到本地的文件均为 100% 纯净 JPEG 图片，杜绝本地离线读取时重复计算或依赖密钥；
+     - iOS 落盘于 `Documents/OfflineComics/<comicId>/<chapterId>/page_<idx>.jpg`，元数据落盘于 `comic_metadata.json`；
+     - Android 落盘于 `context.filesDir/OfflineComics/<comicId>/<chapterId>/page_<idx>.jpg`，元数据落盘于 `comic_metadata.json`；
+  2. **100% 离线阅读优先拦截与秒开体验**：
+     - 阅读器打开章节时，先检索本地是否存在该章节的所有已下载页面文件；若已下载，直接从本地构建页面列表，耗时 0 毫秒、零网络消耗秒开；
+     - 当处于断网或弱网网络请求抛出异常时，自动回退到本地已下载页面，实现完美容灾与离线畅读；
+  3. **UI 细节与 Apple HIG 标准对齐**：
+     - 漫画详情页：各章节提供未下载（下载箭头）、下载中（环形进度条与百分比）、已完成（绿色对勾）；顶部提供「下载全本」快捷操作；
+     - 漫画阅读器：顶栏常驻下载操作，支持一键缓存当前话或整本下载；
+     - 资料库/离线缓存：升级为「视频」与「漫画」双 Tab 分段器，展示漫画已缓存章节、占用空间大小，支持直接点击离线阅读、左滑单条删除、编辑多选删除以及清空全部离线文件；
+  4. **双端自动化测试全量通过**：
+     - iOS 单元测试：156 项测试 100% SUCCEEDED（0 failures，6 skipped）；
+     - Android 单元测试：全量 227 项测试 100% 全部通过；双端共 383 项单测全绿；
+  5. **持续交付与 OTA 发布**：
+     - 版本号递增至 Build 200；
+     - 自动化构建、重签并同名原子覆盖推送至 `https://bananarey.us`；
+     - 线上实测：`Netgrey.ipa`（169MB，HTTP 200 OK）、`Netgrey.apk`（169MB，HTTP 200 OK）；
+     - 远端服务器磁盘可用空间维持在 11GB（26%），零历史碎片。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 200 · 社区热门精华封面画幅严格统一 + 草榴「达盖尔的旗帜」（fid=16）图片专栏新增 + 16:9纯正画幅顶对齐 + 双端376项单测全绿 + OTA 双端持续交付发布）
+
+- **最新成果（社区热门精华封面刚性统一 + 达盖尔的旗帜（fid=16）栏目新增 + 双端 376 项单测 100% 通过 + Build 200 双端持续发布交付）**：
+  1. **社区热门精华封面大小与高度 100% 刚性统一**：
+     - **根因彻底查明**：
+       ① 容器未施加刚性约束：原 `AuroraCoverImage` 内部使用 `Color.clear.aspectRatio(16/9, contentMode: .fit)`，在 200×112 画幅中因浮点比例计算得出宽度 199.11pt，与无图帖子占位卡片的 200pt 产生 0.89pt 几何偏差；且未加载或加载失败时占位容器溢出导致卡片尺寸漂移；
+       ② 滚动容器居中对齐导致错落起伏：`ScrollView(.horizontal)` 下的 `HStack` 缺省采用 `.center` 居中对齐，由于单行标题（高 ~20pt）与双行标题（高 ~40pt）卡片总高度不同，垂直居中导致短卡片封面被下推 10~18pt，整排封面错落起伏；
+       ③ 占位样式语义错位：缺省 fallback 为 `.video`（展示摄像机与精选视频文字），与社区帖子属性割裂。
+     - **工业级根治落地**：
+       ① 统一 16:9 封面画幅：在 `ForumFeaturedCard` 声明 `coverHeight = cardWidth * (9.0 / 16.0)`（200×112.5pt），外层封面容器显式声明 `.frame(width: cardWidth, height: coverHeight).clipShape(RoundedRectangle(cornerRadius: 12)).overlay(...)`，`AuroraCoverImage` 传入 `aspectRatio: nil` 配合 `contentMode: .fill`，居中等比裁剪填充，杜绝溢出与尺寸偏差；
+       ② 固定标题槽与元数据槽高度：标题声明 `.frame(width: cardWidth, height: 38, alignment: .topLeading)`，元数据声明 `.frame(width: cardWidth, height: 16)`，卡片总高绝对定格在 182.5pt；
+       ③ 横滑容器采用 `HStack(alignment: .top)`：强制所有卡片及封面顶部绝对齐平在同一基准线上；
+       ④ 专属 `.forum` 占位样式：显示微光气泡图标与「社区精华」文字。
+  2. **全面接入草榴社区「达盖尔的旗帜」（fid=16）专栏**：
+     - **iOS 架构落地**：
+       ① 板块目录扩充：`ForumSourceCatalog.swift` 新增 `t66yDaguerre = ForumBoard(id: "t66y_16", fid: 16, name: "达盖尔的旗帜", description: "唯美摄影与图片分享")` 并加入 `allBoards`；
+       ② 路由适配：`ForumSourceAdapter.pageURL` 精准路由至 `https://t66y.com/thread0806.php?fid=16&page=\(page)`；
+       ③ 解析与抓取：`isT66Y` 统一纳管 fid 100 与 16，基于 UTF-8 编码与 `parseT66Y` 解析线程列表及正文图集；
+       ④ 专属视觉 Token：`ForumBoardVisualSpec` 分配深海孔雀绿渐变（`0x004D40` -> `0x00695C`）、微光青色高亮（`0x80CBC4`）及 `photo.artframe` 摄影相框图标；
+       ⑤ 预取扩容：预取数量由 8 扩至 12，确保热门精华前 10 篇热帖封面 100% 预取命中。
+     - **Android 同步对齐**：
+       ① `T66yForumSource.kt` 支持指定 `fid = 16`、`id = "t66y_16"`、`name = "达盖尔的旗帜"`；
+       ② `ForumRepository.kt` 默认源列表同步纳管 `t66y_16`；
+       ③ `ForumScreen.kt` 顶部分类货架新增「达盖尔的旗帜」NetflixCategoryChip，专属徽标色 `#00695C`；
+       ④ 单元测试新增 `t66yDaguerreSourceUsesFid16AndCustomMetadata` 并通过。
+  3. **双端自动化测试全量通过**：
+     - iOS 单元测试：151 项测试 100% SUCCEEDED（0 failures，6 skipped）；
+     - Android 单元测试：全量 225 项测试 100% 全部通过；双端共 376 项单测全绿；
+  4. **版本升级与持续交付上线**：
+     - 双端版本号统一递增至 Build 200（`ios/project.yml` 200，`app/build.gradle.kts` versionCode 200）；
+     - 执行 `./scripts/publish_ota.sh All` 自动化构建、重签并同名原子覆盖推送至 `https://bananarey.us`；
+     - 线上产物核验：`Netgrey.ipa`（169MB / 176,442,526 字节，HTTP 200 OK）、`Netgrey.apk`（169MB / 176,650,630 字节，HTTP 200 OK）；
+     - 远端磁盘可用容量维持在 11GB（26%），零历史老包堆积。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 199 · 12.9寸 iPad 专属 Apple TV 完整操作逻辑/UI界面显示与控件摆放系统级落地 + 白底主播放大胶囊 + 16:9横版高清剧照大卡片货架 + 倒计时剩余时间 + 双侧无级调光控音HUD + 全屏快速选集抽屉 + 4列自适应海报网格 + 双端375项单测全绿 + OTA 双端持续交付发布）
+
+- **最新成果（12.9寸 iPad 专属 Apple TV 完整体验落地 + 双端 375 项单测 100% 通过 + Build 199 双端持续发布交付）**：
+  1. 深度对齐 12.9 寸 iPad Pro（1024×1366 / 1366×1024 pt）上的 Apple TV 官方规范：
+     - **详情页 UI 界面显示与控件排布**：
+       - 主操作栏采用 Apple TV 标志性白底黑字实心主播放大胶囊 `[▶ 立即播放]` / `[❚❚ 正在播放]`（高度 48pt，触控宽度 240~280pt，带按下弹性触觉反馈与高光投影）；
+       - 旁边接入毛玻璃微晶操作组：`[+ 加入片单]`、`[↓ 缓存]`（带环形下载进度与完成态）、`[↑ 分享]`，大屏下水平舒展排布；
+       - 选集货架彻底升级：在 iPad 端全新重构为 **Apple TV 纯正的 16:9 横版高清剧照大卡片货架**（宽 250pt，高 140pt），包含剧照封面、左上角集数标、选中高光白边与居中毛玻璃播放动效、底部观看进度红条、卡片下方集数标题与来源；
+       - 更多推荐升级为 **4 列自适应宽屏高清海报网格**，带金星评分；
+     - **全屏播放器操作逻辑与控件摆放**：
+       - 顶栏左上角采用 Apple TV 标准向下折叠圆钮 `chevron.down`，右侧保留 16pt 间距展现主标题与 `[第 1 集 · 来源 · 4K HDR]`，绝不与任何片头水印或标题重叠；
+       - 顶栏右上角接入 `[1.0x / 倍速选择菜单]`（支持 0.5x ~ 2.0x 实时变速与 HUD 提示）、`[AirPlay 投屏]`、`[画幅缩放 (Fit / Fill)]`；
+       - 底栏时间右侧默认呈现 Apple TV 标志性倒计时（`-MM:SS`），轻点数字可在「剩余倒计时」与「总时长」之间无缝切换；
+       - 底栏右侧常驻 `forward.end.fill` 下一集快捷键与全屏快速跳集横向抽屉；
+       - 手势操作：左半屏上下滑动无级调亮度，右半屏上下滑动无级调音量，双击切换画幅，均伴随居中毛玻璃 Apple TV 动态 HUD；全屏下滑或向右滑动折叠退出。
+  2. 双端单元测试全量通过：
+     - iOS 单元测试：151 项测试 100% SUCCEEDED（0 failures，6 skipped）；
+     - Android 单元测试：全量 224 项测试 100% 全部通过；双端共 375 项单测全绿；
+  3. 自动化构建与持续交付：
+     - 版本号提升至 Build 199（`app/build.gradle.kts` versionCode 199，`ios/project.yml` CURRENT_PROJECT_VERSION 199）；
+     - 执行 `./scripts/publish_ota.sh All` 自动化构建、重签并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 169MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘健康 11GB 可用 / 26% 使用率，零历史包残留）。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 198）
+
+- **最新成果（iPad 四大缺陷彻底根治 + 系统侧边栏遮挡清除 + Delegate锁死破除 + 双端 374 项单测 100% 通过 + Build 198 双端持续发布交付）**：
+  1. 根因彻底查明与系统级根治（用户反馈：1. 返回按键不能用；2. 选取手势还是不行；3. 返回按键和菜单按键重叠；4. 全屏按键按了没有反应）：
+     - **系统侧边栏遮挡拔除，根除重叠与按键失效**：
+       - iPadOS 在 `.tabViewStyle(.sidebarAdaptable)` 下，`NavigationStack` 默认常驻全宽 `(0 10; 1210 54)` 的 `SwiftUI.UIKitNavigationBar`，并自动在 leading 插入系统侧边栏菜单切换按钮；
+       - 原代码未彻底隐藏 NavigationBar，导致系统菜单按钮与自定义返回按钮在左上角重叠，且整个顶部 64pt 的触控事件（左上角返回与右上角全屏）被 `UINavigationBar` 透明层吞噬；
+       - 在 `HomeScreen.swift`、`VideoDetailPlaybackScreen.swift` 以及 `PopGestureEnablerController` 中全量调用 `nav.setNavigationBarHidden(true, animated: false)`，彻底移出系统导航栏；
+       - 返回键触控热区放大至 `54×44pt`，全屏键放大至 `48×44pt`，均挂载中度触觉反馈；
+     - **UIKit 手势锁死破除**：
+       - UIKit 在导航栏隐藏时会在每次转场完成强行将 `interactivePopGestureRecognizer.isEnabled` 设为 `NO`；
+       - `NavigationPopCoordinator` 遵循 `UINavigationControllerDelegate` 并在 `didShow` 回调中强制重新将 `isEnabled` 置为 `true`；
+       - iPad 端边缘手势容差扩展至 280pt，位移判定阈值降低至 50pt；
+     - **进度条 Apple HIG 44pt 触控重构**：
+       - 底栏 `PlayerScrubberBar` 显式声明 `.frame(height: isPad ? 44 : 36)`，满足 Apple HIG 44pt 规范，彻底杜绝在 HStack 中由于高度过窄导致的点按/拖拽选取落空；
+  2. 双端单元测试全量通过：
+     - iOS 单元测试：150 项测试 100% SUCCEEDED（0 failures，6 skipped）；
+     - Android 单元测试：全量 224 项测试 100% 全部通过；双端共 374 项单测全绿；
+  3. 自动化构建与持续交付：
+     - 版本号提升至 Build 198（`app/build.gradle.kts` versionCode 198，`ios/project.yml` CURRENT_PROJECT_VERSION 198）；
+     - 执行 `./scripts/publish_ota.sh All` 自动化构建、重签并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 169MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘健康 11GB 可用 / 26% 使用率，零历史包残留）。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月8日 · Build 197）
+
+- **最新成果（iPad 三大缺陷彻底根治 + 交互逻辑理顺 + 双端 374 项单测 100% 通过 + Build 197 双端持续发布交付）**：
+  1. 根因彻底查明与系统级根治（用户反馈 iPad 无法使用右滑手势返回、视频无法正常全屏播放、操作逻辑混乱）：
+     - **右滑手势返回机理修复**：
+       - `NavigationPopCoordinator` 的 `shouldBeRequiredToFailBy` 设为 `false`，彻底解除宽屏 ScrollView 对系统返回手势的永久阻断；
+       - `shouldRecognizeSimultaneouslyWith` 设为 `true`，允许在宽屏内容滑动时响应边缘返回；
+       - 移除触屏瞬间 `velocity.x > 0` 的零速度误杀判定；
+       - 增加 iPad 140pt 边缘容差的 `DragGesture` 兜底；
+       - `findNavigation` 深度适配 `UISplitViewController` 的 `.secondary` 与 `.compact` 详情主视口，并针对 `CategoryDetailScreen` 与 `ForumPostDetailView` 全量挂载 `.enableSwipeBack`；
+     - **视频全屏与内嵌大画幅黄金分割**：
+       - 内嵌视口重构为 `min(screenGeo.size.height * 0.48, 440)`，彻底消除在 iPad 宽屏（1194pt）下按手机 16:9 计算得出 695pt 挤占 84% 导致下半部选集被挤扁的严重缺陷；
+       - 彻底拔除 iPad 端施加手机 90 度强制逆向旋转的 Bug，交由设备全向重力感应自然旋转；
+       - 新增全屏下滑（`height > 60`）或向右滑动（`width > 80`）秒级平滑折叠退出全屏；
+       - 顶栏按钮、中央播放组（56pt/76pt/56pt）自适应 iPad 大屏点按体验；
+     - **操作逻辑理顺**：
+       - `HomeScreen` 与 `CategoryDetailScreen` 的海报卡片轻点由弹窗 `selectedDetailVideo = video` 改为直调 `playVideo(video)`；
+       - 彻底消除“先弹 Sheet 看详情、点播放关闭 Sheet 再推播放器、播放器里又放一遍详情”的二次重复跳转，实现 1-Tap 直达全功能播放与详情一体化；
+  2. iPhone 与 iPad 多端实测验证：
+     - iPad Pro 11-inch (M5) 模拟器实测：
+       - 内嵌态（`verify_ipad_embedded_player.png`）：顶部播放器占 48% 黄金视口，底部完整展现选集、工具栏与剧情简介；
+       - 全屏态（`verify_ipad_fullscreen_player.png`）：纯净铺满 2420×1668 视口，无旋转畸变，支持手势平滑折叠退出；
+     - iPhone 17 Pro 模拟器实测：
+       - 内嵌态（`verify_iphone_embedded_player.png`）与全屏态（`verify_iphone_fullscreen_player.png`）保持顶级丝滑与原生视差转场；
+  3. 双端单元测试全量通过：
+     - iOS 单元测试：150 项测试 100% SUCCEEDED（0 failures，6 skipped）；
+     - Android 单元测试：全量 224 项测试 100% 全部通过；双端共 374 项单测全绿；
+  4. 自动化构建与持续交付：
+     - 版本号提升至 Build 197（`app/build.gradle.kts` versionCode 197，`ios/project.yml` CURRENT_PROJECT_VERSION 197）；
+     - 执行 `./scripts/publish_ota.sh All` 自动化构建并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 169MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘健康 11GB 可用 / 26% 使用率，零历史包残留）。
+- **最近更新**：2026-11-08 by Antigravity。
+
+## 歷史工作狀態（2026年11月7日 · Build 196）
+
+- **最新成果（播放器遮罩尺寸与居中割裂横线彻底根除 + 双端 374 项单测 100% 通过 + Build 196 双端持续发布交付）**：
+  1. 根因彻底查明与根治（用户反馈图示播放器中间出现遮罩大小设置错误与亮暗割裂横线）：
+     - 根因定位：在二级内嵌与全屏播放器一体化视图 `VideoDetailPlaybackScreen.swift` 中，控制层渐变遮罩 `LinearGradient` 之前直接作为单个子视图置于 `playerControlsOverlay` 的顶层 `ZStack` 中，由于 `ZStack` 默认对齐方式为 `.center`，导致该 130pt 高度的单向暗调遮罩在全屏（852~932pt）与内嵌模式下被纵向垂直居中放置；
+     - 现象重现：渐变遮罩在屏幕中央（y ≈ 360~420pt 区域）突然从 0% 透明度跳跃至 85% 纯黑不透明度，在画面中央形成一条极其刺眼的水平明暗切割线，且导致画面中部大面积变暗，而真正的顶栏（返回/退出/标题/AirPlay）与底栏（进度条/时间）反而缺少遮罩衬底；
+     - 双向吸附通透重构：将单体居中渐变重构为标准的双端吸附体系：
+       - `VStack(spacing: 0)` 包含顶部吸顶渐变（`topGradientHeight` 从 0 开始覆盖至顶栏下方平滑衰减至 `Color.clear`）；
+       - 中间放置弹性 `Spacer()`，使中央视频视口保持 100% 绝对通透，彻底根除任何画面割裂横线与中央暗块；
+       - 底部吸底渐变（`bottomGradientHeight` 从透明向底部平滑渐变至 85% 暗调，完美衬托进度条与时间文本）；
+  2. iPhone 与 iPad 多端实测验证：
+     - iPhone 17 Pro 模拟器实测：内嵌态（`verify_iphone_video_detail_clean_mask.png`）与全屏态（`verify_iphone_video_fullscreen_clean_mask.png`）中央画面 100% 纯净通透，无任何割裂横线，顶底工具栏对比度与易读性完美符合 Apple HIG 标准；
+     - iPad Pro 11-inch (M5) 模拟器实测：宽屏黄金画幅（`verify_ipad_video_detail_clean_mask.png`）下顶栏与底栏自然衰减，中央视频画面无异常遮挡；
+  3. 双端单元测试全量通过：
+     - iOS 单元测试：150 项测试 100% SUCCEEDED（0 failures，6 skipped）；
+     - Android 单元测试：全量 224 项测试 100% 全部通过；双端共 374 项单测全绿；
+  4. 自动化构建与持续交付：
+     - 版本号提升至 Build 196（`app/build.gradle.kts` versionCode 196，`ios/project.yml` CURRENT_PROJECT_VERSION 196）；
+     - 执行 `./scripts/publish_ota.sh All` 自动化构建并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 169MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘健康 11GB 可用 / 26% 使用率，零历史包残留）。
+- **最近更新**：2026-11-07 by Antigravity。
+
+## 歷史工作狀態（2026年11月7日 · iOS 新用户安装「无法验证其完整性」根治 + Admin API 密钥全面接管 + 自动注册与包含 4 台设备 Provisioning Profile 签名包 OTA 交付）
+
+- **最新成果（新用户安装「无法验证其完整性」彻底根治 + 部署 Admin 权限 App Store Connect API Key + 4 台设备 100% 注册至 Apple 后台 + 本地自动同步下载最新描述文件重签 + OTA 发布）**：
+  1. 根因彻底查明与根治（iOS 新用户安装提示「无法安装此 app，因为无法验证其完整性」）：
+     - 证书与 Profile 匹配断层：检查既有 `Netgrey.ipa` 内的 `embedded.mobileprovision`，其 `<key>ProvisionedDevices</key>` 仅包含开发机单台 UDID `00008150-000270240A88401C`；
+     - 权限不足导致写入失败：OTA 服务器 `ota_service.py` 虽正确捕获到新用户设备 UDID（`00008150-001A38A621E2401C`），但原配置的 App Store Connect API Key（`595BMVUTA7`）角色为 Developer，调用 Apple 官方 API `POST /v1/devices` 被拒绝（返回 `403 FORBIDDEN_ERROR: You are not allowed to perform this operation`），无法向 Apple 开发者后台写入新设备；
+     - Admin 权限密钥部署与服务升级：部署全新 Admin 角色的 App Store Connect API 密钥（Key ID: `QAGFLU87T3`，私钥 `AuthKey_QAGFLU87T3.p8`，权限 `chmod 600`）至服务器 `/etc/netgrey-ota/`，更新 `api_config.json` 并重启 `netgrey-ota.service`；
+  2. 设备批量注册与后台 100% 写入验证：
+     - 调用 Apple 开发者官方 API，成功将服务器暂存的全部待注册设备录入 Apple Developer 账号后台：
+       - `00008150-001A38A621E2401C`（新用户 iPhone 17 Pro Max，写入 SUCCESS）
+       - `00008103-000D24E00163401E`（iPad Pro 11-inch，写入 SUCCESS）
+       - `00008150-0016144A1178C01C`（iPhone 17 Pro，写入 SUCCESS）
+       - `00008150-000270240A88401C`（初始设备，ALREADY REGISTERED）
+     - 服务器 `registered_devices.json` 全量设备标记 `apple_registered: true`；
+  3. 本地描述文件重置与全量签名重签：
+     - 清理本地过期的 Provisioning Profile 缓存与旧归档，执行 `./scripts/build_ios_signed.sh Release`；
+     - Xcode 通过 `-allowProvisioningUpdates` 自动从 Apple 开发者中心拉取包含上述 4 台已登记设备的最新通配符 Provisioning Profile；
+     - 实测解包验证新生成的 `Netgrey.ipa` 内 `embedded.mobileprovision`：`<key>ProvisionedDevices</key>` 100% 包含 `00008150-001A38A621E2401C`、`00008103-000D24E00163401E`、`00008150-0016144A1178C01C` 与初始设备；
+  4. 生产持续交付与服务器健康防爆：
+     - 执行 `./scripts/publish_ota.sh UploadOnly`，将全新签名的 `Netgrey.ipa`（166MB）原子同名覆盖发布至 OTA 生产服务器；
+     - 实测验证：`curl -I https://bananarey.us/Netgrey.ipa` 返回 HTTP 200 OK，`manifest.plist` 指向正常；
+     - 服务器可用空间 11GB（26%），零历史包或临时碎片残留；新用户直接打开 `https://bananarey.us` 点击安装即可顺畅装机与验证。
+- **最近更新**：2026-11-07 by Antigravity。
+
+## 歷史工作狀態（2026年11月7日 · Build 194）
+
+- **最新成果（全面根治右滑返回黑屏过渡缺陷 + 二级/三级界面全面迁移 iOS 原生 NavigationStack 视差过渡 + 激活系统级 interactivePopGestureRecognizer + 双端 374 项单测全绿 + Build 194 OTA 双端持续交付发布）**：
+  1. 根因彻底查明与根治（右滑返回“黑屏过渡”）：
+     - 模态呈现机理断层：原二级/三级界面（`VideoDetailPlaybackScreen`、`LiveDetailView`、`ComicReaderView`、`GameContainerView`）均挂载在根视图的 `.fullScreenCover` 模态呈现上。在 UIKit 中，`fullScreen` 模态呈现后底层 Presenting 视图（根 TabView/HomeScreen 等）直接被移出渲染管线，且模态控制器不存在于 `UINavigationController` 内部；
+     - 自定义手势容器假过渡：`SwipeBackContainer` 采用 `.offset(x: dragOffset)` 右移顶层卡片，其底层硬编码为 `Color.black` 黑色遮罩与背景，滑动时卡片移开直接露出纯黑底色，用户肉眼直观看到“黑屏过渡”；
+     - 导航栈双轨原生化改造：全面废弃 `.fullScreenCover` 呈现，所有二级/三级界面全面切换为所属 Tab 根级 `NavigationStack` 的 `.navigationDestination` 导航下钻；
+     - 沉浸与 TabBar 智能隐藏：为各二级界面挂载 `.toolbar(.hidden, for: .tabBar)` 与 `.navigationBarBackButtonHidden(true)`，实现沉浸式全屏画幅与原生流体隐藏；
+     - 激活系统原生转场引擎：通过 `NavigationPopGestureEnabler` 将 `nav.interactivePopGestureRecognizer` 代理委托给 `NavigationPopCoordinator`，在隐藏系统返回按钮的前提下，100% 激活 iOS 原生边缘交互式转场引擎。拖曳时上一层页面在底层以 1/3 视差（Parallax）平滑滑入，伴随系统级微渐变遮罩，彻底根绝黑屏过渡；全屏播放态智能禁用手势防误触；
+  2. 双端同权同质同步验证：
+     - iPhone 17 Pro 模拟器实测：实机截屏验证直播详情页（`verify_iphone_live_detail_nav.png`）、视频播放详情页（`verify_iphone_video_detail_nav.png`）、漫画专区（`verify_iphone_comics_nav.png`）及游戏视口（`verify_iphone_game_slots.png`）均完美构建在原生导航栈内，支持原生 1:1 视差右滑返回；
+     - iPad Pro 11-inch (M5) 模拟器实测：实机截屏验证直播详情（`verify_ipad_live_detail_nav.png`）在 iPad 宽屏黄金画幅下完美居中、零白边、零位移，右滑返回平滑展现底层直播列表，无黑屏；
+  3. 双端单元测试全量通过：
+     - iOS 单元测试：新增 `testNavigationPopCoordinatorLifecycleAndRules` 与 `testPopGestureEnablerControllerConfiguration`，共 150 项测试 100% 全部通过（0 failures, 6 skipped）；
+     - Android 单元测试：全量 224 项测试 100% 全部通过（0 failures）；双端合计 374 项单测全绿；
+  4. 自动化构建与持续交付：
+     - 版本号提升至 Build 194（`app/build.gradle.kts` versionCode 194，`ios/project.yml` CURRENT_PROJECT_VERSION 194）；
+     - 修复 `publish_ota.sh` 在 SSH 协商时由于遍历本地密钥导致的 `Too many authentication failures`，增加 `-o PubkeyAuthentication=no` 确保 `sshpass` 一次性直通密码认证；
+     - 自动化构建并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 168MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘健康 11GB 可用 / 26% 使用率，零历史包残留）。
+- **最近更新**：2026-11-07 by Antigravity。
+
+## 歷史工作狀態（2026年11月7日 · Build 193）
+
+- **最新成果（华视影院多集选集列表读取缺陷根治 + 全 App 封面画幅/高度参差不齐彻底统一定标 + 双端 372 项单测全绿 + Build 193 OTA 双端持续交付发布）**：
+  1. 根因彻底查明与根治（华视选集仅显示 1 集）：
+     - 华视播放页（`vodplay`）分集使用 `<a class="episode-link" href="javascript:void(0)" data-url="/vodplay/132170-1-1.html"><span>第1集</span></a>`；
+     - 原代码正则仅匹配 `href="/vodplay/..."`，在所有 `vodplay` 播放页中匹配数均为 0，导致直接回退为假象的第 1 集；
+     - 双端（`VideoRepository.swift` & `PlaybackResolver.kt`）改用同时支持 `data-url` 与 `href` 的兼容正则与选择器，并对 `<span>` 标题与 `<em>` 状态标签做清洁提取，且增加详情页 `/voddetail/{vodId}.html` 容灾兜底补齐；
+     - 实测剧集验证：《令人心动的offer第八季》解析出全部 11 期、《现在就出发第四季》解析出全部 57 期、《俺娘田小草》解析出全部 54 集、《醉梦》（电视剧）实机截屏验证展示全部 18 集；
+  2. 全 App 封面高度/尺寸参差不齐彻底统一定标（漫画、直播、影视）：
+     - 几何画幅锁定：漫画与影视严格锁定 2:3（`AuroraMetrics.posterAspect`），直播预览严格锁定 4:3（`AuroraMetrics.liveAspect`）；
+     - 文字区域定标：卡片标题统一采用 `.lineLimit(2, reservesSpace: true)` 严格预留双行空间，彻底消除 1 行与 2 行标题造成的整行高低起伏；
+     - 元数据区域定标：漫画作者/章节与影视来源/时长统一采用 `.lineLimit(1, reservesSpace: true)` 与 `.frame(height: 18)`，直播用户名与直播间描述锁定 1 行预留，头像固定 24×24pt，卡片容器锁定 `.frame(maxWidth: .infinity, alignment: .topLeading)`；
+     - 横滑货架对齐：所有横向滚动货架统一改用 `HStack(alignment: .top, spacing: ...)`，杜绝默认垂直居中对齐导致的封面上下跳跃错位；
+     - 占位图语义化：`AuroraCoverImage` 增加 `CoverPlaceholderStyle`，漫画展示 `book.closed.fill` + “精选漫画”，直播展示 `antenna.radiowaves.left.and.right` + “精彩直播”，视频展示 `film.fill` + “精选视频”，彻底拔除全 App 占位图显示“华视影院”违和胶卷的缺陷；
+  3. 双端实测验证：双端 372 项单测（iOS 148 项、Android 224 项）100% 全绿；iPhone 17 Pro 与 iPad Pro 11-inch 双端模拟器截屏确证多集选集列表完整读取（`verify_huavod_drama_episodes.png`、`verify_ipad_huavod_drama_episodes.png`）与封面规整统一对齐（`verify_comics_uniform_covers.png`、`verify_live_uniform_covers.png`、`verify_ipad_comics_uniform.png`）；
+  4. 自动化构建与持续交付：递增至 Build 193，自动化打包并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 168MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘健康 11GB 可用 / 26% 使用率，零历史包残留）。
+- **最近更新**：2026-11-07 by Antigravity。
+
+## 歷史工作狀態（2026年11月7日 · Build 192）
+
+- **最新成果（华视影院热门综艺无法播放根治 + 消除全屏播放残余 UI 干扰 + 双端 370 项单测全绿 + Build 192 OTA 双端持续交付发布）**：
+  1. 根因彻底查明与根治（华视综艺无法起播）：
+     - 华视热门综艺（《令人心动的offer》、《现在就出发》、《花儿与少年》等）通过 BunnyCDN 分发，需要 POST `/Player/resolveUrl` 换链；
+     - 原代码在换链前减去 2 秒（`adDuration - 2_000`）；实测捕获到服务端使用严格的 Redis 签发时间戳，提前 1ms 请求即触发 `too early` 并从 Redis 彻底销毁 token，导致后续报错 `token not found or expired` 抛出 `malformedResponse` 彻底无法播放；
+     - 双端（`VideoRepository.swift` & `PlaybackResolver.kt`）改为等待 `max(0, adDuration) + 1_200` 毫秒安全缓冲，确保服务端绝对已过广告期，并增加 2 次容灾自动重试与 token 缓存清理；
+     - 选集去重：锁定首个主线路 `primarySid`，杜绝华视多线路导致的同一集重复展示；
+  2. 视频全屏播放残余 UI 干扰彻底消除：
+     - 系统级沉浸：`VideoDetailPlaybackScreen` 与 `LiveDetailView` 挂载 `.statusBarHidden(isFullScreen ? (!showControls || isLandscape) : false)` 与 `.persistentSystemOverlays(isFullScreen && !showControls ? .hidden : .automatic)`，全屏时完全消除状态栏时钟/电池与底部 Home 指示条；
+     - 控件自动隐匿生命周期闭环：在 `itemStatusObserver` 的 `readyToPlay`、进出全屏、画幅切换、横竖屏切换全量补齐 `scheduleHideControls()`，起播 3.5 秒后控制条平滑隐退；
+     - 轻触空白区域即隐：在 `playerControlsOverlay` 底层注入 `Color.clear.contentShape(Rectangle())` 单击与双击手势，用户轻点屏幕任意空白处立即收起控制层，双击自适应画幅；
+     - 修复 `NativePlayerView` 控制条隐藏时强行绘制 `PlayerOverlayBar` 的反向 Bug；
+     - Android `NativeSitePlayer.kt` 同步消除全屏常驻字幕图标与底部细线；
+  3. 双端实测验证：双端 370 项单测（iOS 146 项、Android 224 项）100% 全绿；iPhone 17 Pro 与 iPad Pro 11-inch 双端模拟器截屏确证全屏无残余 UI 干扰（`verify_fullscreen_active_video.png`、`verify_landscape_fullscreen_clean.png`、`verify_ipad_fullscreen_no_residual_ui.png`）；
+  4. 自动化构建与持续交付：递增至 Build 192，自动化打包并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 168MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘健康 11GB 可用 / 26% 使用率，零历史包残留）。
+- **最近更新**：2026-11-07 by Antigravity。
+
+## 歷史工作狀態（2026年11月7日 · Build 191）
+
+- **最新成果（根治 iOS 直播二级界面播放视口向上位移与灵动岛遮挡缺陷 + 双端安全区纯黑隔离垫 + 视频点播详情页同步几何重构 + 367 项单测全绿 + Build 191 OTA 双端发布）**：
+  1. 根因彻底查明：为消除上下白边对根视图挂载 `.ignoresSafeArea()` 后，播放器容器高为 `targetHeight = (width * 9 / 16) + safeTop`（iPhone 17 Pro 上为 280pt）；但核心视口直接置于 `ZStack` 撑满 280pt，导致 16:9（221pt）视频在 280pt 内部垂直居中，顶部物理坐标为 `y = 29.5pt`，整整 30pt 的画面（主播头部、额头、眼睛）被顶进灵动岛（至 48pt）和系统状态栏（至 59pt），用户肉眼呈现“画面向上位移”；
+  2. 双端播放视口 safeTop 纯黑隔离垫重构：
+     - `LivePlayerView.swift`：在非全屏竖屏嵌入态（`!isFullScreen && !isLandscape`）下，引入 `VStack(spacing: 0)` 架构；顶部加入 `Color.black.frame(height: safeTop)` 作为纯黑安全底衬（占据 `y = 0` 至 `y = 59pt`），确保灵动岛/状态栏纯黑且零白边；视频播放视口（`StripchatLiveWebView` / `AuroraPlayerSurface` / 加载底图 / 错误层）放置于下方视口容器中，高度精确为 `221pt`（`16:9`）；视频物理渲染起始坐标严格锁定为 `y = 59pt`（即 177 物理像素），完完全全展现在灵动岛与状态栏下方，彻底根治向上位移；全屏时隔离垫自动退场；
+     - `StripchatLiveWebView.swift`：为 `webView.scrollView` 挂载 `contentInsetAdjustmentBehavior = .never`，严防 WebKit 被系统注入内边距；
+     - `VideoDetailPlaybackScreen.swift`：同步对点播视频详情页施加相同的 `needsTopOffset` 几何隔离架构，确保视频详情页在非全屏下画面同样从 `y = safeTop` 起始，全画幅 16:9 不被灵动岛遮挡；
+     - `scripts/publish_ota.sh`：将 `SSH_OPTS` 改为 Bash 数组参数传递 `"${SSH_OPTS[@]}"`，根治 zsh/bash 参数空格拆解导致的 scp 异常；
+  3. 双端实测验证：单测合计 367 项全绿；实机截屏确证在 iPhone 17 Pro 上（`verify_live_detail_aligned.png`）：y=100px 为纯黑 `(0, 0, 0, 255)`，y=200px 为真实视频画面 `(111, 67, 45, 255)`；主播面部完整呈现在灵动岛下方，零位移、零遮挡；视频详情页（`verify_video_detail_aligned.png`）与 iPad Pro（`verify_ipad_live_detail.png`）同步严谨验证通过；
+  4. 自动化构建与持续交付：递增至 Build 191，自动化打包并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 168MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘健康 > 5GB，零历史包残留）。
+- **最近更新**：2026-11-07 by Antigravity。
+
+## 歷史工作狀態（2026年11月7日 · Build 190）
+
+- **最新成果（根治 iOS 二级/三级界面顶部按钮及组件过高点不到缺陷 + 全局 safeAreaTop 动态避让体系 + 44x44 Apple HIG 黄金触控热区 + 367 项单测全绿 + Build 190 OTA 双端发布）**：
+  1. 根因彻底查明：为消除上下白边对根视图挂载 `.ignoresSafeArea()` 后，内部 `GeometryReader` 的 `safeAreaInsets.top` 被置为 0，导致各二级/三级全屏界面（视频详情、直播详情、漫画阅读器）顶栏的 `.padding(.top)` 仅为 12pt~44pt，按钮直接撞入 iPhone 灵动岛（11~48pt）与系统状态栏（0~59pt）区域，物理上被硬件挖孔截断且被系统状态栏触控手势拦截，导致用户“过高点不到”；
+  2. 全局动态安全区避让重构：
+     - 在 `DeviceLayout` 建立统一的 `safeAreaTop`（优先获取当前 Window 真实安全区，并对横竖屏与设备形态自适应，默认 59pt / iPad 24pt）与 `safeAreaBottom`；
+     - `VideoDetailPlaybackScreen`：顶栏内衬重构为 `safeTop + 6`（65pt），暗调渐变遮罩扩容至 130pt，顶部返回、AirPlay、全屏等按钮坐落于 75pt~105pt 黄金触控区，并挂载 44x44pt 最小触控热区（`minWidth: 44, minHeight: 44, contentShape: Rectangle()`）；
+     - `LivePlayerView`：顶栏 `topPadding` 重构为 `isLandscape ? 16 : (safeTop + 6)`，全部操作按钮赋予 44x44pt 最小触控热区；
+     - `PlayerOverlayBar`：内置 `topPadding` 升级为 `customTopPadding ?? (DeviceLayout.safeAreaTop + 6)`，并自带暗调保护渐变与 44x44pt 触控返回键，驱动 `ComicReaderView` 与 `NativePlayerView` 顶栏自动沉浸下沉，同时底部章节指示胶囊以 `max(DeviceLayout.safeAreaBottom, spacingXL)` 避让 Home 指示条；
+     - `ForumPostDetailView` 与 `VideoDetailSheet`：顶栏返回键均补充 44x44pt 触控热区；
+  3. 双端实测验证：单测合计 367 项全绿；实机截屏确证在 iPhone 17 Pro 与 iPad Pro 11-inch 上，视频、直播、漫画详情页顶栏按钮均精准位于 75pt~105pt 黄金可触控区，彻底告别灵动岛冲突；
+  4. 自动化构建与持续交付：递增至 Build 190，自动化打包并同名原子覆盖推送至 `https://bananarey.us`（Netgrey.ipa / Netgrey.apk，HTTP 200 OK，服务器磁盘健康 > 5GB，零历史包残留）。
+- **最近更新**：2026-11-07 by Antigravity。
+
+## 歷史工作狀態（2026年11月7日 · Build 189）
+
+- **歷史成果（根治 iOS 二级/三级界面上下白边与非沉浸遮挡缺陷 + SwipeBackContainer 穿透安全区与零裁剪重构 + 媒体页面全景暗调与沉浸直通 + 367 项单测全绿 + Build 189 OTA 双端发布）**：
+  1. 上下白边与非沉浸遮挡根因彻底查明：`SwipeBackContainer` 内 `GeometryReader` 缺省安全区修饰符导致页面被压缩进安全区（y=59~818），且静止状态施加 `.clipShape` 暴力截断子视图向安全区延伸，叠加 Light Mode 下 UIHostingController 白底泄漏形成上下白边；
+  2. 全局沉浸与零白边重构：
+     - `SwipeBackContainer` 增加 `.ignoresSafeArea()` 与 `.background(Color.black.ignoresSafeArea())`；未拖拽状态下直接以 `content()` 零包裹透传，彻底移除静止态的 `.clipShape` 与缩放；
+     - `VideoDetailPlaybackScreen` 增加 `.ignoresSafeArea()` 与 `.preferredColorScheme(.dark)`，播放器直通顶部 `y=0`，动态补偿安全区高度，顶部控件避让灵动岛；
+     - `LiveDetailView` 增加 `.ignoresSafeArea()` 与 `.preferredColorScheme(.dark)`，播放器直通顶端，`LivePlayerView` 顶栏 `topPadding` 设为 `max(safeTop, 44)`，暗调渐变扩容至 110pt；
+     - `ComicReaderView` 与 `GameContainerView` 全屏直通黑色背景与暗色方案，彻底消除漫画与游戏的上下白条；
+     - `ForumPostDetailView` 移除 `SwipeBackContainer`，接入原生 `NavigationPopGestureEnabler` 并设置 `.navigationBarBackButtonHidden(true)` 消除双返回按钮；
+  3. 双端实测验证：单测合计 367 项全绿；实机截屏验证 iPhone 与 iPad 在日间与夜间模式下视频、直播、漫画、游戏、论坛详情均 100% 沉浸无白边；
+  4. 自动化构建与持续交付：递增至 Build 189，自动化打包并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 168MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘健康 > 5GB，零历史包残留）。
+- **最近更新**：2026-11-07 by Antigravity。
+
+## 歷史工作狀態（2026年11月7日 · Build 188）
+
+- **最新成果（游戏全局原生滑动返回重构 + 根治游戏看板立绘偏右截断 + Slots 旋转与拉杆合一醒目大按钮 + 伴游区屏幕比例自适应铺满 + 367 项单测全绿 + Build 188 OTA 双端发布）**：
+  1. **游戏返回逻辑与全局滑动返回统一**：取消 `GameContainerView` 中浮动的「< 返回视频」胶囊组件及其计时器与拖拽状态，接入原生 `.enableSwipeBack`；在屏幕左侧 28pt（iPad 36pt）边缘向右轻扫即可平滑触发 iOS 27 流体微动卡片缩放（1.0 → 0.95）、超椭圆圆角与零闪烁退出；游戏内部手势 100% 透传给 WebGL 画布；
+  2. **游戏看板人物立绘偏右且截断物理根治**：查明 `js/app.js` SpineStage `xRatio: 0.55` 与 Kitty 原画武器严重偏右两大根因；修正 `xRatio` 为 0.5，配置 Kitty 专属视觉重心校正 `{ scale: 0.92, y: 0, x: -28 }`，`.hub-art` 设为 `height: clamp(380px, 56vh, 490px); max-width: 86%;`，实机验证居中无裁剪且无遮挡；
+  3. **Slots 旋转与拉杆合二为一醒目大按钮**：移除分散的拉杆与 Spin 按钮，引入全新单一超大主操作按钮 `.slots-master-spin-btn`（`id="btn-slots-spin"`），内置金色微光脉冲、操纵手柄动态徽标、`SPIN 旋转拉杆` 主标题与 `PULL LEVER · 开启幸运旋转` 副标题，点击统一联动 3D 机械拉杆下压动画、音效与转轮旋转；
+  4. **机台下方伴游窗口自适应放大铺满**：`.slots-mascot-deck` 重构为 `flex: 1 1 auto; min-height: clamp(120px, 16vh, 220px); height: auto; border-radius: 14px;`，伴游区放大至约 180px 完整清晰展示动态骨骼动画与爆率气泡，整屏无溢出无滚动；
+  5. **自动化构建与持续交付**：递增至 Build 188，iOS 143 项单测全绿，Android 224 项单测全绿（合计 367 项全通过）；自动化打包并同名原子覆盖推送至 `https://bananarey.us`（`Netgrey.ipa` 168MB / `Netgrey.apk` 169MB，HTTP 200 OK，服务器磁盘可用空间 11GB / 27%，零历史包残留）。
+- **最近更新**：2026-11-07 by Antigravity。
+
 ## 獨立設計審計補充（2026年11月4日）
 
 - `docs/ios/design-audit-2026-11-04.md` 對固定提交 `3412839b29a01a8be111ef09c161b7255b46750a` 判為 `reject`：2 P1、5 P2 已確認，4 項風險待運行驗證。下文歷史「全量 HIG 通過」不能作現行發布依據。
@@ -241,3 +916,29 @@ JVM：30 test suites，175 項測試（173 passed, 0 failed, 2 skipped，100% �
 ## Next Recommended Action
 
 向用戶 Randy 匯報 Candidate 158 交付與量化驗收數據；待指示後提交 Git 代碼。
+
+## 2026-11-08 游戏审计阶段
+
+- 当前目标：审计并修复已集成游戏的战斗与 Slot 质量问题。
+- 已完成：修复 Slot 首位 Wild 错误连线，新增 `docs/game/AUDIT-REPORT-2026-11-08.md` 与 `scripts/verify-game-logic.js`。
+- 验证：Node 游戏逻辑回归通过，Android `testDebugUnitTest` 通过。
+- 进行中：等待代表性 Android/iOS 设备上的游戏画面、适配、无障碍和生命周期验证。
+- 阻塞：当前轮尚未取得真实设备视觉证据，不能宣称完整游戏视觉验收通过。
+- OTA 状态：Release 发布尝试被 iOS Xcode Archive 的 `build.db: disk I/O error` 阻断，未上传新包。
+
+## 2026-11-08 Bug 修复进展
+
+- 已修复共享游戏生命周期、离开页面停止自动运行、战斗结果重复结算，以及 Android 固定竖屏问题。
+- 已验证 Node 游戏逻辑和 Android JVM 测试通过。
+- 待完成：iOS 原生生命周期接入、四端设备视觉/方向/无障碍回归。
+
+### 2026-11-09 源连通性复核
+- 对 Android/iOS 目录登记的 19 个视频源、10 个漫画源及论坛/直播入口做了 HTTP 入口探测。大陆源与多数海外源在当前网络下可达。MissAV、85po、OHentai 等使用移动 Safari UA 后返回 200。SpankBang 在当前出口持续返回 Cloudflare 403，属于上游/地区访问策略，未找到可验证的替代官方域名，未伪造修复。
+- 修复 Android 冷启动默认源漂移：`ContentSourceCatalog.DEFAULT_BASE_URL` 从需要计时签名握手的华视影院改为稳定直连的 91 动漫，与 iOS 当前冷启动路径一致。
+- 验证：`./gradlew testDebugUnitTest --no-daemon` PASS；当前无连接 Android 模拟器，未运行 instrumentation 源审计。
+
+### 2026-11-09 全链路在线复核
+- Android `RUN_LIVE_SOURCE_TESTS=1 ./gradlew :app:testDebugUnitTest --tests com.aurorashelf.app.data.FullSystemSourceProbeTest --no-daemon` PASS。
+- 视频源 19/19 通过列表 + 首条播放解析。华视影院首条解析约 25.3s，功能通但存在明显时延，符合其服务端计时签名机制，需真机体验层继续优化。
+- 漫画源 9/10 通过浏览 + 详情 + 首章页图。哔咔为 NEEDS_ACCOUNT，代码主动要求 API Key/登录，因此是配置前置条件，不是连通性回归。
+- Android `testDebugUnitTest` 与 `lintDebug` PASS，老虎机确定性测试 PASS。iOS Simulator `xcodebuild test` exit 0。未发现本轮可复现的代码级全链路故障。

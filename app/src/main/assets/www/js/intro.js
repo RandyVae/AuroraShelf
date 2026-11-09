@@ -139,14 +139,14 @@
         camera: { scale: 1.08, panX: 25, panY: 0, shake: true },
         actors: [
           {
-            key: 'drone_enemy',
-            name: '巡航侦测无人机',
-            role: '敌方先哨',
-            unit: 'drone_enemy',
+            key: 'zoe_enemy',
+            name: '叛变特勤 Zoe',
+            role: '敌方先锋',
+            unit: 'zoe_enemy',
             type: 'spine',
             animation: 'idle',
-            size: { heightRatio: 0.58, yRatio: 0.15, xRatio: 0.72 },
-            badge: '敌军警报',
+            size: { heightRatio: 0.65, yRatio: 0.12, xRatio: 0.72 },
+            badge: '特勤警报',
             targetLock: true
           }
         ],
@@ -426,14 +426,14 @@
         suppActor.hidden = true;
       }
 
-      // 敌方单位展示 (Drone / Lucretia / Lilith)
-      const enemy = actors.find((a) => a.isEnemy || a.unit === 'drone_enemy' || a.key === 'lucretia' || a.key === 'lilith' || a.role === '沙海领主' || a.role === '终局审判者');
+      // 敌方单位展示 (Zoe / Lucretia / Lilith)
+      const enemy = actors.find((a) => a.isEnemy || a.unit === 'zoe_enemy' || a.key === 'zoe_enemy' || a.key === 'lucretia' || a.key === 'lilith' || a.role === '沙海领主' || a.role === '终局审判者');
       if (enemy && enemyActor) {
         enemyActor.hidden = false;
         const badge = enemyActor.querySelector('.enemy-badge');
         if (badge) badge.textContent = enemy.badge || '敌军警报';
 
-        if (enemy.unit === 'drone_enemy' && !this.reduceMotion && window.SpineStage && enemyCanvas) {
+        if (enemy.unit === 'zoe_enemy' && !this.reduceMotion && window.SpineStage && enemyCanvas) {
           if (enemyArt) enemyArt.hidden = true;
           enemyCanvas.hidden = false;
           if (!this.enemySpineStage) {

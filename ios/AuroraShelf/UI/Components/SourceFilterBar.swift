@@ -4,6 +4,7 @@ import SwiftUI
 public struct SourceFilterBar: View {
     public let categories: [String]
     @Binding public var selectedCategory: String
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     public init(categories: [String], selectedCategory: Binding<String>) {
         self.categories = categories
@@ -18,7 +19,7 @@ public struct SourceFilterBar: View {
                         title: cat,
                         isSelected: selectedCategory == cat,
                         onSelect: {
-                            withAnimation(AuroraMotion.quick) {
+                            withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
                                 selectedCategory = cat
                             }
                         }
@@ -35,6 +36,8 @@ private struct SourceFilterChip: View {
     let title: String
     let isSelected: Bool
     let onSelect: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
     
     var body: some View {
         Button(action: {
@@ -44,18 +47,28 @@ private struct SourceFilterChip: View {
             Text(title)
                 .font(.subheadline)
                 .fontWeight(isSelected ? .bold : .medium)
-                .foregroundStyle(isSelected ? .white : AuroraColor.textSecondary)
+                .foregroundStyle(isSelected ? AuroraColor.textOnBrand : AuroraColor.textSecondary)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
+                .frame(minHeight: AuroraMetrics.minTouchTarget)
+                .contentShape(Capsule(style: .continuous))
                 .background(
                     Capsule(style: .continuous)
-                        .fill(isSelected ? AuroraColor.brand : Color.white.opacity(0.08))
+                        .fill(isSelected ? AuroraColor.brand : unselectedChipFill)
                 )
                 .overlay(
                     Capsule(style: .continuous)
-                        .stroke(isSelected ? Color.clear : Color.white.opacity(0.12), lineWidth: 1)
+                        .stroke(isSelected ? Color.clear : AuroraColor.hairline, lineWidth: 1)
                 )
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var unselectedChipFill: Color {
+        if colorScheme == .dark && colorSchemeContrast == .standard {
+            return Color.white.opacity(0.08)
+        }
+        return AuroraColor.surfaceHigh
     }
 }

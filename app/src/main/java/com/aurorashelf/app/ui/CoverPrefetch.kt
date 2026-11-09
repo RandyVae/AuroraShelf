@@ -129,7 +129,8 @@ internal object CoverPrefetcher {
         if (!isPrefetchEnabled(context.applicationContext)) return
         val appContext = context.applicationContext
         val targets = comicPrefetchTargets(comics, limit).filter { comic ->
-            deduplicator.markStartedIfAbsent(comic.coverUrl!!)
+            val coverUrl = comic.coverUrl ?: return@filter false
+            deduplicator.markStartedIfAbsent(coverUrl)
         }
         if (targets.isEmpty()) return
         val startedAt = System.currentTimeMillis()

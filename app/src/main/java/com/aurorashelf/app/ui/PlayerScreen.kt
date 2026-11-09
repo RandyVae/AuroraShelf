@@ -188,6 +188,7 @@ import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
 import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
 import com.aurorashelf.app.ui.theme.AuroraMediaLabel
 import com.aurorashelf.app.ui.theme.AuroraMediaMuted
+import com.aurorashelf.app.ui.theme.AuroraMediaMeta
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -283,17 +284,17 @@ internal fun PlayerScreen(
             }
         }
     }
-    // Warm the next episode once per selection: switching episodes changes the key and re-runs it.
-    LaunchedEffect(video.id, nextEpisode?.pageUrl) {
-        val next = nextEpisode ?: return@LaunchedEffect
+    // 针对多集短剧开启持续向后滑动窗口预缓存系统（预热后续 1~2 集播放流）
+    LaunchedEffect(video.id, selectedEpisode, episodes) {
+        val curNum = selectedEpisode
         val appContext = context.applicationContext
         if (!isPrefetchEnabled(appContext)) return@LaunchedEffect
         delay(NEXT_EPISODE_PREFETCH_DELAY_MS)
         // Re-check after the delay: the network may have switched to mobile data meanwhile.
         if (!isPrefetchEnabled(appContext)) return@LaunchedEffect
-        Log.i(PREFETCH_LOG_TAG, "next episode start")
-        PlaybackResolver().prefetchPlayback(next.pageUrl)
-        Log.i(PREFETCH_LOG_TAG, "next episode done")
+        Log.i(PREFETCH_LOG_TAG, "sliding window prefetch start for ep=$curNum")
+        PlaybackResolver().prefetchSlidingWindow(episodes, curNum, windowSize = 2)
+        Log.i(PREFETCH_LOG_TAG, "sliding window prefetch done")
     }
     // task-17 shared warm-up: dedupes, bounds parallelism and applies the same Wi-Fi policy.
     LaunchedEffect(relatedVideos) {
@@ -514,6 +515,19 @@ internal fun PlayerScreen(
                 onVideoOrientationChange = onVideoOrientationChange,
                 onVideoAspectRatioChange = { videoAspectRatio = it },
                 onPositionChange = { currentPositionMs = it },
+                onPlaybackEnded = {
+                    val curNum = selectedEpisode
+                    val nextEp = episodes.firstOrNull { it.number == curNum + 1 }
+                    if (nextEp != null) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        playbackUrl = nextEp.pageUrl
+                        currentPositionMs = 0L
+                        val activeDevice = (castState as? CastState.Connected)?.device
+                        if (activeDevice != null) {
+                            launchCastForUrl(activeDevice, nextEp.pageUrl, nextEp.label, 0L)
+                        }
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .then(
@@ -798,21 +812,98 @@ private fun PlayerDetails(
             exit = fadeOut() + scaleOut(targetScale = 0.98f),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(vertical = 6.dp),
             ) {
                 episodes.forEach { episode ->
                     val selected = episode.number == selectedEpisode
-                    Surface(
-                        onClick = { onEpisode(episode) },
-                        color = if (selected) AuroraCoral else AuroraMediaSurfaceVariant,
-                        contentColor = if (selected) Color.White else AuroraMediaLabel,
-                        shape = RoundedCornerShape(14.dp),
+                    Column(
+                        modifier = Modifier
+                            .width(180.dp)
+                            .clickable(role = Role.Button, onClick = { onEpisode(episode) }),
                     ) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = AuroraMediaSurfaceVariant,
+                            border = if (selected) BorderStroke(2.dp, AuroraCoral) else null,
+                            modifier = Modifier
+                                .width(180.dp)
+                                .height(101.dp),
+                            shadowElevation = if (selected) 6.dp else 2.dp,
+                        ) {
+                            Box(Modifier.fillMaxSize()) {
+                                MediaImage(
+                                    video = video,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .padding(6.dp)
+                                        .background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                                ) {
+                                    Text(
+                                        text = "EP ${episode.number}",
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                                if (selected) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.Center)
+                                            .size(32.dp)
+                                            .background(AuroraCoral.copy(alpha = 0.88f), CircleShape),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Filled.PlayArrow,
+                                            contentDescription = "正在播放",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                    // Apple TV 标志性红白进度微条
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .fillMaxWidth()
+                                            .height(3.dp)
+                                            .background(Color.White.copy(alpha = 0.3f)),
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .fillMaxWidth(0.5f)
+                                                .background(AuroraCoral),
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
                         Text(
                             text = episode.label,
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontSize = 13.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+                            ),
+                            color = if (selected) AuroraCoral else Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = if (selected) "正在播放 · 4K 超清" else "4K HDR · 极速播放",
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = AuroraMediaMeta,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }

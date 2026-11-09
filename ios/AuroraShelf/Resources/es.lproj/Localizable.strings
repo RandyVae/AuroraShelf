@@ -1,0 +1,111 @@
+/* Tabs */
+"tab.home" = "Inicio";
+"tab.comics" = "Cómics";
+"tab.live" = "En vivo";
+"tab.forum" = "Comunidad";
+"tab.library" = "Biblioteca";
+
+/* Home Screen */
+"home.today_top_hits" = "Tendencias de hoy";
+"home.top10" = "TOP 10 DE HOY";
+"home.up_next" = "A continuación";
+"home.channels" = "Canales";
+"home.connecting" = "Conectando a %@...";
+"home.loading_recommendations" = "Cargando recomendaciones...";
+"home.loading_more" = "Cargando más…";
+"home.all_loaded" = "Todo cargado";
+"home.play" = "Reproducir";
+"home.watchlist" = "Mi lista";
+"home.details" = "Detalles";
+"home.related" = "Relacionados";
+"home.all" = "Todos";
+
+/* Search */
+"search.placeholder" = "Buscar vídeos, anime, manga o códigos";
+"search.concurrent_hint" = "Búsqueda simultánea en 19 fuentes de vídeo";
+"search.no_results" = "Sin resultados";
+"search.searching" = "Buscando…";
+"search.history" = "Historial de búsqueda";
+"search.clear_history" = "Borrar historial";
+"search.cancel" = "Cancelar";
+
+/* Comics */
+"comics.title" = "Cómics";
+"comics.featured" = "Destacados";
+"comics.loading" = "Cargando cómics…";
+"comics.loading_more" = "Cargando más cómics…";
+"comics.all_loaded" = "Todos los cómics cargados";
+"comics.select_source" = "Seleccionar fuente";
+"comics.unconfigured" = "Credenciales no configuradas";
+"comics.unconfigured_hint" = "Configura las credenciales en ajustes para acceder";
+
+/* Reader */
+"reader.chapter" = "Capítulo %d";
+"reader.page" = "Página %d de %d";
+"reader.prev_chapter" = "Capítulo anterior";
+"reader.next_chapter" = "Capítulo siguiente";
+"reader.loading_image" = "Cargando imagen…";
+
+/* Live */
+"live.title" = "En vivo";
+"live.featured" = "Destacados";
+"live.female" = "Femenino";
+"live.male" = "Masculino";
+"live.couples" = "Parejas";
+"live.trans" = "Trans";
+"live.loading" = "Cargando transmisiones…";
+"live.viewers" = "%@ espectadores";
+"live.online" = "En directo";
+"live.offline" = "Desconectado";
+"live.select_source" = "Seleccionar fuente en vivo";
+"live.chat" = "Chat en vivo";
+
+/* Forum */
+"forum.title" = "Comunidad";
+"forum.all" = "Todos";
+"forum.cl" = "Comunidad CL";
+"forum.91" = "Foro 91";
+"forum.loading" = "Cargando publicaciones…";
+"forum.replies" = "%d respuestas";
+"forum.original_post" = "Ver publicación original";
+
+/* Player / Detail / Watchlist / InSight */
+"player.play" = "Reproducir";
+"player.pause" = "Pausa";
+"player.aspect_fit" = "Ajustar";
+"player.aspect_fill" = "Llenar pantalla";
+"player.airplay" = "AirPlay";
+"player.episodes" = "Episodios";
+"detail.synopsis" = "Sinopsis";
+"detail.more_like_this" = "Similares";
+"watchlist.add" = "Añadir a mi lista";
+"watchlist.in_list" = "En mi lista";
+"watchlist.remove" = "Quitar";
+"watchlist.title" = "Mi lista";
+"watchlist.empty" = "Tu lista está vacía";
+"watchlist.count" = "%d títulos";
+
+/* Library / Settings */
+"library.title" = "Biblioteca";
+"settings.language" = "Idioma";
+"settings.language_title" = "Seleccionar idioma";
+"settings.follow_system" = "Según el sistema";
+"settings.game" = "Entretenimiento · Juegos";
+"settings.game_title" = "Diosa del Deseo · RPG táctico";
+"settings.game_desc" = "RPG táctico · Aceleración por hardware";
+"settings.launch" = "Iniciar";
+"settings.video_source" = "Fuente de vídeo actual";
+"settings.comic_source" = "Fuente de cómic actual";
+"settings.live_source" = "Fuente en vivo actual";
+"settings.offline_download" = "Descarga sin conexión";
+"settings.not_available" = "No disponible en esta versión";
+"settings.version" = "Versión";
+"settings.airplay_title" = "Transmitir con AirPlay";
+"settings.airplay_select" = "Seleccionar dispositivo";
+"settings.select_live_source" = "Seleccionar fuente en vivo";
+
+/* Common Actions */
+"common.done" = "Listo";
+"common.cancel" = "Cancelar";
+"common.close" = "Cerrar";
+"common.ok" = "Aceptar";

@@ -1,0 +1,49 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "85A543BE-30D6-41D8-8898-4FC2FE05872B",
+        "deviceName" : "iPhone 17 Pro",
+        "modelName" : "iPhone 17 Pro",
+        "osBuildNumber" : "23E244",
+        "osVersion" : "26.4",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 0,
+      "passedTests" : 96,
+      "skippedTests" : 5,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "AuroraShelf · Built with macOS 27.2",
+  "expectedFailures" : 0,
+  "failedTests" : 0,
+  "finishTime" : 1793950631.255,
+  "passedTests" : 96,
+  "result" : "Passed",
+  "runtimeWarnings" : [
+
+  ],
+  "skippedTests" : 5,
+  "startTime" : 1793950591.65,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+
+  ],
+  "title" : "Test - AuroraShelf",
+  "topInsights" : [
+    {
+      "category" : "Longest Test Runs",
+      "impact" : "96% of duration",
+      "text" : "2 longest test runs with outlier durations exceeding 0.78s (three standard deviations)"
+    }
+  ],
+  "totalTestCount" : 101
+}

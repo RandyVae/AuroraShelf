@@ -62,6 +62,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.animation.core.Spring
+import androidx.compose.runtime.mutableFloatStateOf
+import kotlin.math.roundToInt
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -795,30 +800,19 @@ internal fun NetflixProfileAvatar(
 internal fun NetflixRankNumber(
     rank: Int,
     modifier: Modifier = Modifier,
-    fontSize: TextUnit = 84.sp,
-    outlineColor: Color = AuroraMediaRankOutline,
-    fillColor: Color = AuroraMediaRankFill,
+    fontSize: TextUnit = 34.sp,
+    outlineColor: Color = Color.Transparent,
+    fillColor: Color = Color.White.copy(alpha = 0.55f),
 ) {
     val rankText = "$rank"
-    Box(modifier = modifier) {
-        Text(
-            text = rankText,
-            fontSize = fontSize,
-            lineHeight = fontSize,
-            fontWeight = FontWeight.Black,
-            style = TextStyle(
-                drawStyle = Stroke(width = 6f, join = StrokeJoin.Round),
-            ),
-            color = outlineColor,
-        )
-        Text(
-            text = rankText,
-            fontSize = fontSize,
-            lineHeight = fontSize,
-            fontWeight = FontWeight.Black,
-            color = fillColor,
-        )
-    }
+    Text(
+        text = rankText,
+        fontSize = fontSize,
+        lineHeight = fontSize,
+        fontWeight = FontWeight.Bold,
+        color = fillColor,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -917,54 +911,53 @@ internal fun NetflixPosterShelfCard(
 ) {
     Column(
         modifier = modifier
-            .width(114.dp)
+            .width(140.dp)
             .applePressEffect(onClick = onClick),
     ) {
         Surface(
-            shape = RoundedCornerShape(4.dp),
+            shape = RoundedCornerShape(10.dp),
             color = AuroraMediaPlaceholder,
             modifier = Modifier
-                .width(114.dp)
-                .height(165.dp),
+                .width(140.dp)
+                .height(210.dp),
+            shadowElevation = 4.dp,
         ) {
             Box(Modifier.fillMaxSize()) {
                 MediaImage(
                     video = video,
                     modifier = Modifier.fillMaxSize(),
                 )
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(5.dp),
-                ) {
-                    NetflixNLogo(modifier = Modifier.size(width = 11.dp, height = 17.dp))
-                }
-                if (video.duration.isNotBlank()) {
+                if (video.duration.isNotBlank() && video.duration != "--:--") {
                     Text(
                         text = video.duration,
                         color = Color.White,
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(4.dp)
-                            .background(AuroraImmersiveBackground.copy(alpha = 0.76f), RoundedCornerShape(3.dp))
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                            .padding(6.dp)
+                            .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 2.dp),
                     )
                 }
             }
         }
-        Spacer(Modifier.height(5.dp))
+        Spacer(Modifier.height(8.dp))
         Text(
             text = video.title,
-            style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-            color = AuroraMediaLabel,
-            maxLines = 1,
+            style = MaterialTheme.typography.labelMedium.copy(
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 16.sp,
+            ),
+            color = Color.White,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        Spacer(Modifier.height(2.dp))
         Text(
-            text = video.views,
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            text = video.views.ifBlank { video.author },
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
             color = AuroraMediaMeta,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1224,3 +1217,62 @@ internal fun CenteredSearchBar(
         }
     }
 }
+
+/**
+ * 全局右滑返回交互手势（遵循 Apple HIG 交互规范）
+ * 支持从屏幕左边缘轻扫拖拽、实时水平位移跟踪与触觉反馈，超过阈值触发 onDismiss，否则弹性平滑归位。
+ */
+internal fun Modifier.auroraSwipeBack(
+    enabled: Boolean = true,
+    onDismiss: () -> Unit,
+): Modifier = composed {
+    if (!enabled) return@composed this
+    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    var isDragging by remember { mutableStateOf(false) }
+    val animatedOffsetPx by animateFloatAsState(
+        targetValue = if (isDragging) dragOffsetPx else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.85f,
+            stiffness = Spring.StiffnessMediumLow,
+        ),
+        label = "auroraSwipeBackOffset",
+    )
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val triggerDistancePx = with(density) { 90.dp.toPx() }
+    val edgeThresholdPx = with(density) { 60.dp.toPx() }
+
+    this
+        .offset { IntOffset(x = animatedOffsetPx.roundToInt().coerceAtLeast(0), y = 0) }
+        .pointerInput(enabled) {
+            detectHorizontalDragGestures(
+                onDragStart = { offset ->
+                    if (offset.x <= edgeThresholdPx) {
+                        isDragging = true
+                        dragOffsetPx = 0f
+                    }
+                },
+                onDragEnd = {
+                    if (isDragging) {
+                        isDragging = false
+                        if (dragOffsetPx > triggerDistancePx) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onDismiss()
+                        }
+                        dragOffsetPx = 0f
+                    }
+                },
+                onDragCancel = {
+                    isDragging = false
+                    dragOffsetPx = 0f
+                },
+                onHorizontalDrag = { change, dragAmount ->
+                    if (isDragging) {
+                        change.consume()
+                        dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
+                    }
+                },
+            )
+        }
+}
+

@@ -97,6 +97,8 @@ internal class T906ForumSource(
             val subject = row.selectFirst("span[id^=thread_] a[href*=viewthread]")
                 ?: row.selectFirst("th.subject a[href*=viewthread]")
                 ?: return@mapNotNull null
+            val title = subject.text().trim()
+            if (ForumNoiseFilter.isNoisePost(title)) return@mapNotNull null
             val id = row.id().removePrefix("normalthread_").takeIf { it.all(Char::isDigit) } ?: return@mapNotNull null
             val author = row.selectFirst("td.author cite a")?.text().orEmpty().ifBlank {
                 row.selectFirst("div.new_tr cite a")?.text().orEmpty().ifBlank { "匿名" }

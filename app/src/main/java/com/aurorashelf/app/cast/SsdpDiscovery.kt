@@ -57,7 +57,7 @@ internal class SsdpDiscovery(
                     val sendData = query.toByteArray(StandardCharsets.UTF_8)
                     val packet = DatagramPacket(sendData, sendData.size, multicastGroup, SSDP_PORT)
                     try {
-                        socket?.send(packet)
+                        socket.send(packet)
                     } catch (e: Exception) {
                         Log.w(TAG, "Failed to send SSDP M-SEARCH for $st: ${e.message}")
                     }
@@ -70,7 +70,7 @@ internal class SsdpDiscovery(
                 while (System.currentTimeMillis() - startTime < timeoutMs) {
                     try {
                         val receivePacket = DatagramPacket(receiveBuffer, receiveBuffer.size)
-                        socket?.receive(receivePacket)
+                        socket.receive(receivePacket)
                         val response = String(receivePacket.data, 0, receivePacket.length, StandardCharsets.UTF_8)
                         val location = extractHeader(response, "LOCATION")
                         if (!location.isNullOrBlank() && seenLocations.add(location)) {

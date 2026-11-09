@@ -11,31 +11,31 @@ public enum MainTab: String, CaseIterable, Identifiable {
     
     public var title: String {
         switch self {
-        case .home: return "精选"
-        case .comics: return "漫画"
-        case .live: return "直播"
-        case .forum: return "论坛"
-        case .profile: return "我的"
+        case .home: return "tab.home".localized
+        case .comics: return "tab.comics".localized
+        case .live: return "tab.live".localized
+        case .forum: return "tab.forum".localized
+        case .profile: return "tab.library".localized
         }
     }
     
     public var iconName: String {
         switch self {
-        case .home: return "sparkles.tv"
-        case .comics: return "books.vertical"
-        case .live: return "antenna.radiowaves.left.and.right"
-        case .forum: return "bubble.left.and.bubble.right"
-        case .profile: return "person.crop.circle"
+        case .home: return "house"
+        case .comics: return "book.pages"
+        case .live: return "dot.radiowaves.left.and.right"
+        case .forum: return "person.2"
+        case .profile: return "books.vertical"
         }
     }
     
     public var selectedIconName: String {
         switch self {
-        case .home: return "sparkles.tv.fill"
-        case .comics: return "books.vertical.fill"
-        case .live: return "antenna.radiowaves.left.and.right.circle.fill"
-        case .forum: return "bubble.left.and.bubble.right.fill"
-        case .profile: return "person.crop.circle.fill"
+        case .home: return "house.fill"
+        case .comics: return "book.pages.fill"
+        case .live: return "dot.radiowaves.left.and.right"
+        case .forum: return "person.2.fill"
+        case .profile: return "books.vertical.fill"
         }
     }
 }

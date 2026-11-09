@@ -10,6 +10,8 @@ struct AuroraShelfApp: App {
             let src = VideoSourceCatalog.find(by: srcId)
             VideoRepository.shared.switchSource(to: src)
         }
+        // 启动全平台全面预热系统（涵盖视频、论坛与漫画，实现即点即看）
+        GlobalStartupPrefetchEngine.shared.startGlobalWarmup()
     }
     
     var body: some Scene {

@@ -11,6 +11,12 @@
 </head>
 <body>
 <div id="app">
+  <!-- 微信 / iOS 小程序规范右上角浮动胶囊按键（纯网页环境兜底） -->
+  <aside class="mini-program-capsule" id="mini-program-capsule" aria-label="小程序控制胶囊">
+    <button class="mp-btn mp-menu" id="mp-btn-menu" aria-label="小程序功能菜单">···</button>
+    <div class="mp-divider"></div>
+    <button class="mp-btn mp-close" id="mp-btn-close" aria-label="关闭小程序">✕</button>
+  </aside>
   <main class="stage" id="stage">
 
     <!-- BOOT -->
@@ -39,10 +45,6 @@
     <section class="screen" id="screen-hub" aria-label="主大厅">
       <div class="hub-bg" id="hub-bg"></div>
       <div class="hub-grad"></div>
-      <canvas class="hub-canvas" id="hub-canvas" aria-hidden="true"></canvas>
-      <img class="hub-art" id="hub-art" alt="" hidden>
-      <button class="hub-hero-nav hub-hero-prev" id="btn-hub-hero-prev" aria-label="上一个特勤英雄">‹</button>
-      <button class="hub-hero-nav hub-hero-next" id="btn-hub-hero-next" aria-label="下一个特勤英雄">›</button>
       <div class="hub-top">
         <div class="hud">
           <span class="pill" title="金币"><span class="ico">🪙</span><b id="hud-gold">0</b></span>
@@ -69,6 +71,20 @@
             <span id="hub-outfit-label">18+觉醒</span>
           </button>
         </div>
+      </div>
+      <div class="hub-hero-stage" id="hub-hero-stage" title="轻触特勤队员互动">
+        <div class="hub-hero-ambient" aria-hidden="true"></div>
+        <div class="hub-speech-bubble" id="hub-speech-bubble" hidden>
+          <span id="hub-speech-text">指挥官，全员整备完毕，请下达作战指令！</span>
+          <i class="hub-speech-arrow"></i>
+        </div>
+        <div class="hub-art-wrap" id="hub-art-wrap">
+          <img class="hub-art breathing-art" id="hub-art" alt="18+ 特勤立绘">
+          <div class="hub-art-glint" aria-hidden="true"></div>
+        </div>
+        <canvas class="hub-canvas" id="hub-canvas" aria-hidden="true" hidden></canvas>
+        <button class="hub-hero-nav hub-hero-prev" id="btn-hub-hero-prev" aria-label="上一个特勤英雄">‹</button>
+        <button class="hub-hero-nav hub-hero-next" id="btn-hub-hero-next" aria-label="下一个特勤英雄">›</button>
       </div>
       <div class="hub-focus" aria-label="当前作战焦点">
         <div class="hub-focus-main">
@@ -375,17 +391,13 @@
         <div class="jackpot-tier tier-mini"><span>MINI</span><b id="slots-mini">500</b></div>
       </div>
       <div class="slots-cabinet">
+        <div class="cabinet-side-lever" id="cabinet-side-lever" hidden aria-hidden="true" style="display:none !important">
+          <img src="assets/slots/lever.webp" alt="拉杆" class="side-lever-img" aria-hidden="true">
+        </div>
         <div class="slots-marquee" aria-hidden="true">
-          <div class="marquee-chase-lights" id="marquee-lights">
-            <span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span>
-            <span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span>
-            <span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span>
-            <span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span><span class="ml-bulb"></span>
-          </div>
           <div class="marquee-banner">
             <img src="assets/slots/cabinet_marquee.png" alt="Neon Frontline Slots" class="marquee-art">
           </div>
-          <div class="marquee-sub"><span>TACTICAL REELS</span><i>•</i><span>5×3 MECHANICAL CYLINDER</span><i>•</i><span>9 PAYLINES</span></div>
         </div>
         <div class="slots-display">
           <span class="slots-badge">TACTICAL JACKPOT</span>
@@ -412,6 +424,22 @@
           <div class="reel-cylinder-shadow-bottom" aria-hidden="true"></div>
           <svg class="slots-line-overlay" id="slots-line-overlay" viewBox="0 0 100 60" preserveAspectRatio="none" aria-hidden="true"></svg>
           <div class="slots-grid" id="slots-grid" aria-live="polite"></div>
+          <!-- 旋转中途 18+ 特勤高清立绘动态突入层 (In-spin 18+ Eros Impact Cut-in) -->
+          <div class="slots-hero-cutin" id="slots-hero-cutin" aria-hidden="true" hidden>
+            <div class="cutin-blast-ring" aria-hidden="true"></div>
+            <div class="cutin-speed-lines" aria-hidden="true"></div>
+            <div class="cutin-slash-fx" id="cutin-slash-fx" aria-hidden="true"></div>
+            <div class="cutin-art-container" id="cutin-art-container">
+              <img id="slots-cutin-art" class="cutin-art-img" src="" alt="18+ 专属突入立绘">
+              <div class="cutin-art-shimmer" aria-hidden="true"></div>
+            </div>
+            <div class="cutin-hud-badge" id="cutin-hud-badge">
+              <div class="cutin-badge-glow"></div>
+              <span class="cutin-callsign">✦ 18+ EROS IMPACT ✦</span>
+              <b class="cutin-hero-name" id="cutin-hero-name">CARTILLA 魅惑突入</b>
+              <small class="cutin-quote" id="cutin-quote">「全轴功率超载！长官，头奖非你莫属～」</small>
+            </div>
+          </div>
         </div>
         <div class="slots-win-meter">
           <div class="win-meter-header">
@@ -421,66 +449,69 @@
           <b id="slots-last-win">0</b>
           <small id="slots-result">选择下注档位并旋转</small>
         </div>
-        <div class="slots-status">
-          <span id="slots-hint">每次旋转消耗虚拟金币，中奖自动结算</span>
-          <b>免费旋转 <i id="slots-free-spins">0</i></b>
+        <div class="slots-status" id="slots-status-bar">
+          <div class="slots-status-lead">
+            <span class="slots-status-dot" id="slots-status-dot"></span>
+            <span class="slots-status-hint" id="slots-hint">单次 20 金币 · 命中 3 个 Scatter 激活免费大旋转</span>
+          </div>
+          <div class="slots-free-pill" id="slots-free-pill" aria-label="免费旋转剩余次数">
+            <span class="free-pill-icon">⚡</span>
+            <span class="free-pill-label">免费旋转</span>
+            <b class="free-pill-count" id="slots-free-spins">0</b>
+            <span class="free-pill-unit">次</span>
+          </div>
         </div>
-        <div class="slots-controls" aria-label="控制台">
-          <div class="slots-controls-aux">
-            <button class="btn sm ghost slots-extra" id="btn-slots-paytable">赔率表</button>
-            <div class="bet-stepper">
-              <button class="btn sm" id="btn-slots-bet-down" aria-label="降低下注">−</button>
-              <span class="slots-bet-readout">下注 <b id="slots-bet">20</b></span>
-              <button class="btn sm" id="btn-slots-bet-up" aria-label="提高下注">+</button>
-              <button class="btn sm ghost" id="btn-slots-max-bet" aria-label="最大下注">MAX</button>
+        <!-- FULL-WIDTH CONTROL & BET BAR -->
+        <div class="slots-controls-aux" aria-label="下注与游戏辅助控制">
+          <button class="btn sm ghost slots-extra" id="btn-slots-paytable">赔率表</button>
+          <div class="bet-stepper">
+            <button class="btn sm" id="btn-slots-bet-down" aria-label="降低下注">−</button>
+            <span class="slots-bet-readout">下注 <b id="slots-bet">20</b></span>
+            <button class="btn sm" id="btn-slots-bet-up" aria-label="提高下注">+</button>
+            <button class="btn sm ghost" id="btn-slots-max-bet" aria-label="最大下注">MAX</button>
+          </div>
+          <button class="btn sm ghost slots-extra" id="btn-slots-auto" aria-pressed="false">AUTO</button>
+          <button class="btn sm ghost slots-extra" id="btn-slots-turbo" aria-pressed="false">TURBO</button>
+        </div>
+        <!-- DUAL-WING COCKPIT: LEFT 18+ MASCOT COMPANION, RIGHT MASTER SPIN BUTTON -->
+        <div class="slots-console-deck" id="slots-console-deck" aria-label="Slot 双翼操作台">
+          <!-- LEFT WING: 18+ MASCOT COMPANION STAGE -->
+          <div class="slots-mascot-wing" id="slots-mascot-deck" aria-label="18+ 幸运特勤伴游">
+            <div class="mascot-stage-ambient" aria-hidden="true"></div>
+            <div class="mascot-header-row">
+              <span class="mascot-tag">✦ 18+ 伴游 ✦</span>
+              <button class="mascot-switch-btn" id="btn-slots-mascot-switch" aria-label="切换伴游特勤" title="点击切换 18+ 动态伴游">
+                <span id="slots-mascot-name">Charlotte 18+</span> ↺
+              </button>
             </div>
-            <button class="btn sm ghost slots-extra" id="btn-slots-auto" aria-pressed="false">AUTO</button>
-            <button class="btn sm ghost slots-extra" id="btn-slots-turbo" aria-pressed="false">TURBO</button>
+            <div class="mascot-actor-wrap" id="mascot-actor-wrap" title="轻触特勤互动">
+              <canvas id="slots-mascot-canvas" class="slots-mascot-canvas" width="480" height="480" aria-label="18+ 伴游骨骼动画"></canvas>
+              <div class="mascot-speech-bubble" id="mascot-speech" hidden>
+                <span id="mascot-speech-text">指挥官，今天手气很旺盛呢，转一转试试看？</span>
+                <i class="speech-arrow"></i>
+              </div>
+            </div>
+            <div class="mascot-footer-stats">
+              <span class="lsi-val" id="mascot-lucky-mult">+18% 爆率</span>
+              <span class="lsi-sep">·</span>
+              <span class="lsi-val" id="mascot-favor-level">Lv.7 · 依恋</span>
+            </div>
           </div>
-          <button class="btn primary slots-spin" id="btn-slots-spin" aria-label="旋转滚轮">
-            <span class="spin-btn-content">
-              <img src="assets/slots/button_spin.png" alt="" class="spin-btn-icon" aria-hidden="true">
-              <b>SPIN 旋转</b>
-            </span>
-          </button>
-        </div>
-        <div class="slots-console-badge"><span class="console-dot"></span> ARCADE 3D CHASSIS <i>•</i> 9 PAYLINES <i>•</i> SPACEBAR TO SPIN</div>
-        <div class="slots-coin-tray" id="slots-coin-tray" aria-hidden="true">
-          <div class="coin-tray-lip"></div>
-          <div class="coin-tray-basin">
-            <div class="tray-coins" id="tray-coins"></div>
-          </div>
-          <div class="tray-label">TACTICAL COIN HOPPER</div>
-        </div>
-      </div>
-      <!-- 18+ LIVE SPINE MASCOT COMPANION STAGE -->
-      <div class="slots-mascot-deck" id="slots-mascot-deck" aria-label="18+ 幸运特勤伴游">
-        <div class="mascot-stage-ambient" aria-hidden="true"></div>
-        <div class="mascot-actor-wrap" id="mascot-actor-wrap" title="轻触特勤互动">
-          <canvas id="slots-mascot-canvas" class="slots-mascot-canvas" width="360" height="360" aria-label="18+ 伴游骨骼动画"></canvas>
-          <div class="mascot-speech-bubble" id="mascot-speech">
-            <span id="mascot-speech-text">指挥官，今天手气很旺盛呢，转一转试试看？</span>
-            <i class="speech-arrow"></i>
-          </div>
-        </div>
-        <div class="mascot-meta-panel">
-          <div class="mascot-header-row">
-            <span class="mascot-tag">✦ 18+ 幸运伴游 ✦</span>
-            <button class="mascot-switch-btn" id="btn-slots-mascot-switch" aria-label="切换伴游特勤" title="点击切换 18+ 动态伴游">
-              <span id="slots-mascot-name">Charlotte 18+</span> ↺
+
+          <!-- RIGHT WING: MASTER SPIN BUTTON -->
+          <div class="slots-action-wing" aria-label="操作控制台">
+            <button class="slots-master-spin-btn" id="btn-slots-spin" aria-label="启动旋转并拉杆" title="SPIN & PULL">
+              <span class="master-spin-glow" aria-hidden="true"></span>
+              <span class="master-spin-content">
+                <span class="master-spin-icon">🕹️</span>
+                <span class="master-spin-text">
+                  <b class="spin-main-title">SPIN 旋转拉杆</b>
+                  <small class="spin-sub-title">PULL LEVER · 开启幸运旋转</small>
+                </span>
+                <span class="master-spin-tag">PULL ▶</span>
+              </span>
             </button>
           </div>
-          <div class="mascot-lucky-stats">
-            <div class="lucky-stat-item">
-              <span class="lsi-label">幸运加护</span>
-              <span class="lsi-val" id="mascot-lucky-mult">+15% 爆率</span>
-            </div>
-            <div class="lucky-stat-item">
-              <span class="lsi-label">伴游好感</span>
-              <span class="lsi-val" id="mascot-favor-level">Lv.5 · 亲密</span>
-            </div>
-          </div>
-          <div class="mascot-action-hint">轻触特勤互动 · 旋转触发助威</div>
         </div>
       </div>
       <p class="slots-disclaimer">仅使用本地虚拟金币，不提供充值、提现或真实货币下注。</p>
@@ -697,6 +728,115 @@
           <span class="cg-cinema-badge" id="cg-cinema-badge">战役突破 · 动态特写</span>
           <button class="btn sm primary" id="btn-cg-skip">跳过演出 ⏭</button>
         </div>
+      </div>
+    </div>
+
+    <!-- SLOTS 伴游破产救济弹窗 (Bailout) -->
+    <div class="sheet" id="modal-slots-bailout" hidden role="dialog" aria-modal="true" aria-label="紧急战术救济">
+      <div class="sheet-panel bailout-panel">
+        <div class="sheet-grabber"></div>
+        <div class="bailout-header">
+          <span class="bailout-badge">伴游私密空投</span>
+          <h2 class="bailout-title">指挥官，别泄气～</h2>
+        </div>
+        <div class="bailout-body">
+          <p class="bailout-desc">Charlotte 偷偷动用了特勤后勤金库，为你申请了紧急筹码！</p>
+          <div class="bailout-reward-box">
+            <span class="reward-item">🪙 <b>+300</b> 虚拟金币</span>
+            <span class="reward-item">✦ <b>1 次</b> 必中天命黄金旋转</span>
+          </div>
+          <p class="bailout-sub">“打起精神来，下一把一定会中超级大奖的，快试试看～”</p>
+        </div>
+        <button class="btn primary block bailout-claim-btn" id="btn-bailout-claim">收下空投并翻盘</button>
+      </div>
+    </div>
+
+    <!-- SLOTS 10倍超值首充金库弹窗 (First Deposit VIP Vault) -->
+    <div class="sheet" id="modal-slots-recharge" hidden role="dialog" aria-modal="true" aria-label="首充超值金库">
+      <div class="sheet-panel recharge-panel">
+        <div class="sheet-grabber"></div>
+        <div class="recharge-badge-row">
+          <span class="recharge-tag">1000% 超值返利</span>
+          <span class="recharge-tag highlight">限时特惠</span>
+          <button class="icon-btn ghost" id="btn-slots-recharge-close" aria-label="关闭">✕</button>
+        </div>
+        <h2 class="recharge-title">指挥官尊享 · 黄金金库</h2>
+        <p class="recharge-subtitle">只需 HK$ 6.00 / $0.99，解锁无限快感与极品伴游</p>
+        <div class="recharge-items-grid">
+          <div class="recharge-card">
+            <span class="rc-icon">🪙</span>
+            <b>50,000</b>
+            <small>战术虚拟金币</small>
+          </div>
+          <div class="recharge-card highlight">
+            <span class="rc-icon">👗</span>
+            <b>全员 18+</b>
+            <small>伴游爆衣觉醒</small>
+          </div>
+          <div class="recharge-card">
+            <span class="rc-icon">👑</span>
+            <b>VIP 1</b>
+            <small>每日 10 次大旋转</small>
+          </div>
+        </div>
+        <button class="btn primary block recharge-action-btn" id="btn-slots-recharge-pay">
+          <span class="rc-price">免费补给</span>
+          <span class="rc-label">立即领取特勤金币</span>
+        </button>
+        <p class="recharge-footer-note">（极速入账 · 纯本地畅玩 · 随时随地无限爽）</p>
+      </div>
+    </div>
+
+    <!-- 战役模式战败绝地翻盘血清 (Battle Emergency Revival) -->
+    <div class="sheet" id="modal-battle-revive" hidden role="dialog" aria-modal="true" aria-label="战术绝地血清">
+      <div class="sheet-panel revive-panel">
+        <div class="sheet-grabber"></div>
+        <div class="revive-header">
+          <span class="revive-badge">战术紧急协议</span>
+          <h2 class="revive-title">全队濒危！请求逆转支援！</h2>
+        </div>
+        <p class="revive-desc">敌方重装压境，先锋部队已遭重创。指挥官，是否立即注入战术血清？</p>
+        <div class="revive-perks">
+          <span>💚 全队立即 100% 满血复活</span>
+          <span>⚡ 5 秒狂暴状态，攻速 +100%</span>
+        </div>
+        <button class="btn primary block revive-btn" id="btn-battle-revive-ok">立即激活绝地反杀</button>
+        <button class="btn ghost block" id="btn-battle-revive-cancel" style="margin-top:8px">承认战败并撤退</button>
+      </div>
+    </div>
+
+    <!-- 战役模式战备首充战神礼包 (Battle Vanguard Pack) -->
+    <div class="sheet" id="modal-battle-recharge" hidden role="dialog" aria-modal="true" aria-label="特勤战备礼包">
+      <div class="sheet-panel recharge-panel">
+        <div class="sheet-grabber"></div>
+        <div class="recharge-badge-row">
+          <span class="recharge-tag">战神觉醒</span>
+          <span class="recharge-tag highlight">首胜空投 · 免费激活</span>
+          <button class="icon-btn ghost" id="btn-battle-recharge-close" aria-label="关闭">✕</button>
+        </div>
+        <h2 class="recharge-title">特勤战备 · SSR 降临礼包</h2>
+        <p class="recharge-subtitle">战力直破 3,500！横扫后续所有战线</p>
+        <div class="recharge-items-grid">
+          <div class="recharge-card highlight">
+            <span class="rc-icon">⚔️</span>
+            <b>SSR Esther</b>
+            <small>顶级输出战神</small>
+          </div>
+          <div class="recharge-card">
+            <span class="rc-icon">⚡</span>
+            <b>+200 行动力</b>
+            <small>战役无阻连击</small>
+          </div>
+          <div class="recharge-card">
+            <span class="rc-icon">🗝</span>
+            <b>10 把金钥匙</b>
+            <small>豪华招募十连</small>
+          </div>
+        </div>
+        <button class="btn primary block recharge-action-btn" id="btn-battle-recharge-pay">
+          <span class="rc-price">免费空投</span>
+          <span class="rc-label">立即唤醒顶级战神</span>
+        </button>
       </div>
     </div>
   </main>

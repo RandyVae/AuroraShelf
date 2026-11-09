@@ -2,6 +2,7 @@
 .idea/
 local.properties
 source-secrets.properties
+ios/AuroraShelf/Resources/SourceSecrets.plist
 **/build/
 build.nosync/
 *.iml
@@ -13,3 +14,8 @@ dist/
 *.log
 docs/design-audit/**/*.png
 docs/design-audit/**/*.mp4
+
+# Server deployment credentials (private)
+.server_credentials
+.env.local
+.playwright-cli/

@@ -122,13 +122,10 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
             val result = prefetched?.let { Result.success(it) } ?: runCatching { repository.load(targetPage) }
             result.onSuccess { page ->
                 mutableUiState.update { current ->
+                    val existingKeys = current.posts.map { it.sourceId to it.id }.toSet()
+                    val newUniquePosts = page.posts.filter { (it.sourceId to it.id) !in existingKeys }
                     current.copy(
-                        posts = (current.posts + page.posts)
-                            .distinctBy { post -> post.sourceId to post.id }
-                            .sortedWith(
-                                compareByDescending<ForumPost> { post -> post.updatedEpochSeconds }
-                                    .thenByDescending { post -> post.id.toLongOrNull() ?: 0L },
-                            ),
+                        posts = current.posts + newUniquePosts,
                         page = targetPage,
                         canLoadMore = page.canLoadMore && page.posts.isNotEmpty(),
                         isLoadingMore = false,

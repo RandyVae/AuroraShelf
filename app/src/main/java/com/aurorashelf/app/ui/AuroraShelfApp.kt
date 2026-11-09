@@ -199,6 +199,7 @@ fun AuroraShelfApp(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val comicState by comicViewModel.uiState.collectAsStateWithLifecycle()
+    val comicDownloadedChapters by comicViewModel.downloadedChapters.collectAsStateWithLifecycle()
     val forumState by forumViewModel.uiState.collectAsStateWithLifecycle()
     val liveState by liveViewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -411,6 +412,9 @@ fun AuroraShelfApp(
                             personalRoute = PersonalRoute.SETTINGS
                             viewModel.selectDestination(AppDestination.ME)
                         },
+                        onDownloadChapter = comicViewModel::downloadChapter,
+                        onDownloadAll = comicViewModel::downloadAllChapters,
+                        downloadedChapters = comicDownloadedChapters,
                     )
                 }
 
@@ -425,6 +429,7 @@ fun AuroraShelfApp(
                         onVideoOrientationChange = { isCurrentLivePortrait = it },
                         onCategory = liveViewModel::selectCategory,
                         onSelectSource = liveViewModel::selectSource,
+                        onSearch = { viewModel.setSearchOpen(true) },
                         onRefresh = liveViewModel::refresh,
                         onLoadMore = liveViewModel::loadMore,
                         onOpen = liveViewModel::open,
@@ -449,6 +454,7 @@ fun AuroraShelfApp(
                     onPost = forumViewModel::open,
                     onClosePost = forumViewModel::closePost,
                     onSelectSource = forumViewModel::selectSource,
+                    onSearch = { viewModel.setSearchOpen(true) },
                     onSettings = {
                         personalRoute = PersonalRoute.SETTINGS
                         viewModel.selectDestination(AppDestination.ME)
@@ -569,19 +575,28 @@ fun AuroraShelfApp(
                 val currentRelatedVideos = remember(video.id, state.videos) {
                     relatedVideos(video, state.videos)
                 }
-                PlayerScreen(
-                    video = video,
-                    isFavorite = video.id in state.favoriteIds,
-                    isFullscreen = isPlayerFullscreen,
-                    relatedVideos = currentRelatedVideos,
-                    favoriteIds = state.favoriteIds,
-                    onBack = viewModel::closeVideo,
-                    onFavorite = { viewModel.toggleFavorite(video) },
-                    onFullscreenChange = { isPlayerFullscreen = it },
-                    onVideoOrientationChange = { isCurrentVideoPortrait = it },
-                    onVideo = viewModel::openVideo,
-                    onRelatedFavorite = viewModel::toggleFavorite,
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .auroraSwipeBack(
+                            enabled = !isPlayerFullscreen,
+                            onDismiss = viewModel::closeVideo,
+                        ),
+                ) {
+                    PlayerScreen(
+                        video = video,
+                        isFavorite = video.id in state.favoriteIds,
+                        isFullscreen = isPlayerFullscreen,
+                        relatedVideos = currentRelatedVideos,
+                        favoriteIds = state.favoriteIds,
+                        onBack = viewModel::closeVideo,
+                        onFavorite = { viewModel.toggleFavorite(video) },
+                        onFullscreenChange = { isPlayerFullscreen = it },
+                        onVideoOrientationChange = { isCurrentVideoPortrait = it },
+                        onVideo = viewModel::openVideo,
+                        onRelatedFavorite = viewModel::toggleFavorite,
+                    )
+                }
             }
         }
 
@@ -651,12 +666,18 @@ private fun ExpressiveBottomBar(
                     onSelect(destination)
                 },
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null, // Text provides the accessible label, avoid duplicate reading
-                    tint = if (isTabSelected) Color.White else Color(0xFFA0AAB8),
-                    modifier = Modifier.size(22.dp),
-                )
+                if (destination == AppDestination.HOME) {
+                    NetflixNLogo(
+                        modifier = Modifier.size(width = 16.dp, height = 22.dp),
+                    )
+                } else {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null, // Text provides the accessible label, avoid duplicate reading
+                        tint = if (isTabSelected) Color.White else Color(0xFFA0AAB8),
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
                 Text(
                     text = destination.label,
                     color = if (isTabSelected) Color.White else Color(0xFFA0AAB8),
@@ -711,7 +732,11 @@ private fun CompactNavigationRail(
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     ) {
-                        Icon(icon, contentDescription = destination.label, modifier = Modifier.size(22.dp))
+                        if (destination == AppDestination.HOME) {
+                            NetflixNLogo(modifier = Modifier.size(width = 16.dp, height = 22.dp))
+                        } else {
+                            Icon(icon, contentDescription = destination.label, modifier = Modifier.size(22.dp))
+                        }
                     }
                 }
             }

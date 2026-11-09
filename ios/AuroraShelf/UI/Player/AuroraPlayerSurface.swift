@@ -15,12 +15,14 @@ public struct AuroraPlayerSurface: UIViewRepresentable {
         let view = PlayerUIView()
         view.playerLayer.player = player
         view.playerLayer.videoGravity = videoGravity
+        PictureInPictureManager.shared.attach(playerLayer: view.playerLayer)
         view.backgroundColor = .black
         return view
     }
     
     public func updateUIView(_ uiView: PlayerUIView, context: Context) {
         uiView.playerLayer.player = player
+        PictureInPictureManager.shared.attach(playerLayer: uiView.playerLayer)
         if uiView.playerLayer.videoGravity != videoGravity {
             CATransaction.begin()
             CATransaction.setAnimationDuration(0.3)

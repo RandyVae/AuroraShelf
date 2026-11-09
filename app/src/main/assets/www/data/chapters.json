@@ -11,9 +11,9 @@
         "title": "第一章 · 霓虹雨夜 · 1",
         "enemy": [
           {
-            "id": "drone_enemy",
-            "name": "Drone",
-            "unit": "drone_enemy",
+            "id": "zoe_enemy",
+            "name": "Zoe",
+            "unit": "zoe_enemy",
             "class": "melee",
             "race": "order",
             "rarity": "rare",
@@ -1020,9 +1020,9 @@
         "title": "第五章 · 霓虹港湾 · 2",
         "enemy": [
           {
-            "id": "hunter_dog_enemy",
-            "name": "Hunter Dog",
-            "unit": "hunter_dog_enemy",
+            "id": "regina_enemy",
+            "name": "Regina",
+            "unit": "regina_enemy",
             "class": "melee",
             "race": "chaos",
             "rarity": "legendary",
@@ -1693,9 +1693,9 @@
         "title": "第七章 · 星界裂隙 · 4",
         "enemy": [
           {
-            "id": "tenebras_mecha_dragon_enemy",
-            "name": "Tenebras Mecha Dragon",
-            "unit": "tenebras_mecha_dragon_enemy",
+            "id": "esther_enemy",
+            "name": "Esther",
+            "unit": "esther_enemy",
             "class": "melee",
             "race": "order",
             "rarity": "legendary",
@@ -2165,5 +2165,485 @@
       }
     ],
     "bgWeb": "assets/bg/ch8.webp"
+  },
+  {
+    "id": 9,
+    "title": "第九章 · 圣殿回廊",
+    "subtitle": "尘封的远古秘境",
+    "bg": "lobby_rea",
+    "stages": [
+      {
+        "id": "9-1",
+        "stage": 1,
+        "title": "第九章 · 圣殿回廊 · 1",
+        "enemy": [
+          {
+            "id": "wl_aurelia_enemy",
+            "name": "圣殿守卫 · 盾",
+            "unit": "wl_aurelia_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9800,
+            "battleHp": 78400,
+            "rank": 0.9
+          },
+          {
+            "id": "wl_cirax_enemy",
+            "name": "圣殿守卫 · 剑",
+            "unit": "wl_cirax_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 9800,
+            "battleHp": 78400,
+            "rank": 0.92
+          }
+        ],
+        "level": 31,
+        "rewardGold": 600,
+        "rewardKeys": 0,
+        "rewardShards": 15
+      },
+      {
+        "id": "9-2",
+        "stage": 2,
+        "title": "第九章 · 圣殿回廊 · 2",
+        "enemy": [
+          {
+            "id": "wl_dragana_enemy",
+            "name": "圣殿游侠",
+            "unit": "wl_dragana_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 10200,
+            "battleHp": 81600,
+            "rank": 0.92
+          },
+          {
+            "id": "wl_domino_enemy",
+            "name": "幻影刺客",
+            "unit": "wl_domino_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 10200,
+            "battleHp": 81600,
+            "rank": 0.94
+          }
+        ],
+        "level": 32,
+        "rewardGold": 620,
+        "rewardKeys": 0,
+        "rewardShards": 15
+      },
+      {
+        "id": "9-3",
+        "stage": 3,
+        "title": "第九章 · 圣殿回廊 · 3",
+        "enemy": [
+          {
+            "id": "wl_inferna_enemy",
+            "name": "火炎执事",
+            "unit": "wl_inferna_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 10500,
+            "battleHp": 84000,
+            "rank": 0.91
+          },
+          {
+            "id": "wl_marcela_enemy",
+            "name": "裁决祭司",
+            "unit": "wl_marcela_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 10500,
+            "battleHp": 84000,
+            "rank": 0.93
+          }
+        ],
+        "level": 33,
+        "rewardGold": 640,
+        "rewardKeys": 0,
+        "rewardShards": 15
+      },
+      {
+        "id": "9-4",
+        "stage": 4,
+        "title": "第九章 · 圣殿回廊 · 4",
+        "enemy": [
+          {
+            "id": "wl_morgan_enemy",
+            "name": "秩序骑士",
+            "unit": "wl_morgan_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 10800,
+            "battleHp": 86400,
+            "rank": 0.89
+          },
+          {
+            "id": "wl_orsa_enemy_1",
+            "name": "重装使徒",
+            "unit": "wl_orsa_enemy_1",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 10800,
+            "battleHp": 86400,
+            "rank": 0.88
+          }
+        ],
+        "level": 34,
+        "rewardGold": 660,
+        "rewardKeys": 0,
+        "rewardShards": 15
+      },
+      {
+        "id": "9-5",
+        "stage": 5,
+        "title": "第九章 · 圣殿回廊 · 5",
+        "enemy": [
+          {
+            "id": "wl_roxie_enemy",
+            "name": "回廊精魅",
+            "unit": "wl_roxie_enemy",
+            "class": "melee",
+            "race": "nature",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 11000,
+            "battleHp": 88000,
+            "rank": 0.86
+          },
+          {
+            "id": "wl_solt_enemy",
+            "name": "暗影执行官",
+            "unit": "wl_solt_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 11000,
+            "battleHp": 88000,
+            "rank": 0.88
+          }
+        ],
+        "level": 35,
+        "rewardGold": 680,
+        "rewardKeys": 0,
+        "rewardShards": 15
+      },
+      {
+        "id": "9-6",
+        "stage": 6,
+        "title": "第九章 · 圣殿回廊 · 6",
+        "enemy": [
+          {
+            "id": "wl_alexa_enemy",
+            "name": "圣殿大统领 · 亚历克莎",
+            "unit": "wl_alexa_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 12000,
+            "battleHp": 96000,
+            "rank": 0.95
+          },
+          {
+            "id": "wl_annabelle_enemy",
+            "name": "副官 · 安娜贝尔",
+            "unit": "wl_annabelle_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 11500,
+            "battleHp": 92000,
+            "rank": 0.94
+          }
+        ],
+        "level": 36,
+        "rewardGold": 720,
+        "rewardKeys": 1,
+        "rewardShards": 20
+      }
+    ],
+    "story": [
+      {
+        "who": "Astara",
+        "text": "指挥官，前方就是尘封千年的圣殿回廊。阿芙蘿黛蒂大人的神格低语正从深处传来。"
+      },
+      {
+        "who": "Ethan",
+        "text": "全员戒备，这里残留着强大的远古神祇禁制。"
+      },
+      {
+        "who": "Ariana",
+        "text": "我的黑晶之刃已经感知到了虚空的脉动，无论是什么敌人，尽管交给我。"
+      },
+      {
+        "who": "Astara",
+        "text": "破晓神辉将指引我们的步伐，随我踏破迷雾！"
+      }
+    ],
+    "bgWeb": "assets/bg/rea_temple_b001.webp",
+    "rewardCg": "assets/videos/cg_rea_general.mp4"
+  },
+  {
+    "id": 10,
+    "title": "第十章 · 诸神王座",
+    "subtitle": "爱欲神格降临",
+    "bg": "title_rea",
+    "stages": [
+      {
+        "id": "10-1",
+        "stage": 1,
+        "title": "第十章 · 诸神王座 · 1",
+        "enemy": [
+          {
+            "id": "wl_aurelia_enemy",
+            "name": "王座亲卫 · 辉",
+            "unit": "wl_aurelia_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 12500,
+            "battleHp": 100000,
+            "rank": 0.95
+          },
+          {
+            "id": "wl_cirax_enemy",
+            "name": "王座亲卫 · 灭",
+            "unit": "wl_cirax_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 12500,
+            "battleHp": 100000,
+            "rank": 0.95
+          }
+        ],
+        "level": 37,
+        "rewardGold": 750,
+        "rewardKeys": 0,
+        "rewardShards": 20
+      },
+      {
+        "id": "10-2",
+        "stage": 2,
+        "title": "第十章 · 诸神王座 · 2",
+        "enemy": [
+          {
+            "id": "wl_dragana_enemy",
+            "name": "神域狙击长",
+            "unit": "wl_dragana_enemy",
+            "class": "ranged",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 13000,
+            "battleHp": 104000,
+            "rank": 0.96
+          },
+          {
+            "id": "wl_domino_enemy",
+            "name": "神域猎杀者",
+            "unit": "wl_domino_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 13000,
+            "battleHp": 104000,
+            "rank": 0.96
+          }
+        ],
+        "level": 38,
+        "rewardGold": 780,
+        "rewardKeys": 0,
+        "rewardShards": 20
+      },
+      {
+        "id": "10-3",
+        "stage": 3,
+        "title": "第十章 · 诸神王座 · 3",
+        "enemy": [
+          {
+            "id": "wl_inferna_enemy",
+            "name": "神火审判尊",
+            "unit": "wl_inferna_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 13500,
+            "battleHp": 108000,
+            "rank": 0.97
+          },
+          {
+            "id": "wl_marcela_enemy",
+            "name": "光明大司祭",
+            "unit": "wl_marcela_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 13500,
+            "battleHp": 108000,
+            "rank": 0.97
+          }
+        ],
+        "level": 39,
+        "rewardGold": 800,
+        "rewardKeys": 0,
+        "rewardShards": 20
+      },
+      {
+        "id": "10-4",
+        "stage": 4,
+        "title": "第十章 · 诸神王座 · 4",
+        "enemy": [
+          {
+            "id": "wl_morgan_enemy",
+            "name": "神殿圣骑统领",
+            "unit": "wl_morgan_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 14000,
+            "battleHp": 112000,
+            "rank": 0.98
+          },
+          {
+            "id": "wl_orsa_enemy_1",
+            "name": "神之铁壁",
+            "unit": "wl_orsa_enemy_1",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 14000,
+            "battleHp": 112000,
+            "rank": 0.98
+          }
+        ],
+        "level": 40,
+        "rewardGold": 820,
+        "rewardKeys": 0,
+        "rewardShards": 20
+      },
+      {
+        "id": "10-5",
+        "stage": 5,
+        "title": "第十章 · 诸神王座 · 5",
+        "enemy": [
+          {
+            "id": "wl_alexa_enemy",
+            "name": "神圣审判者 · 亚历克莎",
+            "unit": "wl_alexa_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 15000,
+            "battleHp": 120000,
+            "rank": 0.99
+          },
+          {
+            "id": "wl_annabelle_enemy",
+            "name": "极光战巫 · 安娜贝尔",
+            "unit": "wl_annabelle_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 15000,
+            "battleHp": 120000,
+            "rank": 0.99
+          }
+        ],
+        "level": 41,
+        "rewardGold": 850,
+        "rewardKeys": 0,
+        "rewardShards": 25
+      },
+      {
+        "id": "10-6",
+        "stage": 6,
+        "title": "第十章 · 诸神王座 · 终局试炼",
+        "enemy": [
+          {
+            "id": "wl_aurelia_enemy",
+            "name": "诸神真形 · 爱欲神使",
+            "unit": "wl_aurelia_enemy",
+            "class": "melee",
+            "race": "order",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 18000,
+            "battleHp": 144000,
+            "rank": 1.0
+          },
+          {
+            "id": "wl_cirax_enemy",
+            "name": "诸神真形 · 破晓之怒",
+            "unit": "wl_cirax_enemy",
+            "class": "melee",
+            "race": "chaos",
+            "rarity": "legendary",
+            "atk": 0,
+            "hp": 18000,
+            "battleHp": 144000,
+            "rank": 1.0
+          }
+        ],
+        "level": 42,
+        "rewardGold": 1000,
+        "rewardKeys": 2,
+        "rewardShards": 30
+      }
+    ],
+    "story": [
+      {
+        "who": "Aphrodite",
+        "text": "凡人的指挥官……你竟然真的走到了诸神王座之前。"
+      },
+      {
+        "who": "Ethan",
+        "text": "不论是神祇还是宿命，我们都不会退缩。"
+      },
+      {
+        "who": "Aphrodite",
+        "text": "很好。这份狂妄与炽热的灵魂，正合我意。让我看看，你是否配得上拥有这爱欲与战火的神格！"
+      },
+      {
+        "who": "Astara",
+        "text": "指挥官，我的破晓之光与你同在！"
+      },
+      {
+        "who": "Ariana",
+        "text": "王座就在眼前，一起上吧！"
+      }
+    ],
+    "bgWeb": "assets/bg/rea_throne_b002.webp",
+    "rewardCg": "assets/videos/cg_rea_event049.mp4"
   }
 ]

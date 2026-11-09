@@ -6,6 +6,12 @@ import org.junit.Test
 
 class ContentSourceCatalogTest {
     @Test
+    fun defaultsToStableDirectSource() {
+        assertEquals(ContentSourceCatalog.T91DONGMAN_BASE_URL, ContentSourceCatalog.DEFAULT_BASE_URL)
+        assertTrue(ContentSourceCatalog.find(ContentSourceCatalog.DEFAULT_BASE_URL)?.isDirectDomestic == true)
+    }
+
+    @Test
     fun exposesAllVendoredPipePipeServicesWithUsableKiosks() {
         val pipeSources = ContentSourceCatalog.sources.filter { it.extractorServiceName != null }
         val expectedServices = setOf(

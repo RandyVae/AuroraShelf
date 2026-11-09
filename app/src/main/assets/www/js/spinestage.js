@@ -31,7 +31,10 @@
     if (!this.view || !this.field) return;
     const W = this.field.W, H = this.field.H;
     const heightPx = Math.max(160, this.opts.heightRatio * H);
-    const scale = heightPx / (this.view.data.height || 900);
+    const scaleMult = this.opts.scaleMultiplier || 1.0;
+    const scale = (heightPx / (this.view.data.height || 900)) * scaleMult;
+    this.view.scale = scale;
+    this.view.baseScale = scale;
     this.view.skeleton.scaleX = scale * (this.opts.flip ? -1 : 1);
     this.view.skeleton.scaleY = scale;
     this.view.skeleton.x = W * this.opts.xRatio;
@@ -45,6 +48,7 @@
     if (opts) Object.assign(this.opts, opts);
     if (this.active && this.unitName === unitName && this.view) {
       this.resize();
+      if (opts && opts.anim) this.setAnim(opts.anim, opts.loop !== false);
       return true;
     }
     const field = this.ensure();
@@ -58,6 +62,7 @@
       await field.loadAll();
       if (this.unitName !== unitName) return false;
       this.view = field.build(unitName, { heightPx: 200, flip: this.opts.flip });
+      if (opts && opts.anim) this.setAnim(opts.anim, opts.loop !== false);
       this.place();
       this.start();
       return true;
@@ -66,6 +71,21 @@
       this.canvas.hidden = true;
       return false;
     }
+  };
+
+  SpineStage.prototype.setAnim = function (name, loop) {
+    if (!this.view || !this.field) return false;
+    return this.field.setAnim(this.view, name, loop);
+  };
+
+  SpineStage.prototype.playAction = function (name) {
+    if (!this.view || !this.field) return false;
+    return this.field.setAnim(this.view, name, false);
+  };
+
+  SpineStage.prototype.resumeIdle = function () {
+    if (!this.view || !this.field) return;
+    this.field.resumeIdle(this.view);
   };
 
   SpineStage.prototype.loop = function (now) {

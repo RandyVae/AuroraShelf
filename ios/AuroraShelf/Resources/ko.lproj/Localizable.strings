@@ -1,0 +1,111 @@
+/* Tabs */
+"tab.home" = "홈";
+"tab.comics" = "만화";
+"tab.live" = "라이브";
+"tab.forum" = "커뮤니티";
+"tab.library" = "보관함";
+
+/* Home Screen */
+"home.today_top_hits" = "오늘의 인기";
+"home.top10" = "오늘의 TOP 10";
+"home.up_next" = "다음 재생";
+"home.channels" = "채널";
+"home.connecting" = "%@에 연결 중...";
+"home.loading_recommendations" = "추천 콘텐츠 로드 중...";
+"home.loading_more" = "추가 콘텐츠 로드 중…";
+"home.all_loaded" = "모든 콘텐츠를 불러왔습니다";
+"home.play" = "재생";
+"home.watchlist" = "보관함";
+"home.details" = "상세정보";
+"home.related" = "관련 추천";
+"home.all" = "전체";
+
+/* Search */
+"search.placeholder" = "비디오, 애니, 만화, 품번 검색";
+"search.concurrent_hint" = "19개 비디오 소스 동시 검색";
+"search.no_results" = "검색 결과 없음";
+"search.searching" = "검색 중…";
+"search.history" = "검색 기록";
+"search.clear_history" = "기록 지우기";
+"search.cancel" = "취소";
+
+/* Comics */
+"comics.title" = "만화";
+"comics.featured" = "추천 만화";
+"comics.loading" = "만화 로드 중…";
+"comics.loading_more" = "만화 추가 로드 중…";
+"comics.all_loaded" = "모든 만화를 불러왔습니다";
+"comics.select_source" = "만화 소스 선택";
+"comics.unconfigured" = "자격 증명 미설정";
+"comics.unconfigured_hint" = "설정 파일에서 자격 증명을 설정하세요";
+
+/* Reader */
+"reader.chapter" = "제%d화";
+"reader.page" = "%d/%d 페이지";
+"reader.prev_chapter" = "이전 화";
+"reader.next_chapter" = "다음 화";
+"reader.loading_image" = "이미지 로드 중…";
+
+/* Live */
+"live.title" = "라이브";
+"live.featured" = "추천 방송";
+"live.female" = "여성 스트리머";
+"live.male" = "남성 스트리머";
+"live.couples" = "커플 스트리머";
+"live.trans" = "트랜스";
+"live.loading" = "스트리머 목록 로드 중…";
+"live.viewers" = "시청자 %@";
+"live.online" = "온라인";
+"live.offline" = "오프라인";
+"live.select_source" = "방송 소스 선택";
+"live.chat" = "실시간 채팅";
+
+/* Forum */
+"forum.title" = "커뮤니티";
+"forum.all" = "전체";
+"forum.cl" = "CL 커뮤니티";
+"forum.91" = "91 포럼";
+"forum.loading" = "게시글 로드 중…";
+"forum.replies" = "댓글 %d";
+"forum.original_post" = "원문 보기";
+
+/* Player / Detail / Watchlist / InSight */
+"player.play" = "재생";
+"player.pause" = "일시정지";
+"player.aspect_fit" = "원본 비율";
+"player.aspect_fill" = "꽉 찬 화면";
+"player.airplay" = "AirPlay";
+"player.episodes" = "에피소드";
+"detail.synopsis" = "줄거리";
+"detail.more_like_this" = "비슷한 콘텐츠";
+"watchlist.add" = "보관함에 추가";
+"watchlist.in_list" = "보관함 저장됨";
+"watchlist.remove" = "삭제";
+"watchlist.title" = "나의 보관함";
+"watchlist.empty" = "보관함이 비어 있습니다";
+"watchlist.count" = "%d편";
+
+/* Library / Settings */
+"library.title" = "보관함";
+"settings.language" = "언어";
+"settings.language_title" = "언어 선택";
+"settings.follow_system" = "시스템 설정 따름";
+"settings.game" = "엔터테인먼트 · 게임";
+"settings.game_title" = "욕망의 여신 · 택티컬 RPG";
+"settings.game_desc" = "전략 턴제 RPG · 하드웨어 가속";
+"settings.launch" = "시작";
+"settings.video_source" = "현재 비디오 소스";
+"settings.comic_source" = "현재 만화 소스";
+"settings.live_source" = "현재 방송 소스";
+"settings.offline_download" = "오프라인 다운로드";
+"settings.not_available" = "현재 버전에서는 지원하지 않음";
+"settings.version" = "버전 정보";
+"settings.airplay_title" = "AirPlay 스트리밍";
+"settings.airplay_select" = "기기 선택";
+"settings.select_live_source" = "방송 소스 선택";
+
+/* Common Actions */
+"common.done" = "완료";
+"common.cancel" = "취소";
+"common.close" = "닫기";
+"common.ok" = "확인";

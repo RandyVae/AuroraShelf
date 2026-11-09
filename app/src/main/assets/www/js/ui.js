@@ -102,19 +102,69 @@
       img.alt = lead.name + ' 立绘';
       img.classList.add('hero-breathing');
 
-      // Apply per-hero visual adaptation & scale normalization (55 hero adaptive engine)
+      // Apply per-hero visual adaptation & scale normalization (58 hero adaptive engine)
       const HERO_HUB_ADAPTATION = {
-        regina: { scale: 1.02, y: 0, x: 0 },
-        lucretia: { scale: 1.0, y: 0, x: 0 },
-        esther: { scale: 1.0, y: 0, x: 0 },
-        yumiko: { scale: 0.98, y: 2, x: 0 },
-        harper: { scale: 1.02, y: -4, x: 0 },
-        bonita: { scale: 1.0, y: 0, x: 0 },
-        ravenna: { scale: 1.0, y: 0, x: 0 },
-        kitty: { scale: 1.0, y: 0, x: 0 },
+        esther: { scale: 1.22, y: 0, x: 0 },
+        justina: { scale: 1.18, y: 0, x: 0 },
+        zoechloe: { scale: 1.07, y: 0, x: 0 },
+        bonita: { scale: 1.00, y: 0, x: 0 },
+        gwenny: { scale: 1.05, y: 0, x: 0 },
+        arachne: { scale: 1.00, y: 0, x: 0 },
+        asha: { scale: 1.00, y: 0, x: 0 },
+        dominica: { scale: 1.02, y: 0, x: 0 },
+        yumiko: { scale: 1.11, y: 0, x: 0 },
+        britney: { scale: 1.02, y: 0, x: 0 },
+        nicole: { scale: 1.04, y: 0, x: 0 },
+        orin: { scale: 1.00, y: 0, x: 0 },
+        lorraine: { scale: 1.02, y: 0, x: 0 },
+        maddie: { scale: 1.15, y: 0, x: 0 },
+        morana: { scale: 1.13, y: 0, x: 0 },
+        blanche: { scale: 1.00, y: 0, x: 0 },
+        falenia: { scale: 1.02, y: 0, x: 0 },
+        lilith: { scale: 1.00, y: 0, x: 0 },
+        omega: { scale: 1.00, y: 0, x: 0 },
+        bea: { scale: 1.04, y: 0, x: 0 },
+        charlotte: { scale: 1.00, y: 0, x: 0 },
+        selina: { scale: 1.13, y: 0, x: 0 },
+        lola: { scale: 1.00, y: 0, x: 0 },
+        vespina: { scale: 1.02, y: 0, x: 0 },
+        diya: { scale: 1.16, y: 0, x: 0 },
+        hilda: { scale: 1.09, y: 0, x: 0 },
+        casey: { scale: 1.00, y: 0, x: 0 },
+        kiana: { scale: 1.08, y: 0, x: 0 },
+        victoria: { scale: 1.00, y: 0, x: 0 },
+        tsintah: { scale: 1.06, y: 0, x: 0 },
+        alisha: { scale: 1.00, y: 0, x: 0 },
+        vivienne: { scale: 1.02, y: 0, x: 0 },
+        kitty: { scale: 1.02, y: 0, x: 0 },
+        wendy: { scale: 1.00, y: 0, x: 0 },
+        paloma: { scale: 1.00, y: 0, x: 0 },
+        kirsten: { scale: 1.11, y: 0, x: 0 },
+        shelby: { scale: 1.16, y: 0, x: 0 },
+        irma: { scale: 1.02, y: 0, x: 0 },
+        grace: { scale: 1.08, y: 0, x: 0 },
+        nonna: { scale: 1.02, y: 0, x: 0 },
+        thora: { scale: 1.14, y: 0, x: 0 },
+        lucretia: { scale: 1.07, y: 0, x: 0 },
+        sixtine: { scale: 1.00, y: 0, x: 0 },
+        zelia: { scale: 1.00, y: 0, x: 0 },
+        regina: { scale: 1.14, y: 0, x: 0 },
+        pixie: { scale: 1.02, y: 0, x: 0 },
+        rose: { scale: 1.12, y: 0, x: 0 },
+        mitsuki: { scale: 1.00, y: 0, x: 0 },
+        ravenna: { scale: 1.00, y: 0, x: 0 },
+        kira: { scale: 1.02, y: 0, x: 0 },
+        harper: { scale: 1.00, y: 0, x: 0 },
+        naomi: { scale: 1.00, y: 0, x: 0 },
+        belle: { scale: 1.00, y: 0, x: 0 },
+        river: { scale: 1.09, y: 0, x: 0 },
+        nymeria: { scale: 1.12, y: 0, x: 0 },
+        astara: { scale: 1.08, y: 0, x: 0 },
+        aphrodite: { scale: 1.15, y: 0, x: 0 },
+        ariana: { scale: 1.08, y: 0, x: 0 },
       };
-      const adapt = HERO_HUB_ADAPTATION[leadKey] || { scale: 1, y: 0, x: 0 };
-      img.style.setProperty('--hero-scale', String(adapt.scale || 1));
+      const adapt = HERO_HUB_ADAPTATION[leadKey] || { scale: 1.0, y: 0, x: 0 };
+      img.style.setProperty('--hero-scale', String(adapt.scale || 1.0));
       img.style.setProperty('--hero-offset-y', (adapt.y || 0) + 'px');
       img.style.setProperty('--hero-offset-x', (adapt.x || 0) + 'px');
 
@@ -150,6 +200,28 @@
         toast('看板特勤已切换：' + (nextHeroObj ? nextHeroObj.name : nextKey) + ' (' + (nextIdx + 1) + '/' + ownedList.length + ')');
       };
 
+      // 手势横划切换特勤看板 (Swipe Gestures)
+      const hubScreen = $('#screen-hub');
+      if (hubScreen && !hubScreen._swipeBound) {
+        hubScreen._swipeBound = true;
+        let startX = 0;
+        let startY = 0;
+        hubScreen.addEventListener('touchstart', (e) => {
+          if (!e.touches || !e.touches[0]) return;
+          startX = e.touches[0].clientX;
+          startY = e.touches[0].clientY;
+        }, { passive: true });
+        hubScreen.addEventListener('touchend', (e) => {
+          if (!e.changedTouches || !e.changedTouches[0]) return;
+          const dx = e.changedTouches[0].clientX - startX;
+          const dy = e.changedTouches[0].clientY - startY;
+          if (Math.abs(dx) > 42 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+            if (dx > 0) switchHero(-1);
+            else switchHero(1);
+          }
+        }, { passive: true });
+      }
+
       const btnPrev = $('#btn-hub-hero-prev');
       const btnNext = $('#btn-hub-hero-next');
       const btnSwitch = $('#btn-hub-hero-switch');
@@ -182,13 +254,118 @@
       const av = $('#hub-avatar');
       if (av) av.style.backgroundImage = 'url(' + heroThumb(lead) + ')';
 
-      // Ensure casual Spine skeleton is stopped on Hub, displaying high-res tactical / 18+ art
+      // 绑定大厅英雄全动态点击互动舞台 (Touch Reaction & Spine Animation)
+      const stageEl = $('#hub-hero-stage');
+      if (stageEl && !stageEl._tapBound) {
+        stageEl._tapBound = true;
+        stageEl.addEventListener('click', (e) => {
+          if (e.target.closest('.hub-hero-nav')) return; // 避开左右切换箭头
+          this.onHubHeroTap(this._currentLeadHero);
+        });
+      }
+      this._currentLeadHero = lead;
+
+      // 激活大厅特勤超高清 18+ 原画立绘与物理有机呼吸律动（停用战斗 Spine 小人，呈现高画质 18+ 艺术）
       if (APP.stages && APP.stages.hub) {
         try { APP.stages.hub.stop(); } catch (e) {}
-        const canvas = $('#hub-canvas');
-        if (canvas) canvas.hidden = true;
       }
+      const canvas = $('#hub-canvas');
+      if (canvas) canvas.hidden = true;
+      const artImg = $('#hub-art');
+      if (artImg) {
+        artImg.hidden = false;
+        const outfitPref = state.hubOutfit || (state.settings && state.settings.adult ? 'nude' : 'lega');
+        const artSrc = heroArt(lead, outfitPref) || heroArt(lead, 'nude') || heroArt(lead, 'base') || heroThumb(lead);
+        artImg.src = artSrc;
+        artImg.alt = (lead.name || '') + ' 18+ 原画立绘';
+        artImg.className = 'hub-art breathing-art';
+      }
+      this.showHubSpeech('「指挥官，' + (lead.name || '') + ' 专属随侍在侧，请下达作战指令～」');
+
       this.renderHud(state);
+    },
+
+    onHubHeroTap(lead) {
+      if (!lead) return;
+      const artImg = $('#hub-art');
+      if (artImg) {
+        artImg.classList.remove('hero-tapped');
+        void artImg.offsetWidth;
+        artImg.classList.add('hero-tapped');
+      }
+      if (window.NativeBridge && window.NativeBridge.haptic) {
+        NativeBridge.haptic('selection');
+      }
+      if (window.LGAudio && LGAudio.playSe) {
+        try { LGAudio.playSe('tap'); } catch (e) {}
+      }
+      const HERO_INTERACTION_VOICES = {
+        kart: [
+          '「指挥官，我的突击步枪已充能完毕，随时可以出击！」',
+          '「呀……别突然戳我腰带啦，战术挂钩会松开的！」',
+          '「今天的心率传感器有点异常……是指挥官靠得太近了吗？」',
+        ],
+        misa: [
+          '「八百米内目标全数锁定，指挥官只需下达开火指令。」',
+          '「狙击手需要绝对的专注……但你的视线，更让我心跳加速。」',
+          '「轻点碰……这身战术紧身衣的灵敏传感器很敏感的。」',
+        ],
+        ines: [
+          '「神圣护盾已展开，没有任何人能伤害指挥官分毫。」',
+          '「被指挥官触碰时，护盾似乎产生了奇异的共鸣涟漪呢。」',
+          '「无论战场还是生活，我都会一直守护在你的身侧。」',
+        ],
+        luf: [
+          '「神圣光辉庇佑着我们！指挥官今天也元气满满呢！」',
+          '「嘿嘿，被指挥官摸头好舒服～要不要再摸一下？」',
+          '「无论前方是什么敌人，只要两个人在一起就绝对不会输！」',
+        ],
+        astara: [
+          '「黑暗契约的力量在体内涌动……想要见识真正的深渊吗？」',
+          '「指挥官的手，总是带着让人无法抗拒的温度呢。」',
+          '「再碰一下……我可不敢保证接下来会发生什么哦？」',
+        ],
+        aphrodite: [
+          '「爱意如同潮水～指挥官的目光就是我最大的力量源泉。」',
+          '「靠近一点嘛……我的心跳声，你能听得清吗？」',
+          '「今天也要沉醉在我的魅力之中哦，亲爱的长官～」',
+        ],
+        kitty: [
+          '「喵～本喵的利爪已经磨好啦，指挥官要看杂技吗？」',
+          '「耳朵是敏感部位！不准随便捏啦……喵呜～」',
+          '「小鱼干……不对，胜利的战利品准备好了吗？」',
+        ],
+        charlotte: [
+          '「指挥官今天的手法还是这么温柔呢～」',
+          '「需要我换上那套更私密的特别装扮吗？只要你一句话。」',
+          '「胜负就在一瞬之间，但我整个人都是属于你的。」',
+        ],
+      };
+      const heroKey = lead.key || lead.id || '';
+      const pool = HERO_INTERACTION_VOICES[heroKey] || [
+        '「特勤整备完毕，战况实时同步中，请指示！」',
+        '「指挥官，无论面对任何强敌，我们都绝不后退半步！」',
+        '「感受到了指挥官的信赖，战斗效能已提升至 120%！」',
+        '「呀……轻点碰，战术服的传感器可是很敏锐的哦！」',
+      ];
+      const speech = pool[Math.floor(Math.random() * pool.length)];
+      this.showHubSpeech(speech);
+    },
+
+    showHubSpeech(text) {
+      const bubble = $('#hub-speech-bubble');
+      const textEl = $('#hub-speech-text');
+      if (!bubble || !textEl) return;
+      textEl.textContent = text;
+      bubble.hidden = false;
+      bubble.classList.remove('pop-anim');
+      void bubble.offsetWidth;
+      bubble.classList.add('pop-anim');
+      clearTimeout(this._hubSpeechTimer);
+      this._hubSpeechTimer = setTimeout(() => {
+        bubble.classList.remove('pop-anim');
+        bubble.hidden = true;
+      }, 4000);
     },
 
     renderCampaign(state, data) {
@@ -493,14 +670,26 @@
       const canvas = document.getElementById('detail-canvas');
       const stage = APP.stages && APP.stages.detail;
 
+      if (canvas && !canvas._tapBound && stage) {
+        canvas._tapBound = true;
+        canvas.style.cursor = 'pointer';
+        canvas.addEventListener('click', () => {
+          const anims = ['rangehit', 'attack', 'hit', 'damage'];
+          const a = anims[Math.floor(Math.random() * anims.length)];
+          stage.playAction(a);
+          if (window.NativeBridge && window.NativeBridge.haptic) NativeBridge.haptic('selection');
+          if (window.LGAudio && LGAudio.playSe) { try { LGAudio.playSe('tap'); } catch (e) {} }
+        });
+      }
+
       const showVariant = (v) => {
         img.src = heroArt(h, v);
         img.alt = h.name + ' 立绘';
-        const animate = v === 'base' && stage && h.unit;
+        const animate = !!(stage && h.unit);
         img.style.display = animate ? 'none' : '';
         if (canvas) canvas.hidden = !animate;
         if (animate) {
-          stage.show(h.unit).then((ok) => {
+          stage.show(h.unit, { anim: 'idle' }).then((ok) => {
             if (!ok) { img.style.display = ''; if (canvas) canvas.hidden = true; }
           });
         } else if (stage) {
@@ -733,17 +922,83 @@
       this.renderHud(state);
     },
 
-    renderCg(videos) {
+    renderCg(videos, cgs) {
       const box = $('#cg-list');
       box.innerHTML = '';
+
+      // 1. 特勤服飾圖鑑 / 典藏 CG (優先展示豐富的美術畫廊)
+      if (cgs && cgs.length > 0) {
+        const secCg = el('div', { class: 'cg-section-header', style: 'margin-bottom:10px' }, [
+          el('div', { style: 'font-weight:700;font-size:15px;color:var(--text-primary);letter-spacing:0.3px', text: '特勤圖鑑 · 高清立繪與典藏 CG' }),
+          el('div', { style: 'font-size:12px;color:var(--text-tertiary);margin-top:2px', text: '點擊卡片可放大全螢幕檢視高清原畫' })
+        ]);
+        box.appendChild(secCg);
+
+        const grid = el('div', { class: 'cg-gallery-grid', style: 'display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px' });
+        cgs.forEach((cg) => {
+          const item = el('div', { class: 'cg-gallery-card', style: 'background:rgba(255,255,255,0.06);border-radius:var(--radius-m);overflow:hidden;cursor:pointer;border:1px solid rgba(255,255,255,0.08);transition:transform 0.2s,box-shadow 0.2s' }, [
+            el('div', { style: 'position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#151515' }, [
+              el('img', { src: cg.thumb || cg.src, alt: cg.title, loading: 'lazy', style: 'width:100%;height:100%;object-fit:cover;display:block' }),
+              el('div', { style: 'position:absolute;bottom:0;inset-inline:0;height:40%;background:linear-gradient(to top, rgba(0,0,0,0.8), transparent);pointer-events:none' })
+            ]),
+            el('div', { style: 'padding:8px' }, [
+              el('div', { style: 'font-size:12px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: cg.title }),
+              el('div', { style: 'font-size:11px;color:var(--accent);margin-top:2px;font-weight:500', text: cg.char })
+            ])
+          ]);
+          item.onclick = () => UI.showLightbox(cg);
+          grid.appendChild(item);
+        });
+        box.appendChild(grid);
+      }
+
+      // 2. 戰役動態 CG (MP4)
+      const secVideo = el('div', { class: 'cg-section-header', style: 'margin-bottom:8px' }, [
+        el('div', { style: 'font-weight:700;font-size:15px;color:var(--text-primary);letter-spacing:0.3px', text: '戰役突破 · 專屬動態 CG' }),
+        el('div', { style: 'font-size:12px;color:var(--text-tertiary);margin-top:2px', text: '原版劇情戰役與突破動畫重溫' })
+      ]);
+      box.appendChild(secVideo);
+
       (videos || []).forEach((src, i) => {
-        const wrap = el('div', { style: 'margin-top:12px' }, [
-          el('div', { style: 'font-size:var(--type-caption);color:var(--text-tertiary);margin-bottom:4px', text: 'CG ' + (i + 1) }),
-          el('video', { src: src, controls: '', playsinline: '', preload: 'metadata', style: 'width:100%;border-radius:var(--radius-m);background:#000' }),
+        const title = src.includes('event049') ? '諸神降臨 · 盛典特寫' :
+                      src.includes('general') ? '神殿巡禮 · 史詩序幕' :
+                      src.includes('comics_maze') ? ('番外迷宮 · 記憶切片 ' + (i - 3)) :
+                      ('戰役 CG · 第 ' + (i + 1) + ' 章');
+        const wrap = el('div', { style: 'margin-top:10px;margin-bottom:14px' }, [
+          el('div', { style: 'font-size:var(--type-caption);color:var(--text-secondary);font-weight:600;margin-bottom:4px', text: title }),
+          el('video', { src: src, controls: '', playsinline: '', preload: 'metadata', style: 'width:100%;border-radius:var(--radius-m);background:#000;border:1px solid rgba(255,255,255,0.08)' }),
         ]);
         box.appendChild(wrap);
       });
+
       $('#cg-sheet').classList.add('open');
+    },
+
+    showLightbox(cg) {
+      let overlay = $('#cg-lightbox-overlay');
+      if (!overlay) {
+        overlay = el('div', { class: 'cg-lightbox-overlay', id: 'cg-lightbox-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-label': '全屏 CG 鑑賞' }, [
+          el('div', { class: 'cg-lightbox-wrap' }, [
+            el('img', { class: 'cg-lightbox-img', id: 'cg-lightbox-img', alt: 'CG' }),
+            el('div', { class: 'cg-lightbox-bar' }, [
+              el('div', { id: 'cg-lightbox-info' }, [
+                el('div', { id: 'cg-lightbox-title', style: 'font-size:14px;font-weight:700;color:#fff' }),
+                el('div', { id: 'cg-lightbox-char', style: 'font-size:12px;color:var(--accent);margin-top:2px' })
+              ]),
+              el('span', { class: 'spacer' }),
+              el('button', { class: 'icon-btn', id: 'btn-cg-lightbox-close', text: '✕', 'aria-label': '關閉', style: 'color:#fff;background:rgba(255,255,255,0.2);border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer' })
+            ])
+          ])
+        ]);
+        document.body.appendChild(overlay);
+        const closeLightbox = () => { overlay.hidden = true; };
+        $('#btn-cg-lightbox-close', overlay).onclick = closeLightbox;
+        overlay.onclick = (e) => { if (e.target === overlay) closeLightbox(); };
+      }
+      $('#cg-lightbox-img', overlay).src = cg.src;
+      $('#cg-lightbox-title', overlay).textContent = cg.title;
+      $('#cg-lightbox-char', overlay).textContent = cg.char;
+      overlay.hidden = false;
     },
 
     renderGacha(state, data) {

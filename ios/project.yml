@@ -20,11 +20,26 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.aurorashelf.app
         INFOPLIST_FILE: AuroraShelf/Resources/Info.plist
         SWIFT_VERSION: "6.0"
-        CURRENT_PROJECT_VERSION: 173
-        MARKETING_VERSION: "2.16.0"
-        DEVELOPMENT_TEAM: ""
-        CODE_SIGNING_REQUIRED: "NO"
-        CODE_SIGNING_ALLOWED: "NO"
-        CODE_SIGN_IDENTITY: ""
+        CURRENT_PROJECT_VERSION: 227
+        MARKETING_VERSION: "2.16.1"
+        DEVELOPMENT_TEAM: "U4MXHLA3GF"
+        CODE_SIGN_STYLE: "Automatic"
+        CODE_SIGNING_REQUIRED: "YES"
+        CODE_SIGNING_ALLOWED: "YES"
+        CODE_SIGN_IDENTITY: "Apple Development"
         GENERATE_INFOPLIST_FILE: "NO"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+        ASSETCATALOG_COMPILER_APPICON_NAME: "AppIcon"
+  AuroraShelfTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.4"
+    sources:
+      - path: AuroraShelfTests
+    dependencies:
+      - target: AuroraShelf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.aurorashelf.tests
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: "YES"

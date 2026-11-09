@@ -61,10 +61,13 @@ internal class IkmmhComicSource : ComicSource {
             "$BASE_URL/api/comic/zyz/chapters?ph=1&tempid=3&zpid=$bookId&page=0&line=48&orderby=desc",
         ).replace("\\,", ","))
         val chapterArray = chapterJson.optJSONArray("length")
-        val chapters = List(chapterArray?.length() ?: 0) { index ->
-            val chapter = chapterArray!!.getJSONObject(index)
-            ComicChapter(chapter.getString("url"), chapter.optString("name").ifBlank { "章节" })
-        }
+        val chapters = chapterArray?.let { array ->
+            List(array.length()) { index ->
+                val chapter = array.optJSONObject(index) ?: return@List null
+                val chapterUrl = chapter.optString("url").takeIf(String::isNotBlank) ?: return@List null
+                ComicChapter(chapterUrl, chapter.optString("name").ifBlank { "章节" })
+            }.filterNotNull()
+        }.orEmpty()
         ComicDetails(
             comic = comic.copy(
                 title = document.selectFirst("meta[property=og:title]")?.attr("content")?.trim().orEmpty().ifBlank { comic.title },

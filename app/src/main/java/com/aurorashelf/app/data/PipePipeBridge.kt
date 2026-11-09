@@ -100,7 +100,7 @@ internal object PipePipeBridge {
     }
 
     private fun VideoStream.qualityScore(): Int {
-        val pixels = Regex("(\\d{3,4})p").find(resolution.orEmpty())?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        val pixels = Regex("(\\d{3,4})p").find(getResolution().orEmpty())?.groupValues?.get(1)?.toIntOrNull() ?: 0
         val deliveryBonus = if (deliveryMethod == DeliveryMethod.HLS) 1 else 0
         return pixels * 10 + deliveryBonus
     }

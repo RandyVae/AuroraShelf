@@ -4,6 +4,9 @@ import com.aurorashelf.app.model.ComicDetails
 import com.aurorashelf.app.model.ComicPage
 import com.aurorashelf.app.model.ComicSourceInfo
 import com.aurorashelf.app.model.ComicSummary
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 
 class ComicRepository internal constructor(
     private val sources: List<ComicSource>,
@@ -25,6 +28,11 @@ class ComicRepository internal constructor(
         ),
     )
 
+    private val chapterCache = object : LinkedHashMap<String, List<ComicPage>>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<ComicPage>>?): Boolean = size > 64
+    }
+    private val inFlightChapters = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Deferred<List<ComicPage>>>()
+
     val availableSources: List<ComicSourceInfo> = sources.map(ComicSource::info)
 
     suspend fun browse(sourceId: String, categoryId: String, page: Int): List<ComicSummary> =
@@ -35,8 +43,43 @@ class ComicRepository internal constructor(
 
     suspend fun details(comic: ComicSummary): ComicDetails = source(comic.sourceId).details(comic)
 
-    suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage> =
-        source(comic.sourceId).chapter(comic, chapterId)
+    fun getCachedChapter(comic: ComicSummary, chapterId: String): List<ComicPage>? {
+        val key = "${comic.sourceId}:${comic.id}:$chapterId"
+        return synchronized(chapterCache) { chapterCache[key] }
+    }
+
+    suspend fun prewarmChapter(comic: ComicSummary, chapterId: String) = kotlinx.coroutines.coroutineScope {
+        val key = "${comic.sourceId}:${comic.id}:$chapterId"
+        synchronized(chapterCache) {
+            if (chapterCache.containsKey(key)) return@coroutineScope
+        }
+        if (inFlightChapters.containsKey(key)) return@coroutineScope
+        val deferred = async(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val pages = source(comic.sourceId).chapter(comic, chapterId)
+                synchronized(chapterCache) {
+                    chapterCache[key] = pages
+                }
+                pages
+            } finally {
+                inFlightChapters.remove(key)
+            }
+        }
+        inFlightChapters[key] = deferred
+    }
+
+    suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage> {
+        val key = "${comic.sourceId}:${comic.id}:$chapterId"
+        synchronized(chapterCache) {
+            chapterCache[key]?.let { return it }
+        }
+        inFlightChapters[key]?.let { return it.await() }
+        val pages = source(comic.sourceId).chapter(comic, chapterId)
+        synchronized(chapterCache) {
+            chapterCache[key] = pages
+        }
+        return pages
+    }
 
     fun isAuthenticationRequired(sourceId: String): Boolean = source(sourceId) is AuthenticatedComicSource
 

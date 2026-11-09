@@ -1,0 +1,111 @@
+/* Tabs */
+"tab.home" = "Utama";
+"tab.comics" = "Komik";
+"tab.live" = "Langsung";
+"tab.forum" = "Komuniti";
+"tab.library" = "Pustaka";
+
+/* Home Screen */
+"home.today_top_hits" = "Popular Hari Ini";
+"home.top10" = "TOP 10 HARI INI";
+"home.up_next" = "Seterusnya";
+"home.channels" = "Saluran";
+"home.connecting" = "Menyambung ke %@...";
+"home.loading_recommendations" = "Memuatkan cadangan...";
+"home.loading_more" = "Memuatkan lagi…";
+"home.all_loaded" = "Semua kandungan dimuatkan";
+"home.play" = "Main";
+"home.watchlist" = "Senarai tontonan";
+"home.details" = "Butiran";
+"home.related" = "Berkaitan";
+"home.all" = "Semua";
+
+/* Search */
+"search.placeholder" = "Cari video, anime, komik atau kod";
+"search.concurrent_hint" = "Cari serentak merentasi 19 sumber video";
+"search.no_results" = "Tiada hasil carian";
+"search.searching" = "Sedang mencari…";
+"search.history" = "Sejarah carian";
+"search.clear_history" = "Kosongkan sejarah";
+"search.cancel" = "Batal";
+
+/* Comics */
+"comics.title" = "Komik";
+"comics.featured" = "Pilihan";
+"comics.loading" = "Memuatkan komik…";
+"comics.loading_more" = "Memuatkan lebih banyak komik…";
+"comics.all_loaded" = "Semua komik dimuatkan";
+"comics.select_source" = "Pilih sumber komik";
+"comics.unconfigured" = "Kredensial belum dikonfigurasi";
+"comics.unconfigured_hint" = "Sila konfigurasikan kredensial dalam tetapan untuk akses";
+
+/* Reader */
+"reader.chapter" = "Bab %d";
+"reader.page" = "Halaman %d daripada %d";
+"reader.prev_chapter" = "Bab sebelumnya";
+"reader.next_chapter" = "Bab seterusnya";
+"reader.loading_image" = "Memuatkan gambar…";
+
+/* Live */
+"live.title" = "Langsung";
+"live.featured" = "Pilihan";
+"live.female" = "Wanita";
+"live.male" = "Lelaki";
+"live.couples" = "Pasangan";
+"live.trans" = "Trans";
+"live.loading" = "Memuatkan strimer…";
+"live.viewers" = "%@ Penonton";
+"live.online" = "Dalam talian";
+"live.offline" = "Luar talian";
+"live.select_source" = "Pilih sumber siaran langsung";
+"live.chat" = "Sembang langsung";
+
+/* Forum */
+"forum.title" = "Komuniti";
+"forum.all" = "Semua";
+"forum.cl" = "Komuniti CL";
+"forum.91" = "Forum 91";
+"forum.loading" = "Memuatkan catatan…";
+"forum.replies" = "%d balasan";
+"forum.original_post" = "Lihat catatan asal";
+
+/* Player / Detail / Watchlist / InSight */
+"player.play" = "Main";
+"player.pause" = "Jeda";
+"player.aspect_fit" = "Muat Skrin";
+"player.aspect_fill" = "Penuh Skrin";
+"player.airplay" = "AirPlay";
+"player.episodes" = "Episod";
+"detail.synopsis" = "Sinopsis";
+"detail.more_like_this" = "Kandungan serupa";
+"watchlist.add" = "Tambah ke senarai";
+"watchlist.in_list" = "Dalam senarai";
+"watchlist.remove" = "Buang";
+"watchlist.title" = "Senarai Saya";
+"watchlist.empty" = "Senarai tontonan kosong";
+"watchlist.count" = "%d item";
+
+/* Library / Settings */
+"library.title" = "Pustaka";
+"settings.language" = "Bahasa";
+"settings.language_title" = "Pilih Bahasa";
+"settings.follow_system" = "Ikut Sistem";
+"settings.game" = "Hiburan · Permainan";
+"settings.game_title" = "Dewi Keinginan · RPG Taktikal";
+"settings.game_desc" = "RPG Taktikal · Pecutan perkakasan";
+"settings.launch" = "Mula";
+"settings.video_source" = "Sumber video semasa";
+"settings.comic_source" = "Sumber komik semasa";
+"settings.live_source" = "Sumber siaran langsung semasa";
+"settings.offline_download" = "Muat turun luar talian";
+"settings.not_available" = "Belum tersedia dalam versi ini";
+"settings.version" = "Maklumat Versi";
+"settings.airplay_title" = "Pancaran AirPlay";
+"settings.airplay_select" = "Pilih peranti";
+"settings.select_live_source" = "Pilih sumber siaran";
+
+/* Common Actions */
+"common.done" = "Selesai";
+"common.cancel" = "Batal";
+"common.close" = "Tutup";
+"common.ok" = "OK";

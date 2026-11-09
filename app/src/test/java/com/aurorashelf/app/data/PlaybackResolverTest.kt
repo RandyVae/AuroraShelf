@@ -89,6 +89,30 @@ class PlaybackResolverTest {
         assertEquals("https://huavod.com/vodplay/196089-1-2.html", episodes[1].pageUrl)
     }
 
+    @Test fun parsesHuavodEpisodeLinksFromPlayPageWithDataUrl() {
+        val page = Jsoup.parse(
+            """
+            <ul class="anthology-list-play">
+              <li class="anthology-item"><a class="episode-link" href="javascript:void(0)" data-url="/vodplay/132170-1-1.html"><span>第1集</span><em class="play-on"><i></i><i></i></em></a></li>
+              <li class="anthology-item"><a class="episode-link" href="javascript:void(0)" data-url="/vodplay/132170-1-2.html"><span>第2集</span><em class="play-on"><i></i><i></i></em></a></li>
+              <li class="anthology-item"><a class="episode-link" href="javascript:void(0)" data-url="/vodplay/132170-1-3.html"><span>第3集</span><em class="play-on"><i></i><i></i></em></a></li>
+            </ul>
+            <ul class="anthology-list-play">
+              <li class="anthology-item"><a class="episode-link" href="javascript:void(0)" data-url="/vodplay/132170-2-1.html"><span>第1集</span></a></li>
+            </ul>
+            """.trimIndent(),
+            "https://huavod.com/vodplay/132170-1-1.html",
+        )
+
+        val episodes = PlaybackResolver().parseHuavodEpisodes(page, "https://huavod.com/vodplay/132170-1-1.html")
+
+        assertEquals(listOf(1, 2, 3), episodes.map { it.number })
+        assertEquals("第1集", episodes[0].label)
+        assertEquals("https://huavod.com/vodplay/132170-1-1.html", episodes[0].pageUrl)
+        assertEquals("第3集", episodes[2].label)
+        assertEquals("https://huavod.com/vodplay/132170-1-3.html", episodes[2].pageUrl)
+    }
+
     @Test fun extractsHuavodEpisodeParamDirectlyWithoutNetworkFetch() {
         val resolver = PlaybackResolver()
         // Detail page maps to first episode 1-1
@@ -299,5 +323,61 @@ class PlaybackResolverTest {
         assertEquals(1, episodes.size)
         assertEquals("正片", episodes.single().label)
         assertEquals("https://beeg.com/-0714126256274840", episodes.single().pageUrl)
+    }
+
+    @Test fun differentiateHuangguoFeedFavorsCategorySpecificItems() {
+        val vCommon = com.aurorashelf.app.model.VideoItem("1", "通用热剧", "黄果短剧", "--:--", "热度 999", "https://h.com/1", null)
+        val vManju = com.aurorashelf.app.model.VideoItem("2", "极品绝色AI漫剧", "黄果短剧", "--:--", "热度 800", "https://h.com/2", null)
+        val vHuanlian = com.aurorashelf.app.model.VideoItem("3", "顶流明星AI换脸", "黄果短剧", "--:--", "热度 700", "https://h.com/3", null)
+
+        val repo = VideoRepository()
+
+        // 漫剧分类下，vManju 必须排在通用热剧前面
+        val manjuFeed = repo.differentiateHuangguoFeed(listOf(vCommon, vManju), com.aurorashelf.app.model.FeedCategory.MONTHLY_HOT)
+        assertEquals("2", manjuFeed.first().id)
+        assertEquals("极品绝色AI漫剧", manjuFeed.first().title)
+
+        // 换脸分类下，vHuanlian 必须排在前面
+        val huanlianFeed = repo.differentiateHuangguoFeed(listOf(vCommon, vHuanlian), com.aurorashelf.app.model.FeedCategory.FAVORITES)
+        assertEquals("3", huanlianFeed.first().id)
+        assertEquals("顶流明星AI换脸", huanlianFeed.first().title)
+    }
+
+    @Test fun resolvesHuangguoEpisodesViaEdgeGatewayLiveOrMock() = kotlinx.coroutines.runBlocking {
+        val resolver = PlaybackResolver()
+        val episodes = resolver.resolveEpisodes("https://huangguoai.com/video/117/")
+        assertTrue(episodes.isNotEmpty())
+        assertEquals(1, episodes.first().number)
+        assertEquals("https://huangguoai.com/video/117/", episodes.first().pageUrl)
+    }
+
+    @Test fun resolvesHuangguoStreamViaEdgeGatewayLiveOrMock() = kotlinx.coroutines.runBlocking {
+        val resolver = PlaybackResolver()
+        val source = resolver.resolve("https://huangguoai.com/video/117/")
+        assertTrue(source.url.isNotBlank())
+        assertTrue(source.url.contains(".m3u8"))
+        assertEquals("https://huangguoai.com/", source.referer)
+    }
+
+    @Test fun huavodExtractEpisodeParamMapsDetailAndPlayBidirectionally() {
+        val resolver = PlaybackResolver()
+        assertEquals("204772-1-1", resolver.extractHuavodEpisodeParam("https://huavod.com/voddetail/204772.html"))
+        assertEquals("204772-1-1", resolver.extractHuavodEpisodeParam("https://huavod.com/vodplay/204772-1-1.html"))
+        assertEquals("204772-1-2", resolver.extractHuavodEpisodeParam("https://huavod.com/vodplay/204772-1-2.html"))
+    }
+
+    @Test fun xvideosPrioritizesHighQualityMp4Stream() = kotlinx.coroutines.runBlocking {
+        val resolver = PlaybackResolver()
+        val mockHtml = """
+            <html>
+            <script>
+            html5player.setVideoUrlLow('https://mp4-gcore.xvideos-cdn.com/test/mp4_sd.mp4?secure=low');
+            html5player.setVideoUrlHigh('https://mp4-gcore.xvideos-cdn.com/test/mp4_sd.mp4?secure=high');
+            html5player.setVideoHLS('https://hls-gcore.xvideos-cdn.com/test/hls_low.m3u8');
+            </script>
+            </html>
+        """.trimIndent()
+        val highMp4 = Regex("""html5player\.setVideoUrlHigh\('([^']+)'\)""").find(mockHtml)?.groupValues?.get(1)
+        assertEquals("https://mp4-gcore.xvideos-cdn.com/test/mp4_sd.mp4?secure=high", highMp4)
     }
 }

@@ -20,23 +20,33 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubbleOutline
@@ -111,17 +121,25 @@ internal fun ForumScreen(
     onPost: (ForumPost) -> Unit,
     onClosePost: () -> Unit,
     onSelectSource: (String?) -> Unit = {},
+    onSearch: () -> Unit = {},
     onSettings: () -> Unit = {},
 ) {
     // Keep the list state in composition while the reader is open.
     val listState = rememberLazyListState()
+    val isScrolled by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 40
+        }
+    }
     LaunchedEffect(state.posts.size) {
         if (state.posts.isNotEmpty()) {
             ForumPostCache.prefetchAll(state.posts.map { it.url }, limit = POST_PREFETCH_LIMIT)
         }
     }
     state.selectedPost?.let { post ->
-        ForumReader(post = post, onClose = onClosePost)
+        Box(Modifier.fillMaxSize().auroraSwipeBack(enabled = true, onDismiss = onClosePost)) {
+            ForumReader(post = post, onClose = onClosePost)
+        }
         return
     }
 
@@ -131,58 +149,27 @@ internal fun ForumScreen(
     }
 
     LaunchedEffect(Unit) { onEnsureLoaded() }
-    LaunchedEffect(listState, visiblePosts.size, state.canLoadMore) {
+    LaunchedEffect(listState, state.canLoadMore, state.isLoading, state.isLoadingMore) {
         snapshotFlow {
-            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            visiblePosts.isNotEmpty() && lastVisible >= visiblePosts.lastIndex - 4
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            totalItems > 0 && lastVisible >= totalItems - 3 && !state.isLoading && !state.isLoadingMore && state.canLoadMore
         }.distinctUntilChanged().filter { it }.collect { onLoadMore() }
     }
 
     Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 18.dp, bottom = bottomPadding + 20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxSize().statusBarsPadding().testTag("forum-feed"),
-        ) {
-            item {
-                NetflixTopBar() {
-                    IconButton(
-                        onClick = onRefresh,
-                        enabled = !state.isLoading,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .testTag("forum-refresh"),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "刷新论坛",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
+        Box(Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                flingBehavior = ScrollableDefaults.flingBehavior(),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 0.dp, bottom = bottomPadding + 20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxSize().testTag("forum-feed"),
+            ) {
+                item(key = "forum-header-spacer") {
+                    Spacer(Modifier.height(115.dp))
                 }
-            }
-
-            item(key = "forum-pinned-sources") {
-                CategoryStrip(testTag = "forum-category-bar") {
-                    NetflixCategoryChip(
-                        selected = state.selectedSourceId == null,
-                        onClick = { onSelectSource(null) },
-                        label = "全部",
-                    )
-                    NetflixCategoryChip(
-                        selected = state.selectedSourceId == "t66y",
-                        onClick = { onSelectSource("t66y") },
-                        label = "草榴社区",
-                    )
-                    NetflixCategoryChip(
-                        selected = state.selectedSourceId == "t906",
-                        onClick = { onSelectSource("t906") },
-                        label = "91自拍论坛",
-                    )
-                }
-            }
 
         if (state.unavailableSources.isNotEmpty()) {
             item {
@@ -266,7 +253,7 @@ internal fun ForumScreen(
                 }
             }
         } else {
-            items(visiblePosts, key = { "${it.sourceId}:${it.id}" }) { post ->
+            items(visiblePosts, key = { "${it.sourceId}:${it.id}" }, contentType = { "forum_post" }) { post ->
                 ForumPostCard(post = post, onClick = { onPost(post) })
             }
         }
@@ -295,19 +282,85 @@ internal fun ForumScreen(
             }
         }
     }
+
+    val headerModifier = if (isScrolled) {
+        Modifier
+            .background(Color(0xFF000000).copy(alpha = 0.96f))
+            .border(BorderStroke(0.5.dp, Color(0xFF222222)), RectangleShape)
+    } else {
+        Modifier.background(
+            Brush.verticalGradient(
+                listOf(
+                    Color.Black.copy(alpha = 0.85f),
+                    Color.Black.copy(alpha = 0.40f),
+                    Color.Transparent,
+                ),
+            ),
+        )
     }
+
+    Column(
+        modifier = Modifier
+            .align(Alignment.TopCenter)
+            .fillMaxWidth()
+            .then(headerModifier)
+            .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
+        NetflixTopBar {
+            NetflixSearchCapsule(
+                label = "搜索社区",
+                onClick = onSearch,
+            )
+        }
+        CategoryStrip(
+            testTag = "forum-category-bar",
+            isScrolled = isScrolled,
+            applyBackground = false,
+        ) {
+            NetflixCategoryChip(
+                selected = state.selectedSourceId == null,
+                onClick = { onSelectSource(null) },
+                label = "全部",
+            )
+            NetflixCategoryChip(
+                selected = state.selectedSourceId == "t66y",
+                onClick = { onSelectSource("t66y") },
+                label = "草榴社区",
+            )
+            NetflixCategoryChip(
+                selected = state.selectedSourceId == "t66y_16",
+                onClick = { onSelectSource("t66y_16") },
+                label = "达盖尔的旗帜",
+            )
+            NetflixCategoryChip(
+                selected = state.selectedSourceId == "t906",
+                onClick = { onSelectSource("t906") },
+                label = "91自拍论坛",
+            )
+        }
+        if (state.isLoading) {
+            LinearProgressIndicator(
+                color = AuroraCoral,
+                trackColor = Color.Transparent,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp),
+            )
+        }
+    }
+}
+}
 }
 
 @Composable
 private fun ForumPostCard(post: ForumPost, onClick: () -> Unit) {
     Surface(
+        onClick = onClick,
         color = AuroraMediaSurface,
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, Color(0xFF262626)),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .applePressEffect(onClick = onClick)
             .testTag("forum-post"),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(16.dp)) {
@@ -326,6 +379,7 @@ private fun ForumPostCard(post: ForumPost, onClick: () -> Unit) {
                 val badgeColor = when (post.sourceId) {
                     "t906" -> Color(0xFFE50914) // Netflix Red / 91
                     "t66y" -> Color(0xFF2E7D32) // Forest Green / 1024
+                    "t66y_16" -> Color(0xFF00695C) // Peacock Green / 达盖尔
                     "sis" -> AuroraCoral
                     else -> Color(0xFFE65100)
                 }

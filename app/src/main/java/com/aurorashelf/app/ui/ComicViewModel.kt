@@ -55,6 +55,8 @@ data class ComicUiState(
 class ComicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = ComicRepository(EncryptedComicAuthStore(application))
     private val preferences = AppPreferences(application)
+    val downloadManager = com.aurorashelf.app.data.comic.ComicDownloadManager.getInstance(application)
+    val downloadedChapters = downloadManager.chapters
     private val initialSourceId = preferences.comicSourceId.takeIf { savedId ->
         repository.availableSources.any { it.id == savedId }
     } ?: AppPreferences.DEFAULT_COMIC_SOURCE_ID
@@ -220,7 +222,13 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         detailsJob = viewModelScope.launch {
             mutableUiState.update { it.copy(isDetailsLoading = true, error = null) }
             runCatching { repository.details(comic) }
-                .onSuccess { details -> mutableUiState.update { it.copy(details = details, isDetailsLoading = false) } }
+                .onSuccess { details ->
+                    mutableUiState.update { it.copy(details = details, isDetailsLoading = false) }
+                    // 静默预热第 1 话，用户点击「开始阅读」时 0ms 瞬间进入
+                    if (details.chapters.isNotEmpty()) {
+                        launch { runCatching { repository.prewarmChapter(details.comic, details.chapters[0].id) } }
+                    }
+                }
                 .onFailure { failure ->
                     if (failure is CancellationException) return@onFailure
                     mutableUiState.update { it.copy(isDetailsLoading = false, error = failure.userMessage()) }
@@ -309,10 +317,55 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun downloadChapter(chapter: com.aurorashelf.app.model.ComicChapter) {
+        val details = mutableUiState.value.details ?: mutableUiState.value.reader?.details ?: return
+        downloadManager.startDownload(details.comic, chapter, repository)
+    }
+
+    fun downloadAllChapters() {
+        val details = mutableUiState.value.details ?: mutableUiState.value.reader?.details ?: return
+        downloadManager.startDownloadAll(details, repository)
+    }
+
+    fun removeComicDownload(id: String) {
+        downloadManager.removeDownload(id)
+    }
+
     private fun loadChapter(details: ComicDetails, index: Int) {
         if (index !in details.chapters.indices) return
         val chapter = details.chapters[index]
         readerJob?.cancel()
+
+        // 1. 离线优先拦截：若本章节已完整下载，直接加载本地沙盒图片，实现 100% 离线秒开
+        if (downloadManager.isDownloaded(details.comic.id, chapter.id)) {
+            val localPages = downloadManager.getLocalPages(details.comic, chapter)
+            if (localPages.isNotEmpty()) {
+                mutableUiState.update {
+                    it.copy(
+                        reader = ComicReaderSession(details, index, localPages),
+                        isReaderLoading = false,
+                        readerError = null,
+                    )
+                }
+                prewarmNextChapterIfNeeded(details, index)
+                return
+            }
+        }
+
+        // 2. 内存秒开拦截：若前置预热或历史已解析此章节，0ms 瞬间渲染
+        val cachedPages = repository.getCachedChapter(details.comic, chapter.id)
+        if (!cachedPages.isNullOrEmpty()) {
+            mutableUiState.update {
+                it.copy(
+                    reader = ComicReaderSession(details, index, cachedPages),
+                    isReaderLoading = false,
+                    readerError = null,
+                )
+            }
+            prewarmNextChapterIfNeeded(details, index)
+            return
+        }
+
         mutableUiState.update {
             it.copy(
                 reader = ComicReaderSession(details, index, emptyList()),
@@ -330,11 +383,36 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                             readerError = if (pages.isEmpty()) "该章节没有返回图片" else null,
                         )
                     }
+                    if (pages.isNotEmpty()) {
+                        prewarmNextChapterIfNeeded(details, index)
+                    }
                 }
                 .onFailure { failure ->
                     if (failure is CancellationException) return@onFailure
-                    mutableUiState.update { it.copy(isReaderLoading = false, readerError = failure.userMessage()) }
+                    // 网络失败时，若本地有部分或全部缓存图片，进行兜底恢复
+                    val localPages = downloadManager.getLocalPages(details.comic, chapter)
+                    if (localPages.isNotEmpty()) {
+                        mutableUiState.update {
+                            it.copy(
+                                reader = ComicReaderSession(details, index, localPages),
+                                isReaderLoading = false,
+                                readerError = null,
+                            )
+                        }
+                    } else {
+                        mutableUiState.update { it.copy(isReaderLoading = false, readerError = failure.userMessage()) }
+                    }
                 }
+        }
+    }
+
+    private fun prewarmNextChapterIfNeeded(details: ComicDetails, index: Int) {
+        if (index + 1 in details.chapters.indices) {
+            viewModelScope.launch {
+                runCatching {
+                    repository.prewarmChapter(details.comic, details.chapters[index + 1].id)
+                }
+            }
         }
     }
 

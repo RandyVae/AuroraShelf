@@ -1,6 +1,7 @@
 package com.aurorashelf.app.ui
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -34,10 +35,16 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.clip
+import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.Cast
@@ -195,14 +202,14 @@ internal fun HomeScreen(
                         }
                     }
                 } else {
-                    val hero = state.videos.first()
                     item(key = "hero-billboard") {
+                        val spotlightVideos = remember(state.videos) { state.videos.take(4) }
                         NetflixHeroBillboard(
-                            video = hero,
-                            isFavorite = hero.id in state.favoriteIds,
-                            onPlay = { onVideo(hero) },
-                            onFavorite = { onFavorite(hero) },
-                            onDetails = { onVideo(hero) },
+                            videos = spotlightVideos,
+                            favoriteIds = state.favoriteIds,
+                            onPlay = { onVideo(it) },
+                            onFavorite = { onFavorite(it) },
+                            onDetails = { onVideo(it) },
                         )
                     }
 
@@ -214,16 +221,9 @@ internal fun HomeScreen(
 
                     if (state.videos.size > 1) {
                         item(key = "top-10-heading") {
-                            Text(
-                                text = "今日热播 Top 10",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 19.sp,
-                                ),
-                                color = Color.White,
-                                modifier = Modifier
-                                    .padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 10.dp)
-                                    .semantics { heading() },
+                            NetflixSectionHeader(
+                                title = "今日热播 Top 10",
+                                subtitle = "每日精选热门影视排行榜",
                             )
                         }
                         item(key = "top-10-row") {
@@ -248,16 +248,9 @@ internal fun HomeScreen(
 
                     if (state.videos.size > 11) {
                         item(key = "recommended-heading") {
-                            Text(
-                                text = "为你推荐",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 19.sp,
-                                ),
-                                color = Color.White,
-                                modifier = Modifier
-                                    .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 10.dp)
-                                    .semantics { heading() },
+                            NetflixSectionHeader(
+                                title = "为你推荐",
+                                subtitle = "猜你喜欢的精彩大片",
                             )
                         }
                         item(key = "recommended-row") {
@@ -281,16 +274,9 @@ internal fun HomeScreen(
 
                     if (state.videos.size > 21) {
                         item(key = "trending-heading") {
-                            Text(
-                                text = "热播精选",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    fontSize = 19.sp,
-                                ),
-                                color = Color.White,
-                                modifier = Modifier
-                                    .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 10.dp)
-                                    .semantics { heading() },
+                            NetflixSectionHeader(
+                                title = "热播精选",
+                                subtitle = "高口碑热门精选内容",
                             )
                         }
                         item(key = "trending-row") {
@@ -313,16 +299,9 @@ internal fun HomeScreen(
                     }
 
                     item(key = "explore-heading") {
-                        Text(
-                            text = "更多精彩视频",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 19.sp,
-                            ),
-                            color = Color.White,
-                            modifier = Modifier
-                                .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 12.dp)
-                                .semantics { heading() },
+                        NetflixSectionHeader(
+                            title = "更多精彩视频",
+                            subtitle = "海量全库深度探索",
                         )
                     }
 
@@ -471,19 +450,34 @@ private fun CategoryBar(
 
 @Composable
 private fun NetflixHeroBillboard(
-    video: VideoItem,
-    isFavorite: Boolean,
-    onPlay: () -> Unit,
-    onFavorite: () -> Unit,
-    onDetails: () -> Unit,
+    videos: List<VideoItem>,
+    favoriteIds: Set<String>,
+    onPlay: (VideoItem) -> Unit,
+    onFavorite: (VideoItem) -> Unit,
+    onDetails: (VideoItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (videos.isEmpty()) return
     val haptic = LocalHapticFeedback.current
+    var currentIndex by remember { mutableIntStateOf(0) }
+    val video = videos.getOrNull(currentIndex) ?: videos.first()
+    val isFavorite = video.id in favoriteIds
+
+    // 6.5s 自动轮播聚光灯画廊
+    LaunchedEffect(videos.size) {
+        if (videos.size > 1) {
+            while (true) {
+                delay(6500)
+                currentIndex = (currentIndex + 1) % videos.size
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(460.dp)
-            .clickable(role = Role.Button, onClick = onDetails),
+            .clickable(role = Role.Button, onClick = { onDetails(video) }),
     ) {
         MediaImage(
             video = video,
@@ -604,7 +598,7 @@ private fun NetflixHeroBillboard(
                             role = Role.Button,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onFavorite()
+                                onFavorite(video)
                             },
                         )
                         .padding(vertical = 4.dp),
@@ -627,7 +621,7 @@ private fun NetflixHeroBillboard(
                 Button(
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onPlay()
+                        onPlay(video)
                     },
                     shape = RoundedCornerShape(4.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -666,7 +660,7 @@ private fun NetflixHeroBillboard(
                             role = Role.Button,
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onDetails()
+                                onDetails(video)
                             },
                         )
                         .padding(vertical = 4.dp),
@@ -686,6 +680,35 @@ private fun NetflixHeroBillboard(
                     )
                 }
             }
+
+            if (videos.size > 1) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                ) {
+                    videos.indices.forEach { index ->
+                        val isSelected = index == currentIndex
+                        val targetWidth by animateDpAsState(
+                            targetValue = if (isSelected) 22.dp else 6.dp,
+                            animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+                            label = "indicator-width",
+                        )
+                        Box(
+                            modifier = Modifier
+                                .width(targetWidth)
+                                .height(6.dp)
+                                .clip(CircleShape)
+                                .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.35f))
+                                .clickable {
+                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    currentIndex = index
+                                },
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -699,90 +722,87 @@ private fun NetflixTop10Card(
 ) {
     val haptic = LocalHapticFeedback.current
     val rankText = "$rank"
-    val numberOffset = if (rank >= 10) 64.dp else 44.dp
-    val totalWidth = numberOffset + 112.dp
+    val rankWidth = if (rank >= 10) 30.dp else 20.dp
+    val totalWidth = 140.dp + rankWidth + 8.dp
 
-    Box(
+    Row(
+        verticalAlignment = Alignment.Bottom,
         modifier = modifier
             .width(totalWidth)
-            .height(168.dp)
             .clickable(role = Role.Button) {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()
             },
     ) {
-        // LAYER 0: The huge stylized rank number (behind poster)
+        // Subtle 34sp Apple TV translucent rank watermark
         Box(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .offset(x = (-4).dp, y = 10.dp),
+                .width(rankWidth)
+                .padding(bottom = 36.dp),
+            contentAlignment = Alignment.BottomCenter,
         ) {
             Text(
                 text = rankText,
-                fontSize = 96.sp,
-                lineHeight = 96.sp,
-                fontWeight = FontWeight.Black,
-                style = TextStyle(
-                    drawStyle = Stroke(width = 8f, join = StrokeJoin.Round),
-                ),
-                color = Color(0xFF6B6B6B),
-            )
-            Text(
-                text = rankText,
-                fontSize = 96.sp,
-                lineHeight = 96.sp,
-                fontWeight = FontWeight.Black,
-                color = Color(0xFF141414),
+                fontSize = 34.sp,
+                lineHeight = 34.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White.copy(alpha = 0.55f),
             )
         }
-
-        // LAYER 1: The Poster Card (overlapping the right side of the number)
-        Surface(
-            shape = RoundedCornerShape(4.dp),
-            color = Color(0xFF1E1E1E),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .width(112.dp)
-                .height(160.dp),
-            shadowElevation = 6.dp,
-        ) {
-            Box(Modifier.fillMaxSize()) {
-                MediaImage(
-                    video = video,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                // Netflix red "TOP 10" badge in top-right corner
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .background(
-                            Color(0xFFE50914),
-                            RoundedCornerShape(bottomStart = 4.dp),
+        Spacer(Modifier.width(8.dp))
+        // Standard 140x210 poster card with metadata below
+        Column(modifier = Modifier.width(140.dp)) {
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFF1E1E1E),
+                modifier = Modifier
+                    .width(140.dp)
+                    .height(210.dp),
+                shadowElevation = 6.dp,
+            ) {
+                Box(Modifier.fillMaxSize()) {
+                    MediaImage(
+                        video = video,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    if (video.duration.isNotBlank() && video.duration != "--:--") {
+                        Text(
+                            text = video.duration,
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(6.dp)
+                                .background(
+                                    Color.Black.copy(alpha = 0.72f),
+                                    RoundedCornerShape(4.dp),
+                                )
+                                .padding(horizontal = 5.dp, vertical = 2.dp),
                         )
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
-                ) {
-                    Text(
-                        text = "TOP 10",
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.5.sp,
-                    )
-                }
-                if (video.duration.isNotBlank() && video.duration != "--:--") {
-                    Text(
-                        text = video.duration,
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(4.dp)
-                            .background(Color.Black.copy(alpha = 0.78f), RoundedCornerShape(3.dp))
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                    )
+                    }
                 }
             }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = video.title,
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 16.sp,
+                ),
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = video.views.ifBlank { video.author },
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                color = AuroraMediaMeta,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -814,13 +834,6 @@ private fun VideoGridCard(
                 .background(HomeMediaPlaceholder),
         ) {
             MediaImage(video = video, modifier = Modifier.fillMaxSize())
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(6.dp),
-            ) {
-                NetflixNLogo(modifier = Modifier.size(width = 11.dp, height = 17.dp))
-            }
             if (video.duration.isNotBlank()) {
                 Text(
                     text = video.duration,

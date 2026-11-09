@@ -4407,5 +4407,478 @@
       "nudeThumb": "assets/heroes/nymeria/nude_thumb.webp"
     },
     "unitWeb": "assets/units/nymeria_player/nymeria_player.atlas"
+  },
+  {
+    "id": "1121",
+    "key": "astara",
+    "name": "Astara",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 592,
+    "hp": 135,
+    "battleHp": 1080,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "圣辉弹幕",
+        "desc": "对目标造成一次神圣远程射击伤害。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.15
+        }
+      },
+      {
+        "token": "Astara_AuraBlessing",
+        "name": "极光赐福",
+        "desc": "登场时，为全体友军施加神圣护甲与攻击加成。",
+        "effect": {
+          "type": "buff",
+          "mult": 1.25
+        },
+        "trigger": "on_appear",
+        "action": "buff",
+        "target": "all_allies",
+        "value": 25,
+        "chance": 100,
+        "duration": 2
+      },
+      {
+        "token": "Astara_RadiantBurst",
+        "name": "破晓终局",
+        "desc": "攻击时，释放神圣破晓烈光贯穿全列敌方单位。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.45
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "enemy_row",
+        "value": 150,
+        "chance": 40,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/astara_big",
+      "lega": "events_monsters/astara_lega_big"
+    },
+    "unit": "victoria_player",
+    "voice": [],
+    "power": 1940,
+    "artWeb": {
+      "base": "assets/heroes/astara/base.webp",
+      "baseThumb": "assets/heroes/astara/base_thumb.webp",
+      "lega": "assets/heroes/astara/lega.webp",
+      "legaThumb": "assets/heroes/astara/lega_thumb.webp"
+    },
+    "unitWeb": "assets/units/victoria_player/victoria_player.atlas"
+  },
+  {
+    "id": "1122",
+    "key": "aphrodite",
+    "name": "Aphrodite",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 635,
+    "hp": 140,
+    "battleHp": 1120,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "爱欲之触",
+        "desc": "以神圣爱欲之力重击敌方单个目标。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.2
+        }
+      },
+      {
+        "token": "Aphrodite_AllureCharm",
+        "name": "神格魅惑",
+        "desc": "登场时，魅惑敌方首位敌人，使其攻击力大幅下降。",
+        "effect": {
+          "type": "debuff",
+          "mult": 0.7
+        },
+        "trigger": "on_appear",
+        "action": "debuff",
+        "target": "first_enemy",
+        "value": 30,
+        "chance": 100,
+        "duration": 2
+      },
+      {
+        "token": "Aphrodite_ErosDomain",
+        "name": "神圣乐园",
+        "desc": "攻击时，展开爱欲领域，回复全体友方生命值并造成神圣真实伤害。",
+        "effect": {
+          "type": "heal_and_damage",
+          "mult": 1.5
+        },
+        "trigger": "on_attack",
+        "action": "heal",
+        "target": "all_allies",
+        "value": 180,
+        "chance": 50,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/aphrodite_big"
+    },
+    "unit": "lilith_player",
+    "voice": [],
+    "power": 2080,
+    "artWeb": {
+      "base": "assets/heroes/aphrodite/base.webp",
+      "baseThumb": "assets/heroes/aphrodite/base_thumb.webp"
+    },
+    "unitWeb": "assets/units/lilith_player/lilith_player.atlas"
+  },
+  {
+    "id": "1123",
+    "key": "ariana",
+    "name": "Ariana",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 615,
+    "hp": 128,
+    "battleHp": 1024,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "混沌斩击",
+        "desc": "以黑晶战刃对近身目标发动致命突袭。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.18
+        }
+      },
+      {
+        "token": "Ariana_ShadowStrike",
+        "name": "暗影潜袭",
+        "desc": "登场时，隐入暗影，提高自身暴击率与闪避率。",
+        "effect": {
+          "type": "buff",
+          "mult": 1.3
+        },
+        "trigger": "on_appear",
+        "action": "buff",
+        "target": "self",
+        "value": 35,
+        "chance": 100,
+        "duration": 2
+      },
+      {
+        "token": "Ariana_SoulReap",
+        "name": "虚空收割",
+        "desc": "攻击时，斩击敌方最虚弱目标造成巨额斩杀伤害。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.6
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "lowest_hp_enemy",
+        "value": 200,
+        "chance": 45,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/ariana_big"
+    },
+    "unit": "alisha_player",
+    "voice": [],
+    "power": 1980,
+    "artWeb": {
+      "base": "assets/heroes/ariana/base.webp",
+      "baseThumb": "assets/heroes/ariana/base_thumb.webp"
+    },
+    "unitWeb": "assets/units/alisha_player/alisha_player.atlas"
+  },
+  {
+    "id": "1124",
+    "key": "kart",
+    "name": "Cartilla",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "order",
+    "raceCn": "秩序",
+    "atk": 605,
+    "hp": 132,
+    "battleHp": 1056,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "执法重击",
+        "desc": "以高动能特勤制式手枪精准压制目标。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.15
+        }
+      },
+      {
+        "token": "Cartilla_LawEnforce",
+        "name": "戒严封锁",
+        "desc": "登场时，启动电磁压制力场，降低全体敌方攻击速度与命中率。",
+        "effect": {
+          "type": "debuff",
+          "mult": 0.8
+        },
+        "trigger": "on_appear",
+        "action": "debuff",
+        "target": "all_enemies",
+        "value": 20,
+        "chance": 100,
+        "duration": 2
+      },
+      {
+        "token": "Cartilla_BulletStorm",
+        "name": "正义弹雨",
+        "desc": "攻击时，倾泻全弹幕覆盖敌方前排，造成毁灭性穿透伤害。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.55
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "front_row",
+        "value": 185,
+        "chance": 45,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/kart_big"
+    },
+    "unit": "casey_player",
+    "voice": [],
+    "power": 1960,
+    "artWeb": {
+      "base": "assets/heroes/kart/base.webp",
+      "baseThumb": "assets/heroes/kart/base_thumb.webp",
+      "lega": "assets/heroes/kart/lega.webp",
+      "legaThumb": "assets/heroes/kart/lega_thumb.webp"
+    },
+    "unitWeb": "assets/units/casey_player/casey_player.atlas"
+  },
+  {
+    "id": "1125",
+    "key": "ines",
+    "name": "Ines",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "ranged",
+    "classCn": "远程",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 620,
+    "hp": 126,
+    "battleHp": 1008,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "奥术教典",
+        "desc": "咏唱远古符文对敌人施加奥术轰击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.16
+        }
+      },
+      {
+        "token": "Ines_StrictGuidance",
+        "name": "严谨教条",
+        "desc": "登场时，全员施加精力充盈效果，提升暴击伤害与穿透力。",
+        "effect": {
+          "type": "buff",
+          "mult": 1.25
+        },
+        "trigger": "on_appear",
+        "action": "buff",
+        "target": "all_allies",
+        "value": 25,
+        "chance": 100,
+        "duration": 2
+      },
+      {
+        "token": "Ines_ArcaneNova",
+        "name": "天罚星芒",
+        "desc": "攻击时，引动星辉法阵对全体敌人造成高额元素伤害并驱散增益。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.5
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "all_enemies",
+        "value": 170,
+        "chance": 40,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/ines_big"
+    },
+    "unit": "morana_player",
+    "voice": [],
+    "power": 1950,
+    "artWeb": {
+      "base": "assets/heroes/ines/base.webp",
+      "baseThumb": "assets/heroes/ines/base_thumb.webp",
+      "lega": "assets/heroes/ines/lega.webp",
+      "legaThumb": "assets/heroes/ines/lega_thumb.webp"
+    },
+    "unitWeb": "assets/units/morana_player/morana_player.atlas"
+  },
+  {
+    "id": "1126",
+    "key": "luf",
+    "name": "Luf",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "nature",
+    "raceCn": "自然",
+    "atk": 610,
+    "hp": 138,
+    "battleHp": 1104,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "流光连击",
+        "desc": "以轻盈迅猛的近身格斗术连续打击目标。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.15
+        }
+      },
+      {
+        "token": "Luf_VitalityBoost",
+        "name": "活力充盈",
+        "desc": "登场时，激发全身潜能，大幅提高生命上限与受疗效果。",
+        "effect": {
+          "type": "buff",
+          "mult": 1.3
+        },
+        "trigger": "on_appear",
+        "action": "buff",
+        "target": "self",
+        "value": 30,
+        "chance": 100,
+        "duration": 2
+      },
+      {
+        "token": "Luf_AcrobaticSmash",
+        "name": "飞影破岳",
+        "desc": "攻击时，飞身跃起以雷霆万钧之势踏碎敌阵，造成范围物理震荡与晕眩。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.6
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "front_row",
+        "value": 190,
+        "chance": 42,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/luf_big"
+    },
+    "unit": "bea_player",
+    "voice": [],
+    "power": 1990,
+    "artWeb": {
+      "base": "assets/heroes/luf/base.webp",
+      "baseThumb": "assets/heroes/luf/base_thumb.webp",
+      "lega": "assets/heroes/luf/lega.webp",
+      "legaThumb": "assets/heroes/luf/lega_thumb.webp"
+    },
+    "unitWeb": "assets/units/bea_player/bea_player.atlas"
+  },
+  {
+    "id": "1127",
+    "key": "misa",
+    "name": "Misaki",
+    "rarity": "legendary",
+    "rarityCn": "SSR",
+    "class": "melee",
+    "classCn": "近战",
+    "race": "chaos",
+    "raceCn": "混沌",
+    "atk": 630,
+    "hp": 125,
+    "battleHp": 1000,
+    "skills": [
+      {
+        "token": "basic",
+        "name": "死斗瞬斩",
+        "desc": "以锁链双刃撕裂近身防线。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.2
+        }
+      },
+      {
+        "token": "Misaki_PrisonerDesire",
+        "name": "囚徒枷锁",
+        "desc": "登场时，斩裂束缚爆发狂暴意志，暴击伤害提升40%。",
+        "effect": {
+          "type": "buff",
+          "mult": 1.4
+        },
+        "trigger": "on_appear",
+        "action": "buff",
+        "target": "self",
+        "value": 40,
+        "chance": 100,
+        "duration": 2
+      },
+      {
+        "token": "Misaki_CrimsonCarnage",
+        "name": "猩红裁决",
+        "desc": "攻击时，化身血色旋风切入敌方后排，对核心目标造成致命一击。",
+        "effect": {
+          "type": "damage",
+          "mult": 1.7
+        },
+        "trigger": "on_attack",
+        "action": "damage",
+        "target": "back_row",
+        "value": 210,
+        "chance": 45,
+        "duration": 1
+      }
+    ],
+    "art": {
+      "base": "events_monsters/misa_big"
+    },
+    "unit": "orin_player",
+    "voice": [],
+    "power": 2020,
+    "artWeb": {
+      "base": "assets/heroes/misa/base.webp",
+      "baseThumb": "assets/heroes/misa/base_thumb.webp",
+      "lega": "assets/heroes/misa/lega.webp",
+      "legaThumb": "assets/heroes/misa/lega_thumb.webp"
+    },
+    "unitWeb": "assets/units/orin_player/orin_player.atlas"
   }
 ]

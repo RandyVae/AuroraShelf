@@ -187,6 +187,9 @@ internal object CoverImageLoader {
                 } else if (referer.contains("91dongman") || normalizedAddress.contains("drleao.cn")) {
                     header("Referer", "https://91dongman.net/")
                     header("Origin", "https://91dongman.net")
+                } else if (referer.contains("xvideos") || normalizedAddress.contains("xvideos")) {
+                    header("Referer", "https://www.xvideos.com/")
+                    header("Origin", "https://www.xvideos.com")
                 }
             }
             .build()

@@ -1,0 +1,12 @@
+AuroraShelf/Services/LocalizationManager.swift:140:32: error: call to main actor-isolated instance method 'localized' in a synchronous nonisolated context [#ActorIsolatedCall]
+    |                                `- error: call to main actor-isolated instance method 'localized' in a synchronous nonisolated context [#ActorIsolatedCall]
+AuroraShelf/Services/LocalizationManager.swift:140:25: error: main actor-isolated static property 'shared' can not be referenced from a nonisolated context
+    |                         `- error: main actor-isolated static property 'shared' can not be referenced from a nonisolated context
+AuroraShelf/Services/LocalizationManager.swift:145:36: error: call to main actor-isolated instance method 'localized' in a synchronous nonisolated context [#ActorIsolatedCall]
+    |                                    `- error: call to main actor-isolated instance method 'localized' in a synchronous nonisolated context [#ActorIsolatedCall]
+AuroraShelf/Services/LocalizationManager.swift:145:29: error: main actor-isolated static property 'shared' can not be referenced from a nonisolated context
+    |                             `- error: main actor-isolated static property 'shared' can not be referenced from a nonisolated context
+AuroraShelf/Services/LocalizationManager.swift:149:36: error: call to main actor-isolated instance method 'localized' in a synchronous nonisolated context [#ActorIsolatedCall]
+    |                                    `- error: call to main actor-isolated instance method 'localized' in a synchronous nonisolated context [#ActorIsolatedCall]
+AuroraShelf/Services/LocalizationManager.swift:149:29: error: main actor-isolated static property 'shared' can not be referenced from a nonisolated context
+    |                             `- error: main actor-isolated static property 'shared' can not be referenced from a nonisolated context

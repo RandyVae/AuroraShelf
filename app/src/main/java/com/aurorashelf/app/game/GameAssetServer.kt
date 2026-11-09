@@ -51,7 +51,8 @@ class GameAssetServer(context: Context) : Runnable {
         if (serverSocket == null) {
             serverSocket = ServerSocket(0, 60, loopback)
         }
-        port = serverSocket!!.localPort
+        val socket = serverSocket ?: error("Unable to start local game asset server")
+        port = socket.localPort
         clientPool = Executors.newCachedThreadPool { r ->
             Thread(r, "lg-asset-worker").apply { isDaemon = true }
         }

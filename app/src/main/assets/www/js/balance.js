@@ -134,7 +134,8 @@
     }
     if (attacker.leaderAura) dmg *= 1 + C.leaderAtkAura;
     let crit = false;
-    if (rnd() < critChance(attacker)) {
+    const effectiveCritChance = (attacker.critChance != null) ? attacker.critChance : critChance(attacker);
+    if (rnd() < effectiveCritChance) {
       crit = true;
       dmg *= C.critMult;
     }

@@ -26,23 +26,86 @@
   function matches(line, symbols, symbolMap) {
     const first = symbolMap[line[0]];
     if (!first || first.kind === 'scatter') return null;
-    let count = 1;
-    for (let col = 1; col < line.length; col += 1) {
-      const current = symbolMap[line[col]];
-      if (!current || (current.id !== first.id && current.kind !== 'wild' && first.kind !== 'wild')) break;
+
+    // A leading Wild substitutes for the first real symbol. It must not make
+    // every following symbol part of the same win. Resolve the base symbol
+    // before counting so a line such as Wild, Kitty, Dominica stops at Kitty.
+    const base = first.kind === 'wild'
+      ? line.slice(1).map((id) => symbolMap[id]).find((symbol) => symbol && symbol.kind !== 'wild' && symbol.kind !== 'scatter')
+      : first;
+    if (!base) return null;
+
+    let count = 0;
+    for (const id of line) {
+      const current = symbolMap[id];
+      if (!current || current.kind === 'scatter' || (current.kind !== 'wild' && current.id !== base.id)) break;
       count += 1;
     }
-    return count >= 2 ? { symbol: first, count } : null;
+    return count >= 2 ? { symbol: base, count } : null;
   }
 
-  function spin(config, bet, seed) {
+  function spin(config, bet, seed, session) {
+    const hasFlow = !!(session && typeof session.totalSpins === 'number');
+    const spinIndex = hasFlow ? session.totalSpins : -1;
+    const isBailout = !!(session && session.luckyBailout);
     const symbols = config.symbols || [];
     const symbolMap = Object.fromEntries(symbols.map((s) => [s.id, s]));
     const rnd = mulberry32(seed == null ? (Date.now() >>> 0) : seed);
+
+    // 经典心流与上瘾机制调度（仅在带会话时启用）：
+    // (a) 新手蜜月期 (0~5转) 或 破产救济期：极大甜头与高潮体验
+    // (b) 爬坡考验期 (6转以后)：真实胜率收紧 (28%~35%) + 65% 概率触发高压 Near-Miss 假近中
+    let isNearMiss = false;
+    let scripted = null;
+
+    if (hasFlow) {
+      if (isBailout) {
+        // 破产救济保底翻盘：中轴 4 WILD 爆出惊天大奖！
+        scripted = 'bailout_wild';
+      } else if (spinIndex === 0) {
+        // 第 1 转：中轴 Kitty 3 连线，小试牛刀首胜甜头
+        scripted = 'kitty_hit';
+      } else if (spinIndex === 1) {
+        // 第 2 转：中轴 Dominica 3 连线，连胜信心建立
+        scripted = 'dominica_hit';
+      } else if (spinIndex === 2) {
+        // 第 3 转：必定命中 3 个 SCATTER，激活 5 次免费大旋转！
+        scripted = 'scatter_free';
+      } else if (spinIndex === 3 || spinIndex === 4) {
+        // 免费旋转期间：命中 WILD 狂暴爆奖 (MEGA BIG WIN)
+        scripted = 'wild_big';
+      }
+    }
+
     const grid = [];
     for (let row = 0; row < config.rows; row += 1) {
       grid[row] = [];
-      for (let col = 0; col < config.reels; col += 1) grid[row][col] = weightedSymbol(symbols, rnd).id;
+      for (let col = 0; col < config.reels; col += 1) {
+        grid[row][col] = weightedSymbol(symbols, rnd).id;
+      }
+    }
+
+    if (scripted === 'kitty_hit') {
+      grid[1][0] = 'kitty'; grid[1][1] = 'kitty'; grid[1][2] = 'kitty';
+    } else if (scripted === 'dominica_hit') {
+      grid[1][0] = 'dominica'; grid[1][1] = 'dominica'; grid[1][2] = 'dominica';
+    } else if (scripted === 'scatter_free') {
+      grid[0][1] = 'scatter'; grid[1][2] = 'scatter'; grid[2][3] = 'scatter';
+    } else if (scripted === 'wild_big' || scripted === 'bailout_wild') {
+      grid[1][0] = 'wild'; grid[1][1] = 'wild'; grid[1][2] = 'wild'; grid[1][3] = 'florence';
+    } else if (hasFlow && spinIndex >= 5) {
+      // 考验期：有 60% 概率触发高压 Dual Scatter Near-Miss（假近中：精准命中 2 个核心，差 1 个触发大旋转）
+      if (rnd() < 0.60) {
+        // 清理现存 scatter 避免意外达到 3 个
+        for (let r = 0; r < config.rows; r++) {
+          for (let c = 0; c < config.reels; c++) {
+            if (grid[r][c] === 'scatter') grid[r][c] = 'kitty';
+          }
+        }
+        grid[0][1] = 'scatter';
+        grid[1][3] = 'scatter';
+        isNearMiss = true;
+      }
     }
 
     const wins = [];
@@ -50,8 +113,14 @@
       const line = config.paylines[lineIndex].map((row, reelIndex) => grid[row][reelIndex]);
       const result = matches(line, symbols, symbolMap);
       if (result) {
-        const multiplier = result.symbol.payouts[String(result.count)] || 0;
-        if (multiplier) wins.push({ line: lineIndex + 1, symbol: result.symbol.id, count: result.count, multiplier, amount: bet * multiplier });
+        const isFreeSpin = !!(session && (session.freeSpins > 0 || session.isFreeSpin));
+        const winMult = isFreeSpin ? 3 : 1;
+        const multiplier = (result.symbol.payouts[String(result.count)] || 0) * winMult;
+        if (multiplier) {
+          const lineBet = Math.max(1, Math.round(bet / (config.paylines.length || 9)));
+          const amount = lineBet * multiplier;
+          wins.push({ line: lineIndex + 1, symbol: result.symbol.id, count: result.count, multiplier, amount, isFreeSpin });
+        }
       }
     }
 
@@ -67,6 +136,8 @@
       freeSpinsAwarded,
       bestCombo: bestWin ? bestWin.count : 0,
       featureSymbol: bestWin ? bestWin.symbol : null,
+      isNearMiss: isNearMiss && freeSpinsAwarded === 0,
+      flowPhase: spinIndex < 5 ? 'honeymoon' : (isNearMiss ? 'near_miss' : 'normal'),
     };
   }
 
@@ -88,7 +159,8 @@
     regina: 'assets/slots/symbol_regina.webp',
     florence: 'assets/slots/symbol_esther.webp',
     esther: 'assets/slots/symbol_esther.webp',
-    drone_enemy: 'assets/slots/symbol_drone.webp',
+    zoe_enemy: 'assets/slots/symbol_zoe.webp',
+    drone_enemy: 'assets/slots/symbol_zoe.webp',
     hilda_enemy: 'assets/slots/symbol_hilda.webp',
     wild: 'assets/slots/symbol_wild.webp',
     scatter: 'assets/slots/symbol_scatter.webp',
@@ -222,6 +294,39 @@
         osc.start(now + idx * 0.08);
         osc.stop(now + idx * 0.08 + 0.55);
       });
+    },
+
+    heroCutin() {
+      if (this.isMuted()) return;
+      const ctx = this.getCtx();
+      if (!ctx) return;
+      const now = ctx.currentTime;
+      // 科技感跃迁与超载能量斩击音效
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(260, now);
+      osc.frequency.exponentialRampToValueAtTime(960, now + 0.16);
+      osc.frequency.exponentialRampToValueAtTime(140, now + 0.42);
+      gain.gain.setValueAtTime(0.32, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.46);
+
+      // 低音冲击轰鸣
+      const sub = ctx.createOscillator();
+      const subGain = ctx.createGain();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(160, now);
+      sub.frequency.exponentialRampToValueAtTime(45, now + 0.35);
+      subGain.gain.setValueAtTime(0.42, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+      sub.connect(subGain);
+      subGain.connect(ctx.destination);
+      sub.start(now);
+      sub.stop(now + 0.4);
     }
   };
 
@@ -233,6 +338,8 @@
       title: '魅惑特勤',
       mult: '+18% 爆率',
       favor: 'Lv.7 · 依恋',
+      scaleMult: 1.28,
+      yRatio: -0.06,
       dialogue: {
         idle: '指挥官，今天手气很旺盛呢，转一转试试看？',
         spin: '幸运能量注入中！转出 MEGA JACKPOT 吧～',
@@ -242,12 +349,116 @@
       }
     },
     {
+      id: 'kart',
+      unit: 'cartilla_agent_nude_enemy',
+      name: 'Cartilla 18+',
+      title: '突击先锋',
+      mult: '+22% 爆率',
+      favor: 'Lv.8 · 亲密',
+      scaleMult: 1.26,
+      yRatio: -0.06,
+      dialogue: {
+        idle: '指挥官，突击步枪与好运皆已校准完毕！',
+        spin: '全轴功率超载！大奖锁定！',
+        win: '精准射击！金币悉数命中！',
+        bigWin: '天命头奖！不愧是指挥官大人！',
+        tap: '呀……战术挂件很敏感的，轻一点啦！'
+      }
+    },
+    {
+      id: 'misa',
+      unit: 'misaki_agent_nude_enemy',
+      name: 'Misaki 18+',
+      title: '王牌狙击',
+      mult: '+25% 爆率',
+      favor: 'Lv.9 · 誓约',
+      scaleMult: 1.26,
+      yRatio: -0.06,
+      dialogue: {
+        idle: '八百米内目标全数锁定，请下达旋转指令。',
+        spin: '狙击瞄准中轴，命中概率 100%！',
+        win: '命中红心，丰厚战利品入库！',
+        bigWin: '一击必杀！这就是长官与我的绝对默契！',
+        tap: '指挥官的手心……比瞄准镜还要炽热呢。'
+      }
+    },
+    {
+      id: 'ines',
+      unit: 'ines_agent_nude_enemy',
+      name: 'Ines 18+',
+      title: '灵能护盾',
+      mult: '+20% 爆率',
+      favor: 'Lv.7 · 信任',
+      scaleMult: 1.26,
+      yRatio: -0.06,
+      dialogue: {
+        idle: '神圣灵能力场已展开，庇护指挥官每一轮转动。',
+        spin: '灵能波动共振！逆转幸运概率！',
+        win: '护盾捕捉到充沛的胜利金币能量！',
+        bigWin: '奇迹降临！神圣之光指引着最高头奖！',
+        tap: '触碰护盾时……心扉也被指挥官打开了呢。'
+      }
+    },
+    {
+      id: 'luf',
+      unit: 'luf_agent_nude_enemy',
+      name: 'Luf 18+',
+      title: '圣光圣灵',
+      mult: '+24% 爆率',
+      favor: 'Lv.8 · 依恋',
+      scaleMult: 1.26,
+      yRatio: -0.06,
+      dialogue: {
+        idle: '元气满满！今天的转轮一定会爆出超级大奖！',
+        spin: '圣光飞舞！为指挥官破除所有厄运！',
+        win: '太棒啦！闪闪发光的战利品到手！',
+        bigWin: '哇啊啊！超级大爆奖！指挥官最帅了！',
+        tap: '嘻嘻，被指挥官摸头好开心～要抱抱！'
+      }
+    },
+    {
+      id: 'astara',
+      unit: 'astara_18_unit',
+      name: 'Astara 18+',
+      title: '深渊魔女',
+      mult: '+26% 爆率',
+      favor: 'Lv.9 · 誓约',
+      scaleMult: 1.26,
+      yRatio: -0.06,
+      dialogue: {
+        idle: '深渊契约在此，渴望力量与金币吗，我的长官？',
+        spin: '黑暗轮盘，为吾等献上无尽财宝！',
+        win: '契约已成，战利品如约奉上。',
+        bigWin: '深渊狂欢！整个奖池都在为您颤抖！',
+        tap: '胆敢触碰魔女……做好被彻底吞噬的准备了吗？'
+      }
+    },
+    {
+      id: 'aphrodite',
+      unit: 'aphrodite_18_unit',
+      name: 'Aphrodite 18+',
+      title: '爱欲女神',
+      mult: '+28% 爆率',
+      favor: 'Lv.10 · 沉沦',
+      scaleMult: 1.28,
+      yRatio: -0.06,
+      dialogue: {
+        idle: '长官的视线……比最热烈的黄金还要诱人呢～',
+        spin: '爱神轻抚转轮～奇迹就要绽放了哦～',
+        win: '命中爱意的奖赏，甜美吗，长官？',
+        bigWin: '啊……至高的狂喜！长官太强大了～',
+        tap: '再靠近一点嘛……感受一下我的心跳～'
+      }
+    },
+    {
       id: 'skye',
       unit: 'skye_skin_nude_enemy',
       name: 'Skye 18+',
       title: '机动先锋',
       mult: '+15% 爆率',
       favor: 'Lv.5 · 亲密',
+      scaleMult: 1.26,
+      yRatio: -0.06,
       dialogue: {
         idle: '战线准备就绪，随时可以扣动转轮。',
         spin: '全速推进！让滚轮飞速旋转起来！',
@@ -263,6 +474,8 @@
       title: '剧毒潜行',
       mult: '+16% 爆率',
       favor: 'Lv.6 · 迷恋',
+      scaleMult: 1.26,
+      yRatio: -0.06,
       dialogue: {
         idle: '空气里弥漫着幸运的气味呢，指挥官。',
         spin: '下注锁定，命运在为你转动～',
@@ -278,6 +491,8 @@
       title: '看板特勤',
       mult: '+20% 爆率',
       favor: 'Lv.10 · 誓约',
+      scaleMult: 1.26,
+      yRatio: -0.05,
       dialogue: {
         idle: '指挥官，有我在，今天的转轮一定会大发！',
         spin: '冲鸭！给滚轮来一次华丽的暴击！',
@@ -293,6 +508,8 @@
       title: '近卫队长',
       mult: '+15% 爆率',
       favor: 'Lv.5 · 亲信',
+      scaleMult: 1.26,
+      yRatio: -0.04,
       dialogue: {
         idle: '保持专注，胜负就在刹那之间。',
         spin: '全军压上！碾碎那些低倍率！',
@@ -303,7 +520,106 @@
     }
   ];
 
-  const SlotsGame = { spin, resolveSymbol, SYMBOL_ASSETS, SLOTS_MASCOTS };
+  const CUTIN_HEROES = [
+    {
+      id: 'kart',
+      name: 'CARTILLA 18+',
+      title: '突击制服',
+      art: 'assets/heroes/kart/lega.webp',
+      quote: '「全轴功率超载！长官，头奖非你莫属～」',
+      color: '#ff3a9d'
+    },
+    {
+      id: 'misa',
+      name: 'MISAKI 18+',
+      title: '王牌禁锢',
+      art: 'assets/heroes/misa/lega.webp',
+      quote: '「红心弹道锁定！长官只需享受爆奖快感～」',
+      color: '#38e1ff'
+    },
+    {
+      id: 'ines',
+      name: 'INES 18+',
+      title: '灵能力场',
+      art: 'assets/heroes/ines/lega.webp',
+      quote: '「灵能力场全开！让赔率随心跳一同狂飙～」',
+      color: '#ffe55b'
+    },
+    {
+      id: 'luf',
+      name: 'LUF 18+',
+      title: '圣光觉醒',
+      art: 'assets/heroes/luf/lega.webp',
+      quote: '「圣光热力全开！为长官打破所有厄运锁链～」',
+      color: '#a78bfa'
+    },
+    {
+      id: 'astara',
+      name: 'ASTARA 18+',
+      title: '深渊契约',
+      art: 'assets/heroes/astara/lega.webp',
+      quote: '「深渊契约生效，滚轮已臣服于您的意志～」',
+      color: '#f43f5e'
+    },
+    {
+      id: 'aphrodite',
+      name: 'APHRODITE 18+',
+      title: '爱欲神格',
+      art: 'assets/heroes/aphrodite/base.webp',
+      quote: '「爱意汹涌绽放～请收下这无尽的黄金恩赐～」',
+      color: '#ec4899'
+    },
+    {
+      id: 'ariana',
+      name: 'ARIANA 18+',
+      title: '暗影战刃',
+      art: 'assets/heroes/ariana/base.webp',
+      quote: '「影之刃破空！为您斩下所有高倍率组合！」',
+      color: '#38bdf8'
+    },
+    {
+      id: 'charlotte',
+      name: 'CHARLOTTE 18+',
+      title: '魅惑觉醒',
+      art: 'assets/heroes/charlotte/nude.webp',
+      quote: '「呀～转轮的心跳，比昨夜的私语还要热烈呢～」',
+      color: '#f472b6'
+    },
+    {
+      id: 'shelby',
+      name: 'SHELBY 18+',
+      title: '狂野烈焰',
+      art: 'assets/heroes/shelby/nude.webp',
+      quote: '「燃烧起来吧！让金币如狂暴暴雨般倾泻！」',
+      color: '#fb923c'
+    },
+    {
+      id: 'esther',
+      name: 'ESTHER 18+',
+      title: '绝对领域',
+      art: 'assets/heroes/esther/nude.webp',
+      quote: '「战术核心超频！所有轴线尽在掌控之中～」',
+      color: '#38bdf8'
+    },
+    {
+      id: 'bonita',
+      name: 'BONITA 18+',
+      title: '暗夜魅影',
+      art: 'assets/heroes/bonita/nude.webp',
+      quote: '「长官的手气……今晚已被我施下不败魔法～」',
+      color: '#c084fc'
+    },
+    {
+      id: 'casey',
+      name: 'CASEY 18+',
+      title: '战场甜心',
+      art: 'assets/heroes/casey/nude.webp',
+      quote: '「火力全开！为您打通通往财富的超音速通道！」',
+      color: '#34d399'
+    }
+  ];
+
+  const SlotsGame = { spin, resolveSymbol, SYMBOL_ASSETS, SLOTS_MASCOTS, CUTIN_HEROES };
   window.SlotsGame = SlotsGame;
 
   const SlotsUI = {
@@ -325,17 +641,92 @@
       this.bet = this.config.defaultBet || 20;
       this.freeSpins = (window.APP && APP.state && APP.state.slots && APP.state.slots.freeSpins) || 0;
       this.bind();
+      this.bindModals();
       this.render();
       this.renderPlaceholder();
       this.initMarqueeLights();
       this.initMascot();
     },
 
+    bindModals() {
+      // 伴游破产救济领取
+      const bailoutBtn = document.getElementById('btn-bailout-claim');
+      if (bailoutBtn) {
+        bailoutBtn.onclick = () => {
+          const state = APP.state;
+          state.gold = (state.gold || 0) + 300;
+          state.slotsSession = state.slotsSession || {};
+          state.slotsSession.bailoutClaims = (state.slotsSession.bailoutClaims || 0) + 1;
+          state.slotsSession.luckyBailout = true; // 下一次旋转保底大翻盘！
+          LGSave.recordTransaction(state, 'gold', 300, 'slots_bailout');
+          LGSave.persist(state);
+          const modal = document.getElementById('modal-slots-bailout');
+          if (modal) modal.hidden = true;
+          this.render();
+          SlotsAudio.coin();
+          if (window.NativeBridge) NativeBridge.haptic('success');
+          UI.toast('🎉 伴游空投已到账！获得 300 金币与天命好运，快拉动拉杆！');
+          const m = SLOTS_MASCOTS[this.mascotIndex || 0];
+          if (m) this.setMascotSpeech('收到我的私密补给啦？这次女神一定会眷顾你的～');
+        };
+      }
+
+      // 首充金库激活
+      const rechargeBtn = document.getElementById('btn-slots-recharge-pay');
+      const rechargeClose = document.getElementById('btn-slots-recharge-close');
+      if (rechargeClose) {
+        rechargeClose.onclick = () => {
+          const modal = document.getElementById('modal-slots-recharge');
+          if (modal) modal.hidden = true;
+        };
+      }
+      if (rechargeBtn) {
+        rechargeBtn.onclick = () => {
+          const state = APP.state;
+          state.gold = (state.gold || 0) + 50000;
+          state.slotsSession = state.slotsSession || {};
+          state.slotsSession.isVip = true;
+          this.freeSpins += 10;
+          LGSave.recordTransaction(state, 'gold', 50000, 'first_recharge_vip');
+          LGSave.persist(state);
+          const modal = document.getElementById('modal-slots-recharge');
+          if (modal) modal.hidden = true;
+          this.render();
+          SlotsAudio.bigWin();
+          this.dropCoins(24);
+          if (window.NativeBridge) NativeBridge.haptic('bigWin');
+          UI.toast('👑 恭喜指挥官！首充超值金库已激活！50,000 金币与 VIP 1 极速到账！');
+          const m = SLOTS_MASCOTS[this.mascotIndex || 0];
+          if (m) this.setMascotSpeech('哇！太霸气了指挥官！全员 18+ 装扮已随侍就绪～');
+        };
+      }
+    },
+
+    handleOutOfGold() {
+      const state = APP.state;
+      state.slotsSession = state.slotsSession || {};
+      const claims = state.slotsSession.bailoutClaims || 0;
+      if (claims < 3) {
+        const modal = document.getElementById('modal-slots-bailout');
+        if (modal) modal.hidden = false;
+        if (window.NativeBridge) NativeBridge.haptic('warning');
+      } else {
+        const modal = document.getElementById('modal-slots-recharge');
+        if (modal) modal.hidden = false;
+        if (window.NativeBridge) NativeBridge.haptic('selection');
+      }
+    },
+
     initMascot() {
       const canvas = document.getElementById('slots-mascot-canvas');
       if (!canvas || !window.SpineStage) return;
       if (!this.mascotStage) {
-        this.mascotStage = new SpineStage(canvas, { heightRatio: 0.94, yRatio: 0.04, xRatio: 0.5 });
+        this.mascotStage = new SpineStage(canvas, {
+          heightRatio: 1.0,
+          scaleMultiplier: 1.28,
+          yRatio: -0.06,
+          xRatio: 0.5
+        });
       }
       const switchBtn = document.getElementById('btn-slots-mascot-switch');
       if (switchBtn) switchBtn.onclick = () => this.switchMascot();
@@ -343,10 +734,72 @@
       const actorWrap = document.getElementById('mascot-actor-wrap');
       if (actorWrap) actorWrap.onclick = () => this.onMascotTap();
 
-      this.loadCurrentMascot();
+      this.loadCurrentMascot(false);
+      this.initCutin();
     },
 
-    loadCurrentMascot() {
+    initCutin() {
+      const canvas = document.getElementById('slots-cutin-canvas');
+      if (!canvas || !window.SpineStage) return;
+      if (!this.cutinStage) {
+        this.cutinStage = new SpineStage(canvas, {
+          heightRatio: 1.15,
+          scaleMultiplier: 1.25,
+          yRatio: -0.15,
+          xRatio: 0.52
+        });
+      }
+    },
+
+    async triggerInSpinHeroEntrance(result) {
+      const cutinEl = document.getElementById('slots-hero-cutin');
+      const artImg = document.getElementById('slots-cutin-art');
+      const nameEl = document.getElementById('cutin-hero-name');
+      const quoteEl = document.getElementById('cutin-quote');
+      const slashFx = document.getElementById('cutin-slash-fx');
+      const reelWindow = document.getElementById('slots-reel-window');
+      if (!cutinEl || !artImg) return;
+
+      const hero = CUTIN_HEROES[Math.floor(Math.random() * CUTIN_HEROES.length)];
+      artImg.src = hero.art;
+      artImg.alt = `${hero.name} 18+ 原画突入`;
+
+      if (nameEl) nameEl.textContent = `${hero.name} 魅惑突入`;
+      if (quoteEl) quoteEl.textContent = hero.quote;
+      cutinEl.style.setProperty('--cutin-accent', hero.color || '#ff3a9d');
+
+      cutinEl.hidden = false;
+      cutinEl.classList.remove('active', 'exit');
+      artImg.classList.remove('art-impact-zoom');
+      void cutinEl.offsetWidth; // force reflow
+      cutinEl.classList.add('active');
+      artImg.classList.add('art-impact-zoom');
+
+      if (reelWindow) reelWindow.classList.add('cutin-shake');
+      SlotsAudio.heroCutin();
+      if (window.NativeBridge) NativeBridge.haptic('impact');
+
+      if (slashFx) {
+        slashFx.classList.remove('slash-anim');
+        void slashFx.offsetWidth;
+        slashFx.classList.add('slash-anim');
+      }
+
+      // 在各轴依次停转前夕平滑退出，确保开奖无缝展现
+      const holdTime = this.turbo ? 480 : 800;
+      setTimeout(() => {
+        if (cutinEl) cutinEl.classList.add('exit');
+        if (reelWindow) reelWindow.classList.remove('cutin-shake');
+        setTimeout(() => {
+          if (cutinEl) {
+            cutinEl.classList.remove('active', 'exit');
+            cutinEl.hidden = true;
+          }
+        }, 300);
+      }, holdTime);
+    },
+
+    loadCurrentMascot(showDialogue = false) {
       const m = SLOTS_MASCOTS[this.mascotIndex || 0];
       if (!m) return;
       const nameEl = document.getElementById('slots-mascot-name');
@@ -355,14 +808,21 @@
       if (nameEl) nameEl.textContent = m.name;
       if (multEl) multEl.textContent = m.mult;
       if (favorEl) favorEl.textContent = m.favor;
-      this.setMascotSpeech(m.dialogue.idle);
+      if (showDialogue) {
+        this.setMascotSpeech(m.dialogue.idle, 3200);
+      } else {
+        const bubble = document.getElementById('mascot-speech');
+        if (bubble) bubble.hidden = true;
+      }
 
       if (this.mascotStage) {
+        this.mascotStage.opts.scaleMultiplier = m.scaleMult || 1.28;
+        this.mascotStage.opts.yRatio = m.yRatio !== undefined ? m.yRatio : -0.06;
         this.mascotStage.show(m.unit, { anim: 'idle' });
       }
     },
 
-    setMascotSpeech(text) {
+    setMascotSpeech(text, autoHideMs = 3500) {
       const bubble = document.getElementById('mascot-speech');
       const textEl = document.getElementById('mascot-speech-text');
       if (!bubble || !textEl) return;
@@ -370,15 +830,14 @@
       bubble.hidden = false;
       clearTimeout(this.speechTimer);
       this.speechTimer = setTimeout(() => {
-        const m = SLOTS_MASCOTS[this.mascotIndex || 0];
-        if (m) textEl.textContent = m.dialogue.idle;
-      }, 4200);
+        bubble.hidden = true;
+      }, autoHideMs);
     },
 
     switchMascot() {
       this.mascotIndex = (this.mascotIndex + 1) % SLOTS_MASCOTS.length;
       SlotsAudio.coin();
-      this.loadCurrentMascot();
+      this.loadCurrentMascot(true);
       const m = SLOTS_MASCOTS[this.mascotIndex];
       UI.toast(`✦ 幸运伴游已切换为：${m.name}`);
     },
@@ -386,7 +845,7 @@
     onMascotSpin() {
       const m = SLOTS_MASCOTS[this.mascotIndex || 0];
       if (!m) return;
-      this.setMascotSpeech(m.dialogue.spin);
+      this.setMascotSpeech(m.dialogue.spin, 2800);
       if (this.mascotStage && this.mascotStage.field && this.mascotStage.view) {
         this.mascotStage.field.setAnim(this.mascotStage.view, 'hit', false);
         setTimeout(() => {
@@ -401,7 +860,7 @@
       const m = SLOTS_MASCOTS[this.mascotIndex || 0];
       if (!m) return;
       if (win > 0) {
-        this.setMascotSpeech(combo >= 3 ? m.dialogue.bigWin : m.dialogue.win);
+        this.setMascotSpeech(combo >= 3 ? m.dialogue.bigWin : m.dialogue.win, 3500);
         if (this.mascotStage && this.mascotStage.field && this.mascotStage.view) {
           this.mascotStage.field.setAnim(this.mascotStage.view, 'hit', false);
           setTimeout(() => {
@@ -417,7 +876,7 @@
       const m = SLOTS_MASCOTS[this.mascotIndex || 0];
       if (!m) return;
       SlotsAudio.coin();
-      this.setMascotSpeech(m.dialogue.tap);
+      this.setMascotSpeech(m.dialogue.tap, 3000);
       if (this.mascotStage && this.mascotStage.field && this.mascotStage.view) {
         this.mascotStage.field.setAnim(this.mascotStage.view, 'damage', false);
         setTimeout(() => {
@@ -432,7 +891,11 @@
       if (this.mascotStage) {
         this.mascotStage.start();
         const m = SLOTS_MASCOTS[this.mascotIndex || 0];
-        if (m) this.mascotStage.show(m.unit, { anim: 'idle' });
+        if (m) {
+          this.mascotStage.opts.scaleMultiplier = m.scaleMult || 1.28;
+          this.mascotStage.opts.yRatio = m.yRatio !== undefined ? m.yRatio : -0.06;
+          this.mascotStage.show(m.unit, { anim: 'idle' });
+        }
       }
     },
 
@@ -444,7 +907,10 @@
 
     bind() {
       const spinButton = document.getElementById('btn-slots-spin');
-      if (spinButton) spinButton.onclick = () => this.playSpin();
+      if (spinButton) spinButton.onclick = () => this.pullLever();
+
+      const sideLever = document.getElementById('cabinet-side-lever');
+      if (sideLever) sideLever.onclick = () => this.pullLever();
 
       const betDown = document.getElementById('btn-slots-bet-down');
       const betUp = document.getElementById('btn-slots-bet-up');
@@ -495,12 +961,17 @@
 
     pullLever() {
       if (this.spinning) return;
-      const lever = document.getElementById('slots-lever');
-      if (lever) {
-        lever.classList.add('pulling');
-        SlotsAudio.lever();
-        setTimeout(() => lever.classList.remove('pulling'), 320);
+      const spinBtn = document.getElementById('btn-slots-spin');
+      const sideLever = document.getElementById('cabinet-side-lever');
+      if (spinBtn) {
+        spinBtn.classList.add('pulling');
+        setTimeout(() => spinBtn.classList.remove('pulling'), 360);
       }
+      if (sideLever) {
+        sideLever.classList.add('pulling');
+        setTimeout(() => sideLever.classList.remove('pulling'), 360);
+      }
+      SlotsAudio.lever();
       this.playSpin();
     },
 
@@ -519,11 +990,33 @@
     stopAutoSpin() {
       this.autoSpin = false;
       this.autoSpinsLeft = 0;
+      if (this._autoSpinTimer) {
+        clearTimeout(this._autoSpinTimer);
+        this._autoSpinTimer = null;
+      }
       const btn = document.getElementById('btn-slots-auto');
       if (btn) {
         btn.setAttribute('aria-pressed', 'false');
         btn.classList.remove('active');
         btn.textContent = 'AUTO';
+      }
+    },
+
+    pause() {
+      this.stopAutoSpin();
+      this.pauseMascot();
+      this.spinning = false;
+      const button = document.getElementById('btn-slots-spin');
+      if (button) button.disabled = false;
+    },
+
+    destroy() {
+      this.stopAutoSpin();
+      if (this.mascotStage && typeof this.mascotStage.stop === 'function') {
+        this.mascotStage.stop();
+      }
+      if (window.APP && APP.stages && APP.stages.slotsFeature && typeof APP.stages.slotsFeature.stop === 'function') {
+        try { APP.stages.slotsFeature.stop(); } catch (e) {}
       }
     },
 
@@ -544,10 +1037,37 @@
       const bet = document.getElementById('slots-bet');
       const free = document.getElementById('slots-free-spins');
       const hint = document.getElementById('slots-hint');
+      const statusBar = document.getElementById('slots-status-bar');
+      const winTier = document.getElementById('slots-win-tier');
+      const spinBtnSub = document.querySelector('.slots-master-spin-btn .spin-sub-title');
+      const spinBtnMain = document.querySelector('.slots-master-spin-btn .spin-main-title');
+
       if (gold) gold.textContent = (state.gold || 0).toLocaleString();
       if (bet) bet.textContent = this.bet.toLocaleString();
       if (free) free.textContent = this.freeSpins;
-      if (hint) hint.textContent = this.freeSpins ? `免费旋转剩余 ${this.freeSpins} 次` : '每次旋转消耗虚拟金币，中奖自动结算';
+
+      const hasFree = this.freeSpins > 0;
+      if (statusBar) statusBar.classList.toggle('has-free-spins', hasFree);
+
+      if (hint) {
+        hint.textContent = hasFree
+          ? `免费大旋转进行中 · 本次旋转免扣金币 · 狂暴倍率生效`
+          : `单次旋转消耗 ${this.bet} 金币 · 命中 3 个 Scatter 激活免费大旋转`;
+      }
+      if (winTier && hasFree && winTier.textContent === 'BASE GAME') {
+        winTier.textContent = 'FREE SPINS';
+        winTier.className = 'slots-badge win-active';
+      }
+      if (spinBtnMain && spinBtnSub) {
+        if (hasFree) {
+          spinBtnMain.textContent = `FREE SPIN · 免费旋转`;
+          spinBtnSub.textContent = `剩余 ${this.freeSpins} 次 · 本次旋转免扣金币`;
+        } else {
+          spinBtnMain.textContent = `SPIN 旋转拉杆`;
+          spinBtnSub.textContent = `PULL LEVER · 开启幸运旋转`;
+        }
+      }
+
       const turbo = document.getElementById('btn-slots-turbo');
       if (turbo) turbo.setAttribute('aria-pressed', String(this.turbo));
       const jackpotValues = { grand: 50000, major: 10000, minor: 2000, mini: 500 };
@@ -655,10 +1175,11 @@
     async playSpin() {
       if (this.spinning || !this.config || !APP.state) return;
       const state = APP.state;
+      state.slotsSession = state.slotsSession || {};
       const useFree = this.freeSpins > 0;
       if (!useFree && (state.gold || 0) < this.bet) {
-        UI.toast('金币不足，请先完成战役或任务获得奖励');
         this.stopAutoSpin();
+        this.handleOutOfGold();
         return;
       }
       this.spinning = true;
@@ -667,11 +1188,15 @@
       const button = document.getElementById('btn-slots-spin');
       if (button) button.disabled = true;
 
-      // Deterministic PRNG calculation
+      // 结合心流状态的确定性 PRNG 轮盘计算
       const seed = (Date.now() ^ ((state.stats && state.stats.slotsSpins) || 0)) >>> 0;
-      const result = SlotsGame.spin(this.config, this.bet, seed);
+      const result = SlotsGame.spin(this.config, this.bet, seed, state.slotsSession);
+      state.slotsSession.totalSpins = (state.slotsSession.totalSpins || 0) + 1;
+      if (state.slotsSession.luckyBailout) {
+        state.slotsSession.luckyBailout = false;
+      }
 
-      // Deduct bet / free spins
+      // 扣除押注或免费旋转
       if (!useFree) {
         state.gold -= this.bet;
         LGSave.recordTransaction(state, 'gold', -this.bet, 'slots_spin');
@@ -692,15 +1217,20 @@
       if (reel) reel.classList.add('spinning');
       if (reelWindow) reelWindow.classList.add('spinning');
 
-      // Staggered stop timing:
+      // 旋转中途特勤动态突入：高赔率/近中/大奖必定突入，普通旋转约 45% 突入
       const reduceMotion = state.settings && state.settings.reduceMotion;
+      const shouldCutin = !reduceMotion && (result.totalWin > 0 || result.isNearMiss || (result.wins && result.wins.length > 0) || Math.random() < 0.45);
+      if (shouldCutin) {
+        this.triggerInSpinHeroEntrance(result);
+      }
       const stepDuration = reduceMotion ? 10 : (this.turbo ? 80 : 200);
       const baseDelay = reduceMotion ? 10 : (this.turbo ? 120 : 450);
 
-      // Staggered column stops with physical bounce & audio
+      // Staggered column stops with physical bounce & audio & haptic
       for (let col = 0; col < this.config.reels; col++) {
         await new Promise((resolve) => setTimeout(resolve, col === 0 ? baseDelay : stepDuration));
         SlotsAudio.reelStop(col);
+        if (window.NativeBridge) NativeBridge.haptic('selection');
         // Add momentary column bounce effect
         if (reelWindow && !reduceMotion) {
           reelWindow.classList.add(`stop-col-${col}`);
@@ -712,6 +1242,16 @@
       if (reel) reel.classList.remove('spinning');
       if (reelWindow) reelWindow.classList.remove('spinning');
       this.renderGrid(result);
+
+      // Near-Miss 假近中急促警报与上瘾刺激
+      if (result.isNearMiss) {
+        if (reelWindow) reelWindow.classList.add('near-miss-tension');
+        if (statusMessage) statusMessage.textContent = '⚡ 差一格绝杀！近距离未中，下一把机会极高！';
+        const m = SLOTS_MASCOTS[this.mascotIndex || 0];
+        if (m) this.setMascotSpeech('唔……只差半格就中超级大奖了！下一把一定出！');
+        if (window.NativeBridge) NativeBridge.haptic('nearMiss');
+        setTimeout(() => { if (reelWindow) reelWindow.classList.remove('near-miss-tension'); }, 2200);
+      }
 
       // Record win & transactions
       const win = result.totalWin;
@@ -777,17 +1317,21 @@
       await this.rollCountUp(win);
       this.onMascotWin(win, result.bestCombo);
 
-      // Trigger audio & coin cascade
+      // Trigger audio & coin cascade & tactile haptics
       if (win > 0) {
-        if (result.bestCombo >= 3) {
+        if (result.bestCombo >= 3 || win >= this.bet * 5) {
           SlotsAudio.bigWin();
+          this.dropCoins(18);
+          if (window.NativeBridge) NativeBridge.haptic('bigWin');
         } else {
           SlotsAudio.winChime(result.bestCombo);
+          this.dropCoins(6);
+          if (window.NativeBridge) NativeBridge.haptic('success');
         }
         if (window.LGVFX) LGVFX.victoryBurst(document.getElementById('slots-grid'));
-        this.dropCoins(Math.min(12, Math.max(3, Math.floor(win / 30))));
-      } else {
+      } else if (!result.isNearMiss) {
         SlotsAudio.coin();
+        if (window.NativeBridge) NativeBridge.haptic('light');
       }
 
       // Feature cut-in popup
@@ -893,7 +1437,7 @@
       if (name) name.textContent = hero ? `【${hero.name}】18+ 觉醒登场` : `${symbol.label} · 连线达成`;
 
       await new Promise((resolve) => setTimeout(resolve, APP.state.settings.reduceMotion ? 120 : 1100));
-      if (playCg) await this.playFeatureCg();
+      if (playCg) await this.playFeatureCg(symbol);
       this.hideFeature();
     },
 
@@ -905,9 +1449,49 @@
       }
     },
 
-    async playFeatureCg() {
-      const videos = (APP.data.videos || []).map((item) => typeof item === 'string' ? item : item.src).filter(Boolean);
-      const source = videos.find((item) => /cg_ch[1-4]\.mp4$/i.test(item)) || videos.find((item) => item.endsWith('.mp4'));
+    async playFeatureCg(symbol) {
+      const allKnown = [
+        'assets/videos/cg_ch1.mp4',
+        'assets/videos/cg_ch2.mp4',
+        'assets/videos/cg_ch3.mp4',
+        'assets/videos/cg_ch4.mp4',
+        'assets/videos/v_comics_maze_2_48.mp4',
+        'assets/videos/v_comics_maze_3_13.mp4',
+        'assets/videos/v_comics_maze_3_14.mp4',
+        'assets/videos/v_comics_maze_3_15.mp4',
+        'assets/videos/cg_rea_general.mp4',
+        'assets/videos/cg_rea_event049.mp4'
+      ];
+      const pool = Array.from(new Set([
+        ...allKnown,
+        ...((APP.data && APP.data.videos) || []).map((item) => typeof item === 'string' ? item : item.src).filter(Boolean)
+      ]));
+
+      // 建立特勤/符號與 CG 的特色關聯映射，兼顧專屬感與隨機豐富度
+      const symbolPreferred = {
+        kitty: ['assets/videos/cg_ch1.mp4', 'assets/videos/v_comics_maze_2_48.mp4'],
+        dominica: ['assets/videos/cg_ch2.mp4', 'assets/videos/v_comics_maze_3_13.mp4'],
+        regina: ['assets/videos/cg_ch3.mp4', 'assets/videos/v_comics_maze_3_14.mp4'],
+        florence: ['assets/videos/cg_ch4.mp4', 'assets/videos/v_comics_maze_3_15.mp4'],
+        zoe_enemy: ['assets/videos/cg_ch3.mp4', 'assets/videos/v_comics_maze_3_14.mp4'],
+        hilda_enemy: ['assets/videos/cg_ch4.mp4', 'assets/videos/v_comics_maze_3_15.mp4'],
+        kart: ['assets/videos/cg_rea_general.mp4', 'assets/videos/cg_rea_event049.mp4'],
+        ines: ['assets/videos/cg_rea_general.mp4'],
+        luf: ['assets/videos/cg_rea_event049.mp4'],
+        misa: ['assets/videos/cg_rea_event049.mp4', 'assets/videos/cg_rea_general.mp4'],
+        wild: allKnown,
+        scatter: allKnown
+      };
+
+      const symId = symbol && symbol.id;
+      let candidates = (symId && symbolPreferred[symId]) ? symbolPreferred[symId] : pool;
+      // 避免連續兩次播放完全相同的 CG
+      let nonRepeating = candidates.filter((v) => v !== this._lastPlayedCg);
+      if (nonRepeating.length === 0) nonRepeating = pool.filter((v) => v !== this._lastPlayedCg);
+      if (nonRepeating.length === 0) nonRepeating = pool;
+
+      const source = nonRepeating[Math.floor(Math.random() * nonRepeating.length)];
+      this._lastPlayedCg = source;
       if (!source) return;
       const overlay = document.getElementById('cg-cinema-overlay');
       const video = document.getElementById('cg-cinema-video');

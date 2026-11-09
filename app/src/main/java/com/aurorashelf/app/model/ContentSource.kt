@@ -17,12 +17,15 @@ data class ContentSource(
 object ContentSourceCatalog {
     const val T91_BASE_URL = "https://h1014.sol148.com"
     const val XVIDEOS_BASE_URL = "https://www.xvideos.com"
-    const val DEFAULT_BASE_URL = XVIDEOS_BASE_URL
     const val HUANGGUO_BASE_URL = "https://huangguoai.com"
     const val HUAVOD_BASE_URL = "https://huavod.com"
     const val BEEG_BASE_URL = "https://beeg.com"
     const val T91DONGMAN_BASE_URL = "https://91dongman.net"
     const val MISSAV_BASE_URL = "https://missav.ws"
+    // Keep cold start on the source that does not require a timed playback token.
+    // Huavod remains available in the picker, but its signed player handshake can
+    // legitimately reject an immediate first request while the token is too early.
+    const val DEFAULT_BASE_URL = T91DONGMAN_BASE_URL
 
     private val builtInSources = listOf(
         ContentSource("91", "91视频", "经典内容库 · 大陆直连稳定", T91_BASE_URL, isDirectDomestic = true),

@@ -78,7 +78,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -176,6 +176,7 @@ import com.aurorashelf.app.ui.theme.AuroraMediaLabel
 import com.aurorashelf.app.ui.theme.AuroraMediaMuted
 import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
 import com.aurorashelf.app.ui.theme.AuroraMediaSurface
+import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
 import com.aurorashelf.app.ui.theme.AuroraProfileAccent
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -709,7 +710,7 @@ private fun SettingsOverview(
         }
         item {
             IntroPreferenceRow(
-                icon = { Icon(Icons.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                icon = { Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                 title = "开屏音效",
                 supporting = "播放原创电影感音效；静音或媒体音量为 0 时不播放",
                 checked = introSoundEnabled,
@@ -1104,6 +1105,63 @@ private fun OfflineCachePage(
                 subtitle = "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
                 onBack = onBack,
             )
+        }
+        item {
+            Surface(
+                color = AuroraMediaSurfaceVariant,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFF2B2B2B)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("本地存储空间", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                        Text("已占用 ${formatBytes(downloadedBytes)}", style = MaterialTheme.typography.labelSmall, color = AuroraCoral)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF333333)),
+                    ) {
+                        Row(Modifier.fillMaxSize()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(0.18f)
+                                    .background(Color(0xFF0A84FF)),
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(0.10f)
+                                    .background(Color(0xFFFF9F0A)),
+                            )
+                        }
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF0A84FF)))
+                            Text("已缓存视频", style = MaterialTheme.typography.labelSmall, color = AuroraMediaMuted)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFFF9F0A)))
+                            Text("海报与元数据", style = MaterialTheme.typography.labelSmall, color = AuroraMediaMuted)
+                        }
+                    }
+                }
+            }
         }
         if (cachedVideos.isEmpty()) {
             item {

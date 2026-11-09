@@ -120,16 +120,24 @@ class LiveViewModel(
         val sourceId = mutableUiState.value.selectedSourceId
         val category = mutableUiState.value.selectedCategory
         loadJob = viewModelScope.launch {
+            var activeSourceId = sourceId
             val result = runCatching {
                 if (sourceId == LiveSourceCatalog.HORNYSTUDENTS.id) {
                     hornyStudentsRepository.load(category, page)
                 } else {
-                    stripchatRepository.load(category, page)
+                    try {
+                        stripchatRepository.load(category, page)
+                    } catch (primaryErr: Exception) {
+                        if (primaryErr is CancellationException) throw primaryErr
+                        // Stripchat 连接失败时自动降级到备用源 HornyStudents
+                        activeSourceId = LiveSourceCatalog.HORNYSTUDENTS.id
+                        hornyStudentsRepository.load(category, page)
+                    }
                 }
             }
             result.onSuccess { res ->
                 if (page == 1 && res.items.isNotEmpty()) {
-                    preferences.saveLiveFeed(sourceId, category.name, res.items)
+                    preferences.saveLiveFeed(activeSourceId, category.name, res.items)
                 }
                 mutableUiState.update { current ->
                     val update = nextLivePage(
@@ -139,6 +147,7 @@ class LiveViewModel(
                         replace = replace,
                     )
                     current.copy(
+                        selectedSourceId = activeSourceId,
                         items = update.items,
                         page = page,
                         canLoadMore = update.canLoadMore,

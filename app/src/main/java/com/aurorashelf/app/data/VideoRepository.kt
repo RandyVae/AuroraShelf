@@ -45,6 +45,12 @@ class VideoRepository {
                     return@withContext pipeItems.getOrThrow()
                 }
             }
+            if (ContentSourceCatalog.isHuangguo(baseUrl)) {
+                val edgeItems = HuangguoEdgeGateway.fetchFeed(baseUrl, category, page)
+                if (edgeItems != null && edgeItems.isNotEmpty()) {
+                    return@withContext edgeItems
+                }
+            }
             val requestUrl = pageUrl(baseUrl, category, page)
             val document = try {
                 fetchDocument(requestUrl, baseUrl)
@@ -57,8 +63,39 @@ class VideoRepository {
             if (page == 1 && records.isEmpty()) {
                 throw IOException("页面已打开，但没有识别到视频条目。请检查站点地址或页面结构。")
             }
-            records
+            if (ContentSourceCatalog.isHuangguo(baseUrl)) {
+                differentiateHuangguoFeed(records, category)
+            } else {
+                records
+            }
         }
+
+    internal fun differentiateHuangguoFeed(records: List<VideoItem>, category: FeedCategory): List<VideoItem> {
+        val (matches, others) = when (category) {
+            FeedCategory.MONTHLY_HOT -> {
+                records.partition {
+                    it.title.contains("漫") || it.title.contains("动漫") || it.title.contains("二次元") ||
+                        it.title.contains("画") || it.title.contains("AI漫") || it.pageUrl.contains("manju")
+                }
+            }
+            FeedCategory.FAVORITES -> {
+                records.partition {
+                    it.title.contains("换脸") || it.title.contains("明星") || it.title.contains("AI换脸") ||
+                        it.title.contains("脸") || it.pageUrl.contains("huanlian")
+                }
+            }
+            FeedCategory.ALL -> {
+                records.partition {
+                    it.title.contains("短剧") || it.title.contains("剧") || it.pageUrl.contains("duanju")
+                }
+            }
+            FeedCategory.RECENT -> {
+                records.partition { it.views.contains("最新") || !it.views.contains("热度") }
+            }
+            else -> records to emptyList()
+        }
+        return if (matches.isNotEmpty()) matches + others else records
+    }
 
     suspend fun search(baseUrl: String, query: String, page: Int = 1): List<VideoItem> =
         withContext(Dispatchers.IO) {
@@ -90,6 +127,10 @@ class VideoRepository {
                 return@withContext parseDocument(document, baseUrl)
             }
             if (ContentSourceCatalog.isHuangguo(baseUrl)) {
+                val edgeResults = HuangguoEdgeGateway.search(baseUrl, query, page)
+                if (edgeResults != null && edgeResults.isNotEmpty()) {
+                    return@withContext edgeResults
+                }
                 val encodedQuery = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8.name())
                 val searchPath = if (page <= 1) "/search?keyword=$encodedQuery" else "/search/video/$encodedQuery/?page=$page"
                 val searchUrl = URI("$baseUrl/").resolve(searchPath).toString()

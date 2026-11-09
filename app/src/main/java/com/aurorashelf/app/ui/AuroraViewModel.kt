@@ -83,6 +83,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         prefetchCovers(initialCachedFeed?.videos.orEmpty())
         prefetchLeadingStream(initialCachedFeed?.videos.orEmpty())
         prefetchHuavodStreams(initialCachedFeed?.videos.orEmpty())
+        startGlobalWarmup()
         refresh()
     }
 
@@ -251,6 +252,10 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     fun openVideo(video: VideoItem) {
         preferences.addToHistory(video.id)
         preferences.saveVideo(video)
+        // 关键落地：用户点击卡片进入详情的瞬间，后台立即静默启动华视首集换链倒计时
+        if (ContentSourceCatalog.isHuavod(video.pageUrl)) {
+            PlaybackResolver().prewarmHuavod(video.pageUrl)
+        }
         _uiState.update {
             it.copy(selectedVideo = video, historyIds = preferences.historyIds(), message = null)
         }
@@ -358,6 +363,34 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                         message = error.message ?: "加载更多失败，请稍后重试。",
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * 启动全平台全面预热系统：涵盖论坛热帖图集、漫画热门作品，实现即点即看
+     */
+    private fun startGlobalWarmup() {
+        val app = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            delay(1_200L) // 让位给首屏渲染
+            try {
+                // 1. 预热论坛热门板块数据
+                val forumRepo = com.aurorashelf.app.data.forum.ForumRepository()
+                runCatching { forumRepo.load(1) }
+
+                // 2. 预热漫画推荐
+                val comicRepo = com.aurorashelf.app.data.comic.ComicRepository(
+                    com.aurorashelf.app.data.comic.EncryptedComicAuthStore(app)
+                )
+                val comics = runCatching {
+                    comicRepo.browse(AppPreferences.DEFAULT_COMIC_SOURCE_ID, "0", 1)
+                }.getOrNull()
+                comics?.take(6)?.forEach { comic ->
+                    comic.coverUrl?.takeIf { it.isNotBlank() }?.let { CoverImageLoader.load(it, it) }
+                }
+            } catch (_: Exception) {
+                // 静默预热
             }
         }
     }

@@ -1,6 +1,7 @@
 package com.aurorashelf.app.ui
 
 import android.animation.ValueAnimator
+import android.content.ContentResolver
 import android.graphics.Color as AndroidColor
 import android.media.AudioManager
 import android.net.Uri
@@ -96,7 +97,10 @@ internal fun BrandIntroOverlay(
         } else {
             runCatching {
                 ExoPlayer.Builder(context.applicationContext).build().apply {
-                    val uri: Uri = RawResourceDataSource.buildRawResourceUri(R.raw.intro_film)
+                    val uri: Uri = Uri.Builder()
+                        .scheme(ContentResolver.SCHEME_ANDROID_RESOURCE)
+                        .path(R.raw.intro_film.toString())
+                        .build()
                     setMediaItem(MediaItem.fromUri(uri))
                     repeatMode = Player.REPEAT_MODE_OFF
                     volume = if (soundEnabled && deviceAudible(context)) 1f else 0f

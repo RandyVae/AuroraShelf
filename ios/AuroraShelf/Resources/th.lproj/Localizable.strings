@@ -1,0 +1,111 @@
+/* Tabs */
+"tab.home" = "หน้าแรก";
+"tab.comics" = "การ์ตูน";
+"tab.live" = "ไลฟ์สด";
+"tab.forum" = "ชุมชน";
+"tab.library" = "คลัง";
+
+/* Home Screen */
+"home.today_top_hits" = "ยอดนิยมวันนี้";
+"home.top10" = "10 อันดับยอดนิยม";
+"home.up_next" = "ดูต่อ";
+"home.channels" = "ช่อง";
+"home.connecting" = "กำลังเชื่อมต่อ %@...";
+"home.loading_recommendations" = "กำลังโหลดเนื้อหาแนะนำ...";
+"home.loading_more" = "กำลังโหลดเพิ่มเติม…";
+"home.all_loaded" = "โหลดเนื้อหาทั้งหมดแล้ว";
+"home.play" = "เล่น";
+"home.watchlist" = "รายการ";
+"home.details" = "รายละเอียด";
+"home.related" = "แนะนำที่เกี่ยวข้อง";
+"home.all" = "ทั้งหมด";
+
+/* Search */
+"search.placeholder" = "ค้นหาวิดีโอ อนิเมะ การ์ตูน หรือรหัส";
+"search.concurrent_hint" = "ค้นหาจาก 19 แหล่งวิดีโอพร้อมกัน";
+"search.no_results" = "ไม่พบผลการค้นหา";
+"search.searching" = "กำลังค้นหา…";
+"search.history" = "ประวัติการค้นหา";
+"search.clear_history" = "ล้างประวัติ";
+"search.cancel" = "ยกเลิก";
+
+/* Comics */
+"comics.title" = "การ์ตูน";
+"comics.featured" = "แนะนำพิเศษ";
+"comics.loading" = "กำลังโหลดการ์ตูน…";
+"comics.loading_more" = "กำลังโหลดการ์ตูนเพิ่มเติม…";
+"comics.all_loaded" = "โหลดการ์ตูนทั้งหมดแล้ว";
+"comics.select_source" = "เลือกแหล่งการ์ตูน";
+"comics.unconfigured" = "ยังไม่ได้ตั้งค่าข้อมูลรับรอง";
+"comics.unconfigured_hint" = "โปรดตั้งค่าข้อมูลรับรองในการตั้งค่าเพื่อเข้าถึง";
+
+/* Reader */
+"reader.chapter" = "ตอนที่ %d";
+"reader.page" = "หน้า %d/%d";
+"reader.prev_chapter" = "ตอนก่อนหน้า";
+"reader.next_chapter" = "ตอนถัดไป";
+"reader.loading_image" = "กำลังโหลดภาพ…";
+
+/* Live */
+"live.title" = "ไลฟ์สด";
+"live.featured" = "แนะนำ";
+"live.female" = "ผู้หญิง";
+"live.male" = "ผู้ชาย";
+"live.couples" = "คู่รัก";
+"live.trans" = "ทรานส์";
+"live.loading" = "กำลังโหลดรายการสตรีมเมอร์…";
+"live.viewers" = "ผู้ชม %@";
+"live.online" = "ออนไลน์";
+"live.offline" = "ออฟไลน์";
+"live.select_source" = "เลือกแหล่งสตรีม";
+"live.chat" = "แชทสด";
+
+/* Forum */
+"forum.title" = "ชุมชน";
+"forum.all" = "ทั้งหมด";
+"forum.cl" = "ชุมชน CL";
+"forum.91" = "ฟอรัม 91";
+"forum.loading" = "กำลังโหลดกระทู้…";
+"forum.replies" = "ตอบกลับ %d";
+"forum.original_post" = "ดูกระทู้ต้นฉบับ";
+
+/* Player / Detail / Watchlist / InSight */
+"player.play" = "เล่น";
+"player.pause" = "หยุดชั่วคราว";
+"player.aspect_fit" = "พอดีหน้าจอ";
+"player.aspect_fill" = "เต็มจอ";
+"player.airplay" = "AirPlay";
+"player.episodes" = "ตอน";
+"detail.synopsis" = "เรื่องย่อ";
+"detail.more_like_this" = "เรื่องที่คล้ายกัน";
+"watchlist.add" = "เพิ่มในรายการ";
+"watchlist.in_list" = "อยู่ในรายการแล้ว";
+"watchlist.remove" = "ลบออก";
+"watchlist.title" = "รายการของฉัน";
+"watchlist.empty" = "ยังไม่มีรายการ";
+"watchlist.count" = "%d เรื่อง";
+
+/* Library / Settings */
+"library.title" = "คลัง";
+"settings.language" = "ภาษา";
+"settings.language_title" = "เลือกภาษา";
+"settings.follow_system" = "ตามระบบ";
+"settings.game" = "บันเทิง · เกม";
+"settings.game_title" = "เทพีแห่งตัณหา · Tactical RPG";
+"settings.game_desc" = "เกมวางแผนกลยุทธ์ · ประมวลผลลื่นไหล";
+"settings.launch" = "เริ่มเกม";
+"settings.video_source" = "แหล่งวิดีโอปัจจุบัน";
+"settings.comic_source" = "แหล่งการ์ตูนปัจจุบัน";
+"settings.live_source" = "แหล่งถ่ายทอดสดปัจจุบัน";
+"settings.offline_download" = "ดาวน์โหลดออฟไลน์";
+"settings.not_available" = "ยังไม่พร้อมใช้งานในเวอร์ชันนี้";
+"settings.version" = "ข้อมูลเวอร์ชัน";
+"settings.airplay_title" = "AirPlay สตรีม";
+"settings.airplay_select" = "เลือกอุปกรณ์";
+"settings.select_live_source" = "เลือกแหล่งสตรีม";
+
+/* Common Actions */
+"common.done" = "เสร็จสิ้น";
+"common.cancel" = "ยกเลิก";
+"common.close" = "ปิด";
+"common.ok" = "ตกลง";

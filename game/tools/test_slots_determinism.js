@@ -3,9 +3,11 @@
 const fs = require('fs');
 const vm = require('vm');
 
-const config = JSON.parse(fs.readFileSync('web/data/slots.json', 'utf8'));
+const slotsPath = fs.existsSync('app/src/main/assets/www/data/slots.json') ? 'app/src/main/assets/www/data/slots.json' : 'web/data/slots.json';
+const jsPath = fs.existsSync('app/src/main/assets/www/js/slots.js') ? 'app/src/main/assets/www/js/slots.js' : 'web/js/slots.js';
+const config = JSON.parse(fs.readFileSync(slotsPath, 'utf8'));
 const context = { window: {}, console };
-vm.runInNewContext(fs.readFileSync('web/js/slots.js', 'utf8'), context);
+vm.runInNewContext(fs.readFileSync(jsPath, 'utf8'), context);
 const spin = context.window.SlotsGame.spin;
 
 function stable(value) { return JSON.stringify(value); }

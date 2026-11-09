@@ -65,6 +65,7 @@ internal fun NativeSitePlayer(
     modifier: Modifier = Modifier,
     onVideoAspectRatioChange: (Float) -> Unit = {},
     onPositionChange: (Long) -> Unit = {},
+    onPlaybackEnded: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -110,6 +111,7 @@ internal fun NativeSitePlayer(
     val videoOrientationChange by rememberUpdatedState(onVideoOrientationChange)
     val videoAspectRatioChange by rememberUpdatedState(onVideoAspectRatioChange)
     val positionChange by rememberUpdatedState(onPositionChange)
+    val playbackEndedChange by rememberUpdatedState(onPlaybackEnded)
 
     val castManager = remember(context) { com.aurorashelf.app.cast.CastManager.getInstance(context) }
     val castState by castManager.castState.collectAsStateWithLifecycle()
@@ -201,6 +203,10 @@ internal fun NativeSitePlayer(
                     if (ratio != null) {
                         videoAspectRatioChange(ratio)
                     }
+                }
+                if (state == Player.STATE_ENDED) {
+                    Log.i(TAG, "playback state ended, invoking playbackEnded callback")
+                    playbackEndedChange?.invoke()
                 }
                 isLoading = state == Player.STATE_BUFFERING
             }
@@ -336,7 +342,8 @@ internal fun NativeSitePlayer(
             }
         }
         // Hidden entirely when the media declares no text track, so no empty control is shown.
-        if (subtitleOptions.isNotEmpty()) {
+        // In fullscreen, hidden along with ExoPlayer controller to eliminate residual UI.
+        if (subtitleOptions.isNotEmpty() && (!isFullscreen || isControllerVisible)) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -390,13 +397,15 @@ internal fun NativeSitePlayer(
                 }
             }
         }
-        PlayerBottomProgressBar(
-            currentPositionMs = currentPositionMs,
-            bufferedPositionMs = bufferedPositionMs,
-            durationMs = durationMs,
-            isControllerVisible = isControllerVisible,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        if (!isFullscreen) {
+            PlayerBottomProgressBar(
+                currentPositionMs = currentPositionMs,
+                bufferedPositionMs = bufferedPositionMs,
+                durationMs = durationMs,
+                isControllerVisible = isControllerVisible,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 }
 
