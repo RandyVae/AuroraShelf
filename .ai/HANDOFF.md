@@ -1,3 +1,34 @@
+## 最新交接：2026-11-09 — Slots 双翼操作台重构（左伴游右拉杆）＋多形态防溢出防截断全面修复＋双端版本号更新至 v2.16.4 (Build 230)＋持续交付发布至 bananarey.us
+
+- **范围**：
+  - 响应用户 Randy 核心指示「安卓端的 slot 游戏 UI 错乱太强了。我说了，底部是左边是伴游，右边是按钮。你看看这个 UI 做的，我不知道 iOS 有没有这个情况，反正你都检查一遍，给我修复掉」：
+    1. **Slots 双翼操作台布局与样式重构**：
+       - 根因：`app/src/main/assets/www/css/app.css` 中缺失 `.slots-console-deck` 规则，导致浏览器默认为 `display: block`，左侧 `.slots-mascot-wing` 独占 100% 宽度并将右侧 `.slots-action-wing`（SPIN 按钮）垂直挤至下方超出屏幕可视区，被机台 `overflow: hidden` 截断，伴游画布亦被旧规则 `width: 46%` 挤压坍塌；
+       - 重构为全新 `.slots-console-deck` 双翼 Flexbox 并排架构：
+         - 左翼 `.slots-mascot-wing`（50%）：包含头部标签 `✦ 18+ 伴游 ✦` 与切换特勤圆钮、动态 Spine 骨骼画布（100% 居中挺立、支持点击互动与对白气泡动态浮现）及底部好感度/爆率指示（`+18% 爆率 · Lv.7 · 依恋`）；
+         - 右翼 `.slots-action-wing`（50%）：全高 3D 霓虹 Prominent SPIN 巨型拉杆，包含 🕹️ 操纵杆图标、`SPIN 旋转拉杆` 主标题、`PULL LEVER · 开启幸运旋转` 副标题与 `PULL ▶` 高亮胶囊，支持 3D 按压与 `pulling` 物理动效；
+       - 高度预算收敛：调整机台 `.slots-reel-window` 高度至 `clamp(170px, 23vh, 215px)`，`.slots-console-deck` 设为 `clamp(135px, 18vh, 165px)`，使整机高度控制在 480~636px，彻底杜绝纵向溢出与多余滚动。
+    2. **多形态多视口实测与防错位核验**：
+       - 使用 Headless Chrome 实测并截屏存盘：
+         - 手机窄屏（393×852）：`mascotWing` (left: 25, width: 222, top: 451, bottom: 589) 与 `actionWing` (left: 253, width: 222, top: 451, bottom: 589) 完美等宽等高并排；
+         - 平板大屏（iPad Pro 834×1194）：`mascotWing` (left: 164, width: 249) 与 `actionWing` (left: 421, width: 248) 等高并排，机台居中展幅；
+         - 折叠屏外屏（Duo 466×678）：高度 481px，全组件在紧凑视口内 100% 完整可见；
+       - 截屏落盘至 `slots_fixed_mobile.png` 与 `slots_fixed_ipad.png`。
+    3. **双端版本号全面升级至 v2.16.4 (Build 230)**：
+       - Android：`versionCode = 230`, `versionName = "2.16.4"`；
+       - iOS：`CURRENT_PROJECT_VERSION: 230`, `MARKETING_VERSION: "2.16.4"`；
+       - `PersonalScreen.swift` 游戏版本标签同步更新为 `v2.16.4`；
+       - OTA 网页（`scripts/ota_web/index.html` 与线上 `/var/www/netgrey/index.html`）升级为 `v2.16.4 (Build 230)`；
+       - 线上 `/var/www/netgrey/manifest.plist` 的 `bundle-version` 同步更新为 `2.16.4`。
+    4. **本地全量验证 100% 全部通过**：
+       - 老虎机确定性测试：`node game/tools/test_slots_determinism.js` 1000 次通过；
+       - Android 单元测试：`./gradlew testDebugUnitTest` 31 项任务全部成功；
+       - iOS 核心引擎测试：`xcodebuild test` 45 项全部成功（0 failures）。
+    5. **双端自动化构建签名与 OTA 持续交付发布**：
+       - 执行 `./scripts/publish_ota.sh Release`；
+       - 生成 `dist/Netgrey.apk`（209MB）与 `ios/build.nosync/outputs/Netgrey.ipa`（205MB）；
+       - 上传覆盖发布至 `https://bananarey.us`，远程服务器碎片清理完成，磁盘剩余可用 11GB（>5GB 安全水位）。
+
 ## 最新交接：2026-11-09 — 全量 33 业务数据源真实连通性排查与加固＋SpankBang Cookie 注入与 MissAV 域名镜像升级＋PermissiveURLSessionDelegate 补全 Task 级 ServerTrust 挑战拦截＋UI 多形态防错位系统性核验＋双端版本号更新至 v2.16.3 (Build 229)＋持续交付发布至 bananarey.us
 
 - **范围**：

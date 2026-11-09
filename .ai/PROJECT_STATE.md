@@ -1,5 +1,35 @@
 # Project State
 
+## 最新工作狀態（2026年11月9日 · 雙端版本號升級至 v2.16.4 Build 230 + Slots 雙翼操作台重構「左伴遊右拉桿」+ 多形態防溢出防截斷修復 + OTA 發布至 bananarey.us）
+
+- **最新成果（Slots 底部雙翼操作台重構 + 伴遊與拉桿並排對齊 + 0 溢出截斷 + 雙端單測 100% 通過 + OTA 發布）**：
+  1. **Slots 底部雙翼操作台重構**：
+     - 根因：`app/src/main/assets/www/css/app.css` 中缺失 `.slots-console-deck` 規則，導致伴遊與 SPIN 按鈕呈上下塊級堆疊，SPIN 按鈕被垂直擠出屏幕且被機台 `overflow: hidden` 截斷，伴遊畫布亦被舊規則 `width: 46%` 壓縮坍塌；
+     - 重構為全新 `.slots-console-deck` 雙翼 Flexbox 並排架構：
+       - 左翼 `.slots-mascot-wing`（50%）：包含頭部標籤 `✦ 18+ 伴遊 ✦` 與切換特勤圓鈕、動態 Spine 骨骼畫布（100% 居中挺立、支持點擊互動與對白氣泡動態浮現）及底部好感度/爆率指示（`+18% 爆率 · Lv.7 · 依戀`）；
+       - 右翼 `.slots-action-wing`（50%）：全高 3D 霓虹 Prominent SPIN 巨型拉桿，包含 🕹️ 操縱桿圖標、`SPIN 旋轉拉桿` 主標題、`PULL LEVER · 開啟幸運旋轉` 副標題與 `PULL ▶` 高亮膠囊，支持 3D 按壓與 `pulling` 物理動效；
+     - 高度預算收斂：調整機台 `.slots-reel-window` 高度至 `clamp(170px, 23vh, 215px)`，`.slots-console-deck` 設為 `clamp(135px, 18vh, 165px)`，使整機高度控制在 480~636px，徹底杜絕縱向溢出與多餘滾動。
+  2. **多形態多視口實測與防錯位核驗**：
+     - 使用 Headless Chrome 實測並截屏存盤：
+       - 手機窄屏（393×852）：`mascotWing` (left: 25, width: 222, top: 451, bottom: 589) 與 `actionWing` (left: 253, width: 222, top: 451, bottom: 589) 完美等寬等高並排；
+       - 平板大屏（iPad Pro 834×1194）：`mascotWing` (left: 164, width: 249) 與 `actionWing` (left: 421, width: 248) 等高並排，機台居中展幅；
+       - 折疊屏外屏（Duo 466×678）：高度 481px，全組件在緊湊視口內 100% 完整可見；
+     - 截屏落盤至 `slots_fixed_mobile.png` 與 `slots_fixed_ipad.png`。
+  3. **版本號全量升級至 v2.16.4 (Build 230)**：
+     - Android 端：`app/build.gradle.kts` versionCode 230、versionName 2.16.4；
+     - iOS 端：`CURRENT_PROJECT_VERSION` 230、`MARKETING_VERSION` 2.16.4；
+     - `PersonalScreen.swift` 遊戲版本標籤更新為 `v2.16.4`；
+     - OTA 發布站 `scripts/ota_web/index.html` 與遠端 `/var/www/netgrey/index.html` 同步升級為 `v2.16.4 (Build 230)`；
+     - 遠端 `/var/www/netgrey/manifest.plist` 同步將 `bundle-version` 更新為 `2.16.4`。
+  4. **全量自動化驗證 100% 通過**：
+     - 老虎機確定性測試：`node game/tools/test_slots_determinism.js` 1000 次通過；
+     - Android 單測 `./gradlew testDebugUnitTest` 31 項任務全綠；
+     - iOS 單元測試 `xcodebuild test` 45 項測試全綠（0 failures）。
+  5. **雙端 Release 構建、自動化簽名與 OTA 發布**：
+     - 生成 Android 正式包 `dist/Netgrey.apk`（209M）與 iOS 正式簽名包 `Netgrey.ipa`（205M）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間 11GB（>5GB 安全水位）。
+- **最近更新**：2026-11-09 by Antigravity。
+
 ## 最新工作狀態（2026年11月9日 · 雙端版本號升級至 v2.16.3 Build 229 + 全量 33 源真實連通性審計與加固 + SpankBang Cookie 注入與 MissAV 域名鏡像升級 + PermissiveURLSessionDelegate 補全 Task 級 ServerTrust + UI 多形態防錯位核驗 + OTA 發布至 bananarey.us）
 
 - **最新成果（全量 33 源 100% 審計通過 + SpankBang / MissAV / 禁漫天堂加固 + 多形態 UI 防錯位全綠 + 雙端單測 100% 通過 + OTA 發布）**：
