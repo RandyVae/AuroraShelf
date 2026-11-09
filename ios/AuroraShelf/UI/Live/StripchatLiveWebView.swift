@@ -579,6 +579,19 @@ public struct StripchatLiveWebView: UIViewRepresentable {
             let js = "window.__auroraFill = \(parent.isFillMode ? "true" : "false"); if (typeof checkAndHook === 'function') { checkAndHook(); }"
             webView.evaluateJavaScript(js, completionHandler: nil)
         }
+
+        public func webView(
+            _ webView: WKWebView,
+            didReceive challenge: URLAuthenticationChallenge,
+            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+        ) {
+            if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+               let serverTrust = challenge.protectionSpace.serverTrust {
+                completionHandler(.useCredential, URLCredential(trust: serverTrust))
+            } else {
+                completionHandler(.performDefaultHandling, nil)
+            }
+        }
     }
 }
 

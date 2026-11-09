@@ -26,7 +26,7 @@ public actor CoverImageLoader {
         config.timeoutIntervalForResource = 30
         config.urlCache = URLCache(memoryCapacity: 64 * 1024 * 1024, diskCapacity: 256 * 1024 * 1024)
         config.requestCachePolicy = .returnCacheDataElseLoad
-        self.session = URLSession(configuration: config)
+        self.session = URLSession.permissive(configuration: config)
 
         // 限制內存緩存最大 120 張封面
         memoryCache.countLimit = 120

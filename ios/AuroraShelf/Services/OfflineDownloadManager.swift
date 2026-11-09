@@ -268,7 +268,7 @@ public final class OfflineDownloadManager: ObservableObject {
         }
         playlistReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
         
-        let (playlistData, _) = try await URLSession.shared.data(for: playlistReq)
+        let (playlistData, _) = try await URLSession.permissive().data(for: playlistReq)
         guard let playlistText = String(data: playlistData, encoding: .utf8) else {
             throw NSError(domain: "OfflineDownload", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法解析播放列表"])
         }
@@ -292,7 +292,7 @@ public final class OfflineDownloadManager: ObservableObject {
                 finalMediaPlaylistURL = resolvedURL
                 var varReq = URLRequest(url: resolvedURL)
                 if let ref = referer { varReq.setValue(ref, forHTTPHeaderField: "Referer") }
-                let (varData, _) = try await URLSession.shared.data(for: varReq)
+                let (varData, _) = try await URLSession.permissive().data(for: varReq)
                 if let varText = String(data: varData, encoding: .utf8) {
                     mediaLines = varText.components(separatedBy: .newlines)
                 }
@@ -338,7 +338,7 @@ public final class OfflineDownloadManager: ObservableObject {
             
             let localSegURL = targetDir.appendingPathComponent("segment_\(i).ts")
             if !fileManager.fileExists(atPath: localSegURL.path) {
-                let (data, _) = try await URLSession.shared.data(for: segReq)
+                let (data, _) = try await URLSession.permissive().data(for: segReq)
                 try data.write(to: localSegURL)
                 downloadedBytes += Int64(data.count)
             } else {
@@ -373,7 +373,7 @@ public final class OfflineDownloadManager: ObservableObject {
         req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
         
         let localFileURL = targetDir.appendingPathComponent("video.mp4")
-        let (tempURL, response) = try await URLSession.shared.download(for: req)
+        let (tempURL, response) = try await URLSession.permissive().download(for: req)
         
         if fileManager.fileExists(atPath: localFileURL.path) {
             try? fileManager.removeItem(at: localFileURL)

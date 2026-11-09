@@ -40,6 +40,8 @@ Check `git status` before editing. Update `.ai` after each meaningful stage. Rec
 
 ## iOS 与 Android 双端持续交付、版本发布与远端磁盘防爆规范（核心强制）
 
+- **版本号显式更新（强制）**：完成任何新的实质性功能开发、UI 调整或缺陷修复时，**必须显式递增版本号**（包含代码层语义化版本 `versionName` / `MARKETING_VERSION` 与构建号 `versionCode` / `CURRENT_PROJECT_VERSION`），并同步更新客户端内部版本显示、分发网页（`index.html`）与安装清单（`manifest.plist`），严禁静默覆盖或版本号停滞。
+- **Git 远程仓库全量同步与发布（核心强制）**：每次任务完成并验证通过后，**必须立即将所有修改与新增代码创建规范 Commit 并同步推送到 Git 远程仓库（`git push origin <branch>`）**。严禁出现「本地代码已修改或已发布安装包，但未同步推送到 Git 远程仓库」的脱节状态。发布正式版本时，必须同步创建对应版本的 Git 标签（`git tag -a vX.Y.Z -m "..."` 并 `git push origin vX.Y.Z`），并在 GitHub 对应发布 Release 与挂载交付包。
 - **双端同权同发**：后续只要完成任何新的实质性功能开发、UI 调整或缺陷修复（不论是 iOS 还是 Android），必须立即执行对应及双端自动化构建与签名打包，并上传发布至 OTA 服务器：
   ```sh
   ./scripts/publish_ota.sh Release

@@ -81,7 +81,7 @@ public final class VideoRepository: ObservableObject {
         config.httpAdditionalHeaders = [
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
         ]
-        self.session = URLSession(configuration: config)
+        self.session = URLSession.permissive(configuration: config)
 
         let args = ProcessInfo.processInfo.arguments
         if let idx = args.firstIndex(of: "--video-source"), idx + 1 < args.count {

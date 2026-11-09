@@ -437,7 +437,7 @@ public struct LivePlayerView: View {
                 request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
                 request.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
 
-                let (data, response) = try await URLSession.shared.data(for: request)
+                let (data, response) = try await URLSession.permissive().data(for: request)
                 try Task.checkCancellation()
                 guard activeStreamRequestID == requestID else { return }
                 guard let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),

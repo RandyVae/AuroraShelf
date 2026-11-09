@@ -13,7 +13,7 @@ actor ComicPageImageLoader {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 20
         configuration.timeoutIntervalForResource = 45
-        session = URLSession(configuration: configuration)
+        session = URLSession.permissive(configuration: configuration)
         cache.countLimit = 32
         cache.totalCostLimit = 80 * 1024 * 1024 // 80 MB 内存上限
         

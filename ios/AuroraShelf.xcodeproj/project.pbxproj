@@ -28,6 +28,7 @@
 		4C47BFDB53CC7416F9B6ED43 /* ChannelVisualSpecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30508D92E37F464A86E4F1B0 /* ChannelVisualSpecTests.swift */; };
 		4FEE940CBCC8498A756873F8 /* www in Resources */ = {isa = PBXBuildFile; fileRef = 13E4CD170412966E1A00AB2C /* www */; };
 		5257C1C716C4B07209A2998C /* MainContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3933D72B16857E731FA931B4 /* MainContainerView.swift */; };
+		528DD4A5F393D84CC1D920F0 /* PermissiveURLSessionDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50A429402BC7F8745B96C96 /* PermissiveURLSessionDelegate.swift */; };
 		5358CCFF000B926522B01325 /* PlaybackProgressStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B88B86089848A5A4D442D46 /* PlaybackProgressStore.swift */; };
 		549B2AA769F17FE72A07C8A5 /* Top10Card.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DAB6670A90C1E0006842744 /* Top10Card.swift */; };
 		572621BD412408661B3AF531 /* PersonalScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 838F7C72BD068562B1E2C771 /* PersonalScreen.swift */; };
@@ -214,6 +215,7 @@
 		EB708E9400255802F2C9BA24 /* GameContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameContainerView.swift; sourceTree = "<group>"; };
 		EEE53A172C776FBF447BF3C4 /* AppleSpringCardButtonStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpringCardButtonStyle.swift; sourceTree = "<group>"; };
 		EF8049893611370D274210DF /* PicacgAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PicacgAuthStore.swift; sourceTree = "<group>"; };
+		F50A429402BC7F8745B96C96 /* PermissiveURLSessionDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissiveURLSessionDelegate.swift; sourceTree = "<group>"; };
 		F62769745BBE61EE8AEDE167 /* OfflineDownloadsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineDownloadsScreen.swift; sourceTree = "<group>"; };
 		F6C67CFE9FA3170F63972AF9 /* CategoryShelfTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryShelfTests.swift; sourceTree = "<group>"; };
 		FB0279A9B460CDE2D20FC3D5 /* CategoryDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryDetailScreen.swift; sourceTree = "<group>"; };
@@ -297,6 +299,7 @@
 				5BBE033BB25CF19AB5ED6C45 /* HTMLVideoSourceAdapter.swift */,
 				AEEB04B9A850FF3CCC032FE8 /* LocalizationManager.swift */,
 				C15F0D0C87A034F3C112DC9B /* OfflineDownloadManager.swift */,
+				F50A429402BC7F8745B96C96 /* PermissiveURLSessionDelegate.swift */,
 				40CCFCDEBDA584EBD485134A /* UniversalVideoEngine.swift */,
 				57E508008FB81FF7A5CC8B78 /* VideoPreloadManager.swift */,
 			);
@@ -675,6 +678,7 @@
 				4A0AC55008952D930FFA495A /* NetgreyLogoView.swift in Sources */,
 				7D48812ED84579D10059C1FF /* OfflineDownloadManager.swift in Sources */,
 				CBF2D9E8E2D0F7056683563C /* OfflineDownloadsScreen.swift in Sources */,
+				528DD4A5F393D84CC1D920F0 /* PermissiveURLSessionDelegate.swift in Sources */,
 				572621BD412408661B3AF531 /* PersonalScreen.swift in Sources */,
 				04767287502C14BE64EE3F5A /* PicacgAuthStore.swift in Sources */,
 				471B153BC19DC524A249BB28 /* PictureInPictureManager.swift in Sources */,
@@ -902,7 +906,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 227;
+				CURRENT_PROJECT_VERSION = 228;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -912,7 +916,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.1;
+				MARKETING_VERSION = 2.16.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
@@ -928,7 +932,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 227;
+				CURRENT_PROJECT_VERSION = 228;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -938,7 +942,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.1;
+				MARKETING_VERSION = 2.16.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;

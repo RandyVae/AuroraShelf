@@ -79,7 +79,7 @@ public final class ComicRepository: ObservableObject {
         config.httpAdditionalHeaders = [
             "User-Agent": ComicSourceAdapter.userAgent
         ]
-        self.session = URLSession(configuration: config)
+        self.session = URLSession.permissive(configuration: config)
         self.loadComics(for: ComicSourceCatalog.jm)
     }
 

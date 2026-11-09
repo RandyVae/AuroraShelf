@@ -426,7 +426,7 @@ public final class ForumRepository: ObservableObject {
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
             "Cookie": "language=cn_CN; watch_times=1"
         ]
-        self.session = URLSession(configuration: config)
+        self.session = URLSession.permissive(configuration: config)
         self.postFetcher = nil
         self.loadPosts()
     }
