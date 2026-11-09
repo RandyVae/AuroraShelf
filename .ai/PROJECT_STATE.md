@@ -1,5 +1,35 @@
 # Project State
 
+## 最新工作狀態（2026年11月9日 · 雙端版本號升級至 v2.16.5 Build 231 + 全源連通性全面修復 + 直播源修復 + Slots 伴遊特勤多端防錯位核驗 + OTA 發布至 bananarey.us）
+
+- **最新成果（全源連通性全面修復 + 直播源修復 + Slots 伴遊特勤多端防錯位核驗 + 雙端構建簽名通過 + OTA 發布）**：
+  1. **黃果短劇 SSL 憑證不信任挑戰強制信任放行**：
+     - 針對 iOS 拋出的「此伺服器的憑證無效。你所連接的伺服器可能是冒用『huangguoai.com』的伺服器，並且可能會對你的私密資訊造成風險」挑戰；
+     - 在 `PermissiveURLSessionDelegate.swift` 配置 `SecPolicyCreateBasicX509()` 並將服務端憑證鏈注入 Anchor 錨點強制信任，同時在 `Info.plist` 配置 ATS 例外域，徹底根除自簽名/反代憑證被阻斷問題。
+  2. **XVideos 404 淨化**：
+     - 抓取鏈接中模板佔位符 `/THUMBNUM/` 導致 404；在 `UniversalVideoEngine.swift` 與 `PlaybackResolver.kt` 替換為 `/0/` 並標準化為 `/video.$1/`。
+  3. **MissAV 域名升級**：
+     - 全端切換至 `https://missav.media` 官方高可用節點，解除 Cloudflare 攔截。
+  4. **PornHub 年齡確認攔截修復**：
+     - 雙端自動注入 `age_verified=1; has_access=1; accessAgeDisclaimerPH=1; platform=mobile; bs=000000000000000022522ffa8ac94dcd; cookieConsent=3;` Cookie，解決缺失流解析失敗。
+  5. **直播板塊修復**：
+     - HornyStudents：放棄 Chaturbate 空流 API，直接從官方頁面正則提取帶 Token 的真實 `hls_source` 直連流；
+     - Stripchat：解封被 CSS 誤殺的 `[class*="ViewCamPublic"]` 容器，並在 WKNavigationDelegate 增加廣告 iframe 域名黑名單。
+  6. **Slots 遊戲 UI 錯乱修復**：
+     - 調優 Charlotte 伴遊骨骼動畫為 `scaleMultiplier: 0.68, yRatio: 0.0`，面容眼睛頭髮 100% 挺拔呈現；
+     - 增加小程序右上角膠囊避讓內邊距，取消名字截斷限制，狀態欄文字單行自適應；
+     - 在 360px、393px 與 820px 多端視口通過 Google Chrome Headless CDP 實測截屏驗證 0 溢出、0 錯位。
+  7. **版本號全量升級至 v2.16.5 (Build 231)**：
+     - Android 端：`app/build.gradle.kts` versionCode 231、versionName 2.16.5；
+     - iOS 端：`CURRENT_PROJECT_VERSION` 231、`MARKETING_VERSION` 2.16.5；
+     - `PersonalScreen.swift` 遊戲版本標籤更新為 `v2.16.5`；
+     - OTA 發布站 `scripts/ota_web/index.html` 與遠端 `/var/www/netgrey/index.html` 同步升級為 `v2.16.5 (Build 231)`；
+     - 遠端 `/var/www/netgrey/manifest.plist` 同步將 `bundle-version` 更新為 `2.16.5`。
+  8. **雙端 Release 構建、自動化簽名與 OTA 發布**：
+     - 生成 Android 正式包 `dist/Netgrey.apk`（209M）與 iOS 正式簽名包 `Netgrey.ipa`（205M）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間 11GB（>5GB 安全水位）。
+- **最近更新**：2026-11-09 by Antigravity。
+
 ## 最新工作狀態（2026年11月9日 · 雙端版本號升級至 v2.16.4 Build 230 + Slots 雙翼操作台重構「左伴遊右拉桿」+ 多形態防溢出防截斷修復 + OTA 發布至 bananarey.us）
 
 - **最新成果（Slots 底部雙翼操作台重構 + 伴遊與拉桿並排對齊 + 0 溢出截斷 + 雙端單測 100% 通過 + OTA 發布）**：

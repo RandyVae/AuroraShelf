@@ -433,26 +433,54 @@ public struct LivePlayerView: View {
             }
 
             do {
-                var request = URLRequest(url: apiUrl)
-                request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-                request.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
+                var hlsFoundUrl: URL? = nil
 
-                let (data, response) = try await URLSession.permissive().data(for: request)
-                try Task.checkCancellation()
-                guard activeStreamRequestID == requestID else { return }
-                guard let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    throw NSError(domain: "LivePlayer", code: 502, userInfo: [NSLocalizedDescriptionKey: "获取主播直播流状态失败"])
+                // 1. 优先直接请求 HornyStudents 官方真实主播页面，提取包含鉴权 Token 的原生 hls_source
+                if let roomPageUrl = URL(string: "https://www.hornystudents.com/\(username)/") {
+                    var roomReq = URLRequest(url: roomPageUrl)
+                    roomReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+                    roomReq.setValue("https://www.hornystudents.com/", forHTTPHeaderField: "Referer")
+                    if let (pageData, _) = try? await URLSession.permissive().data(for: roomReq),
+                       let html = String(data: pageData, encoding: .utf8) {
+                        let pattern = #"hls_source(?:\\u0022|"):\s*(?:\\u0022|")([^"\\]*(?:\\.[^"\\]*)*)(?:\\u0022|")"#
+                        if let regex = try? NSRegularExpression(pattern: pattern),
+                           let match = regex.firstMatch(in: html, range: NSRange(location: 0, length: (html as NSString).length)) {
+                            let rawStream = (html as NSString).substring(with: match.range(at: 1))
+                                .replacingOccurrences(of: "\\u0026", with: "&")
+                                .replacingOccurrences(of: "\\u002D", with: "-")
+                                .replacingOccurrences(of: "\\u003D", with: "=")
+                                .replacingOccurrences(of: "\\/", with: "/")
+                                .replacingOccurrences(of: "\\", with: "")
+                            if let directUrl = URL(string: rawStream) {
+                                hlsFoundUrl = directUrl
+                            }
+                        }
+                    }
                 }
 
-                guard let hlsSource = json["hls_source"] as? String, !hlsSource.isEmpty,
-                      let hlsUrl = URL(string: hlsSource) else {
-                    let roomStatus = json["room_status"] as? String ?? "offline"
-                    throw NSError(domain: "LivePlayer", code: 404, userInfo: [NSLocalizedDescriptionKey: "主播当前状态: \(roomStatus)"])
+                // 2. 次选 API 回退
+                if hlsFoundUrl == nil {
+                    var request = URLRequest(url: apiUrl)
+                    request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+                    request.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
+
+                    let (data, response) = try await URLSession.permissive().data(for: request)
+                    try Task.checkCancellation()
+                    guard activeStreamRequestID == requestID else { return }
+                    if let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
+                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let hlsSource = json["hls_source"] as? String, !hlsSource.isEmpty,
+                       let directUrl = URL(string: hlsSource) {
+                        hlsFoundUrl = directUrl
+                    }
                 }
 
-                Self.streamContextCache[username] = (hlsUrl, Date())
-                startNativePlayback(hlsUrl: hlsUrl, requestID: requestID)
+                guard let finalHlsUrl = hlsFoundUrl else {
+                    throw NSError(domain: "LivePlayer", code: 404, userInfo: [NSLocalizedDescriptionKey: "主播当前离线或直播流已重置"])
+                }
+
+                Self.streamContextCache[username] = (finalHlsUrl, Date())
+                startNativePlayback(hlsUrl: finalHlsUrl, requestID: requestID)
             } catch {
                 guard !Task.isCancelled, activeStreamRequestID == requestID else { return }
                 isLoadingLive = false

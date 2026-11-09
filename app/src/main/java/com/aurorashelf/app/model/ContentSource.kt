@@ -21,7 +21,7 @@ object ContentSourceCatalog {
     const val HUAVOD_BASE_URL = "https://huavod.com"
     const val BEEG_BASE_URL = "https://beeg.com"
     const val T91DONGMAN_BASE_URL = "https://91dongman.net"
-    const val MISSAV_BASE_URL = "https://missav.ws"
+    const val MISSAV_BASE_URL = "https://missav.media"
     // Keep cold start on the source that does not require a timed playback token.
     // Huavod remains available in the picker, but its signed player handshake can
     // legitimately reject an immediate first request while the token is too early.
@@ -90,7 +90,7 @@ object ContentSourceCatalog {
 
     fun is91Dongman(baseUrl: String): Boolean = host(baseUrl) in setOf("91dongman.net", "91dongman.com")
 
-    fun isMissAv(baseUrl: String): Boolean = host(baseUrl) in setOf("missav.ws", "missav.ai")
+    fun isMissAv(baseUrl: String): Boolean = host(baseUrl) in setOf("missav.media", "missav.ws", "missav.ai", "missav123.com")
 
     fun isPipePipe(baseUrl: String): Boolean = find(baseUrl)?.extractorServiceName != null
 

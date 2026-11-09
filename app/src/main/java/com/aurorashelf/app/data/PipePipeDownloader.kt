@@ -80,6 +80,13 @@ internal class PipePipeDownloader : Downloader() {
                     removeHeader(name)
                     values.forEach { addHeader(name, it) }
                 }
+                if (url().contains("pornhub.com")) {
+                    val existingCookie = headers()["Cookie"]?.joinToString("; ").orEmpty()
+                    val ageCookie = "age_verified=1; has_access=1; accessAgeDisclaimerPH=1; platform=mobile; cookieConsent=3; bs=000000000000000022522ffa8ac94dcd;"
+                    val combined = if (existingCookie.isBlank()) ageCookie else "$existingCookie; $ageCookie"
+                    removeHeader("Cookie")
+                    addHeader("Cookie", combined)
+                }
             }
             .build()
     }

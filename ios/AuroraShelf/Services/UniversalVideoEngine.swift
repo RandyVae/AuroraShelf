@@ -117,7 +117,13 @@ public enum UniversalVideoEngine {
 
             guard !href.isEmpty, !cleanTitle.isEmpty else { continue }
 
-            let pageURL = href.hasPrefix("http") ? href : "https://www.xvideos.com\(href)"
+            // 净化 XVideos 链接中的模板占位符（剔除 /THUMBNUM/ 或多余层级，防止直接请求返回 HTTP 404）
+            var cleanHref = href.replacingOccurrences(of: "/THUMBNUM/", with: "/0/")
+            if let normRegex = try? NSRegularExpression(pattern: #"/video\.([a-zA-Z0-9_-]+)/\d+/(?:THUMBNUM|\d+)/"#) {
+                cleanHref = normRegex.stringByReplacingMatches(in: cleanHref, range: NSRange(location: 0, length: cleanHref.utf16.count), withTemplate: "/video.$1/")
+            }
+
+            let pageURL = cleanHref.hasPrefix("http") ? cleanHref : "https://www.xvideos.com\(cleanHref)"
             var coverURL = ""
             if let imgMatch = xvideosImgRegex?.firstMatch(in: block, options: [], range: blockRange),
                imgMatch.numberOfRanges > 1 {

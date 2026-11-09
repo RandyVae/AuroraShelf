@@ -294,6 +294,10 @@ public final class VideoRepository: ObservableObject {
             request.setValue("age_pass=1; pg_interstitial_v5=1; pg_pop_v5=1; player_quality=1080; preroll_skip=1; backend_version=main; videos_layout=four-col", forHTTPHeaderField: "Cookie")
             request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
         }
+        if source.id == "pornhub" || url.host?.contains("pornhub") == true {
+            request.setValue("age_verified=1; has_access=1; accessAgeDisclaimerPH=1; platform=mobile; bs=000000000000000022522ffa8ac94dcd; cookieConsent=3;", forHTTPHeaderField: "Cookie")
+            request.setValue("ja,en-US;q=0.8,en;q=0.6", forHTTPHeaderField: "Accept-Language")
+        }
         let data = try await requestFeedData(for: request, source: source.name)
 
         if source.id == VideoSourceCatalog.eporner.id {
@@ -1410,6 +1414,10 @@ public final class VideoRepository: ObservableObject {
             request.setValue("age_pass=1; pg_interstitial_v5=1; pg_pop_v5=1; player_quality=1080; preroll_skip=1; backend_version=main; videos_layout=four-col", forHTTPHeaderField: "Cookie")
             request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
         }
+        if source.id == "pornhub" || pageURL.host?.contains("pornhub") == true {
+            request.setValue("age_verified=1; has_access=1; accessAgeDisclaimerPH=1; platform=mobile; bs=000000000000000022522ffa8ac94dcd; cookieConsent=3;", forHTTPHeaderField: "Cookie")
+            request.setValue("ja,en-US;q=0.8,en;q=0.6", forHTTPHeaderField: "Accept-Language")
+        }
         let data = try await requestFeedData(for: request, source: source.name)
         guard let html = decodeHTML(data) else {
             throw VideoFeedError.malformedResponse(source: source.name)
@@ -1613,7 +1621,13 @@ public final class VideoRepository: ObservableObject {
     }
 
     public func resolveXVideosStream(pageUrl: String, title: String) async throws -> PlaybackSourceResult {
-        guard let url = URL(string: pageUrl) else {
+        // 净化 XVideos 链接中的模板占位符（如 /THUMBNUM/），防止 404
+        var cleanUrlStr = pageUrl.replacingOccurrences(of: "/THUMBNUM/", with: "/0/")
+        if let normRegex = try? NSRegularExpression(pattern: #"/video\.([a-zA-Z0-9_-]+)/\d+/(?:THUMBNUM|\d+)/"#) {
+            cleanUrlStr = normRegex.stringByReplacingMatches(in: cleanUrlStr, range: NSRange(location: 0, length: cleanUrlStr.utf16.count), withTemplate: "/video.$1/")
+        }
+
+        guard let url = URL(string: cleanUrlStr) else {
             throw NSError(domain: "VideoRepository", code: 400, userInfo: [NSLocalizedDescriptionKey: "无效 XVideos 链接"])
         }
 
@@ -1728,6 +1742,10 @@ public final class VideoRepository: ObservableObject {
         if source.id == "spankbang" {
             request.setValue("age_pass=1; pg_interstitial_v5=1; pg_pop_v5=1; player_quality=1080; preroll_skip=1; backend_version=main; videos_layout=four-col", forHTTPHeaderField: "Cookie")
             request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
+        }
+        if source.id == "pornhub" || url.host?.contains("pornhub") == true {
+            request.setValue("age_verified=1; has_access=1; accessAgeDisclaimerPH=1; platform=mobile; bs=000000000000000022522ffa8ac94dcd; cookieConsent=3;", forHTTPHeaderField: "Cookie")
+            request.setValue("ja,en-US;q=0.8,en;q=0.6", forHTTPHeaderField: "Accept-Language")
         }
         if source.id == VideoSourceCatalog.beeg.id {
             request.setValue("https://beeg.com", forHTTPHeaderField: "Origin")

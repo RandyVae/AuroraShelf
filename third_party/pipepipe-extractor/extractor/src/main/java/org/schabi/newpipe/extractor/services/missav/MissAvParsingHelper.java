@@ -32,7 +32,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 public final class MissAvParsingHelper {
-    public static final String BASE_URL = "https://missav.ws";
+    public static final String BASE_URL = "https://missav.media";
     public static final String DEFAULT_LANGUAGE = "ja";
 
     private static final String RECOMBEE_HOST = "client-rapi-missav.recombee.com";

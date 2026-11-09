@@ -1311,7 +1311,7 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   border-bottom: 1px solid rgba(255, 54, 164, .35);
   background: rgba(9, 10, 18, 0.88);
   backdrop-filter: blur(16px);
-  padding: 4px 8px;
+  padding: 4px calc(var(--safe-r, 0px) + 98px) 4px 8px;
   min-height: 38px;
 }
 #screen-slots .slots-topbar h1 {
@@ -2193,9 +2193,8 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
 }
 
 #slots-mascot-name {
-  max-width: 68px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  max-width: 96px;
+  overflow: visible;
   white-space: nowrap;
 }
 
@@ -2463,25 +2462,36 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 3px;
+    gap: 2px;
     width: 100%;
+    box-sizing: border-box;
+    padding: 3px 2px;
   }
   .slots-controls-aux .btn {
-    min-height: 26px;
-    padding: 3px 5px;
-    font-size: 10px;
+    min-height: 24px;
+    padding: 2px 4px;
+    font-size: 9.5px;
+    white-space: nowrap;
   }
   .bet-stepper {
     flex: 1 1 auto;
     justify-content: center;
-    padding: 2px;
+    padding: 1px;
+    gap: 2px;
   }
   .slots-bet-readout {
-    min-width: 44px;
-    font-size: 10px;
+    min-width: 36px;
+    font-size: 9.5px;
+    white-space: nowrap;
   }
   .slots-bet-readout b {
-    font-size: 12px;
+    font-size: 11px;
+  }
+  .slots-extra {
+    flex: 0 0 auto;
+    min-width: 36px;
+    padding: 2px 3px;
+    font-size: 9.5px;
   }
   .slots-console-deck {
     height: clamp(135px, 18vh, 165px);
@@ -2511,6 +2521,13 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
     min-width: 40px;
     padding: 3px 4px;
     font-size: 10px;
+  }
+  .slots-win-meter small {
+    max-width: 140px;
+    font-size: 9px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .slots-paytable-list { grid-template-columns: 1fr; }
 }

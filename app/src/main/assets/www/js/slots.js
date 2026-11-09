@@ -338,8 +338,8 @@
       title: '魅惑特勤',
       mult: '+18% 爆率',
       favor: 'Lv.7 · 依恋',
-      scaleMult: 1.28,
-      yRatio: -0.06,
+      scaleMult: 0.68,
+      yRatio: 0.0,
       dialogue: {
         idle: '指挥官，今天手气很旺盛呢，转一转试试看？',
         spin: '幸运能量注入中！转出 MEGA JACKPOT 吧～',
@@ -440,8 +440,8 @@
       title: '爱欲女神',
       mult: '+28% 爆率',
       favor: 'Lv.10 · 沉沦',
-      scaleMult: 1.28,
-      yRatio: -0.06,
+      scaleMult: 0.68,
+      yRatio: 0.0,
       dialogue: {
         idle: '长官的视线……比最热烈的黄金还要诱人呢～',
         spin: '爱神轻抚转轮～奇迹就要绽放了哦～',
@@ -723,8 +723,8 @@
       if (!this.mascotStage) {
         this.mascotStage = new SpineStage(canvas, {
           heightRatio: 1.0,
-          scaleMultiplier: 1.28,
-          yRatio: -0.06,
+          scaleMultiplier: 0.68,
+          yRatio: 0.0,
           xRatio: 0.5
         });
       }

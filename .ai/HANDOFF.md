@@ -1,3 +1,33 @@
+## 最新交接：2026-11-09 — 全源连通性全面修复（黄果短剧 SSL 证书不信任挑战强制信任、XVideos 404 净化、MissAV 官方高可用节点切换至 missav.media、PornHub 注入 18 岁免确认 Cookie）＋直播源修复（HornyStudents 官方真实 hls_source 提取、Stripchat 播放器容器解封与第三方广告拦截）＋Slots 伴游特勤骨骼尺寸垂直居中调优（scaleMultiplier: 0.68, yRatio: 0.0）与多端防错位核验＋全量 34 源连通性核验通过＋双端版本号升级至 v2.16.5 (Build 231) 发布至 bananarey.us
+
+- **范围**：
+  - 响应用户 Randy 核心指示与真实手机报错截图：
+    1. **黄果短剧 SSL 证书不信任挑战强制信任放行**：
+       - 针对 iOS 抛出的「此伺服器的憑證無效。你所連接的伺服器可能是冒用『huangguoai.com』的伺服器，並且可能會對你的私密資訊造成風險」挑战；
+       - 在 `PermissiveURLSessionDelegate.swift` 配置 `SecPolicyCreateBasicX509()` 并将服务端证书链注入 Anchor 强制信任，同时在 `Info.plist` 配置 ATS 域名例外（`NSExceptionAllowsInsecureHTTPLoads` 与 `huangguoai.com` 豁免），彻底根除因自签名/反代证书被系统网络阻断的问题。
+    2. **XVideos 404 净化**：
+       - 抓取链接中的模板占位符 `/THUMBNUM/` 导致 404；在 `UniversalVideoEngine.swift` 与 `PlaybackResolver.kt` 替换为 `/0/` 并标准化为 `/video.$1/`。
+    3. **MissAV 域名升级**：
+       - 全端切换至 `https://missav.media` 官方高可用节点，解除 Cloudflare 拦截。
+    4. **PornHub 年龄确认拦截修复**：
+       - 双端自动注入 `age_verified=1; has_access=1; accessAgeDisclaimerPH=1; platform=mobile; bs=000000000000000022522ffa8ac94dcd; cookieConsent=3;` Cookie，解决缺失流解析失败。
+    5. **直播板块修复**：
+       - HornyStudents：放弃 Chaturbate 空流 API，直接从官方页面提取带 Token 的真实 `hls_source` 直连流；
+       - Stripchat：解封被 CSS 误杀的 `[class*="ViewCamPublic"]` 容器，并在 WKNavigationDelegate 增加广告 iframe 域名黑名单。
+    6. **Slots 游戏 UI 错乱修复**：
+       - 调优 Charlotte 伴游骨骼动画为 `scaleMultiplier: 0.68, yRatio: 0.0`，面容眼睛头发 100% 挺拔呈现；
+       - 增加小程序右上角胶囊避让内边距，取消名字截断限制，状态栏文字单行自适应；
+       - 在 360px、393px 与 820px 多端视口通过 Google Chrome Headless CDP 实测截屏验证 0 溢出、0 错位。
+    7. **双端版本号升级至 v2.16.5 (Build 231)**：
+       - Android：`versionCode = 231`, `versionName = "2.16.5"`；
+       - iOS：`CURRENT_PROJECT_VERSION: 231`, `MARKETING_VERSION: "2.16.5"`；
+       - `PersonalScreen.swift` 标签同步更新为 `v2.16.5`；
+       - OTA 网页（`scripts/ota_web/index.html` 与线上 `/var/www/netgrey/index.html`）升级为 `v2.16.5 (Build 231)`；
+       - 线上 `/var/www/netgrey/manifest.plist` 的 `bundle-version` 同步更新为 `2.16.5`。
+    8. **双端自动化签名打包与 OTA 持续交付发布**：
+       - 生成 `dist/Netgrey.apk`（209MB）与 `ios/build.nosync/outputs/Netgrey.ipa`（205MB）；
+       - 上传覆盖发布至 `https://bananarey.us`，远程服务器碎片清理完成，磁盘剩余可用 11GB（>5GB 安全水位）。
+
 ## 最新交接：2026-11-09 — Slots 双翼操作台重构（左伴游右拉杆）＋多形态防溢出防截断全面修复＋双端版本号更新至 v2.16.4 (Build 230)＋持续交付发布至 bananarey.us
 
 - **范围**：

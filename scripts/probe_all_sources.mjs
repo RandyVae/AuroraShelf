@@ -9,20 +9,26 @@ const sources = [
     type: '视频', 
     id: 'huangguo', 
     name: '黄果短剧', 
-    url: 'https://huangguoai.com/api/edge/request', 
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ method: 'GET', path: '/api/v1/feed/ranks', body: '', content_type: '' }),
+    url: 'https://huangguoai.com/recommend', 
     referer: 'https://huangguoai.com/'
   },
   { type: '视频', id: '91porn', name: '91视频', url: 'https://h1014.sol148.com/index.php', referer: 'https://h1014.sol148.com/' },
   { type: '视频', id: '91dongman', name: '91动漫', url: 'https://91dongman.net', referer: 'https://91dongman.net/' },
   { type: '视频', id: 'beeg', name: 'Beeg', url: 'https://beeg.com/api/v6/index/main/0/pc', referer: 'https://beeg.com/' },
   { type: '视频', id: 'xvideos', name: 'XVideos', url: 'https://www.xvideos.com/new/1/', referer: 'https://www.xvideos.com/' },
-  { type: '视频', id: 'missav', name: 'MissAV', url: 'https://missav123.com/new', referer: 'https://missav123.com/' },
+  { type: '视频', id: 'missav', name: 'MissAV', url: 'https://missav.media', referer: 'https://missav.media/' },
   { type: '视频', id: 'kissjav', name: 'KissJAV', url: 'https://kissjav.li', referer: 'https://kissjav.li/' },
   { type: '视频', id: '85po', name: '85po', url: 'https://www.85po.com', referer: 'https://www.85po.com/' },
-  { type: '视频', id: 'pornhub', name: 'Pornhub', url: 'https://jp.pornhub.com/video?o=mv', referer: 'https://jp.pornhub.com/' },
+  { 
+    type: '视频', 
+    id: 'pornhub', 
+    name: 'Pornhub', 
+    url: 'https://jp.pornhub.com/video?o=mv', 
+    headers: {
+      'Cookie': 'age_verified=1; has_access=1; accessAgeDisclaimerPH=1; platform=mobile; bs=000000000000000022522ffa8ac94dcd; cookieConsent=3;'
+    },
+    referer: 'https://jp.pornhub.com/' 
+  },
   { type: '视频', id: 'javnoni', name: 'JAV-NONI', url: 'https://javnoni.com', referer: 'https://javnoni.com/' },
   { type: '视频', id: 'javsb', name: 'JAVSB', url: 'https://jav.sb', referer: 'https://jav.sb/' },
   { type: '视频', id: 'tokyomotion', name: 'TOKYO Motion', url: 'https://www.tokyomotion.net', referer: 'https://www.tokyomotion.net/' },
@@ -45,9 +51,10 @@ const sources = [
   { type: '漫画', id: 'ikmmh', name: '爱看漫画', url: 'https://ymcdnyfqdapp.ikmmh.com', referer: 'https://ymcdnyfqdapp.ikmmh.com/' },
   { type: '漫画', id: 'ehentai', name: 'E-Hentai', url: 'https://e-hentai.org', referer: 'https://e-hentai.org/' },
 
-  // 直播源 (2)
+  // 直播源 (3)
   { type: '直播', id: 'chaturbate', name: 'Chaturbate', url: 'https://chaturbate.com/api/public/affiliates/onlinerooms/?wm=9RhSM&client_ip=request_ip&gender=f&limit=5', referer: 'https://chaturbate.com/' },
   { type: '直播', id: 'stripchat', name: 'Stripchat', url: 'https://stripchat.com/api/front/v2/models?limit=5&primaryTag=girls', referer: 'https://stripchat.com/' },
+  { type: '直播', id: 'hornystudents', name: 'HornyStudents', url: 'https://www.hornystudents.com/', referer: 'https://www.hornystudents.com/' },
 
   // 论坛源 (2)
   { type: '论坛', id: '91forum', name: '91社区自拍区', url: 'https://t924.sol140.com/forumdisplay.php?fid=4', referer: 'https://t924.sol140.com/' },

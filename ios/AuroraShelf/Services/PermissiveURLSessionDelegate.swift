@@ -27,12 +27,39 @@ public final class PermissiveURLSessionDelegate: NSObject, URLSessionDelegate, U
         _ challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
-        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-           let serverTrust = challenge.protectionSpace.serverTrust {
-            completionHandler(.useCredential, URLCredential(trust: serverTrust))
-        } else {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let serverTrust = challenge.protectionSpace.serverTrust else {
             completionHandler(.performDefaultHandling, nil)
+            return
         }
+
+        // 1. 设置宽松的基础 X.509 评估策略，完全忽略主机名不匹配（彻底根除因证书 CN/SAN 与域名不一致导致的拦截）
+        SecTrustSetPolicies(serverTrust, SecPolicyCreateBasicX509())
+
+        // 2. 将服务器返回的证书链本身直接注入为 Anchor 信任锚点，即便自签名或第三方代理中间人（MitM）亦可强行信任
+        if #available(iOS 15.0, *) {
+            if let certChain = SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate], !certChain.isEmpty {
+                SecTrustSetAnchorCertificates(serverTrust, certChain as CFArray)
+                SecTrustSetAnchorCertificatesOnly(serverTrust, false)
+            }
+        } else {
+            let certCount = SecTrustGetCertificateCount(serverTrust)
+            var certs: [SecCertificate] = []
+            for i in 0..<certCount {
+                if let cert = SecTrustGetCertificateAtIndex(serverTrust, i) {
+                    certs.append(cert)
+                }
+            }
+            if !certs.isEmpty {
+                SecTrustSetAnchorCertificates(serverTrust, certs as CFArray)
+                SecTrustSetAnchorCertificatesOnly(serverTrust, false)
+            }
+        }
+
+        // 3. 执行评估并将凭证返回放行
+        var secError: CFError?
+        _ = SecTrustEvaluateWithError(serverTrust, &secError)
+        completionHandler(.useCredential, URLCredential(trust: serverTrust))
     }
 }
 

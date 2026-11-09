@@ -443,8 +443,10 @@ class PlaybackResolver {
     }
 
     internal suspend fun resolveXVideos(pageUrl: String, startedAtMs: Long): PlaybackSource = withContext(Dispatchers.IO) {
+        val cleanUrl = pageUrl.replace("/THUMBNUM/", "/0/")
+            .replace(Regex("""/video\.([a-zA-Z0-9_-]+)/\d+/(?:THUMBNUM|\d+)/"""), "/video.$1/")
         val html = try {
-            Jsoup.connect(pageUrl)
+            Jsoup.connect(cleanUrl)
                 .userAgent(VideoRepository.USER_AGENT)
                 .referrer("https://www.xvideos.com/")
                 .timeout(15_000)

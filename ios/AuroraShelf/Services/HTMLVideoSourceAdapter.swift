@@ -276,6 +276,7 @@ enum HTMLVideoSourceAdapter {
             #"(?is)(?:href|data-src)=['\"]([^'\"]*/dload/[^'\"]+\.mp4[^'\"]*)['\"]"#,
             #"(?is)html5player\.setVideo(?:HLS|UrlHigh|UrlLow)\(['\"]([^'\"]+)['\"]\)"#,
             #"(?is)(?:src|href)=['\"]([^'\"]*/vsrc/(?:sd|hd)/[^'\"]+)['\"]"#,
+            #"(?is)['\"]videoUrl['\"]\s*:\s*['\"]([^'\"]+)['\"]"#,
             #"(?is)['\"]?(?:file|video_url|video_alt_url|videoUrl|hlsUrl|contentUrl|url_inline|source|source1280|source842)['\"]?\s*[=:]\s*['\"]([^'\"]+\.(?:m3u8|mp4)(?:/?\?[^'\"]*)?/?)["'\"]"#,
             #"(?is)<(?:source|video)[^>]+(?:src|data-src)=['\"]([^'\"]+\.(?:m3u8|mp4)(?:\/?\?[^'\"]*)?)['\"]"#
         ]

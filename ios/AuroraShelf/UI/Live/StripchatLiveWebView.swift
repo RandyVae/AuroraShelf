@@ -129,7 +129,6 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         [class*="modelList"], [class*="ModelList"],
         .related-models, .models-list, .gallery-section, .profile-section,
         [class*="ViewCamShutterWrapper"],
-        [class*="ViewCamPublic"],
         [class*="ShutterWrapper"],
         [class*="ViewCamWrapper__bottom"],
         [class*="poster"], [class*="thumbnail"], [class*="thumb"],
@@ -331,7 +330,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                     }
 
                     // 彻底隐藏任何快门/封面与次级多余缩略标签与悬浮画中画容器
-                    document.querySelectorAll('[class*="ViewCamPublic"], [class*="ViewCamShutterWrapper"], [class*="ShutterWrapper"]').forEach(function(s) {
+                    document.querySelectorAll('[class*="ViewCamShutterWrapper"], [class*="ShutterWrapper"]').forEach(function(s) {
                         s.style.setProperty('display', 'none', 'important');
                         s.style.setProperty('visibility', 'hidden', 'important');
                     });
@@ -570,8 +569,22 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                   url.scheme == "https" else {
                 return .cancel
             }
-            guard navigationAction.targetFrame?.isMainFrame == true else { return .allow }
-            guard let host = url.host?.lowercased(), host == "stripchat.com" || host.hasSuffix(".stripchat.com") else { return .cancel }
+            guard let host = url.host?.lowercased() else { return .cancel }
+
+            // 广告与跟踪域名拦截列表
+            let blockedKeywords = ["exoclick", "trafficjunky", "juicyads", "adtraffic", "popads", "propeller", "syndication", "doubleclick", "adnxs", "googletagmanager", "adservice"]
+            if blockedKeywords.contains(where: { host.contains($0) }) {
+                return .cancel
+            }
+
+            // 白名单域名允许加载
+            let allowedDomains = ["stripchat.com", "highwebmedia.com", "bcvcdn.com", "strpst.com", "stripcdn.com"]
+            let isAllowed = allowedDomains.contains { host == $0 || host.hasSuffix(".\($0)") }
+            guard isAllowed else { return .cancel }
+
+            if navigationAction.targetFrame?.isMainFrame == true {
+                guard host == "stripchat.com" || host.hasSuffix(".stripchat.com") else { return .cancel }
+            }
             return .allow
         }
 
