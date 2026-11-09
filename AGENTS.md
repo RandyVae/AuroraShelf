@@ -61,6 +61,20 @@ Check `git status` before editing. Update `.ai` after each meaningful stage. Rec
   2. 涉及数据源、播放器控制器与核心逻辑：确保核心组件在不同尺寸与设备形态（`DeviceFormFactor`）下均无异常；
   3. 验收标准：必须明确在 iPhone 与 iPad 双端形态下均通过构建与逻辑核验后，方可完成任务并执行 OTA 发布。
 
+## 缺陷修复后全源连通性与 UI 防错位全量核验规范（核心强制）
+
+- **全源连通性全量核验（核心强制）**：
+  任何缺陷修复（Bug Fix）、数据源网络策略调整或数据模型重构后，**严禁仅测试当前改动的单个源即草率交付**。必须对工程内支持的全部源进行一次全量连通性与解析可用性检查（涵盖 19 个视频流媒体源、黄果短剧源、漫画源、直播源、社区论坛源、图床 CDN 等）：
+  1. 验证 Feed 列表数据解析返回有效项目；
+  2. 验证封面与切片图片通过防盗链/代理加载正常解码；
+  3. 验证播放直链或切片解析成功且协议有效（无 SSL/TLS 证书握手阻断、无 403 跨域拦截、无协程/Task 自身死锁）；
+  4. 可直接执行全源探针自动化测试：`RUN_IOS_LIVE_SOURCE_AUDIT=1 xcodebuild test -project ios/AuroraShelf.xcodeproj -scheme AuroraShelf -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:AuroraShelfTests/LiveVideoSourceAuditTests`。
+- **UI 多形态防错位与防截断核验（核心强制）**：
+  任何缺陷修复或界面调整后，**必须对全链路 UI 进行系统性防错位与防溢出核验**：
+  1. 严禁出现布局错位、元素腰斩、文字省略截断（如“...”）、图文重叠、边距塌陷或超出视口等视觉回归问题；
+  2. 必须覆盖多端与不同设备视口断点（iPhone 标准窄屏 393pt、Duo 外屏折叠态 466×678pt、内屏展开态 669×951pt、iPad Pro 宽屏与横竖屏翻转）；
+  3. 必须核验核心控制组（如 Slots 下注辅助条、播放器悬浮按键、TabBar 胶囊、设置页列表）的光学居中与自适应排布，确保原生质感与零错位呈现。
+
 ## Apple UI / UX 持久规范
 
 所有 UI 任务必须遵循本项目的 Apple HIG 产品设计基线，并完成构建、运行和视觉验收。具体规则：[docs/ui/design-system.md](docs/ui/design-system.md)；验收流程：[docs/ui/visual-qa.md](docs/ui/visual-qa.md)。现有项目规则继续有效；平台差异以目标平台原生规范和当前官方文档为准。

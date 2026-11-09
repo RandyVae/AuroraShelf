@@ -26,6 +26,9 @@
            - 新增 `app/src/main/res/xml/network_security_config.xml`，显式配置 `system` 与 `user` 双证书信任锚点并开启 cleartext 宽容模式，在 `AndroidManifest.xml` 中引入 `android:networkSecurityConfig`，彻底预防 Android 移动设备在使用代理/VPN 或遇到非标证书时的握手阻断。
     2. **全局跨 Agent 规范固化（写入全局与项目开发规则）**：
        - 在 `/Users/itou/.gemini/config/plugins/agent-memory/rules/AGENTS.md`、`~/.codex/AGENTS.md`、`~/.claude/CLAUDE.md` 及项目根目录 `AGENTS.md` 中固化「Git 远程仓库全量同步与发布」及「版本号显式更新」准则；
+       - **新增「缺陷修复后全源连通性与 UI 防错位全量核验」强制规范**：
+         - **全源连通性**：严禁只测当前修复的单源便草率交付，必须对工程内支持的全部源（视频、短剧、漫画、直播、论坛、图床）进行全量连通性检查（Feed 请求、封面加载、播放直链解析提取），杜绝未捕获的 SSL/TLS 证书拦截、403 防盗链或协程死锁；
+         - **UI 防错位**：必须系统性核验各设备形态与断点（手机窄屏、横竖屏翻转、iPad 大屏/自适应网格、折叠屏内外屏、桌面端），严禁元素腰斩、文字省略截断或超出视口；
        - 强制要求后续任何实质性开发任务完成并通过验证后，必须立即递增版本号、打包发布双端正式包、更新 OTA 网页与 Manifest，并创建 Git Commit、Tag 且全量推送至 Git 远程仓库。
     3. **双端版本号全面升级至 v2.16.2 (Build 228)**：
        - Android：`versionCode = 228`, `versionName = "2.16.2"`；
