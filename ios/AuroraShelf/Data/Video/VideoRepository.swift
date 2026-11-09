@@ -290,6 +290,10 @@ public final class VideoRepository: ObservableObject {
         var request = URLRequest(url: url)
         request.setValue(HTMLVideoSourceAdapter.baseURL(for: source) + "/", forHTTPHeaderField: "Referer")
         request.setValue("text/html,application/json;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
+        if source.id == "spankbang" {
+            request.setValue("age_pass=1; pg_interstitial_v5=1; pg_pop_v5=1; player_quality=1080; preroll_skip=1; backend_version=main; videos_layout=four-col", forHTTPHeaderField: "Cookie")
+            request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
+        }
         let data = try await requestFeedData(for: request, source: source.name)
 
         if source.id == VideoSourceCatalog.eporner.id {
@@ -1402,6 +1406,10 @@ public final class VideoRepository: ObservableObject {
         var request = URLRequest(url: pageURL)
         request.setValue(referer ?? HTMLVideoSourceAdapter.baseURL(for: source) + "/", forHTTPHeaderField: "Referer")
         request.setValue("text/html,application/xhtml+xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
+        if source.id == "spankbang" {
+            request.setValue("age_pass=1; pg_interstitial_v5=1; pg_pop_v5=1; player_quality=1080; preroll_skip=1; backend_version=main; videos_layout=four-col", forHTTPHeaderField: "Cookie")
+            request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
+        }
         let data = try await requestFeedData(for: request, source: source.name)
         guard let html = decodeHTML(data) else {
             throw VideoFeedError.malformedResponse(source: source.name)
@@ -1717,6 +1725,10 @@ public final class VideoRepository: ObservableObject {
         var request = URLRequest(url: url)
         request.setValue(HTMLVideoSourceAdapter.baseURL(for: source) + "/", forHTTPHeaderField: "Referer")
         request.setValue("text/html,application/json;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
+        if source.id == "spankbang" {
+            request.setValue("age_pass=1; pg_interstitial_v5=1; pg_pop_v5=1; player_quality=1080; preroll_skip=1; backend_version=main; videos_layout=four-col", forHTTPHeaderField: "Cookie")
+            request.setValue("en-US,en;q=0.9", forHTTPHeaderField: "Accept-Language")
+        }
         if source.id == VideoSourceCatalog.beeg.id {
             request.setValue("https://beeg.com", forHTTPHeaderField: "Origin")
         }

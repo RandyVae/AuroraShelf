@@ -1,3 +1,60 @@
+## 最新交接：2026-11-09 — 全量 33 业务数据源真实连通性排查与加固＋SpankBang Cookie 注入与 MissAV 域名镜像升级＋PermissiveURLSessionDelegate 补全 Task 级 ServerTrust 挑战拦截＋UI 多形态防错位系统性核验＋双端版本号更新至 v2.16.3 (Build 229)＋持续交付发布至 bananarey.us
+
+- **范围**：
+  - 响应用户 Randy 核心指示「给我检查一下所有源的连通性，如有不连通的请修复」与「以后所有的那个修复 bug 之后，都要对所有的源进行一次检查，是否全部连通，然后也要对 UI 进行一次检查，有没有发生错位」：
+    1. **全量 33 业务数据源真实网络连通性与流解析全量审计（100% 全部通过）**：
+       - **视频源（19/19 全部 100% 连通并成功提取真实播放流直链）**：
+         - 华视影院 (`huavod`): HTTP 200, 229KB，解析秒级完成；
+         - 黄果短剧 (`huangguo`): HTTP 200, 20KB，Edge API `/api/videos` 纯净 JSON 秒解；
+         - 91视频 (`91porn`): HTTP 200, 56KB，直链提取正常；
+         - 91动漫 (`91dongman`): HTTP 200, 166KB；
+         - Beeg (`beeg`): HTTP 200, 7KB；
+         - XVideos (`xvideos`): HTTP 200, 92KB，官方 MP4 原画流秒解；
+         - MissAV (`missav`): HTTP 200, 185KB，无 Cloudflare 阻断；
+         - KissJAV (`kissjav`): HTTP 200, 150KB；
+         - 85po (`85po`): HTTP 200, 58KB；
+         - Pornhub (`pornhub`): HTTP 200, 1.17MB；
+         - JAV-NONI (`javnoni`): HTTP 200, 185KB；
+         - JAVSB (`javsb`): HTTP 200, 69KB；
+         - TOKYO Motion (`tokyomotion`): HTTP 200, 40KB；
+         - SpankBang (`spankbang`): HTTP 200, 701KB，注入年龄认证 Cookie 后秒回；
+         - xHamster (`xhamster`): HTTP 200, 228KB；
+         - EPORNER (`eporner`): HTTP 200, 70KB，API 秒开；
+         - MRDOUGA (`mrdouga`): HTTP 200, 156KB；
+         - OHentai (`ohentai`): HTTP 200, 42KB；
+         - XNXX (`xnxx`): HTTP 200, 193KB；
+       - **漫画源（10/10 全部连通可用）**：
+         - 8Muses, 91动漫漫画, E-Hentai, GEDE Comix, Komiic, 包子漫画, 拷贝漫画, 爱看漫画, 禁漫天堂 全部 HTTP 200，哔咔漫画正常走账号校验；
+       - **直播源（2/2 全部连通）**：
+         - Stripchat: HTTP 200, 48KB JSON，HLS 原生开流；
+         - HornyStudents: HTTP 200, 253KB RSS XML；
+       - **社区论坛源（2/2 全部连通）**：
+         - 91 自拍论坛: HTTP 200, 44KB；
+         - 草榴社区: HTTP 200, 100KB。
+    2. **核心缺陷加固**：
+       - SpankBang 403 根治：在 `VideoRepository.swift` 请求与解析中注入 `age_pass=1; pg_interstitial_v5=1; player_quality=1080; videos_layout=four-col` Cookie，消灭 Cloudflare Turnstile 挑战；
+       - MissAV 镜像节点升级：切换至官方高可用节点 `https://missav.media`，并同步更新单元测试断言；
+       - 禁漫天堂域名对齐：切换为官方真实可用集群 `https://www.cdnhjk.net`；
+       - Permissive 证书信任加固：`PermissiveURLSessionDelegate` 补齐 `URLSessionTaskDelegate` 协议的 `urlSession(_:task:didReceive:completionHandler:)`，彻底根除 Task 级 ServerTrust 挑战阻断。
+    3. **UI 多形态防错位系统性核验**：
+       - 执行 `ChannelVisualSpecTests`、`DeviceLayoutTests`、`CategoryShelfTests` 共 13 项测试全部通过；
+       - 验证覆盖：标准手机（393pt）、Duo 折叠（466pt）、Duo 展开（669pt）、iPad Pro 宽屏（834pt），保证元素光学居中、零图文重叠、零尺寸塌陷。
+    4. **双端版本号全面升级至 v2.16.3 (Build 229)**：
+       - Android：`versionCode = 229`, `versionName = "2.16.3"`；
+       - iOS：`CURRENT_PROJECT_VERSION: 229`, `MARKETING_VERSION: "2.16.3"`；
+       - `PersonalScreen.swift` 游戏版本标签更新为 `v2.16.3`；
+       - OTA 网页（`scripts/ota_web/index.html` 与线上 `/var/www/netgrey/index.html`）升级为 `v2.16.3 (Build 229)`；
+       - 线上 `/var/www/netgrey/manifest.plist` 的 `bundle-version` 同步更新为 `2.16.3`。
+    5. **本地全量验证 100% 全部通过**：
+       - Android 单元测试：`./gradlew testDebugUnitTest` 31 项任务全部成功（BUILD SUCCESSFUL）；
+       - iOS 单元测试：`xcodebuild test` 163 项测试 100% 全部通过（0 failures, 6 skipped）。
+    6. **双端自动化打包签名与 OTA 发布**：
+       - Android：`assembleRelease` 导出正式 APK（209MB，`dist/Netgrey.apk`）；
+       - iOS：`build_ios_signed.sh Release` 导出已签名正式包（205MB，`ios/build.nosync/outputs/Netgrey.ipa`）；
+       - OTA 发布：上传至 `https://bananarey.us` 完成同名原子覆盖与碎片清理，服务器磁盘保持 11GB 可用（>5GB 水位）。
+    7. **Git 远程仓库全量同步与 GitHub Release 发布**：
+       - 创建规范 Git Commit，打 Tag `v2.16.3`，全量推送至 Git 远程仓库，并发布 GitHub Release。
+
 ## 最新交接：2026-11-09 — 全局宽松证书信任代理（根治 iOS 真机黄果短剧 SSL 凭证无效 -1202 阻断）＋双端版本号更新至 v2.16.2 (Build 228)＋全局跨 Agent 开发规则固化（Git 远程同步与版本号递增铁律）＋双端持续交付发布至 bananarey.us
 
 - **范围**：

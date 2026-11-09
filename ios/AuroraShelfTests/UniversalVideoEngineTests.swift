@@ -611,8 +611,8 @@ final class UniversalVideoEngineTests: XCTestCase {
         let missav = VideoSourceCatalog.allSources.first { $0.id == "missav" }!
         let missavPage1 = HTMLVideoSourceAdapter.feedURL(for: missav, category: "热门", page: 1)
         let missavPage2 = HTMLVideoSourceAdapter.feedURL(for: missav, category: "热门", page: 2)
-        XCTAssertEqual(missavPage1?.absoluteString, "https://missav123.com/cn/release")
-        XCTAssertEqual(missavPage2?.absoluteString, "https://missav123.com/cn/release?page=2")
+        XCTAssertEqual(missavPage1?.absoluteString, "https://missav.media/cn/release")
+        XCTAssertEqual(missavPage2?.absoluteString, "https://missav.media/cn/release?page=2")
     }
 
     func testResolveHuangguoStreamViaApiEndpoint() async throws {

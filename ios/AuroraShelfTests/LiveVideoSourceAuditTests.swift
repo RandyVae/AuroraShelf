@@ -100,7 +100,7 @@ final class LiveVideoSourceAuditTests: XCTestCase {
 
         var m3u8Req = URLRequest(url: playback.url)
         playback.headers.forEach { m3u8Req.setValue($0.value, forHTTPHeaderField: $0.key) }
-        let (m3u8Data, m3u8Resp) = try await URLSession.shared.data(for: m3u8Req)
+        let (m3u8Data, m3u8Resp) = try await URLSession.permissive().data(for: m3u8Req)
         let m3u8Status = (m3u8Resp as? HTTPURLResponse)?.statusCode ?? 0
         XCTAssertTrue((200...299).contains(m3u8Status), "M3U8 请求失败: HTTP \(m3u8Status)")
         let m3u8String = String(data: m3u8Data, encoding: .utf8) ?? ""
@@ -121,7 +121,7 @@ final class LiveVideoSourceAuditTests: XCTestCase {
         var segReq = URLRequest(url: segmentURL)
         segReq.setValue("bytes=0-1024", forHTTPHeaderField: "Range")
         playback.headers.forEach { segReq.setValue($0.value, forHTTPHeaderField: $0.key) }
-        let (segData, segResp) = try await URLSession.shared.data(for: segReq)
+        let (segData, segResp) = try await URLSession.permissive().data(for: segReq)
         let segStatus = (segResp as? HTTPURLResponse)?.statusCode ?? 0
         XCTAssertTrue((200...299).contains(segStatus), "分片媒体请求失败: HTTP \(segStatus)")
         XCTAssertFalse(segData.isEmpty, "分片返回数据为空")
@@ -136,7 +136,7 @@ final class LiveVideoSourceAuditTests: XCTestCase {
             request.setValue(referer, forHTTPHeaderField: "Referer")
         }
         playback.headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.permissive().data(for: request)
         guard let http = response as? HTTPURLResponse,
               (200...299).contains(http.statusCode), !data.isEmpty else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0

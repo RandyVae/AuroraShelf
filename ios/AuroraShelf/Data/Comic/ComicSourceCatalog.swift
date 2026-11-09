@@ -109,7 +109,7 @@ public enum ComicSourceCatalog {
         id: "jm",
         name: "禁漫天堂",
         description: "匿名浏览 · Base64 跨平台双轨解密",
-        baseUrl: "https://18comic.vip",
+        baseUrl: "https://www.cdnhjk.net",
         categories: ["全部", "同人", "单本", "短篇", "韩漫", "美漫", "3D"]
     )
     

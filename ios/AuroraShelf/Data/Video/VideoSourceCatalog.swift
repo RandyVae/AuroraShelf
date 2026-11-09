@@ -106,7 +106,7 @@ public enum VideoSourceCatalog {
         name: "MissAV",
         group: .overseas,
         description: "站点检索列表 · 原站详情页解析",
-        baseUrl: "https://missav123.com",
+        baseUrl: "https://missav.media",
         categories: ["全部", "最新发布", "热门中字", "无码流出", "VR专区"],
         isDirectConnect: false
     )

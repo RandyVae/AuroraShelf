@@ -3,12 +3,28 @@ import Foundation
 /// 全局宽松证书信任与防盗链代理（Permissive URLSession Delegate）
 /// 专为第三方跨域流媒体、短剧、漫画图床以及自签名 / 中间证书缺失 / 移动端网络代理（如 Shadowrocket / Surge / Clash / Loon）设计。
 /// 在接收到 NSURLAuthenticationMethodServerTrust 挑战时直接使用凭证信任，彻底根治「此伺服器的憑證無效」阻断。
-public final class PermissiveURLSessionDelegate: NSObject, URLSessionDelegate, @unchecked Sendable {
+public final class PermissiveURLSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, @unchecked Sendable {
     public static let shared = PermissiveURLSessionDelegate()
 
     public func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        handle(challenge, completionHandler: completionHandler)
+    }
+
+    public func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        handle(challenge, completionHandler: completionHandler)
+    }
+
+    private func handle(
+        _ challenge: URLAuthenticationChallenge,
         completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
         if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,

@@ -158,7 +158,7 @@ enum HTMLVideoSourceAdapter {
 
     static func baseURL(for source: VideoSourceDefinition) -> String {
         switch source.id {
-        case "missav": return "https://missav123.com"
+        case "missav": return "https://missav.media"
         case "85po": return "https://www.85po.com"
         case "pornhub": return "https://jp.pornhub.com"
         case "javnoni": return "https://javnoni.com"

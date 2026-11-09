@@ -57,8 +57,11 @@ if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ] || [ -f "${PROJECT_ROOT}/dist/Netgrey.apk"
     SSHPASS_BIN="$(command -v sshpass 2>/dev/null || echo "/opt/homebrew/bin/sshpass")"
     if [ -x "${SSHPASS_BIN}" ]; then
       if [ -f "${PROJECT_ROOT}/scripts/ota_web/index.html" ]; then
-        echo "上传 OTA 网页 index.html..."
+        echo "上传 OTA 网页 index.html 与 manifest.plist..."
         "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/index.html" "root@${SERVER_IP}:${REMOTE_DIR}/index.html"
+        if [ -f "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" ]; then
+          "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" "root@${SERVER_IP}:${REMOTE_DIR}/manifest.plist"
+        fi
       fi
       if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ]; then
         echo "上传 iOS 通用包 Netgrey.ipa..."
@@ -73,8 +76,11 @@ if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ] || [ -f "${PROJECT_ROOT}/dist/Netgrey.apk"
       "${SSHPASS_BIN}" -p "${SERVER_PASS}" ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "${REMOTE_CLEAN_AND_CHECK}"
     else
       if [ -f "${PROJECT_ROOT}/scripts/ota_web/index.html" ]; then
-        echo "上传 OTA 网页 index.html..."
+        echo "上传 OTA 网页 index.html 与 manifest.plist..."
         scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/index.html" "root@${SERVER_IP}:${REMOTE_DIR}/index.html"
+        if [ -f "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" ]; then
+          scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" "root@${SERVER_IP}:${REMOTE_DIR}/manifest.plist"
+        fi
       fi
       if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ]; then
         echo "上传 iOS 通用包 Netgrey.ipa..."
