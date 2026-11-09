@@ -22,8 +22,8 @@ android {
         applicationId = "com.aurorashelf.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 231
-        versionName = "2.16.5"
+        versionCode = 232
+        versionName = "2.16.6"
 
         buildConfigField("String", "PICACG_API_KEY", sourceSecret("PICACG_API_KEY").asBuildConfigString())
         buildConfigField(

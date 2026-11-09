@@ -1,3 +1,54 @@
+## 最新交接：2026-11-10 — 承接 Codex 审计报告 P1/P2/P3 缺陷全量闭环修复（404 根治/时序与用户控制权/动效节奏分层/a11y/减少动效双轨同步）＋多端多形态视口防错位核验＋全量 34 源连通性核验通过＋双端版本号升级至 v2.16.6 (Build 232) 并发布至 bananarey.us
+
+- **范围**：
+  - 响应用户 Randy 核心指示「你接著codex的審計報告接著做，做完之後修復」：
+    1. **P1 缺陷修复：奖励弹层 404 与空白舞台彻底根除**：
+       - 根因：`resolveSymbol` 匹配 `zoe_enemy` 或 `hilda_enemy` 时，返回了 `data.enemies` 中的对象，该对象仅有 `id` 和 `unit`，无 `key` 字段。旧代码中 `${hero.key}` 直接求值为 `undefined`，进而发起不存在的 `assets/heroes/undefined/nude.webp` 网络请求导致 404 与空白舞台；
+       - 重构为 `resolveSymbolVisual(symbol, data)` 安全映射方法：
+         - 8 类符号（kitty, dominica, regina, florence, zoe_enemy, hilda_enemy, wild, scatter）全量安全匹配；
+         - 敌方单位智能匹配至 `zoechloe` 与 `hilda` 高精立绘；
+         - 百搭符号与分散符号提取专属图标，严禁拼接 `undefined`；
+         - 绑定 `portrait.onerror` 容灾回退至符号基础图标，形成双重防御闭环；
+         - 编写 Node.js 校验脚本验证 8 大符号资源 100% 存在于磁盘（0 undefined, 0 missing）。
+    2. **P1 缺陷修复：弹层时序与用户控制权保障**：
+       - 根因：原 `showFeature` 无条件使用 `setTimeout(1100)` 随后直接执行 `hideFeature()`，导致弹层 1.1s 快速闪退，关闭按钮点击无效；
+       - 重构为 `waitForFeatureDismissal(closeBtn)` 控制闭环：
+         - 手动模式：等待用户主动点击「继续」或按空格/回车/ESC 键关闭，保障用户阅读立绘与胜利成果的控制权（最长 10s 兜底防挂起）；
+         - AUTO 模式：提供 2.5 秒倒计时，按钮实时显示「继续 (2s)」，倒计时完毕或用户点击均安全推进；
+         - 减少动效模式 (reduce-motion)：500ms 快速自动推进或点击即走。
+    3. **P2 缺陷修复：动效节奏分层**：
+       - 调整触发阈值：普通 2 符号连线不再打断主盘面，由滚轮与伴游进行自然音画反馈；
+       - 仅在 3+ 连线、免费旋转或 ≥8 倍高额大奖时触发全屏全景弹层；
+       - 旋转中途角色突入动效（Cut-in）仅在 ≥5 倍中奖或 3+ combo 触发，消除低价值连线的过度打断。
+    4. **P2 缺陷修复：可访问性 (a11y) 与键盘操作规范**：
+       - 将伴游互动区 `#mascot-actor-wrap` 赋予 `role="button"`、`tabindex="0"` 与 `aria-label="轻触特勤伴游互动"`；
+       - 绑定 Enter/Space 键响应点击与语音对白触发；
+       - 在 `app.css` 增设 `:focus-visible` 高亮轮廓（2px solid #ff2a85），并为弹层关闭按钮 `#btn-slots-feature-close` 添加金黄色微光焦点外框。
+    5. **P2 缺陷修复：系统级 prefers-reduced-motion 媒体查询双轨同步**：
+       - 在 `app.js` 接入 `window.matchMedia('(prefers-reduced-motion: reduce)')` 动态监听，实现系统无障碍设置与应用内开关双向同步，自动切换 `document.documentElement.classList.toggle('reduce-motion')`。
+    6. **Android 兼容修复**：
+       - 在 `app/src/main/java/com/aurorashelf/app/model/ContentSource.kt` 的 `ContentSourceCatalog.find` 增加 `(isMissAv(it.baseUrl) && isMissAv(baseUrl))` 多别名同源识别，单测 100% 通过。
+    7. **双端版本号全面升级至 v2.16.6 (Build 232)**：
+       - Android：`versionCode = 232`, `versionName = "2.16.6"`；
+       - iOS：`CURRENT_PROJECT_VERSION: 232`, `MARKETING_VERSION: "2.16.6"`，已运行 `xcodegen` 刷新工程配置；
+       - `PersonalScreen.swift` 标签同步更新为 `v2.16.6`；
+       - OTA 网页（`scripts/ota_web/index.html` 与线上 `/var/www/netgrey/index.html`）升级为 `v2.16.6 (Build 232)`；
+       - 线上 `/var/www/netgrey/manifest.plist` 的 `bundle-version` 同步更新为 `2.16.6`。
+    8. **多端多形态防错位与防溢出核验**：
+       - 通过 Headless Chrome CDP 真实视口渲染与截屏存盘：
+         - 393×852 (iPhone 标准视口)
+         - 466×678 (iPhone Duo 折叠外屏)
+         - 669×951 (iPhone Duo 展开内屏)
+         - 820×1180 (iPad 标准视口)
+         - 控制台错误计数：0，网络 404 计数：0，机台与弹层 0 溢出、0 错位。
+    9. **全量 34 源连通性核验通过**：
+       - 执行 `node scripts/probe_all_sources.mjs`，华视影院、黄果短剧、91视频、91动漫、Beeg、XVideos、MissAV、KissJAV、PornHub、HornyStudents、Stripchat 等全部核心源均 100% 成功返回有效数据。
+    10. **双端自动化签名打包与 OTA 持续交付发布**：
+       - Android Release APK（208M）与 iOS Universal IPA（205M）成功打包编译；
+       - 同名原子覆盖发布至 `https://bananarey.us`（`Netgrey.apk` 与 `Netgrey.ipa`），清理临时碎片，服务器磁盘剩余可用 11GB（>5GB 安全水位）。
+    11. **产出正式报告**：
+       - 依据香港公文惯例采用香港繁体中文撰写 `docs/audit/slots-ui-2026-11-10/FIX-REPORT.md`。
+
 ## 最新交接：2026-11-09 — 全源连通性全面修复（黄果短剧 SSL 证书不信任挑战强制信任、XVideos 404 净化、MissAV 官方高可用节点切换至 missav.media、PornHub 注入 18 岁免确认 Cookie）＋直播源修复（HornyStudents 官方真实 hls_source 提取、Stripchat 播放器容器解封与第三方广告拦截）＋Slots 伴游特勤骨骼尺寸垂直居中调优（scaleMultiplier: 0.68, yRatio: 0.0）与多端防错位核验＋全量 34 源连通性核验通过＋双端版本号升级至 v2.16.5 (Build 231) 发布至 bananarey.us
 
 - **范围**：

@@ -145,12 +145,65 @@
     if (typeof symbol === 'string') symbol = { id: symbol };
     if (!symbol || !data) return null;
     const id = symbol.id;
-    if (id === 'florence') return (data.heroes || []).find((h) => h.key === 'esther' || h.key === 'florence');
+    if (id === 'florence' || id === 'esther') {
+      return (data.heroes || []).find((h) => h.key === 'esther' || h.key === 'florence') || null;
+    }
+    if (id === 'zoe_enemy') {
+      return (data.heroes || []).find((h) => h.key === 'zoechloe') || (data.enemies || []).find((e) => e.id === 'zoe_enemy') || null;
+    }
+    if (id === 'hilda_enemy') {
+      return (data.heroes || []).find((h) => h.key === 'hilda') || (data.enemies || []).find((e) => e.id === 'hilda_enemy') || null;
+    }
     const hero = (data.heroes || []).find((h) => h.key === id);
     if (hero) return hero;
     const enemy = (data.enemies || []).find((e) => e.id === id || e.key === id);
     if (enemy) return enemy;
     return null;
+  }
+
+  function resolveSymbolVisual(symbol, data) {
+    if (typeof symbol === 'string') symbol = { id: symbol };
+    if (!symbol) return { artSrc: '', displayName: '', isHero: false, quote: '', fallbackIcon: 'assets/slots/symbol_wild.webp' };
+    const id = symbol.id;
+    const hero = resolveSymbol(symbol, data);
+    const heroKey = (hero && hero.key) || (id === 'florence' ? 'esther' : (id === 'zoe_enemy' ? 'zoechloe' : (id === 'hilda_enemy' ? 'hilda' : (id === 'kitty' ? 'kitty' : (id === 'dominica' ? 'dominica' : (id === 'regina' ? 'regina' : null))))));
+
+    let artSrc = '';
+    if (hero && hero.artWeb) {
+      artSrc = hero.artWeb.nude || hero.artWeb.lega || hero.artWeb.base || '';
+    }
+    if (!artSrc && heroKey && typeof heroKey === 'string' && heroKey !== 'undefined') {
+      if (heroKey === 'kitty') {
+        artSrc = 'assets/heroes/kitty/lega.webp';
+      } else {
+        artSrc = `assets/heroes/${heroKey}/nude.webp`;
+      }
+    }
+    if (!artSrc) {
+      artSrc = symbol.icon || SYMBOL_ASSETS[id] || 'assets/slots/symbol_wild.webp';
+    }
+
+    const isHero = !!(hero && (hero.key || hero.rarity || (id && (id.includes('hero') || ['kitty', 'dominica', 'regina', 'florence', 'esther', 'zoe_enemy', 'hilda_enemy'].includes(id)))));
+    const displayName = (hero && hero.name) || symbol.label || id;
+
+    let quote = '“战术连线达成，高额战利品已直接入库控制台！”';
+    if (isHero && hero && hero.name) {
+      quote = `“特勤英雄【${hero.name}】已直接入库特勤名册！战备奖励已就位。”`;
+    } else if (id === 'wild') {
+      quote = '“皇冠百搭狂飙！全轴替代连线，战利品倍率极限翻腾！”';
+    } else if (id === 'scatter') {
+      quote = '“能量核心激活！战术免费旋转已解锁，火力全开！”';
+    }
+
+    return {
+      hero,
+      heroKey,
+      artSrc,
+      displayName,
+      isHero,
+      quote,
+      fallbackIcon: symbol.icon || SYMBOL_ASSETS[id] || 'assets/slots/symbol_wild.webp'
+    };
   }
 
   const SYMBOL_ASSETS = {
@@ -619,7 +672,7 @@
     }
   ];
 
-  const SlotsGame = { spin, resolveSymbol, SYMBOL_ASSETS, SLOTS_MASCOTS, CUTIN_HEROES };
+  const SlotsGame = { spin, resolveSymbol, resolveSymbolVisual, SYMBOL_ASSETS, SLOTS_MASCOTS, CUTIN_HEROES };
   window.SlotsGame = SlotsGame;
 
   const SlotsUI = {
@@ -630,6 +683,12 @@
     autoSpin: false,
     autoSpinsLeft: 0,
     spinning: false,
+
+    isReduceMotion() {
+      const sys = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const app = !!(typeof APP !== 'undefined' && APP.state && APP.state.settings && APP.state.settings.reduceMotion);
+      return !!(sys || app);
+    },
     currentReelGrid: null,
     mascotIndex: 0,
     mascotStage: null,
@@ -732,7 +791,15 @@
       if (switchBtn) switchBtn.onclick = () => this.switchMascot();
 
       const actorWrap = document.getElementById('mascot-actor-wrap');
-      if (actorWrap) actorWrap.onclick = () => this.onMascotTap();
+      if (actorWrap) {
+        actorWrap.onclick = () => this.onMascotTap();
+        actorWrap.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            this.onMascotTap();
+          }
+        };
+      }
 
       this.loadCurrentMascot(false);
       this.initCutin();
@@ -1217,9 +1284,10 @@
       if (reel) reel.classList.add('spinning');
       if (reelWindow) reelWindow.classList.add('spinning');
 
-      // 旋转中途特勤动态突入：高赔率/近中/大奖必定突入，普通旋转约 45% 突入
-      const reduceMotion = state.settings && state.settings.reduceMotion;
-      const shouldCutin = !reduceMotion && (result.totalWin > 0 || result.isNearMiss || (result.wins && result.wins.length > 0) || Math.random() < 0.45);
+      // 旋转中途特勤动态突入：高赔率(>=5x)/大奖(combo>=3)/免费旋转/Jackpot 突入，普通空转或超低赔率保持滚轮纯净
+      const reduceMotion = this.isReduceMotion();
+      const isHighImpactSpin = result.isJackpot || result.bestCombo >= 3 || (result.totalWin >= this.bet * 5) || (result.freeSpinsAwarded > 0);
+      const shouldCutin = !reduceMotion && isHighImpactSpin;
       if (shouldCutin) {
         this.triggerInSpinHeroEntrance(result);
       }
@@ -1230,7 +1298,7 @@
       for (let col = 0; col < this.config.reels; col++) {
         await new Promise((resolve) => setTimeout(resolve, col === 0 ? baseDelay : stepDuration));
         SlotsAudio.reelStop(col);
-        if (window.NativeBridge) NativeBridge.haptic('selection');
+        if (window.NativeBridge && !reduceMotion) NativeBridge.haptic('selection');
         // Add momentary column bounce effect
         if (reelWindow && !reduceMotion) {
           reelWindow.classList.add(`stop-col-${col}`);
@@ -1335,7 +1403,10 @@
       }
 
       // Feature cut-in popup
-      if (result.bestCombo >= 2) {
+      // 依 Codex 审计报告整改：普通 2 连线通过滚轮连线高亮、跳字计数器与伴游反应自然反馈，保持机器快节奏；
+      // 仅在 3 连线及以上、或免费旋转触发、或高额大奖（>=8倍下注）时弹出大奖特勤奖励弹层，避免视觉疲劳与抢夺焦点
+      const isFeatureReward = result.bestCombo >= 3 || (result.freeSpinsAwarded > 0) || (win >= this.bet * 8);
+      if (isFeatureReward) {
         await this.showFeature(result.featureSymbol, result.bestCombo >= 3);
       }
 
@@ -1404,41 +1475,109 @@
       const name = document.getElementById('slots-feature-name');
       const badge = document.getElementById('slots-feature-badge');
       const quote = document.getElementById('slots-feature-quote');
+      const closeBtn = document.getElementById('btn-slots-feature-close');
       if (!layer || !symbol) return;
       if (typeof symbol === 'string') symbol = this.config.symbols.find((item) => item.id === symbol);
       if (!symbol) return;
 
-      const hero = SlotsGame.resolveSymbol(symbol, APP.data);
+      const visual = SlotsGame.resolveSymbolVisual(symbol, APP.data);
       layer.hidden = false;
-      if (name) name.textContent = `${symbol.label} · ${playCg ? '三连奖励' : '二连奖励'}`;
-      if (badge) badge.textContent = playCg ? 'MEGA HIT 3-COMBO' : 'LINE HIT 2-COMBO';
+
+      if (badge) {
+        badge.textContent = visual.isHero ? '✦ 18+ AWAKEN MEGA HIT ✦' : (playCg ? 'MEGA HIT 3-COMBO' : 'LINE HIT COMBO');
+      }
+      if (name) {
+        name.textContent = visual.isHero ? `【${visual.displayName}】18+ 觉醒登场` : `${visual.displayName} · 连线达成`;
+      }
       if (quote) {
-        quote.textContent = hero && hero.name ? `“特勤英雄【${hero.name}】已直接入库特勤名册！战备奖励已就位。”` : '“战术连线达成，高额战利品已直接入库控制台！”';
+        quote.textContent = visual.quote;
       }
 
-      // 依用戶指示：杜絕常態/戰鬥 Q 版樣式，直接展現震撼 18+ 覺醒全高精立繪
       if (canvas) canvas.hidden = true;
       if (APP.stages && APP.stages.slotsFeature) {
         try { APP.stages.slotsFeature.stop(); } catch (e) {}
       }
 
       if (portrait) {
-        const artSrc = (hero && hero.artWeb && (hero.artWeb.nude || hero.artWeb.lega))
-          || (hero ? `assets/heroes/${hero.key}/nude.webp` : (symbol.icon || SYMBOL_ASSETS[symbol.id] || ''));
-        if (artSrc) {
-          portrait.src = artSrc;
-          portrait.hidden = false;
-        } else {
-          portrait.hidden = true;
-        }
+        portrait.hidden = false;
+        portrait.onerror = function() {
+          this.onerror = null;
+          this.src = visual.fallbackIcon;
+        };
+        portrait.src = visual.artSrc;
       }
 
-      if (badge) badge.textContent = hero ? '✦ 18+ AWAKEN MEGA HIT ✦' : (playCg ? 'MEGA HIT 3-COMBO' : 'LINE HIT 2-COMBO');
-      if (name) name.textContent = hero ? `【${hero.name}】18+ 觉醒登场` : `${symbol.label} · 连线达成`;
+      // 弹层时序与交互闭环（依据 Codex 审计报告 P1 整改）：
+      // 1. 若处于减少动效模式 (reduce-motion)，快速可跳过
+      // 2. 若在 AUTO 模式：提供 2.5 秒倒计时，按钮显示“继续 (2s)”，倒计时完毕或点击均安全推进
+      // 3. 若在手动模式：等待用户主动点击“继续”或按空格/回车键，保障用户阅读与控制权
+      await this.waitForFeatureDismissal(closeBtn);
 
-      await new Promise((resolve) => setTimeout(resolve, APP.state.settings.reduceMotion ? 120 : 1100));
-      if (playCg) await this.playFeatureCg(symbol);
+      if (playCg && !this.isReduceMotion()) {
+        await this.playFeatureCg(symbol);
+      }
       this.hideFeature();
+    },
+
+    waitForFeatureDismissal(closeBtn) {
+      return new Promise((resolve) => {
+        let timer = null;
+        let countdownTimer = null;
+        let done = false;
+
+        const cleanupAndResolve = () => {
+          if (done) return;
+          done = true;
+          if (timer) clearTimeout(timer);
+          if (countdownTimer) clearInterval(countdownTimer);
+          if (closeBtn) {
+            closeBtn.removeEventListener('click', onBtnClick);
+            closeBtn.textContent = '继续';
+          }
+          window.removeEventListener('keydown', onKey);
+          resolve();
+        };
+
+        const onBtnClick = (e) => {
+          if (e) e.preventDefault();
+          cleanupAndResolve();
+        };
+
+        const onKey = (e) => {
+          if (e.code === 'Space' || e.key === 'Escape' || e.key === 'Enter') {
+            e.preventDefault();
+            cleanupAndResolve();
+          }
+        };
+
+        if (closeBtn) {
+          closeBtn.addEventListener('click', onBtnClick);
+          try { closeBtn.focus(); } catch (e) {}
+        }
+        window.addEventListener('keydown', onKey);
+
+        if (this.isReduceMotion()) {
+          // 减少动效模式：500ms 快速自动允许跳过或点击即走
+          timer = setTimeout(cleanupAndResolve, 500);
+          return;
+        }
+
+        if (this.autoSpin) {
+          // 自动旋转：2.5 秒倒计时提示
+          let remaining = 2;
+          if (closeBtn) closeBtn.textContent = `继续 (${remaining}s)`;
+          countdownTimer = setInterval(() => {
+            remaining -= 1;
+            if (closeBtn) {
+              closeBtn.textContent = remaining > 0 ? `继续 (${remaining}s)` : '继续';
+            }
+          }, 1000);
+          timer = setTimeout(cleanupAndResolve, 2500);
+        } else {
+          // 手动模式：最多 10 秒保底防挂起，主交互由用户点击或按键控制
+          timer = setTimeout(cleanupAndResolve, 10000);
+        }
+      });
     },
 
     hideFeature() {
@@ -1503,7 +1642,7 @@
       video.onended = finish;
       const skip = document.getElementById('btn-cg-skip');
       if (skip) skip.onclick = finish;
-      if (APP.state.settings.reduceMotion) { finish(); return; }
+      if (this.isReduceMotion()) { finish(); return; }
       await video.play().catch(() => {});
       await new Promise((resolve) => {
         const done = () => { resolve(); };

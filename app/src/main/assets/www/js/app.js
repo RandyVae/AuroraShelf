@@ -909,7 +909,12 @@
     adult.checked = !!st.settings.adult;
     bgm.addEventListener('input', () => { st.settings.bgm = Number(bgm.value) / 100; LGAudio.setVolumes(st.settings.bgm, st.settings.sfx); save(); });
     sfx.addEventListener('input', () => { st.settings.sfx = Number(sfx.value) / 100; LGAudio.setVolumes(st.settings.bgm, st.settings.sfx); save(); });
-    motion.addEventListener('change', () => { st.settings.reduceMotion = motion.checked; document.documentElement.classList.toggle('reduce-motion', st.settings.reduceMotion); save(); });
+    motion.addEventListener('change', () => {
+      st.settings.reduceMotion = motion.checked;
+      const sys = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.documentElement.classList.toggle('reduce-motion', sys || motion.checked);
+      save();
+    });
     adult.addEventListener('change', () => { st.settings.adult = adult.checked; save(); });
     const btnQaMax = $('#btn-qa-max');
     if (btnQaMax) {
@@ -1042,7 +1047,17 @@
     const hasSave = Object.keys(APP.state.cleared || {}).length > 0 || (APP.state.owned && APP.state.owned.length > LGSave.STARTERS.length);
     $('#btn-start').textContent = hasSave ? '进入游戏' : '开始游戏';
     $('#btn-continue').hidden = !hasSave;
-    document.documentElement.classList.toggle('reduce-motion', !!APP.state.settings.reduceMotion);
+    const syncReduceMotion = () => {
+      const sys = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const app = !!(APP.state && APP.state.settings && APP.state.settings.reduceMotion);
+      document.documentElement.classList.toggle('reduce-motion', sys || app);
+    };
+    syncReduceMotion();
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      try {
+        window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', syncReduceMotion);
+      } catch (e) {}
+    }
     LGAudio.setVolumes(APP.state.settings.bgm, APP.state.settings.sfx);
     UI.setProgress(1);
     show('title');

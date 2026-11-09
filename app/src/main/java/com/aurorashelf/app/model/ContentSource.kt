@@ -73,7 +73,7 @@ object ContentSourceCatalog {
     val sources: List<ContentSource> get() = builtInSources + pipePipeSources
 
     fun find(baseUrl: String): ContentSource? = sources.firstOrNull {
-        host(it.baseUrl) == host(baseUrl)
+        host(it.baseUrl) == host(baseUrl) || (isMissAv(it.baseUrl) && isMissAv(baseUrl))
     }
 
     fun displayName(baseUrl: String): String = find(baseUrl)?.name ?: "自定义视频源"

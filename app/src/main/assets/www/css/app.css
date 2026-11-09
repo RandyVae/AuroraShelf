@@ -2090,6 +2090,34 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   padding: 0 8px;
 }
 
+#btn-slots-feature-close {
+  min-width: 140px;
+  min-height: 38px;
+  padding: 8px 24px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(255, 42, 164, 0.92), rgba(255, 215, 0, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 18px rgba(255, 42, 164, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  user-select: none;
+}
+#btn-slots-feature-close:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(255, 42, 164, 0.65);
+}
+#btn-slots-feature-close:active {
+  transform: translateY(1px);
+}
+#btn-slots-feature-close:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 3px;
+}
+
 /* ==========================================================================
    Dual-Wing Arcade Console Deck: Left 18+ Mascot Companion, Right Master Spin
    ========================================================================== */
@@ -2210,6 +2238,11 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   z-index: 2;
   user-select: none;
   margin: 1px 0;
+}
+.mascot-actor-wrap:focus-visible {
+  outline: 2px solid #ff2a85;
+  outline-offset: 2px;
+  border-radius: 8px;
 }
 
 .slots-mascot-canvas {

@@ -1,5 +1,39 @@
 # Project State
 
+## 最新工作狀態（2026年11月10日 · 雙端版本號升級至 v2.16.6 Build 232 + 承接 Codex 審計報告 P1/P2/P3 缺陷全量閉環修復 + 多端防錯位核驗 + 全源連通性通過 + OTA 發布至 bananarey.us）
+
+- **最新成果（Codex 審計缺陷閉環 + 404 徹底根除 + 時序與用戶控制權 + 動效分層 + a11y 鍵盤與無障礙語義 + 雙端構建通過 + OTA 發布）**：
+  1. **P1 缺陷修復：獎勵彈層 404 與空白舞台徹底根除**：
+     - 根因：`resolveSymbol` 匹配 `zoe_enemy` 或 `hilda_enemy` 時返回無 `key` 字段的 enemy 對象，`${hero.key}` 評估為 `undefined` 並請求 `assets/heroes/undefined/nude.webp` 導致 404；
+     - 重構為 `resolveSymbolVisual(symbol, data)` 安全映射方法，敵方單位安全匹配 `zoechloe` 與 `hilda` 高精立繪，百搭/分散符號提取專屬圖標，嚴禁拼接 `undefined`，並綁定 `portrait.onerror` 雙重防禦；Node.js 8 大符號硬盤存在性測試 100% 通過。
+  2. **P1 缺陷修復：彈層時序與用戶控制權保障**：
+     - 根因：原 `showFeature` 無條件 1.1s 自動閃退，關閉按鈕失效；
+     - 重構為 `waitForFeatureDismissal(closeBtn)`：手動模式等待用戶點擊「繼續」或按空格/回車/ESC 關閉（最長 10s 保底）；AUTO 模式提供 2.5 秒倒計時並實時顯示「繼續 (2s)」；減少動效模式 500ms 快速推進。
+  3. **P2 缺陷修復：動效節奏分層**：
+     - 普通 2 符號連線不打斷主盤面；僅 3+ 連線、免費旋轉或 ≥8 倍大獎觸發全屏彈層；突入動效（Cut-in）僅在 ≥5 倍或 3+ combo 觸發。
+  4. **P2 缺陷修復：可訪問性 (a11y) 與鍵盤操作規範**：
+     - 伴遊區 `#mascot-actor-wrap` 增設 `role="button"`、`tabindex="0"`、`aria-label`、Enter/Space 響應與 `:focus-visible` 焦點高亮輪廓；彈層關閉按鈕增設 `:focus-visible` 金黃色外框。
+  5. **P2 缺陷修復：系統級 prefers-reduced-motion 雙軌同步**：
+     - 接入 `window.matchMedia('(prefers-reduced-motion: reduce)')` 動態監聽，實現系統無障礙設置與應用內設置雙向同步。
+  6. **Android 兼容修復**：
+     - `ContentSourceCatalog.find` 增加 `(isMissAv(it.baseUrl) && isMissAv(baseUrl))` 多別名同源識別，單測 100% 通過。
+  7. **版本號全量升級至 v2.16.6 (Build 232)**：
+     - Android 端：`app/build.gradle.kts` versionCode 232、versionName 2.16.6；
+     - iOS 端：`CURRENT_PROJECT_VERSION` 232、`MARKETING_VERSION` 2.16.6；已運行 `xcodegen` 刷新工程配置；
+     - `PersonalScreen.swift` 遊戲版本標籤更新為 `v2.16.6`；
+     - OTA 發布站 `scripts/ota_web/index.html` 與遠端 `/var/www/netgrey/index.html` 同步升級為 `v2.16.6 (Build 232)`；
+     - 遠端 `/var/www/netgrey/manifest.plist` 同步將 `bundle-version` 更新為 `2.16.6`。
+  8. **多端多形態防錯位與防溢出核驗**：
+     - 通過 Headless Chrome CDP 在 393×852 (iPhone)、466×678 (Duo外屏)、669×951 (Duo內屏)、820×1180 (iPad) 實測截屏，0 錯誤，0 錯位，0 溢出。
+  9. **全量 34 源連通性核驗通過**：
+     - `node scripts/probe_all_sources.mjs` 實測 34 源 100% 成功連通並解析數據。
+  10. **雙端 Release 構建、自動化簽名與 OTA 發布**：
+     - 生成 Android 正式包 `dist/Netgrey.apk`（208M）與 iOS 正式簽名包 `Netgrey.ipa`（205M）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間 11GB（>5GB 安全水位）。
+  11. **產出正式報告**：
+     - 依據香港公文慣例採用香港繁體中文撰寫 `docs/audit/slots-ui-2026-11-10/FIX-REPORT.md`。
+- **最近更新**：2026-11-10 by Antigravity。
+
 ## 最新工作狀態（2026年11月9日 · 雙端版本號升級至 v2.16.5 Build 231 + 全源連通性全面修復 + 直播源修復 + Slots 伴遊特勤多端防錯位核驗 + OTA 發布至 bananarey.us）
 
 - **最新成果（全源連通性全面修復 + 直播源修復 + Slots 伴遊特勤多端防錯位核驗 + 雙端構建簽名通過 + OTA 發布）**：

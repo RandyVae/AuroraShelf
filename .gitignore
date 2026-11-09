@@ -19,3 +19,4 @@ docs/design-audit/**/*.mp4
 .server_credentials
 .env.local
 .playwright-cli/
+output/
