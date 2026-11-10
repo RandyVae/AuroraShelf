@@ -69,10 +69,18 @@ public struct LivePlayerView: View {
                                 player: player,
                                 videoGravity: isFillMode ? .resizeAspectFill : .resizeAspect
                             )
-                        } else if stream.sourceID == LiveSourceCatalog.stripchatID {
-                            // Stripchat 纯净无头视口注入兜底
+                        } else {
+                            // 纯净无头 WebRTC 视口（原生 AVPlayer 403 握手受限自动平滑降级，或平台专属推流）
+                            let defaultRoomUrl: URL = {
+                                if let url = URL(string: stream.roomUrl), !stream.roomUrl.isEmpty { return url }
+                                if stream.sourceID == LiveSourceCatalog.stripchatID {
+                                    return URL(string: "https://zh.stripchat.com/\(stream.username)")!
+                                } else {
+                                    return URL(string: "https://www.hornystudents.com/\(stream.username)/")!
+                                }
+                            }()
                             StripchatLiveWebView(
-                                roomURL: URL(string: stream.roomUrl) ?? URL(string: "https://zh.stripchat.com/\(stream.username)")!,
+                                roomURL: defaultRoomUrl,
                                 isFillMode: isFillMode,
                                 isPlaying: $isPlaying,
                                 isLoading: $isLoadingLive,
@@ -130,7 +138,7 @@ public struct LivePlayerView: View {
                             .allowsHitTesting(false)
                         }
 
-                        // 错误提示状态层
+                        // 错误提示状态层（向下避让顶栏控制按键，杜绝视觉穿透与重叠）
                         if let error = liveError {
                             VStack(spacing: AuroraMetrics.spacingL) {
                                 Image(systemName: "tv.slash.fill")
@@ -160,6 +168,7 @@ public struct LivePlayerView: View {
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("重新连接直播流")
                             }
+                            .padding(.top, safeTop + 44)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .background(Color.black.opacity(0.85))
                         }
@@ -277,13 +286,13 @@ public struct LivePlayerView: View {
                             .lineLimit(1)
                     }
                 }
-                .frame(maxWidth: 160, alignment: .leading)
+                .frame(maxWidth: 220, alignment: .leading)
                 .layoutPriority(1)
 
                 Spacer()
 
                 // 右侧功能键区
-                HStack(spacing: 6) {
+                HStack(spacing: 4) {
                     // 1. 聊天室按钮
                     controlCircleButton(systemImage: "bubble.left.and.bubble.right", label: "打开聊天室") {
                         showRoomChat = true
@@ -476,16 +485,21 @@ public struct LivePlayerView: View {
                 }
 
                 guard let finalHlsUrl = hlsFoundUrl else {
-                    throw NSError(domain: "LivePlayer", code: 404, userInfo: [NSLocalizedDescriptionKey: "主播当前离线或直播流已重置"])
+                    // 未直接嗅探到可用直链，直接平滑降级至纯净 WebRTC 视口起播
+                    self.player = nil
+                    self.isLoadingLive = true
+                    self.liveError = nil
+                    return
                 }
 
                 Self.streamContextCache[username] = (finalHlsUrl, Date())
                 startNativePlayback(hlsUrl: finalHlsUrl, requestID: requestID)
             } catch {
                 guard !Task.isCancelled, activeStreamRequestID == requestID else { return }
-                isLoadingLive = false
-                isPlaying = false
-                liveError = error.localizedDescription
+                // 发生异常时平滑降级至纯净 WebRTC 视口起播，杜绝 403 阻断
+                self.player = nil
+                self.isLoadingLive = true
+                self.liveError = nil
             }
         }
     }
@@ -510,17 +524,10 @@ public struct LivePlayerView: View {
                     avPlayer.play()
                     self.scheduleHideControls()
                 } else if item.status == .failed {
-                    if self.stream.sourceID == LiveSourceCatalog.stripchatID {
-                        // HLS 回调失败时平滑降级至 StripchatLiveWebView
-                        self.player = nil
-                        self.isLoadingLive = true
-                    } else {
-                        self.isLoadingLive = false
-                        self.isPlaying = false
-                        self.player = nil
-                        self.liveError = item.error?.localizedDescription ?? "直播流解码失败"
-                        UIApplication.shared.isIdleTimerDisabled = false
-                    }
+                    // 原生直链解码失败或 MMCDN 403 握手受限时，全量平滑降级至纯净 WebRTC 视口起播
+                    self.player = nil
+                    self.isLoadingLive = true
+                    self.liveError = nil
                 }
             }
         }
