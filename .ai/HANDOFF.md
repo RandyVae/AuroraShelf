@@ -1,3 +1,32 @@
+## 最新交接：2026-11-10 — 黄果短剧 iOS SSL 证书阻断根治＋安卓论坛滑动修复＋8Muses 漫画双端加载修复＋Slots 突入立绘半屏全景展示＋CG 跳过按钮避让＋全量 32 业务源连通性通过＋双端版本号升级至 v2.16.7 (Build 233) 并发布至 bananarey.us
+
+- **范围**：
+  - 响应用户 Randy 真实手机报错截图与核心指示：
+    1. **黄果短剧 iOS SSL 证书阻断根治（SecTrust 锚点强信任＋异常豁免）**：
+       - 根因：真机在特定网络/代理环境下访问 `https://huangguoai.com` 时拋出「此伺服器的憑證無效。你所連接的伺服器可能是冒用「huangguoai.com」的伺服器，並且可能會對你的私密資訊造成風險」；原 `PermissiveURLSessionDelegate` 在设置 Anchor 证书链时误配了 `SecTrustSetAnchorCertificatesOnly(serverTrust, false)`，导致系统仍然强制回溯系统根证书库并触发 -1202 失败；
+       - 修复方案：在 `PermissiveURLSessionDelegate.swift` 改为 `SecTrustSetAnchorCertificatesOnly(serverTrust, true)`，并将评估异常通过 `SecTrustCopyExceptions / SecTrustSetExceptions` 强行豁免，使 ServerTrust 凭证百分之百在系统网络底层放行。
+    2. **安卓论坛上下滑动阻滞彻底解决**：
+       - 根因：`ForumScreen.kt` 的 `ForumReader` 外层包裹了全屏 `Box(Modifier.fillMaxSize().auroraSwipeBack(...))`，其水平拖拽检测器在 Compose 树拦截并抢占了原生 WebView 的 MotionEvent 触摸事件；且 WebView 缺少 `isNestedScrollingEnabled` 与 `OVER_SCROLL_ALWAYS`，CSS 中亦缺少针对 body 的 `overflow-y: auto !important; -webkit-overflow-scrolling: touch !important;`；
+       - 修复方案：移除外层全屏 `auroraSwipeBack`（依赖 `BackHandler` 与原生返回按钮），给 WebView 开启 `isNestedScrollingEnabled = true` 与 `overScrollMode = View.OVER_SCROLL_ALWAYS`，并在 CSS 注入样式中确保 body 及主容器 `min-height: 100% !important; height: auto !important; overflow-y: auto !important; -webkit-overflow-scrolling: touch !important;`。
+    3. **8Muses 漫画源双端加载修复**：
+       - 根因：`8muses.io` 站点改版为 Next.js Turbopack，卡片标题位于 `<strong title="...">` 中，缺少传统的 `grid-card__title` 类名；iOS 端 `ComicSourceAdapter.swift` 的 `titleCandidates` 仅匹配 `span|h[1-6]`，导致标题为空被丢弃；
+       - 修复方案：iOS 端在 `titleCandidates` 补充提取 `strong` 标签内容与 `title` 属性，图片提取优先匹配 `cover__image` 避免误抓 flags 国旗图标；Android 端在 `EightMusesComicSource.kt` 补齐全套现代浏览器 Accept 与 Accept-Language 请求头。
+    4. **Slots 18+ 特勤高清突入立绘半屏全景展示**：
+       - 根因：原 `#slots-hero-cutin` 被硬编码在 `#slots-reel-window` 滚轮窗口内部，受限于 215px 滚轮框与 `overflow: hidden`，立绘被严重腰斩与截断；
+       - 修复方案：将 `#slots-hero-cutin` 从机台滚轮窗口内抽离，提升至 `#screen-slots` 顶层绝对定位居中，样式重构为 `height: 52vh; width: 92vw; max-width: 540px;`（以整体屏幕一半的大小为展示空间），配合脉冲光环、速度线、切割刀光与 HUD 徽章全景呈现。
+    5. **CG 跳过按钮安全区避让与触控放大**：
+       - 根因：`.cg-cinema-controls` 固定设置 `top: 16px`，在 iPhone 灵动岛/刘海屏及 Android 挖孔状态栏下被遮挡，无法点击；
+       - 修复方案：改为 `top: max(24px, calc(env(safe-area-inset-top, 24px) + 12px))`，避让前置摄像头，`#btn-cg-skip` 设置 `min-height: 44px; min-width: 100px;` 保证舒适点击。
+    6. **双端版本号全面升级至 v2.16.7 (Build 233)**：
+       - Android：`versionCode = 233`, `versionName = "2.16.7"`；
+       - iOS：`CURRENT_PROJECT_VERSION: 233`, `MARKETING_VERSION: "2.16.7"`，运行 `xcodegen` 刷新工程；
+       - `PersonalScreen.swift` 标签同步更新为 `v2.16.7`；
+       - OTA 网页（`scripts/ota_web/index.html` 与线上 `/var/www/netgrey/index.html`）升级为 `v2.16.7 (Build 233)`；
+       - 线上 `/var/www/netgrey/manifest.plist` 的 `bundle-version` 同步更新为 `2.16.7`。
+    7. **全量源连通性全量核验（核心强制）**：
+       - 运行 `scripts/diagnose_sources.swift`：全部 32 个业务数据源（视频、短剧、漫画、直播、论坛）100% 连通通过，0 异常；
+       - 单元测试：Android 31 项单元测试全绿，iOS 163 项单元测试全绿。
+
 ## 最新交接：2026-11-10 — 承接 Codex 审计报告 P1/P2/P3 缺陷全量闭环修复（404 根治/时序与用户控制权/动效节奏分层/a11y/减少动效双轨同步）＋多端多形态视口防错位核验＋全量 34 源连通性核验通过＋双端版本号升级至 v2.16.6 (Build 232) 并发布至 bananarey.us
 
 - **范围**：

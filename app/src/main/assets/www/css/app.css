@@ -3026,14 +3026,183 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
 
 .cg-cinema-controls {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  right: 16px;
+  top: max(24px, calc(env(safe-area-inset-top, 24px) + 12px));
+  left: max(16px, calc(env(safe-area-inset-left, 16px) + 8px));
+  right: max(16px, calc(env(safe-area-inset-right, 16px) + 8px));
   display: flex;
   justify-content: space-between;
   align-items: center;
   pointer-events: auto;
   z-index: 101;
+}
+
+#btn-cg-skip {
+  min-height: 44px;
+  min-width: 100px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+/* Slots 18+ 特勤高清立绘动态突入层 (以整体屏幕一半的大小为展示空间，突破机台拘束) */
+.slots-hero-cutin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 92vw;
+  max-width: 540px;
+  height: 52vh;
+  min-height: 320px;
+  max-height: 500px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 95;
+  opacity: 0;
+  transition: opacity 0.25s ease-out;
+}
+
+.slots-hero-cutin.active {
+  opacity: 1;
+}
+
+.slots-hero-cutin.exit {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(1.05);
+  transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+}
+
+.cutin-blast-ring {
+  position: absolute;
+  inset: -20px;
+  border-radius: 24px;
+  background: radial-gradient(ellipse at center, rgba(255, 58, 157, 0.35) 0%, rgba(255, 140, 0, 0.15) 50%, transparent 75%);
+  filter: blur(12px);
+  pointer-events: none;
+  animation: blastPulse 0.6s ease-out infinite alternate;
+}
+
+@keyframes blastPulse {
+  0% { transform: scale(0.92); opacity: 0.6; }
+  100% { transform: scale(1.08); opacity: 1; }
+}
+
+.cutin-speed-lines {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(255, 255, 255, 0.08) 16px, transparent 18px);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.cutin-slash-fx {
+  position: absolute;
+  top: 20%;
+  left: -20%;
+  right: -20%;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, #fff, var(--cutin-accent, #ff3a9d), transparent);
+  transform: rotate(-15deg) scaleX(0);
+  transform-origin: center;
+  filter: drop-shadow(0 0 10px #fff);
+  pointer-events: none;
+}
+
+.cutin-slash-fx.slash-anim {
+  animation: slashImpact 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes slashImpact {
+  0% { transform: rotate(-15deg) scaleX(0); opacity: 0; }
+  50% { transform: rotate(-15deg) scaleX(1.2); opacity: 1; }
+  100% { transform: rotate(-15deg) scaleX(1); opacity: 0.8; }
+}
+
+.cutin-art-container {
+  position: relative;
+  width: 100%;
+  height: 75%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.cutin-art-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.85)) drop-shadow(0 0 20px var(--cutin-accent, #ff3a9d));
+  -webkit-mask-image: linear-gradient(to bottom, black 80%, rgba(0,0,0,0.6) 92%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 80%, rgba(0,0,0,0.6) 92%, transparent 100%);
+  transform: scale(0.85);
+  transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.cutin-art-img.art-impact-zoom {
+  transform: scale(1.08);
+}
+
+.cutin-art-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.4) 50%, transparent 60%);
+  background-size: 200% 200%;
+  animation: shimmerSweep 0.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmerSweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.cutin-hud-badge {
+  position: relative;
+  margin-top: -12px;
+  padding: 8px 24px;
+  border-radius: 999px;
+  background: rgba(15, 15, 25, 0.88);
+  border: 1.5px solid var(--cutin-accent, #ff3a9d);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7), 0 0 16px var(--cutin-accent, #ff3a9d);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  z-index: 2;
+}
+
+.cutin-callsign {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: var(--cutin-accent, #ff3a9d);
+  text-transform: uppercase;
+}
+
+.cutin-hero-name {
+  font-size: 16px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  margin-top: 2px;
+}
+
+.cutin-quote {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 2px;
+  font-style: italic;
 }
 
 .cg-cinema-badge {

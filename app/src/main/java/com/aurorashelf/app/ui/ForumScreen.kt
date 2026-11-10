@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.os.Build
 import android.util.Log
 import android.view.HapticFeedbackConstants
+import android.view.View
 import android.webkit.CookieManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -137,9 +138,7 @@ internal fun ForumScreen(
         }
     }
     state.selectedPost?.let { post ->
-        Box(Modifier.fillMaxSize().auroraSwipeBack(enabled = true, onDismiss = onClosePost)) {
-            ForumReader(post = post, onClose = onClosePost)
-        }
+        ForumReader(post = post, onClose = onClosePost)
         return
     }
 
@@ -485,6 +484,8 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     }
     val webView = remember(post.url) {
         WebView(context).apply {
+            isNestedScrollingEnabled = true
+            overScrollMode = View.OVER_SCROLL_ALWAYS
             settings.apply {
                 javaScriptEnabled = false
                 domStorageEnabled = false
@@ -799,9 +800,13 @@ internal val MOBILE_FORUM_SCRIPT =
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
+          min-height: 100% !important;
+          height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
           overflow-x: hidden !important;
+          overflow-y: auto !important;
+          -webkit-overflow-scrolling: touch !important;
         }
         *, *::before, *::after { box-sizing: border-box !important; }
         img, video, iframe {
@@ -819,6 +824,8 @@ internal val MOBILE_FORUM_SCRIPT =
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
+          height: auto !important;
+          overflow: visible !important;
           margin-left: 0 !important;
           margin-right: 0 !important;
           background: transparent !important;

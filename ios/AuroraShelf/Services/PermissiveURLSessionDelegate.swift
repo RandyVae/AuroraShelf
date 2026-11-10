@@ -36,29 +36,35 @@ public final class PermissiveURLSessionDelegate: NSObject, URLSessionDelegate, U
         // 1. 设置宽松的基础 X.509 评估策略，完全忽略主机名不匹配（彻底根除因证书 CN/SAN 与域名不一致导致的拦截）
         SecTrustSetPolicies(serverTrust, SecPolicyCreateBasicX509())
 
-        // 2. 将服务器返回的证书链本身直接注入为 Anchor 信任锚点，即便自签名或第三方代理中间人（MitM）亦可强行信任
+        // 2. 将服务器返回的证书链本身直接注入为 Anchor 信任锚点，并设置 anchorCertificatesOnly = true
+        // 彻底根除因系统信任库缺失根证书或自签名/反代代理（MitM）导致的凭证无效阻断
+        var certs: [SecCertificate] = []
         if #available(iOS 15.0, *) {
             if let certChain = SecTrustCopyCertificateChain(serverTrust) as? [SecCertificate], !certChain.isEmpty {
-                SecTrustSetAnchorCertificates(serverTrust, certChain as CFArray)
-                SecTrustSetAnchorCertificatesOnly(serverTrust, false)
+                certs = certChain
             }
-        } else {
+        }
+        if certs.isEmpty {
             let certCount = SecTrustGetCertificateCount(serverTrust)
-            var certs: [SecCertificate] = []
             for i in 0..<certCount {
                 if let cert = SecTrustGetCertificateAtIndex(serverTrust, i) {
                     certs.append(cert)
                 }
             }
-            if !certs.isEmpty {
-                SecTrustSetAnchorCertificates(serverTrust, certs as CFArray)
-                SecTrustSetAnchorCertificatesOnly(serverTrust, false)
-            }
+        }
+        if !certs.isEmpty {
+            SecTrustSetAnchorCertificates(serverTrust, certs as CFArray)
+            SecTrustSetAnchorCertificatesOnly(serverTrust, true)
         }
 
-        // 3. 执行评估并将凭证返回放行
+        // 3. 执行评估并将异常（Exceptions）加入白名单豁免，保障 ServerTrust 凭证百分之百有效放行
         var secError: CFError?
-        _ = SecTrustEvaluateWithError(serverTrust, &secError)
+        let evaluated = SecTrustEvaluateWithError(serverTrust, &secError)
+        if !evaluated {
+            if let exceptions = SecTrustCopyExceptions(serverTrust) {
+                SecTrustSetExceptions(serverTrust, exceptions)
+            }
+        }
         completionHandler(.useCredential, URLCredential(trust: serverTrust))
     }
 }

@@ -182,6 +182,8 @@ enum ComicSourceAdapter {
             let context = cardContext(in: ns, around: match.range)
             let titleCandidates = [
                 attribute("title", in: attributes),
+                textContent(matching: #"(?is)<strong\b[^>]*>(.*?)</strong>"#, in: body),
+                attribute("title", in: body),
                 attribute("alt", in: body),
                 textContent(matching: #"(?is)<(?:span|h[1-6])\b[^>]*class=['\"][^'\"]*(?:grid-card__title|card-title|title)[^'\"]*['\"][^>]*>(.*?)</(?:span|h[1-6])>"#, in: body),
                 attribute("alt", in: context),
@@ -192,9 +194,10 @@ enum ComicSourceAdapter {
                 .map { stripHTML($0).trimmingCharacters(in: .whitespacesAndNewlines) }
                 .first { !$0.isEmpty } ?? ""
             guard !title.isEmpty else { continue }
+            let coverImgAttrs = textContent(matching: #"(?is)<img\b([^>]*class=['\"][^'\"]*cover__image[^'\"]*['\"][^>]*)>"#, in: body) ?? body
             let rawImage = ["data-src", "data-original", "data-lazy-src", "src"]
-                .compactMap { attribute($0, in: context) ?? attribute($0, in: body) }
-                .first { !$0.hasPrefix("data:") && !$0.contains("default_cover") }
+                .compactMap { attribute($0, in: coverImgAttrs) ?? attribute($0, in: context) ?? attribute($0, in: body) }
+                .first { !$0.hasPrefix("data:") && !$0.contains("default_cover") && !$0.contains("flags/") }
             let cover = rawImage.flatMap { URL(string: decodeHTML($0), relativeTo: finalURL)?.absoluteURL.absoluteString } ?? ""
             let chapter = source.id == "ehentai" ? [ComicChapter(id: id, title: "完整画廊")] : []
             items.append(ComicItem(id: id, sourceId: source.id, title: title, author: "", coverUrl: cover, chapters: chapter, latestChapterTitle: chapter.first?.title ?? ""))
