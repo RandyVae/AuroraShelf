@@ -1,3 +1,35 @@
+## 最新交接：2026-11-10 — Slots 7大必修缺陷全量闭环＋iPad大屏自适应容器重构＋双端版本号升级至 v2.16.10 (Build 236) 并发布至 bananarey.us
+
+- **范围**：
+  - 响应用户 Randy 与交接文档（`docs/audit/slots-ui-2026-11-10/ANTIGRAVITY-HANDOFF-v2.16.9.md`）要求：
+    1. **QA Boost 严格隔离**：
+       - 根因：`app/src/main/assets/www/js/app.js` 的 `boot()` 中无条件调用 `LGSave.applyQAFullTestResources`，导致任何正常冷启动均被赋予 99,999,999 金币、全英雄、全装备并强制开启 18+；
+       - 修复：增加 `window.__AURORA_QA_BOOST__ === true || location.search.includes('qa=1')` 条件守卫，Release 正常启动保留初始 1,200 金币与基础英雄，QA 能力仅在明确 Debug/Test 开关下启用；
+       - 验证：iPhone 17 Pro 模拟器与 Playwright 沙盒干净安装实测冷启动金币严格为 1,200，无全资源自动解锁。
+    2. **免费旋转倍率 3 倍唯一状态源合流**：
+       - 根因：旧 `SlotsUI.playSpin()` 传入引擎的 session 未同步 `this.freeSpins` 与 `useFree`，导致 `SlotsGame.spin` 内部 `session.freeSpins` 恒为 `undefined`，`isFreeSpin` 判定为 `false`，倍率固定为 1x；
+       - 修复：在 `playSpin()` 执行前双向同步 `state.slotsSession.freeSpins = this.freeSpins` 与 `state.slotsSession.isFreeSpin = useFree`，并在 spin 结束后回写；
+       - 验证：回归固定 seed `3285004900` 预期 480、`3285006502` 预期 438，`node game/tools/test_slots_determinism.js` 100% PASS。
+    3. **Bailout / Recharge Sheet 弹层修复**：
+       - 根因：CSS 中 `.sheet` 默认 `display: none`，只有同时具备 `.sheet.open` 且未 `hidden` 时才显示；旧代码仅切换 `hidden = false` 未添加 `.open`，导致弹层不可见；
+       - 修复：新增 `openSheet`/`closeSheet` helper，原子切换 `hidden` 与 `.open` 类名；`handleOutOfGold()` 接入 helper，背景遮罩点击可关闭；
+       - 验证：0 金币时弹出 bailout、领卡 +300、luckyBailout 保存，3 次后进入 recharge 分支。
+    4. **游戏内版本号全链路同步**：
+       - `index.html` 标题与设置页更新为 `Version 2.16.10`；全端同步升至 `v2.16.10 (Build 236)`。
+    5. **iPad 大屏容器自适应重做**：
+       - 根因：`app.css` 中 `.stage` 硬编码 `width: min(100vw, 560px)`，iPad 纵向视口被拘束在 560px 窄栏；
+       - 修复：重构响应式断点（≥600px 840px、≥900px 960px、≥1200px 1080px），iPad Pro 13-inch 实测直向/横向完全自适应，0 截断、0 溢出。
+    6. **Jackpot 结算规则真实落地与展示一致**：
+       - 实现 5 Wilds = GRAND (50,000)、5 Hilda = MAJOR (10,000)、5 Heroes = MINOR (2,000)、4 Wilds = MINI (500) 奖池结算，计入 `totalWin` 并触发金色爆金动效，赔率表说明完整展示。
+    7. **Near-miss 文案客观中性化**：
+       - 移除「下一把一定出」「下一把机会极高」等无依据假承诺，改为客观描述。
+    8. **双端构建、签名与 OTA 同名原子发布**：
+       - Android Release APK（`dist/Netgrey.apk`，208MB，SHA-256: `6eaee892f1a17fee475379e46e3ce2ecb3273ca1ca2f7cd0a5740dec871ae9b2`）；
+       - iOS 签名包（`ios/build.nosync/outputs/Netgrey.ipa`，205MB，SHA-256: `456163563c6cf2315da40bdc34b12c8579547e970e524ff04470bda637bbf3ba`）；
+       - 上传至 `https://bananarey.us` 完成原子同名覆盖，服务器磁盘维持 11GB 可用（>5GB 安全水位）；
+       - 全源探针 34 源（31 PASS，3 个已知受限）；
+       - iOS XCTest 163 项（157 passed, 0 failed, 6 skipped需网络探针）。
+
 ## 最新交接：2026-11-10 — 黄果短剧 iOS SSL 证书阻断彻底根治＋直播通用纯净视口重构解决 HornyStudents 与 Stripchat＋双端版本号升级至 v2.16.9 (Build 235) 并发布至 bananarey.us
 
 - **范围**：
@@ -4468,3 +4500,10 @@ cp build.nosync/app/outputs/apk/release/app-release.apk \
 - 确认重点风险：Android 三处强制解包、iPad 多处 `UIScreen.main`、三端游戏异步生命周期、iOS 空 catch、WebView/播放器延迟任务和 iPad regular 分屏尺寸误判。
 - Android lintVitalRelease、Android Release、iOS iPad Simulator Debug 和 Slot 固定种子回归均有通过记录。
 - 当前代码审查未修改业务代码，报告按 P1/P2/P3 给出修复顺序。
+## Codex 最新交接：2026-11-10 — v2.16.9 / Build 235 Slots Release 模擬器全量檢驗與 Antigravity 修復清單
+
+- 完整交接文件：`docs/audit/slots-ui-2026-11-10/ANTIGRAVITY-HANDOFF-v2.16.9.md`
+- 可直接複製提示詞：`docs/audit/slots-ui-2026-11-10/ANTIGRAVITY-PROMPT-v2.16.9.md`
+- 最新 Release Android 包 `dist/Netgrey.apk` 已確認 versionCode 235 / versionName 2.16.9，iOS 使用同一 HEAD 建置 Release Simulator 包。
+- 已重現並待修：Release 啟動仍注入 QA 全資源、免費旋轉 3 倍倍率未套用、金幣耗盡 bailout/recharge sheet 不可見、遊戲內版本號仍為 2.16.0、iPad 固定 560px 中央欄、Jackpot 顯示與結算脫節、Near-miss 文案無機率依據。
+- iOS Debug 全量 XCTest：157 passed / 0 failed / 6 skipped；Android `testDebugUnitTest assembleRelease` 成功；Slots 確定性與邏輯回歸通過。Android ADB 與實體 Apple 設備未連線，不能宣稱實機通過。

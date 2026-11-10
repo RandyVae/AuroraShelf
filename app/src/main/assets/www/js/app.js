@@ -1033,9 +1033,16 @@
     UI.setProgress(0.04);
     try {
       APP.data = await loadData();
-      // QA Auto-Boost: Unlock all heroes, max out all resources (Gold, Keys, Energy, Shards, Equipment)
-      LGSave.applyQAFullTestResources(APP.state, APP.data.heroes, APP.data.equipment);
-      save();
+      // QA Auto-Boost: Strictly isolated to explicit Debug/Test harness flag.
+      // Release builds must never auto-grant max gold, all heroes/equips, or force adult mode.
+      const isQAAllowed = (typeof window !== 'undefined' && (
+        window.__AURORA_QA_BOOST__ === true ||
+        (window.location && window.location.search && window.location.search.includes('qa=1'))
+      ));
+      if (isQAAllowed) {
+        LGSave.applyQAFullTestResources(APP.state, APP.data.heroes, APP.data.equipment);
+        save();
+      }
     } catch (e) {
       $('#boot-note').textContent = '载入失败：' + e.message;
       return;

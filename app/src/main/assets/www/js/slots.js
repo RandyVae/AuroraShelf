@@ -30,9 +30,9 @@
     // A leading Wild substitutes for the first real symbol. It must not make
     // every following symbol part of the same win. Resolve the base symbol
     // before counting so a line such as Wild, Kitty, Dominica stops at Kitty.
-    const base = first.kind === 'wild'
+    const base = (first.kind === 'wild'
       ? line.slice(1).map((id) => symbolMap[id]).find((symbol) => symbol && symbol.kind !== 'wild' && symbol.kind !== 'scatter')
-      : first;
+      : first) || first;
     if (!base) return null;
 
     let count = 0;
@@ -124,14 +124,34 @@
       }
     }
 
+    // 奖池判定与实际结算（与界面 GRAND/MAJOR/MINOR/MINI 100% 对齐）
+    let jackpot = null;
+    for (let i = 0; i < wins.length; i++) {
+      const w = wins[i];
+      if (w.count === 5 && w.symbol === 'wild') {
+        jackpot = { tier: 'GRAND', name: 'Grand Jackpot', bonus: 50000 };
+        break;
+      }
+      if (!jackpot && w.count === 5 && w.symbol === 'hilda_enemy') {
+        jackpot = { tier: 'MAJOR', name: 'Major Jackpot', bonus: 10000 };
+      } else if (!jackpot && w.count === 5 && (w.symbol === 'florence' || w.symbol === 'regina' || w.symbol === 'dominica' || w.symbol === 'kitty')) {
+        jackpot = { tier: 'MINOR', name: 'Minor Jackpot', bonus: 2000 };
+      } else if (!jackpot && w.count === 4 && w.symbol === 'wild') {
+        jackpot = { tier: 'MINI', name: 'Mini Jackpot', bonus: 500 };
+      }
+    }
+
     const scatterCount = grid.flat().filter((id) => id === config.scatter.id).length;
     const freeSpinsAwarded = scatterCount >= config.scatter.threshold ? config.scatter.freeSpins : 0;
     const bestWin = wins.reduce((best, win) => (!best || win.count > best.count ? win : best), null);
+    const lineWinTotal = wins.reduce((sum, win) => sum + win.amount, 0);
     return {
       seed: seed == null ? null : seed >>> 0,
       grid,
       wins,
-      totalWin: wins.reduce((sum, win) => sum + win.amount, 0),
+      totalWin: lineWinTotal + (jackpot ? jackpot.bonus : 0),
+      jackpot: jackpot,
+      isJackpot: !!jackpot,
       scatterCount,
       freeSpinsAwarded,
       bestCombo: bestWin ? bestWin.count : 0,
@@ -698,7 +718,10 @@
       const response = await fetch('data/slots.json', { cache: 'no-store' });
       this.config = await response.json();
       this.bet = this.config.defaultBet || 20;
-      this.freeSpins = (window.APP && APP.state && APP.state.slots && APP.state.slots.freeSpins) || 0;
+      this.freeSpins = (window.APP && APP.state && (
+        (APP.state.slots && APP.state.slots.freeSpins) ||
+        (APP.state.slotsSession && APP.state.slotsSession.freeSpins)
+      )) || 0;
       this.bind();
       this.bindModals();
       this.render();
@@ -707,8 +730,21 @@
       this.initMascot();
     },
 
+    openSheet(el) {
+      if (!el) return;
+      el.hidden = false;
+      el.classList.add('open');
+    },
+
+    closeSheet(el) {
+      if (!el) return;
+      el.classList.remove('open');
+      el.hidden = true;
+    },
+
     bindModals() {
       // 伴游破产救济领取
+      const bailoutModal = document.getElementById('modal-slots-bailout');
       const bailoutBtn = document.getElementById('btn-bailout-claim');
       if (bailoutBtn) {
         bailoutBtn.onclick = () => {
@@ -719,8 +755,7 @@
           state.slotsSession.luckyBailout = true; // 下一次旋转保底大翻盘！
           LGSave.recordTransaction(state, 'gold', 300, 'slots_bailout');
           LGSave.persist(state);
-          const modal = document.getElementById('modal-slots-bailout');
-          if (modal) modal.hidden = true;
+          this.closeSheet(bailoutModal);
           this.render();
           SlotsAudio.coin();
           if (window.NativeBridge) NativeBridge.haptic('success');
@@ -729,15 +764,25 @@
           if (m) this.setMascotSpeech('收到我的私密补给啦？这次女神一定会眷顾你的～');
         };
       }
+      if (bailoutModal) {
+        bailoutModal.addEventListener('click', (e) => {
+          if (e.target === bailoutModal) this.closeSheet(bailoutModal);
+        });
+      }
 
-      // 首充金库激活
+      // 充值特权金库
+      const rechargeModal = document.getElementById('modal-slots-recharge');
       const rechargeBtn = document.getElementById('btn-slots-recharge-pay');
       const rechargeClose = document.getElementById('btn-slots-recharge-close');
       if (rechargeClose) {
         rechargeClose.onclick = () => {
-          const modal = document.getElementById('modal-slots-recharge');
-          if (modal) modal.hidden = true;
+          this.closeSheet(rechargeModal);
         };
+      }
+      if (rechargeModal) {
+        rechargeModal.addEventListener('click', (e) => {
+          if (e.target === rechargeModal) this.closeSheet(rechargeModal);
+        });
       }
       if (rechargeBtn) {
         rechargeBtn.onclick = () => {
@@ -746,10 +791,12 @@
           state.slotsSession = state.slotsSession || {};
           state.slotsSession.isVip = true;
           this.freeSpins += 10;
+          state.slotsSession.freeSpins = this.freeSpins;
+          state.slotsSession.isFreeSpin = true;
+          if (state.slots) state.slots.freeSpins = this.freeSpins;
           LGSave.recordTransaction(state, 'gold', 50000, 'first_recharge_vip');
           LGSave.persist(state);
-          const modal = document.getElementById('modal-slots-recharge');
-          if (modal) modal.hidden = true;
+          this.closeSheet(rechargeModal);
           this.render();
           SlotsAudio.bigWin();
           this.dropCoins(24);
@@ -762,16 +809,17 @@
     },
 
     handleOutOfGold() {
-      const state = APP.state;
+      const state = (typeof window !== 'undefined' && window.APP && window.APP.state) || (typeof APP !== 'undefined' ? APP.state : null);
+      if (!state) return;
       state.slotsSession = state.slotsSession || {};
       const claims = state.slotsSession.bailoutClaims || 0;
       if (claims < 3) {
         const modal = document.getElementById('modal-slots-bailout');
-        if (modal) modal.hidden = false;
+        this.openSheet(modal);
         if (window.NativeBridge) NativeBridge.haptic('warning');
       } else {
         const modal = document.getElementById('modal-slots-recharge');
-        if (modal) modal.hidden = false;
+        this.openSheet(modal);
         if (window.NativeBridge) NativeBridge.haptic('selection');
       }
     },
@@ -1240,8 +1288,8 @@
     },
 
     async playSpin() {
-      if (this.spinning || !this.config || !APP.state) return;
-      const state = APP.state;
+      const state = (typeof window !== 'undefined' && window.APP && window.APP.state) || (typeof APP !== 'undefined' ? APP.state : null);
+      if (this.spinning || !this.config || !state) return;
       state.slotsSession = state.slotsSession || {};
       const useFree = this.freeSpins > 0;
       if (!useFree && (state.gold || 0) < this.bet) {
@@ -1255,6 +1303,10 @@
       const button = document.getElementById('btn-slots-spin');
       if (button) button.disabled = true;
 
+      // 保证引擎与 UI 使用单一、统一的免费旋转状态源
+      state.slotsSession.freeSpins = this.freeSpins;
+      state.slotsSession.isFreeSpin = useFree;
+
       // 结合心流状态的确定性 PRNG 轮盘计算
       const seed = (Date.now() ^ ((state.stats && state.stats.slotsSpins) || 0)) >>> 0;
       const result = SlotsGame.spin(this.config, this.bet, seed, state.slotsSession);
@@ -1263,7 +1315,7 @@
         state.slotsSession.luckyBailout = false;
       }
 
-      // 扣除押注或免费旋转
+      // 扣除押注或消耗免费旋转（严格只递减 1 次，严禁双重递减）
       if (!useFree) {
         state.gold -= this.bet;
         LGSave.recordTransaction(state, 'gold', -this.bet, 'slots_spin');
@@ -1311,12 +1363,12 @@
       if (reelWindow) reelWindow.classList.remove('spinning');
       this.renderGrid(result);
 
-      // Near-Miss 假近中急促警报与上瘾刺激
+      // Near-Miss 假近中急促警报与中性客观提示
       if (result.isNearMiss) {
         if (reelWindow) reelWindow.classList.add('near-miss-tension');
-        if (statusMessage) statusMessage.textContent = '⚡ 差一格绝杀！近距离未中，下一把机会极高！';
+        if (statusMessage) statusMessage.textContent = '⚡ 差一格达成 3 连 Scatter！本次仅出现 2 个能量核心。';
         const m = SLOTS_MASCOTS[this.mascotIndex || 0];
-        if (m) this.setMascotSpeech('唔……只差半格就中超级大奖了！下一把一定出！');
+        if (m) this.setMascotSpeech('唔……差一点就凑齐 3 个核心了，再接再厉指挥官！');
         if (window.NativeBridge) NativeBridge.haptic('nearMiss');
         setTimeout(() => { if (reelWindow) reelWindow.classList.remove('near-miss-tension'); }, 2200);
       }
@@ -1326,6 +1378,20 @@
       state.gold += win;
       if (win > 0) LGSave.recordTransaction(state, 'gold', win, 'slots_win');
       if (result.freeSpinsAwarded) this.freeSpins += result.freeSpinsAwarded;
+
+      // 奖池命中动效与提示
+      if (result.isJackpot && result.jackpot) {
+        const tierCls = 'tier-' + result.jackpot.tier.toLowerCase();
+        const tierEl = document.querySelector(`.jackpot-tier.${tierCls}`);
+        if (tierEl) {
+          tierEl.classList.add('jackpot-won');
+          setTimeout(() => tierEl.classList.remove('jackpot-won'), 4000);
+        }
+        UI.toast(`🎰 恭喜斩获【${result.jackpot.tier} JACKPOT】！额外奖金 +${result.jackpot.bonus.toLocaleString()} 金币！`);
+        SlotsAudio.bigWin();
+        this.dropCoins(36);
+        if (window.NativeBridge) NativeBridge.haptic('bigWin');
+      }
 
       // Check for hero symbol wins to directly unlock into inventory/roster
       const heroWins = (result.wins || []).filter((w) => {
@@ -1354,6 +1420,8 @@
         });
       }
 
+      state.slotsSession.freeSpins = this.freeSpins;
+      state.slotsSession.isFreeSpin = this.freeSpins > 0;
       state.slots = state.slots || { version: 2, lastSeed: null, freeSpins: 0 };
       state.slots.lastSeed = seed;
       state.slots.freeSpins = this.freeSpins;
@@ -1365,13 +1433,16 @@
       // Update win displays with rolling odometer
       const resultText = document.getElementById('slots-result');
       if (resultText) {
+        const jackpotText = (result.isJackpot && result.jackpot) ? ` · 【${result.jackpot.tier} JACKPOT】+${result.jackpot.bonus.toLocaleString()}` : '';
         resultText.textContent = win
-          ? `赢得 ${win.toLocaleString()} 金币${result.freeSpinsAwarded ? ` · 免费旋转 +${result.freeSpinsAwarded}` : ''}`
+          ? `赢得 ${win.toLocaleString()} 金币${result.freeSpinsAwarded ? ` · 免费旋转 +${result.freeSpinsAwarded}` : ''}${jackpotText}`
           : (result.freeSpinsAwarded ? `Scatter · 免费旋转 +${result.freeSpinsAwarded}` : '未中奖，再试一次');
       }
 
       const winTier = document.getElementById('slots-win-tier');
-      const tierLabel = result.bestCombo >= 4 ? 'MEGA JACKPOT' : result.bestCombo === 3 ? 'SUPER WIN' : win > 0 ? 'LINE HIT' : 'BASE GAME';
+      const tierLabel = (result.isJackpot && result.jackpot)
+        ? `${result.jackpot.tier} JACKPOT`
+        : (result.bestCombo >= 4 ? 'MEGA HIT' : result.bestCombo === 3 ? 'SUPER WIN' : win > 0 ? 'LINE HIT' : 'BASE GAME');
       if (winTier) {
         winTier.textContent = tierLabel;
         winTier.className = 'slots-badge ' + (win > 0 ? 'win-active' : '');

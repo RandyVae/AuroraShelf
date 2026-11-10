@@ -176,10 +176,19 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   overflow: hidden;
   background: var(--bg-base);
   isolation: isolate;
+  margin: 0 auto;
 }
 
-@media (min-width: 900px) and (orientation: landscape) {
-  .stage { width: min(100vw, 920px); }
+@media (min-width: 600px) {
+  .stage { width: min(100vw, 840px); }
+}
+
+@media (min-width: 900px) {
+  .stage { width: min(100vw, 960px); }
+}
+
+@media (min-width: 1200px) and (orientation: landscape) {
+  .stage { width: min(100vw, 1080px); }
 }
 
 /* ---------- screens ---------- */
@@ -1379,6 +1388,16 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
 .tier-mini { border-color: rgba(212, 85, 255, .5); background: linear-gradient(180deg, #2a113a 0%, #0d0413 100%); }
 .tier-mini span { color: #d455ff; text-shadow: 0 0 8px rgba(212, 85, 255, .6); }
 .tier-mini b { color: #fae4ff; text-shadow: 0 0 12px rgba(212, 85, 255, .8); }
+
+.jackpot-tier.jackpot-won {
+  animation: jackpotPulse 0.8s ease-in-out infinite alternate;
+  box-shadow: 0 0 24px #ffd700, inset 0 0 12px #ffd700;
+  border-color: #ffd700;
+}
+@keyframes jackpotPulse {
+  0% { transform: scale(1); filter: brightness(1); }
+  100% { transform: scale(1.05); filter: brightness(1.4); }
+}
 
 /* Main 3D Arcade Cabinet */
 .slots-cabinet {

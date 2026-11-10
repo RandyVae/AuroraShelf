@@ -1,5 +1,33 @@
 # Project State
 
+## 最新工作狀態（2026年11月10日 · 雙端版本號升級至 v2.16.10 Build 236 + Slots 7大必修問題全量閉環 + iPad大屏自適應容器重構 + 確定性與全源核驗通過 + OTA 發布至 bananarey.us）
+
+- **最新成果（Slots 7大必修問題修復 + 雙端Release構建 + OTA同名原子覆蓋 + 遠端磁碟安全水位）**：
+  1. **QA Boost 嚴格隔離**：`app/src/main/assets/www/js/app.js` boot() 中移除無條件執行的 `LGSave.applyQAFullTestResources`，僅在 `window.__AURORA_QA_BOOST__ === true` 或 URL 參數包含 `qa=1` 時觸發；Release 正常冷啟動金幣嚴格為 1,200，初始英雄與裝備正常，嚴禁自動解鎖 18+ 或滿資源。
+  2. **免費旋轉倍率 3 倍唯一狀態源合流**：`SlotsUI.playSpin()` 前後同步 `state.slotsSession.freeSpins` 與 `state.slotsSession.isFreeSpin`，確保引擎 `SlotsGame.spin` 內部 `isFreeSpin === true` 且倍率固定為 3 倍；使用固定 seed `3285004900`（160*3=480）與 `3285006502`（146*3=438）單測 100% 回歸通過。
+  3. **Bailout / Recharge Sheet 彈層修復**：新增 `openSheet`/`closeSheet` helper，同步切換 `hidden` 與 `.open` 類名，徹底解決 `.sheet` 缺少 `.open` 導致 `display: none` 無法呈現的問題；驗證 0 金幣時正常展示 bailout、可領取 +300、luckyBailout 保存，3 次後正確進入 recharge 分支。
+  4. **遊戲內版本號全鏈路同步**：`index.html` 標題與設定頁更新為 `Version 2.16.10`；客戶端代碼、manifest、OTA 網頁全部同步至 `v2.16.10 (Build 236)`。
+  5. **iPad 大屏容器自適應重做**：`app.css` 中 `.stage` 容器在手機保留 `min(100vw, 560px)`，≥600px 擴展至 840px，≥900px 擴展至 960px，≥1200px 橫向擴展至 1080px，徹底消除 560px 窄柱限制；iPad Pro 13-inch 實測直向 0 截斷、0 溢出。
+  6. **Jackpot 結算規則落盤與展示一致**：實作 GRAND (50,000)、MAJOR (10,000)、MINOR (2,000)、MINI (500) 獎池結算邏輯，返回 `isJackpot` 結構並計入 `totalWin` 與觸發金色爆金動效，規則完整寫入賠率表說明。
+  7. **Near-miss 文案客觀中性化**：移除「下一把一定出」「下一把机会极高」等無依據承諾，改為客觀事實描述。
+  8. **測試與驗證**：
+     - `node game/tools/test_slots_determinism.js`: PASS（1000 次確定性、免費旋轉 480/438、Jackpot 規則）；
+     - `node scripts/verify-game-logic.js`: PASS；
+     - `./gradlew testDebugUnitTest assembleRelease`: BUILD SUCCESSFUL（生成 `dist/Netgrey.apk` 208MB）；
+     - iOS Simulator iPhone 17 Pro XCTest: 163 tests, 157 passed, 0 failed, 6 skipped（需網絡探針）；
+     - iOS Simulator Release iPhone 17 Pro 與 iPad Pro 13-inch 實機走查通過；
+     - 資產校驗：`dist/Netgrey.apk`、`Netgrey.ipa`、`app/src`、`ios/src` 4 處 Slots 核心資產 SHA-256 100% 一致。
+  9. **雙端 Release 構建、自動化簽名與 OTA 發布**：
+     - 生成 Android 正式包 `dist/Netgrey.apk`（208 MB，SHA-256: `6eaee892...`）與 iOS 簽名包 `Netgrey.ipa`（205 MB，SHA-256: `45616356...`）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間維持 11GB（>5GB 安全水位）。
+- **最近更新**：2026-11-10 by Antigravity。
+
+## Codex 最新檢驗狀態（2026-11-10 · v2.16.9 / Build 235）
+
+- 已用最新 Release 產物在 iPhone 17 Pro 與 iPad Pro 13-inch Simulator 完成 Slots 全流程檢驗，完整交接與修復要求見 `docs/audit/slots-ui-2026-11-10/ANTIGRAVITY-HANDOFF-v2.16.9.md`。
+- 待 Antigravity 修復的主要問題：QA 資源無條件注入、免費旋轉倍率未套用、金幣耗盡彈窗不可見、遊戲內版本號過期、iPad 固定窄欄、Jackpot 邏輯脫節、Near-miss 文案無依據。
+- 驗證基線：iOS Debug XCTest 157/0/6；Android `testDebugUnitTest assembleRelease` 成功；Slots 1000 seed 確定性與邏輯回歸通過。Android ADB 與實體 Apple 設備未連線。
+
 ## 最新工作狀態（2026年11月10日 · 雙端版本號升級至 v2.16.9 Build 235 + 黃果短劇 iOS SSL 證書阻斷徹底根治 + 直播視口通用重構解決 HornyStudents 與 Stripchat + OTA 發布至 bananarey.us）
 
 - **最新成果（黃果短劇 SSL 徹底根治 + 直播視口通用純淨重構 + 雙端自動化發布）**：
