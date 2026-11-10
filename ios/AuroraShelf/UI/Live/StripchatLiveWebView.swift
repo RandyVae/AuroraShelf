@@ -112,14 +112,16 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         #portal-root, #agreement-root,
         .CookieReminderContentV2, .cookies-banner, .adblocker-notification,
         #close_entrance_terms, #entrance_terms, #entrance_terms_overlay,
+        .language-mismatch-notice, .language_mismatch_notice, [class*="language-mismatch"], [class*="language_mismatch"],
+        [class*="language_mismatch_update"], [class*="language_mismatch_go_back"], [class*="language_mismatch_dismiss"],
         [id*="language"], [class*="language"], #language-suggestion,
         .notification-bar, .site-notice, .lang-bar, #banner-container,
-        [class*="chat-settings"], [class*="chat-toolbar"], [class*="font-list"],
+        [class*="chat-settings"], [class*="chat-toolbar"], [class*="font-list"], .c-chat-settings, .chat-settings-holder,
         .user-warning-banner, .site_alert,
         .vjs-control-bar, .vjs-big-play-button, .vjs-loading-spinner,
         [data-testid*="banner"], [data-testid*="chat"], [data-testid*="tip"],
         .related-models, .models-list, .gallery-section, .profile-section,
-        .view-cam-controls, .view-cam-info, [class*="view-cam-info"] {
+        .view-cam-controls, .view-cam-info, [class*="view-cam-info"], .videoPlayerControls {
             display: none !important;
             opacity: 0 !important;
             visibility: hidden !important;
@@ -192,8 +194,8 @@ public struct StripchatLiveWebView: UIViewRepresentable {
             }
 
             function checkAndHook() {
-                // 1. 自动处理 Cookie 政策 / 进入确认弹层 / 年龄确认 / 语言提示条
-                const langBars = document.querySelectorAll('#language-suggestion, [id*="language"], [class*="language-choice"], [class*="language-suggest"], .notification-bar, .site-notice');
+                // 1. 自动处理 Cookie 政策 / 进入确认弹层 / 年龄确认 / 语言提示条 / 语言不匹配警告
+                const langBars = document.querySelectorAll('#language-suggestion, [id*="language"], [class*="language-choice"], [class*="language-suggest"], .notification-bar, .site-notice, .language-mismatch-notice, .language_mismatch_notice, [class*="language-mismatch"], [class*="language_mismatch"]');
                 langBars.forEach(function(b) { try { b.remove(); } catch(e) { b.style.display = 'none'; } });
 
                 const closeEntrance = document.getElementById('close_entrance_terms') || document.querySelector('.close_entrance_terms, #close_entrance_terms, [id*="close_entrance"]');
@@ -234,13 +236,30 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                     } catch(e) {}
                 }
 
-                // 3. 侦测离线与私密秀状态
+                // 3. 侦测离线与私密秀状态（结合 window.initialRoomDossier 与真实 DOM）
+                if (window.initialRoomDossier) {
+                    try {
+                        var dossier = typeof window.initialRoomDossier === 'string' ? JSON.parse(window.initialRoomDossier) : window.initialRoomDossier;
+                        if (dossier.room_status === 'private') {
+                            notifySwift('error', { message: '主播当前正在进行私密秀（需付费观看）' });
+                            return;
+                        }
+                        if (dossier.room_status === 'offline') {
+                            notifySwift('error', { message: '主播当前已离线或暂未开播' });
+                            return;
+                        }
+                        if (dossier.room_status === 'away') {
+                            notifySwift('error', { message: '主播暂时离开，请稍后重试' });
+                            return;
+                        }
+                    } catch(e) {}
+                }
                 if (document.querySelector('.model-offline, .king-offline, [data-testid="offline-badge"], [class*="ModelOffline"], [class*="offline-banner"], #room_status_offline, .room_offline, #offline_broadcaster_badge')) {
-                    notifySwift('error', { message: '主播当前离线或处于休息中' });
+                    notifySwift('error', { message: '主播当前已离线或暂未开播' });
                     return;
                 }
                 if (document.querySelector('#private_room, .private-room, #room_status_private, .c-private-show, [class*="private-show"], .private-show-overlay')) {
-                    notifySwift('error', { message: '主播当前正在进行私密秀（Private Show）' });
+                    notifySwift('error', { message: '主播当前正在进行私密秀（需付费观看）' });
                     return;
                 }
 
@@ -329,19 +348,41 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                     }
                 }
 
-                // 5. 提取实时聊天室评论消息并桥接至 SwiftUI
-                var msgNodes = document.querySelectorAll('.message, [class*="ChatMessage"], [class*="TipMessage"], [data-testid*="chat-message"], .chat-message');
+                // 5. 提取真实用户实时评论（严禁将界面设置条、规则提示、语言警告、字体选择器等非用户发言当作评论）
+                var msgNodes = document.querySelectorAll('.chat-list li, .msg-text, [data-testid="chat-message"], .message.message-base');
                 msgNodes.forEach(function(node) {
                     if (node.dataset.auroraSent) return;
                     node.dataset.auroraSent = 'true';
-                    var authorNode = node.querySelector('[class*="username"], [class*="author"], .message-username');
-                    var author = (authorNode ? authorNode.innerText : '观众').trim().slice(0, 30);
-                    var textNode = node.querySelector('[class*="text"], [class*="message-text"], [class*="content"]') || node;
-                    var text = (textNode.innerText || textNode.textContent || '').replace(author, '').trim().replace(/\\s+/g, ' ');
+
+                    // 排除设置面板、字体列表、规则条、提示栏内的节点
+                    if (node.closest('.chat-settings, .font-list, [class*="setting"], [class*="notice"], [class*="rule"], [class*="toolbar"], [class*="warning"]')) return;
+
+                    // 必须存在明确的用户名或发言人节点，否则属于系统杂质
+                    var authorNode = node.querySelector('.username, [class*="username"], [class*="user"], .message-username, a[href*="/"]');
+                    if (!authorNode) return;
+                    var author = (authorNode.innerText || authorNode.textContent || '').replace(/[:\\s]+$/, '').trim().slice(0, 30);
+                    if (!author || author === '观众' || author === '用户') return;
+
+                    var textNode = node.querySelector('.text, [class*="text"], [class*="message-text"], [class*="content"]');
+                    var rawText = textNode ? (textNode.innerText || textNode.textContent) : (node.innerText || node.textContent);
+                    var text = (rawText || '').replace(author, '').replace(/[:\\s]+/, ' ').trim().replace(/\\s+/g, ' ');
                     if (!text || text.length > 200) return;
+
+                    // 黑名单过滤（杜绝页面提示词泄露）
+                    var lowerText = text.toLowerCase();
+                    if (lowerText.includes('featured chat') ||
+                        lowerText.includes('chat settings') ||
+                        lowerText.includes('viewing chaturbate in') ||
+                        lowerText.includes('send a message') ||
+                        lowerText.includes('no spamming') ||
+                        lowerText.includes('fontdefault') ||
+                        lowerText.includes('caution: the chaturbate')) {
+                        return;
+                    }
+
                     notifySwift('comment', {
                         id: Math.random().toString(36).slice(2),
-                        author: author || '观众',
+                        author: author,
                         text: text
                     });
                 });
@@ -375,9 +416,11 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         webView.scrollView.bounces = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
 
-        var request = URLRequest(url: roomURL)
-        request.setValue("https://zh.stripchat.com/", forHTTPHeaderField: "Referer")
-        request.setValue("zh-CN,zh;q=0.9", forHTTPHeaderField: "Accept-Language")
+        let host = roomURL.host ?? "zh.stripchat.com"
+        let acceptLang = host.contains("stripchat") ? "zh-CN,zh;q=0.9,en;q=0.8" : "en-US,en;q=0.9"
+        var request = URLRequest(url: roomURL, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 35.0)
+        request.setValue("https://\(host)/", forHTTPHeaderField: "Referer")
+        request.setValue(acceptLang, forHTTPHeaderField: "Accept-Language")
         webView.load(request)
 
         return webView
@@ -407,9 +450,11 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         // 2. 房间地址变化时重载
         if context.coordinator.requestedURL != roomURL {
             context.coordinator.requestedURL = roomURL
-            var request = URLRequest(url: roomURL)
-            request.setValue("https://zh.stripchat.com/", forHTTPHeaderField: "Referer")
-            request.setValue("zh-CN,zh;q=0.9", forHTTPHeaderField: "Accept-Language")
+            let host = roomURL.host ?? "zh.stripchat.com"
+            let acceptLang = host.contains("stripchat") ? "zh-CN,zh;q=0.9,en;q=0.8" : "en-US,en;q=0.9"
+            var request = URLRequest(url: roomURL, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 35.0)
+            request.setValue("https://\(host)/", forHTTPHeaderField: "Referer")
+            request.setValue(acceptLang, forHTTPHeaderField: "Accept-Language")
             webView.load(request)
         }
     }
@@ -447,7 +492,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                 }
             }
             playTimeoutTask = task
-            DispatchQueue.main.asyncAfter(deadline: .now() + 12.0, execute: task)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 25.0, execute: task)
         }
 
         public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -516,9 +561,30 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
             let nsErr = error as NSError
             if nsErr.code == NSURLErrorCancelled { return }
+
+            // 失败时自动平滑切入备用线路
+            if let currentUrl = self.requestedURL {
+                let currentHost = currentUrl.host ?? ""
+                var fallbackUrl: URL? = nil
+                if currentHost.contains("zh.stripchat.com") {
+                    fallbackUrl = URL(string: currentUrl.absoluteString.replacingOccurrences(of: "zh.stripchat.com", with: "stripchat.com"))
+                } else if currentHost.contains("chaturbate.com") {
+                    let uname = self.parent.roomURL.lastPathComponent
+                    fallbackUrl = URL(string: "https://www.hornystudents.com/\(uname)/")
+                }
+
+                if let nextUrl = fallbackUrl, nextUrl != currentUrl {
+                    self.requestedURL = nextUrl
+                    var req = URLRequest(url: nextUrl, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 35.0)
+                    req.setValue("https://\(nextUrl.host ?? "")/", forHTTPHeaderField: "Referer")
+                    webView.load(req)
+                    return
+                }
+            }
+
             DispatchQueue.main.async {
                 self.parent.isLoading = false
-                self.parent.errorMessage = "主播页面连接超时，请重试"
+                self.parent.errorMessage = "网络连接超时，请检查网络后点击重试"
             }
         }
 

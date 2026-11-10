@@ -3,10 +3,11 @@ package com.aurorashelf.app.data
 import com.aurorashelf.app.model.LiveCategory
 import com.aurorashelf.app.model.LiveItem
 import com.aurorashelf.app.model.LivePage
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URL
+import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -67,25 +68,19 @@ class StripchatLiveRepository {
     }
 
     private fun request(address: String, originBase: String): String {
-        val connection = URL(address).openConnection() as HttpURLConnection
-        return try {
-            connection.requestMethod = "GET"
-            connection.connectTimeout = REQUEST_TIMEOUT_MS
-            connection.readTimeout = REQUEST_TIMEOUT_MS
-            connection.instanceFollowRedirects = true
-            connection.setRequestProperty("Accept", "application/json")
-            connection.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-            connection.setRequestProperty("Origin", originBase)
-            connection.setRequestProperty("Referer", "$originBase/")
-            connection.setRequestProperty("User-Agent", VideoRepository.USER_AGENT)
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (status !in 200..299) throw IOException("Stripchat 接口返回 HTTP $status")
+        val req = Request.Builder()
+            .url(address)
+            .header("Accept", "application/json")
+            .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+            .header("Origin", originBase)
+            .header("Referer", "$originBase/")
+            .header("User-Agent", VideoRepository.USER_AGENT)
+            .build()
+        okHttpClient.newCall(req).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("Stripchat 接口返回 HTTP ${response.code}")
             if (body.isBlank()) throw IOException("Stripchat 接口返回空内容")
-            body
-        } finally {
-            connection.disconnect()
+            return body
         }
     }
 
@@ -98,21 +93,36 @@ class StripchatLiveRepository {
         const val SITE_BASE = "https://zh.stripchat.com"
         const val FALLBACK_SITE_BASE = "https://stripchat.com"
         internal const val PAGE_SIZE = 30
-        private const val REQUEST_TIMEOUT_MS = 15_000
+        private const val REQUEST_TIMEOUT_SECONDS = 25L
         private const val PUBLIC_STATUS = "public"
         private val USERNAME_PATTERN = Regex("[A-Za-z0-9_-]{1,80}")
+
+        internal val okHttpClient: OkHttpClient by lazy {
+            val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
+                override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+            })
+            val sslContext = javax.net.ssl.SSLContext.getInstance("TLS").apply {
+                init(null, trustAllCerts, java.security.SecureRandom())
+            }
+            OkHttpClient.Builder()
+                .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
+                .hostnameVerifier { _, _ -> true }
+                .connectTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .readTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .retryOnConnectionFailure(true)
+                .build()
+        }
 
         /** Asynchronously warms DNS and TLS connection for live stream hosts to eliminate handshake delay. */
         fun prefetchDns() {
             java.util.concurrent.Executors.newSingleThreadExecutor().execute {
                 runCatching {
-                    java.net.InetAddress.getAllByName("zh.stripchat.com")
-                    val conn = URL("$SITE_BASE/api/front/models?limit=1").openConnection() as HttpURLConnection
-                    conn.connectTimeout = 5000
-                    conn.readTimeout = 5000
-                    conn.requestMethod = "HEAD"
-                    conn.connect()
-                    conn.disconnect()
+                    val req = Request.Builder().url("$SITE_BASE/api/front/models?limit=1").head().build()
+                    okHttpClient.newCall(req).execute().close()
                 }
             }
         }

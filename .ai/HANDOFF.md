@@ -1,3 +1,72 @@
+## 最新交接：2026-11-11 — 直播服務器連接超時徹底根除＋Stripchat 官方 HLS 直鏈原生秒播＋WebKit 違規 Origin 頭移除與寬鬆超時防禦＋雙端版本號升級至 v2.16.14 (Build 240) 並發布至 bananarey.us
+
+- **範圍**：
+  - 響應用戶 Randy 反饋「現在的直播直接服務器連接超時le q」，徹底排查並根除雙端直播連接超時問題：
+    1. **直播「服務器連接超時」排查與徹底根除**：
+       - 根因：
+         1. 在 `StripchatLiveWebView.swift` 中，為 GET 請求違規注入了 `Origin: https://\(host)` 請求頭，觸發反向代理與 Cloudflare WAF 阻斷或丟包；且設置了 12.0 秒極短硬超時，在 `didFailProvisionalNavigation` 裡無條件直接將錯誤覆蓋為「主播页面连接超时，请重试」；同時在 `init` 裡設置了 12.0 秒看門狗定時器，超過 12 秒直接報離線或超時；
+         2. 在 `LivePlayerView.swift` 中，官方 API 請求超時只給了 3.0 秒，備用頁面請求超時只給了 3.5 秒；在稍有延遲的網絡下必定超時；且降級至 WebView 時錯誤地將 `isLoadingLive` 設為 `true`，使全屏轉圈遮罩永久卡在畫面上無法淡出；且 Stripchat 源原本就有官方直鏈 `hlsStreamUrl`，卻被硬編碼跳過直接走臃腫的 WebRTC WebView；
+         3. 在 Android 端：`StripchatLiveRepository.kt` 的 OkHttpClient 超時時間僅有 8 秒；拉取 250KB 的 HornyStudents RSS feed 時，若 8 秒內未完成即拋出 `SocketTimeoutException`，被 `LiveViewModel.kt` 轉化為「连接直播服务器超时，请稍后重试」；
+       - 修復落盤：
+         1. **iOS 端 Stripchat 原生 HLS 秒播**：在 `LivePlayerView.swift` 優先從 `stream.hlsStreamUrl` 或通過數字 ID 即時構造的 `https://edge-hls.doppiocdn.media/hls/\(numericId)/master/\(numericId).m3u8` 起播，帶上專屬 Referer，由原生 `AVPlayer` 0.3 秒硬解秒播；
+         2. **Chaturbate 官方 API 超時加固與狀態攔截**：官方 JSON 請求與備用頁面請求超時延長至 10.0 秒 / 12.0 秒；若判定 private 或 offline 立即友好提示並終止轉圈；若 public 則直接提取 `hls_source` 原生秒播；
+         3. **平滑降級與遮罩移除**：若未獲取到直鏈，降級至 WebView 時正確將 `isLoadingLive` 置為 `false`，絕不再卡死轉圈；
+         4. **WebView 網絡頭與超時糾正**：徹底移除 GET 請求中的非標準 `Origin` 請求頭；恢復 35.0 秒正常超時；看門狗延長至 25.0 秒；
+         5. **Android 端超時加固與快照容災**：`StripchatLiveRepository` 超時由 8L 提升至 25L 秒；`HornyStudentsLiveRepository` 引入內存快照平滑容災機制（Stale-While-Revalidate），若網絡請求超時優先使用現有快照兜底，絕不中斷用戶瀏覽體驗；
+    2. **雙端構建、簽名與 OTA 同名原子發布**：
+       - Android Release APK（`dist/Netgrey.apk`，208MB，SHA-256: `97913304932a5f3bc1db55ca347a66b0141340d60e56a81a46496e4b260b55cd`）；
+       - iOS 簽名包（`ios/build.nosync/outputs/Netgrey.ipa`，205MB，SHA-256: `e1bbe775c5124b9a64db2167227d41c46d9f8f5f3a985edea44be5de0d1d01fb`）；
+       - 上傳至 `https://bananarey.us` 完成原子同名覆蓋，伺服器磁碟維持 11GB 可用（>5GB 安全水位）；
+       - iOS XCTest 163 項全量通過（157 passed, 0 failed, 6 skipped需網絡探針）；
+       - Android 單測 238 項全量通過（231 passed, 0 failed, 7 skipped）。
+
+## 歷史交接：2026-11-10 — 直播私密秀即时识别阻断＋英文/中文语言不匹配横幅彻底隐藏＋实时评论区系统杂质/字体/规则公告彻底清洗＋双端版本号升级至 v2.16.13 (Build 239) 并发布至 bananarey.us
+
+- **范围**：
+  - 响应用户 Randy 真实 iPhone 报错截图（主播 soft_katy 卡在「正在连接 soft_katy 的直播流…」、上方浮动「You are viewing Chaturbate in English. Did you mean to go to Chinese...」语言横幅、下方「实时评论」充斥「Featured Chat Rooms」、「FontDefaultArialBookman...」、「Rules: No spamming...」等系统文本）：
+    1. **直播卡在「正在连接直播流…」根因排查与修复**：
+       - 根因：主播处于私密秀（Private Show，`room_status == "private"`，HLS 直链为空）；原 iOS `LiveSourceCatalog.swift` 拉取 HornyStudents RSS 2.0 Feed 时未像 Android 那样严格过滤 `current_show == "public"`，导致私密秀主播混入列表；且 `LivePlayerView.swift` 优先尝试抓取 300KB+ HTML 页面并因 Unicode 转义字符导致 JSON 解析报错（Code 3840），退回 WebRTC 视口后因无权观赏私密秀而陷入无限转圈；
+       - 修复：
+         1. `LiveSourceCatalog.swift` 增加强制过滤：`guard currentShow == "public" else { continue }`；
+         2. `LivePlayerView.swift` 重构为首选官方轻量 JSON 接口（`api/chatvideocontext`，耗时 <200ms），即时侦测 `room_status`：若为 `private` 立即提示「主播当前正在进行私密秀（需付费观看）」并停止加载；若为 `offline` 立即提示「主播当前已离线或暂未开播」；若为 `public` 则直接提取 `hls_source` 并由原生 `AVPlayer` 0.3s 硬解起播；
+         3. 备用 HTML 提取引入精确 `unescapeUnicodeEntities` 转换，消除转义字符解析障碍。
+    2. **语言提示条（Language Mismatch Notice）遮挡修复**：
+       - 根因：WebView 请求 `chaturbate.com` 域名时带入了 `Accept-Language: zh-CN` 报头，Chaturbate SPA 侦测到中文系统语言后在播放器上方覆盖了「You are viewing Chaturbate in English...」提示条；且 CSS 中缺少针对该横幅 class 的隐藏规则；
+       - 修复：
+         1. `StripchatLiveWebView.swift` 中针对 Chaturbate/HornyStudents 将 `Accept-Language` 调整为 `en-US,en;q=0.9`，注入 `lang=en` Cookie；
+         2. 在 `injectionCSS` 中追加 `.language-mismatch-notice, .language_mismatch_notice, [class*="language-mismatch"], #language-suggestion` 等全局强制隐藏规则（`display: none !important; opacity: 0 !important; height: 0 !important;`）；
+         3. 在 JS `checkAndHook` 中即时探测并移除该提示节点；
+         4. Android 端 `LiveScreen.kt` 同步追加相同 CSS 隐藏防预。
+    3. **实时评论区（Live Comments）系统杂质/字体/规则文字彻底清洗**：
+       - 根因：原 WebView 提取评论时未校验发言人，当找不到用户名时硬编码 fallback 为「观众/用户」，并将包含 `.message` 类的字体选择器（"FontDefaultArialBookman..."）、发言规则（"Rules: No spamming..."）、Tip 指引（"To send a tip..."）、聊天设置等系统节点误当作用户发言推送到前端；
+       - 修复：
+         1. 严格要求必须存在真实发言人节点（`authorNode != null`，且作者非空且非「观众/用户」）；
+         2. 排除 `.chat-settings`、`.font-list`、`[class*="setting"]`、`[class*="rule"]`、`[class*="notice"]` 内的所有子节点；
+         3. 增加黑名单关键词拦截机制（过滤 "Featured Chat", "Chat Settings", "FontDefault", "Rules: No spamming", "You are viewing Chaturbate" 等），彻底净化评论流。
+    4. **双端构建、签名与 OTA 同名原子发布**：
+       - Android Release APK（`dist/Netgrey.apk`，208MB，SHA-256: `f5472edb09cc808a8012bfeac5aec18945cdfd13bbacbb35112680b631c0a522`）；
+       - iOS 签名包（`ios/build.nosync/outputs/Netgrey.ipa`，205MB，SHA-256: `e7f418767b860f419dd6566fb8d52b9fce43998e3a42a94802dc8b85276a8b4a`）；
+       - 上传至 `https://bananarey.us` 完成原子同名覆盖，服务器磁盘维持 11GB 可用（>5GB 安全水位）；
+       - iOS XCTest 163 项（157 passed, 0 failed, 6 skipped需网络探针）；
+       - Android 单测 238 项（231 passed, 0 failed, 7 skipped）。
+
+## 历史交接：2026-11-10 — 直播服务器连接超时双端彻底根治＋Android OkHttp 全量升级与离线缓存兜底＋iOS 嗅探防超时与并发加载容灾＋双端版本号升级至 v2.16.12 (Build 238) 并发布至 bananarey.us
+
+- **范围**：
+  - 响应用户 Randy 核心指示「現在的直播直接服務器連接超時le q」：
+    1. **Android 端直播网络层 OkHttpClient 化与超时根治**：
+       - 根因：原 `StripchatLiveRepository` 与 `HornyStudentsLiveRepository` 使用 Java 原生老旧 `HttpURLConnection`，无连接池、无 HTTP/2，且未配置 Permissive SSL 信任导致 TLS 握手经常阻塞达 15 秒，主备站与降级源累加超时达 45 秒抛出 `SocketTimeoutException`，触发全屏大字报「连接直播服务器超时，请稍后重试」；
+       - 修复：全量升级为单例 `OkHttpClient`，配置 Permissive SSL 信任所有证书、HTTP/2 多路复用连接池与 8 秒短超时；并在 `LiveViewModel` 引入本地离线持久化缓存兜底（`preferences.cachedLiveFeed`），网络抖动时继续展示有效主播列表，绝不空白卡死。
+    2. **iOS 端直播嗅探超时防御与并发加载重构**：
+       - 根因：`LiveSourceCatalog` 串行请求 4 个分类与 HornyStudents 导致超时叠加；`LivePlayerView` 嗅探请求未设超时（默认 60s）与 Web 视口 12s 看门狗严重冲突；`StripchatLiveWebView` 错误写死 `Referer: https://zh.stripchat.com/` 引发跨域拒绝；
+       - 修复：`fetchSelectedSources` 改为 `async let` / `withThrowingTaskGroup` 并发请求，加载时间从 10+ 秒缩减至 1~2 秒；直链嗅探严格限定 3.0~3.5 秒超时并快速放行；Web 视口使用动态 Referer，并在加载失败时自动平滑切入备用线路重试（如 `zh.stripchat.com` -> `stripchat.com`，`chaturbate.com` -> `hornystudents.com`）。
+    3. **双端构建、签名与 OTA 同名原子发布**：
+       - Android Release APK（`dist/Netgrey.apk`，208MB，SHA-256: `e9bb493abda79b5d7274875ba3576facdb2f42be2ad7dfce21721a25e8ed6024`）；
+       - iOS 签名包（`ios/build.nosync/outputs/Netgrey.ipa`，205MB，SHA-256: `c0dda7c931311f5981cfb773c28308a165d0da4ea85e15466e9658f95516812a`）；
+       - 上传至 `https://bananarey.us` 完成原子同名覆盖，服务器磁盘维持 11GB 可用（>5GB 安全水位）；
+       - iOS XCTest 163 项（157 passed, 0 failed, 6 skipped需网络探针）；
+       - Android 单测 238 项（231 passed, 0 failed, 7 skipped）。
+
 ## 最新交接：2026-11-10 — 直播播放器原生HLS秒播与弹幕杂质过滤＋游戏大厅看板立绘呼吸感恢复与超大尺寸自适应校准＋双端版本号升级至 v2.16.11 (Build 237) 并发布至 bananarey.us
 
 - **范围**：

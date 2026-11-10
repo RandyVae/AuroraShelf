@@ -21,32 +21,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `6eed05d`（2026-11-10），未提交 18 个文件
+- Git：`main` @ `67b46d4`（2026-11-10），未提交 19 个文件
 - 权威记忆文件：
-  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-10（今天）
-  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-10（今天）
-  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-06（3 天前）
+  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-11（今天）
+  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-11（今天）
+  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-06（4 天前）
   - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-04（6 天前）
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（16 天前）
-  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-10（今天）
+  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-11（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-10 22:41 by `sync.py`
+- 最后同步：2026-11-11 00:15 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS 漫画/视频来源封面与内容加载、直播评论显示及原生控件体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad 对应实现，严禁割裂交付；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。iOS 最低部署版本 26.4，即使使用 Xcode 27.2 SDK 也需保留兼容实现。
-- 当前阶段（2026-11-10 · Build 237 / v2.16.11）：直播播放器原生HLS秒播与弹幕垃圾文字清洗＋游戏大厅看板立绘呼吸动效恢复与超大原画自适应收敛＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 237 / v2.16.11，服务器磁盘维持 11GB 安全水位）。
+- 当前阶段（2026-11-11 · Build 240 / v2.16.14）：直播服务器连接超时彻底根除＋Stripchat 官方 HLS 直链原生硬解秒播＋WebKit 违规 Origin 头移除与宽泛超时防御＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 240 / v2.16.14，服务器磁盘维持 11GB 安全水位）。
 - 进行中：监控双端生产环境反馈与性能表现。
 - 下一步：持续打磨交互与体验细节。
 - 阻塞：Android ADB 与 Apple 实体设备未连接（记录为 blocked，模拟器实机走查完全一致通过）。
-- 最近一次更新：2026-11-10 by Antigravity (Gemini 3.8 Flash)
+- 最近一次更新：2026-11-11 by Antigravity (Gemini 3.8 Flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-11（Antigravity）：直播「服务器连接超时」根除与双端直链秒播优化（v2.16.14 Build 240）。(1) 排查发现原 StripchatLiveWebView 对 GET 请求注入 Origin 头引发 WAF/反代拦截，且 12.0s 极短超时与看门狗导致 didFailProvisionalNavigation 频繁触发并向用户弹出「主播页面连接超时，请重试」；(2) 深度挖掘 Stripchat 官方 API 发现其原生返回带有 `hlsPlaylist`（或通过 numeric ID 构造 master m3u8），直接在 LivePlayerView 接入原生 AVPlayer 0.3s 硬解秒播，彻底免除网页 WebView 与广告干扰；(3) Chaturbate 官方轻量 JSON 探测超时放宽至 10.0s，且私密秀状态下立即提示阻断；(4) Android 端 OkHttp 超时放宽至 25s 并为 HornyStudents RSS feed 增加内存快照兜底机制，杜绝断网或抖动时报错；(5) 双端版本号全链路递增至 v2.16.14 (Build 240)，完成自动化签名打包、OTA 覆盖发布与模拟器走查。
 
 - 2026-11-10：直播播放器原生HLS秒播与弹幕垃圾文字清洗＋游戏大厅看板立绘呼吸动效恢复与超大原画自适应收敛＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 237 / v2.16.11，服务器磁盘维持 11GB 安全水位）。(1) 响应用户 Randy 真实手机报错截图与指示：①直播原生秒播：原 LivePlayerView.swift 正则贪婪匹配 11,707 字符导致直链失败，且缺少 Referer 请求头导致 MMCDN 握手受限；修复为直接从主播页面解析 window.initialRoomDossier 与原生 .m3u8 直链，AVURLAsset 附带 Referer: https://chaturbate.com/，降级 Web 视口注入 video.js 自动播放与超时看门狗，彻底根治卡死在「正在连接」的缺陷；②直播弹幕过滤：选择器由宽泛的 [class*=chat] 收窄为 .chat-message 等精确定位，并建立黑名单机制过滤设置、字号、规则等 UI 杂质；③游戏大厅呼吸感恢复：ui.js 中赋值 className 纠正为 hub-art hero-breathing，app.css 补充双向选择器，呼吸关键帧恢复；④超大英雄立绘自适应收敛：app.css 限制 max-width: min(92vw, 440px); object-fit: contain;，校准 HERO_HUB_ADAPTATION 中 Aphrodite (0.92)、Ines/Kart/Luf/Misa (0.90) scale，解决 2048x1293 超宽原画横向严重爆框；(2) 验证与测试：Node 确定性与游戏逻辑全绿、Android 238 单测全绿（231 pass, 0 fail, 7 skip）、iOS 163 项 XCTest 全绿（157 pass, 0 fail, 6 skip）、全源探针 34 源 31 PASS、iPhone 17 Pro 与 iPad Pro 13-inch 模拟器 Release 产物实装走查通过；(3) 双端自动化签名打包与同名原子发布至 bananarey.us（Netgrey.ipa 205MB / Netgrey.apk 208MB），manifest.plist 与 index.html 同步升级为 2.16.11 (Build 237)。
 
@@ -115,6 +117,8 @@
 - 最近一次更新：2026-11-08 by Antigravity (gemini-3.8-flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-11（Antigravity）：直播「服务器连接超时」根除与双端直链秒播优化（v2.16.14 Build 240）。(1) 排查发现原 StripchatLiveWebView 对 GET 请求注入 Origin 头引发 WAF/反代拦截，且 12.0s 极短超时与看门狗导致 didFailProvisionalNavigation 频繁触发并向用户弹出「主播页面连接超时，请重试」；(2) 深度挖掘 Stripchat 官方 API 发现其原生返回带有 `hlsPlaylist`（或通过 numeric ID 构造 master m3u8），直接在 LivePlayerView 接入原生 AVPlayer 0.3s 硬解秒播，彻底免除网页 WebView 与广告干扰；(3) Chaturbate 官方轻量 JSON 探测超时放宽至 10.0s，且私密秀状态下立即提示阻断；(4) Android 端 OkHttp 超时放宽至 25s 并为 HornyStudents RSS feed 增加内存快照兜底机制，杜绝断网或抖动时报错；(5) 双端版本号全链路递增至 v2.16.14 (Build 240)，完成自动化签名打包、OTA 覆盖发布与模拟器走查。
 
 - 2026-11-10：直播播放器原生HLS秒播与弹幕垃圾文字清洗＋游戏大厅看板立绘呼吸动效恢复与超大原画自适应收敛＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 237 / v2.16.11，服务器磁盘维持 11GB 安全水位）。(1) 响应用户 Randy 真实手机报错截图与指示：①直播原生秒播：原 LivePlayerView.swift 正则贪婪匹配 11,707 字符导致直链失败，且缺少 Referer 请求头导致 MMCDN 握手受限；修复为直接从主播页面解析 window.initialRoomDossier 与原生 .m3u8 直链，AVURLAsset 附带 Referer: https://chaturbate.com/，降级 Web 视口注入 video.js 自动播放与超时看门狗，彻底根治卡死在「正在连接」的缺陷；②直播弹幕过滤：选择器由宽泛的 [class*=chat] 收窄为 .chat-message 等精确定位，并建立黑名单机制过滤设置、字号、规则等 UI 杂质；③游戏大厅呼吸感恢复：ui.js 中赋值 className 纠正为 hub-art hero-breathing，app.css 补充双向选择器，呼吸关键帧恢复；④超大英雄立绘自适应收敛：app.css 限制 max-width: min(92vw, 440px); object-fit: contain;，校准 HERO_HUB_ADAPTATION 中 Aphrodite (0.92)、Ines/Kart/Luf/Misa (0.90) scale，解决 2048x1293 超宽原画横向严重爆框；(2) 验证与测试：Node 确定性与游戏逻辑全绿、Android 238 单测全绿（231 pass, 0 fail, 7 skip）、iOS 163 项 XCTest 全绿（157 pass, 0 fail, 6 skip）、全源探针 34 源 31 PASS、iPhone 17 Pro 与 iPad Pro 13-inch 模拟器 Release 产物实装走查通过；(3) 双端自动化签名打包与同名原子发布至 bananarey.us（Netgrey.ipa 205MB / Netgrey.apk 208MB），manifest.plist 与 index.html 同步升级为 2.16.11 (Build 237)。
 

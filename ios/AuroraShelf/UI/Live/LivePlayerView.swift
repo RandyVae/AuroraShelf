@@ -409,10 +409,21 @@ public struct LivePlayerView: View {
         cleanupLivePlayer(cancelRequest: false)
 
         if stream.sourceID == LiveSourceCatalog.stripchatID {
-            if let hlsStr = stream.hlsStreamUrl, let hlsUrl = URL(string: hlsStr) {
-                startNativePlayback(hlsUrl: hlsUrl, requestID: requestID)
+            var directHlsUrl: URL? = nil
+            if let hlsStr = stream.hlsStreamUrl, let url = URL(string: hlsStr) {
+                directHlsUrl = url
             } else {
-                UIApplication.shared.isIdleTimerDisabled = true
+                let numericId = stream.id.replacingOccurrences(of: "sc-", with: "")
+                if !numericId.isEmpty && Int(numericId) != nil {
+                    directHlsUrl = URL(string: "https://edge-hls.doppiocdn.media/hls/\(numericId)/master/\(numericId).m3u8")
+                }
+            }
+            if let targetUrl = directHlsUrl {
+                startNativePlayback(hlsUrl: targetUrl, referer: "https://zh.stripchat.com/", requestID: requestID)
+            } else {
+                self.player = nil
+                self.isLoadingLive = false
+                self.liveError = nil
             }
         } else {
             startChaturbatePlayback(requestID: requestID)
@@ -430,7 +441,7 @@ public struct LivePlayerView: View {
 
         // 10 秒短生命周期内存缓存拦截：避免切房重复建立流解析往返
         if let cached = Self.streamContextCache[username], Date().timeIntervalSince(cached.timestamp) < 10.0 {
-            startNativePlayback(hlsUrl: cached.url, requestID: requestID)
+            startNativePlayback(hlsUrl: cached.url, referer: "https://chaturbate.com/", requestID: requestID)
             return
         }
 
@@ -444,49 +455,80 @@ public struct LivePlayerView: View {
             do {
                 var hlsFoundUrl: URL? = nil
 
-                // 1. 优先直接请求 Chaturbate / HornyStudents 官方真实主播页面，提取 window.initialRoomDossier 或原生 HLS 直链
-                let candidatePages = [
-                    URL(string: "https://chaturbate.com/\(username)/"),
-                    URL(string: "https://www.hornystudents.com/\(username)/")
-                ].compactMap { $0 }
+                // 1. 优先直接请求官方轻量 JSON 接口（~2KB，响应耗时 <200ms），秒级识别开播与私密秀状态
+                var apiReq = URLRequest(url: apiUrl, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10.0)
+                apiReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+                apiReq.setValue("https://chaturbate.com/\(username)/", forHTTPHeaderField: "Referer")
+                apiReq.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+                apiReq.setValue("agreeterms=1; isAdult=1; hasConfirmedAge=1; lang=en;", forHTTPHeaderField: "Cookie")
 
-                for roomPageUrl in candidatePages {
-                    if hlsFoundUrl != nil { break }
-                    var roomReq = URLRequest(url: roomPageUrl)
-                    roomReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
-                    roomReq.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
-                    roomReq.setValue("agreeterms=1; isAdult=1; hasConfirmedAge=1; lang=en;", forHTTPHeaderField: "Cookie")
+                if let (apiData, apiResp) = try? await URLSession.permissive().data(for: apiReq),
+                   let httpResp = apiResp as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
+                   let json = try? JSONSerialization.jsonObject(with: apiData) as? [String: Any] {
+                    try Task.checkCancellation()
+                    guard activeStreamRequestID == requestID else { return }
 
-                    if let (pageData, _) = try? await URLSession.permissive().data(for: roomReq),
-                       let html = String(data: pageData, encoding: .utf8) {
+                    let status = (json["room_status"] as? String)?.lowercased() ?? "public"
+                    if status == "private" {
+                        self.isLoadingLive = false
+                        self.liveError = "主播当前正在进行私密秀（需付费观看）"
+                        return
+                    } else if status == "offline" {
+                        self.isLoadingLive = false
+                        self.liveError = "主播当前已离线或暂未开播"
+                        return
+                    } else if status == "away" {
+                        self.isLoadingLive = false
+                        self.liveError = "主播暂时离开，请稍后刷新"
+                        return
+                    }
 
-                        // 1.1 从 window.initialRoomDossier 中安全提取结构化 JSON
-                        if let dossierRegex = try? NSRegularExpression(pattern: #"window\.initialRoomDossier\s*=\s*"([^"]+)""#),
-                           let match = dossierRegex.firstMatch(in: html, range: NSRange(location: 0, length: (html as NSString).length)) {
-                            let rawJson = (html as NSString).substring(with: match.range(at: 1))
-                                .replacingOccurrences(of: "\\\"", with: "\"")
-                                .replacingOccurrences(of: "\\\\", with: "\\")
-                                .replacingOccurrences(of: "\\u0022", with: "\"")
-                                .replacingOccurrences(of: "\\/", with: "/")
-                            if let jsonData = rawJson.data(using: .utf8),
-                               let dossier = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                               let hlsSource = dossier["hls_source"] as? String, !hlsSource.isEmpty,
-                               let directUrl = URL(string: hlsSource) {
-                                hlsFoundUrl = directUrl
+                    if let hlsSource = json["hls_source"] as? String, !hlsSource.isEmpty,
+                       let directUrl = URL(string: hlsSource) {
+                        hlsFoundUrl = directUrl
+                    }
+                }
+
+                // 2. 备用线路：当 API 受限时，解析 HTML 页面中的 window.initialRoomDossier
+                if hlsFoundUrl == nil {
+                    let candidatePages = [
+                        URL(string: "https://chaturbate.com/\(username)/"),
+                        URL(string: "https://www.hornystudents.com/\(username)/")
+                    ].compactMap { $0 }
+
+                    for roomPageUrl in candidatePages {
+                        if hlsFoundUrl != nil { break }
+                        var roomReq = URLRequest(url: roomPageUrl, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12.0)
+                        roomReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+                        roomReq.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
+                        roomReq.setValue("agreeterms=1; isAdult=1; hasConfirmedAge=1; lang=en;", forHTTPHeaderField: "Cookie")
+
+                        if let (pageData, _) = try? await URLSession.permissive().data(for: roomReq),
+                           let rawHtml = String(data: pageData, encoding: .utf8) {
+                            try Task.checkCancellation()
+                            guard activeStreamRequestID == requestID else { return }
+
+                            // 2.1 状态检测（规避进入私密秀房间陷入无限加载）
+                            if rawHtml.contains(#""room_status": "private""#) ||
+                               rawHtml.contains(#""room_status":"private""#) ||
+                               rawHtml.contains(#"\u0022room_status\u0022: \u0022private\u0022"#) ||
+                               rawHtml.contains(#"\u0022room_status\u0022:\u0022private\u0022"#) {
+                                self.isLoadingLive = false
+                                self.liveError = "主播当前正在进行私密秀（需付费观看）"
+                                return
                             }
-                        }
+                            if rawHtml.contains(#""room_status": "offline""#) ||
+                               rawHtml.contains(#"\u0022room_status\u0022: \u0022offline\u0022"#) {
+                                self.isLoadingLive = false
+                                self.liveError = "主播当前已离线或暂未开播"
+                                return
+                            }
 
-                        // 1.2 从源码中精准嗅探包含鉴权 Token 的原生 .m3u8 直链
-                        if hlsFoundUrl == nil {
-                            let m3u8Pattern = #"https?:\/\/[^"\s\\]+?\.m3u8[^"\s\\]*"#
-                            if let mRegex = try? NSRegularExpression(pattern: m3u8Pattern),
-                               let mMatch = mRegex.firstMatch(in: html, range: NSRange(location: 0, length: (html as NSString).length)) {
-                                let rawM3u8 = (html as NSString).substring(with: mMatch.range)
-                                    .replacingOccurrences(of: "\\u0026", with: "&")
-                                    .replacingOccurrences(of: "\\u002D", with: "-")
-                                    .replacingOccurrences(of: "\\u003D", with: "=")
-                                    .replacingOccurrences(of: "\\/", with: "/")
-                                    .replacingOccurrences(of: "\\", with: "")
+                            // 2.2 解码 Unicode 转义符并提取 hls_source
+                            let unescaped = Self.unescapeUnicodeEntities(rawHtml)
+                            if let hlsRegex = try? NSRegularExpression(pattern: #""hls_source"\s*:\s*"(https?:\/\/[^"\s\\]+?\.m3u8[^"\s\\]*)""#),
+                               let mMatch = hlsRegex.firstMatch(in: unescaped, range: NSRange(location: 0, length: (unescaped as NSString).length)) {
+                                let rawM3u8 = (unescaped as NSString).substring(with: mMatch.range(at: 1))
                                 if let directUrl = URL(string: rawM3u8) {
                                     hlsFoundUrl = directUrl
                                 }
@@ -495,49 +537,52 @@ public struct LivePlayerView: View {
                     }
                 }
 
-                // 2. 次选 API 回退
-                if hlsFoundUrl == nil {
-                    var request = URLRequest(url: apiUrl)
-                    request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-                    request.setValue("https://chaturbate.com/\(username)/", forHTTPHeaderField: "Referer")
-                    request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
-                    request.setValue("agreeterms=1; isAdult=1; hasConfirmedAge=1; lang=en;", forHTTPHeaderField: "Cookie")
-
-                    let (data, response) = try await URLSession.permissive().data(for: request)
-                    try Task.checkCancellation()
-                    guard activeStreamRequestID == requestID else { return }
-                    if let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
-                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let hlsSource = json["hls_source"] as? String, !hlsSource.isEmpty,
-                       let directUrl = URL(string: hlsSource) {
-                        hlsFoundUrl = directUrl
-                    }
-                }
-
                 guard let finalHlsUrl = hlsFoundUrl else {
-                    // 未直接嗅探到可用直链，直接平滑降级至纯净 WebRTC 视口起播
+                    // 未直接嗅探到可用直链，平滑降级至纯净 WebRTC 视口起播
                     self.player = nil
-                    self.isLoadingLive = true
+                    self.isLoadingLive = false
                     self.liveError = nil
                     return
                 }
 
                 Self.streamContextCache[username] = (finalHlsUrl, Date())
-                startNativePlayback(hlsUrl: finalHlsUrl, requestID: requestID)
+                startNativePlayback(hlsUrl: finalHlsUrl, referer: "https://chaturbate.com/", requestID: requestID)
             } catch {
                 guard !Task.isCancelled, activeStreamRequestID == requestID else { return }
-                // 发生异常时平滑降级至纯净 WebRTC 视口起播，杜绝 403 阻断
+                // 发生异常时平滑降级至纯净 WebRTC 视口起播
                 self.player = nil
-                self.isLoadingLive = true
+                self.isLoadingLive = false
                 self.liveError = nil
             }
         }
     }
 
-    private func startNativePlayback(hlsUrl: URL, requestID: UUID) {
+    private static func unescapeUnicodeEntities(_ str: String) -> String {
+        var result = ""
+        result.reserveCapacity(str.count)
+        var index = str.startIndex
+        while index < str.endIndex {
+            if str[index] == "\\", str.index(after: index) < str.endIndex, str[str.index(after: index)] == "u" {
+                let uStart = str.index(index, offsetBy: 2)
+                if let uEnd = str.index(uStart, offsetBy: 4, limitedBy: str.endIndex) {
+                    let hex = String(str[uStart..<uEnd])
+                    if let code = UInt32(hex, radix: 16), let scalar = UnicodeScalar(code) {
+                        result.append(Character(scalar))
+                        index = uEnd
+                        continue
+                    }
+                }
+            }
+            result.append(str[index])
+            index = str.index(after: index)
+        }
+        return result
+    }
+
+    private func startNativePlayback(hlsUrl: URL, referer: String = "https://chaturbate.com/", requestID: UUID) {
         guard activeStreamRequestID == requestID else { return }
         let headers: [String: String] = [
-            "Referer": "https://chaturbate.com/",
+            "Referer": referer,
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
         ]
         let asset = AVURLAsset(url: hlsUrl, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
@@ -561,7 +606,7 @@ public struct LivePlayerView: View {
                 } else if item.status == .failed {
                     // 原生直链解码失败或 MMCDN 403 握手受限时，全量平滑降级至纯净 WebRTC 视口起播
                     self.player = nil
-                    self.isLoadingLive = true
+                    self.isLoadingLive = false
                     self.liveError = nil
                 }
             }

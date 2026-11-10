@@ -2242,7 +2242,8 @@ private fun livePlayerModeScript(roomUrl: String): String {
           overflow: hidden !important;
           background: #000 !important;
         }
-        header, #static-header, .header, nav, footer, .room-header, .evolve-header, #room-bottom-banner {
+        header, #static-header, .header, nav, footer, .room-header, .evolve-header, #room-bottom-banner,
+        .language-mismatch-notice, [class*="language-mismatch"], #language-suggestion {
           display: none !important;
           height: 0 !important;
           min-height: 0 !important;

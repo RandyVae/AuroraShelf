@@ -71,7 +71,8 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
     
     private init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForRequest = 25
+        config.timeoutIntervalForResource = 35
         config.httpAdditionalHeaders = [
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
             "Accept": "application/xml, text/xml, */*"
@@ -128,32 +129,54 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
     }
 
     private func fetchSelectedSources(selectedSourceID: String, selectedGender: String) async -> LiveFeedOutcome {
-        let sourceIDs = selectedSourceID == LiveSourceCatalog.allSourcesID
-            ? [LiveSourceCatalog.hornyStudentsID, LiveSourceCatalog.stripchatID]
-            : [selectedSourceID]
+        if selectedSourceID == LiveSourceCatalog.allSourcesID {
+            async let hsFeed = runCatchingStreams { try await self.fetchRealHornyStudentsFeed() }
+            async let scFeed = runCatchingStreams { try await self.fetchRealStripchatFeed(gender: selectedGender) }
+            let (hsResult, scResult) = await (hsFeed, scFeed)
 
-        var streams: [LiveStreamItem] = []
-        var failures: [String] = []
-        for sourceID in sourceIDs {
-            do {
-                let loaded = sourceID == LiveSourceCatalog.stripchatID
-                    ? try await fetchRealStripchatFeed(gender: selectedGender)
-                    : try await fetchRealHornyStudentsFeed()
-                streams.append(contentsOf: loaded)
-            } catch {
-                guard !Task.isCancelled else { return .failed("直播列表加载已取消。") }
-                failures.append("\(LiveSourceCatalog.name(for: sourceID))：\((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)")
+            var streams: [LiveStreamItem] = []
+            var failures: [String] = []
+
+            switch hsResult {
+            case .success(let items): streams.append(contentsOf: items)
+            case .failure(let err): failures.append("HornyStudents：\(err.localizedDescription)")
+            }
+            switch scResult {
+            case .success(let items): streams.append(contentsOf: items)
+            case .failure(let err): failures.append("Stripchat：\(err.localizedDescription)")
+            }
+
+            if !streams.isEmpty {
+                return .loaded(streams.uniqued(by: \.id), failures)
+            } else if !failures.isEmpty {
+                return .failed(failures.joined(separator: "\n"))
+            } else {
+                return .loaded([], [])
             }
         }
 
-        guard !streams.isEmpty || failures.isEmpty else {
-            return .failed(failures.joined(separator: "\n"))
+        do {
+            let loaded = selectedSourceID == LiveSourceCatalog.stripchatID
+                ? try await fetchRealStripchatFeed(gender: selectedGender)
+                : try await fetchRealHornyStudentsFeed()
+            return .loaded(loaded, [])
+        } catch {
+            guard !Task.isCancelled else { return .failed("直播列表加载已取消。") }
+            return .failed("\(LiveSourceCatalog.name(for: selectedSourceID))：\((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)")
         }
-        return .loaded(streams, failures)
     }
-    
+
+    private func runCatchingStreams(_ block: @escaping () async throws -> [LiveStreamItem]) async -> Result<[LiveStreamItem], Error> {
+        do {
+            let res = try await block()
+            return .success(res)
+        } catch {
+            return .failure(error)
+        }
+    }
+
     // MARK: - 真实请求 HornyStudents RSS 2.0 在线主播流
-    
+
     private func fetchRealHornyStudentsFeed() async throws -> [LiveStreamItem] {
         guard let url = URL(string: "https://www.hornystudents.com/feed/latest/") else {
             throw LiveFeedError.invalidURL
@@ -180,22 +203,21 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
         case "情侣互动": primaryTags = ["couples"]
         case "男性主播": primaryTags = ["men"]
         case "跨性别": primaryTags = ["trans"]
-        default: primaryTags = ["girls", "couples", "men", "trans"]
+        default: primaryTags = ["girls", "couples"]
         }
 
-        var streams: [LiveStreamItem] = []
-        var errors: [Error] = []
-        for tag in primaryTags {
-            do {
-                streams.append(contentsOf: try await fetchStripchatFeed(primaryTag: tag))
-            } catch {
-                errors.append(error)
+        return try await withThrowingTaskGroup(of: [LiveStreamItem].self) { group in
+            for tag in primaryTags {
+                group.addTask {
+                    try await self.fetchStripchatFeed(primaryTag: tag)
+                }
             }
+            var allStreams: [LiveStreamItem] = []
+            while let streams = try await group.next() {
+                allStreams.append(contentsOf: streams)
+            }
+            return allStreams.uniqued(by: \.id)
         }
-        if streams.isEmpty, let firstErr = errors.first {
-            throw firstErr
-        }
-        return streams.uniqued(by: \.id)
     }
 
     private func fetchStripchatFeed(primaryTag: String) async throws -> [LiveStreamItem] {
@@ -267,7 +289,8 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
             let location = extractTag(from: block, tag: "cb:location") ?? "Online"
             
             let currentShow = extractTag(from: block, tag: "cb:current_show") ?? "public"
-            let isPrivate = currentShow != "public"
+            guard currentShow == "public" else { continue }
+            let isPrivate = false
             
             let imgUrl = extractTag(from: block, tag: "cb:image_url")
                 ?? "https://thumb.live.mmcdn.com/ri/\(username).jpg"

@@ -3,9 +3,8 @@ package com.aurorashelf.app.data
 import com.aurorashelf.app.model.LiveCategory
 import com.aurorashelf.app.model.LiveItem
 import com.aurorashelf.app.model.LivePage
+import okhttp3.Request
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -43,11 +42,20 @@ class HornyStudentsLiveRepository {
             cachedItems?.let {
                 if (now - cacheTimestamp < CACHE_TTL_MS) return it
             }
-            val xml = request(FEED_URL)
-            val parsed = parseFeed(xml)
-            cachedItems = parsed
-            cacheTimestamp = System.currentTimeMillis()
-            return parsed
+            try {
+                val xml = request(FEED_URL)
+                val parsed = parseFeed(xml)
+                if (parsed.isNotEmpty()) {
+                    cachedItems = parsed
+                    cacheTimestamp = System.currentTimeMillis()
+                    return parsed
+                }
+            } catch (e: Exception) {
+                // 网络波动或超时优先使用内存快照平滑兜底，杜绝阻断
+                cachedItems?.let { return it }
+                throw e
+            }
+            return cachedItems ?: emptyList()
         }
     }
 
@@ -93,22 +101,16 @@ class HornyStudentsLiveRepository {
     }
 
     private fun request(address: String): String {
-        val connection = URL(address).openConnection() as HttpURLConnection
-        return try {
-            connection.requestMethod = "GET"
-            connection.connectTimeout = REQUEST_TIMEOUT_MS
-            connection.readTimeout = REQUEST_TIMEOUT_MS
-            connection.instanceFollowRedirects = true
-            connection.setRequestProperty("Accept", "application/xml, text/xml, */*")
-            connection.setRequestProperty("User-Agent", VideoRepository.USER_AGENT)
-            val status = connection.responseCode
-            val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (status !in 200..299) throw IOException("HornyStudents 接口返回 HTTP $status")
+        val req = Request.Builder()
+            .url(address)
+            .header("Accept", "application/xml, text/xml, */*")
+            .header("User-Agent", VideoRepository.USER_AGENT)
+            .build()
+        StripchatLiveRepository.okHttpClient.newCall(req).execute().use { response ->
+            val body = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IOException("HornyStudents 接口返回 HTTP ${response.code}")
             if (body.isBlank()) throw IOException("HornyStudents 接口返回空内容")
-            body
-        } finally {
-            connection.disconnect()
+            return body
         }
     }
 

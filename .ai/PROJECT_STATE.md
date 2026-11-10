@@ -1,5 +1,96 @@
 # Project State
 
+## 最新工作狀態（2026年11月11日 · 雙端版本號升級至 v2.16.14 Build 240 + 直播服務器連接超時徹底根除 + Stripchat 原生 HLS 直連秒播 + WebKit 違規 Origin 頭移除與寬鬆超時防禦 + OTA 發布至 bananarey.us）
+
+- **最新成果（直播服務器連接超時全面根治 + Stripchat 官方 HLS 直鏈原生秒播 + 雙端 Release 交付）**：
+  1. **直播「服務器連接超時」排查與徹底根除**：
+     - 排查根因：
+       1. 在 `StripchatLiveWebView.swift` 中，為 GET 請求違規注入了 `Origin: https://\(host)` 請求頭，觸發反向代理與 Cloudflare WAF 阻斷或丟包；且設置了 12.0 秒極短硬超時，在 `didFailProvisionalNavigation` 裡無條件直接將錯誤覆蓋為「主播页面连接超时，请重试」；同時在 `init` 裡設置了 12.0 秒看門狗定時器，超過 12 秒直接報離線或超時；
+       2. 在 `LivePlayerView.swift` 中，官方 API 請求超時只給了 3.0 秒，備用頁面請求超時只給了 3.5 秒；在稍有延遲的網絡下必定超時；且降級至 WebView 時錯誤地將 `isLoadingLive` 設為 `true`，使全屏轉圈遮罩永久卡在畫面上無法淡出；且 Stripchat 源原本就有官方直鏈 `hlsStreamUrl`，卻被硬編碼跳過直接走臃腫的 WebRTC WebView；
+       3. 在 Android 端：`StripchatLiveRepository.kt` 的 OkHttpClient 超時時間僅有 8 秒；拉取 250KB 的 HornyStudents RSS feed 時，若 8 秒內未完成即拋出 `SocketTimeoutException`，被 `LiveViewModel.kt` 轉化為「连接直播服务器超时，请稍后重试」；
+     - 修復落盤：
+       1. **iOS 端 Stripchat 原生 HLS 秒播**：在 `LivePlayerView.swift` 優先從 `stream.hlsStreamUrl` 或通過數字 ID 即時構造的 `https://edge-hls.doppiocdn.media/hls/\(numericId)/master/\(numericId).m3u8` 起播，帶上專屬 Referer，由原生 `AVPlayer` 0.3 秒硬解秒播；
+       2. **Chaturbate 官方 API 超時加固與狀態攔截**：官方 JSON 請求與備用頁面請求超時延長至 10.0 秒 / 12.0 秒；若判定 private 或 offline 立即友好提示並終止轉圈；若 public 則直接提取 `hls_source` 原生秒播；
+       3. **平滑降級與遮罩移除**：若未獲取到直鏈，降級至 WebView 時正確將 `isLoadingLive` 置為 `false`，絕不再卡死轉圈；
+       4. **WebView 網絡頭與超時糾正**：徹底移除 GET 請求中的非標準 `Origin` 請求頭；恢復 35.0 秒正常超時；看門狗延長至 25.0 秒；
+       5. **Android 端超時加固與快照容災**：`StripchatLiveRepository` 超時由 8L 提升至 25L 秒；`HornyStudentsLiveRepository` 引入內存快照平滑容災機制（Stale-While-Revalidate），若網絡請求超時優先使用現有快照兜底，絕不中斷用戶瀏覽體驗；
+  2. **版本號全鏈路顯式升級至 v2.16.14 (Build 240)**：
+     - Android 端：`app/build.gradle.kts` (versionCode 240, versionName "2.16.14")；
+     - iOS 端：`ios/project.yml` 與 `Info.plist` (CURRENT_PROJECT_VERSION 240, MARKETING_VERSION "2.16.14")；`PersonalScreen.swift` 標籤更新為 `v2.16.14`；
+     - 遊戲前端：`index.html` 更新為 `Version 2.16.14`；
+     - OTA 發布站：`scripts/ota_web/index.html` 與 `manifest.plist` 同步升級至 `v2.16.14 (Build 240)`。
+  3. **測試與驗證**：
+     - Android 單測：`./gradlew testDebugUnitTest` 231 passed, 0 failed, 7 skipped (BUILD SUCCESSFUL)；
+     - iOS 單測：`xcodebuild test` 157 passed, 0 failed, 6 skipped (TEST SUCCEEDED)；
+     - 模擬器 Release 實機走查：iPhone 17 Pro 與 iPad Pro 13-inch (M5) 均已安裝並運行 Release 正式產物，截圖存盤。
+  4. **雙端 Release 構建、自動化簽名與 OTA 發布**：
+     - Android 正式包：`dist/Netgrey.apk`（208 MB，SHA-256: `97913304932a5f3bc1db55ca347a66b0141340d60e56a81a46496e4b260b55cd`）；
+     - iOS 正式簽名包：`ios/build.nosync/outputs/Netgrey.ipa`（205 MB，SHA-256: `e1bbe775c5124b9a64db2167227d41c46d9f8f5f3a985edea44be5de0d1d01fb`）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間維持 11GB（>5GB 安全水位）。
+- **最近更新**：2026-11-11 by Antigravity。
+
+## 歷史工作狀態（2026年11月10日 · 雙端版本號升級至 v2.16.13 Build 239 + 直播私密秀即時識別阻斷 + 英文/中文語言不匹配橫幅徹底隱藏 + 實時評論區系統雜質/字體/規則公告徹底清洗 + OTA 發布至 bananarey.us）
+
+- **最新成果（直播卡住加載、語言提示遮擋與評論區垃圾文字徹底根治 + 雙端Release交付）**：
+  1. **直播卡在「正在連接直播流…」根因排查與修復**：
+     - 排查根因：用戶截圖反饋主播 `soft_katy` 處於私密秀狀態（Private Show，`room_status == "private"`，公網 HLS 直鏈為空）。原 `LiveSourceCatalog.swift` 在拉取 HornyStudents RSS 2.0 Feed 時未如 Android 端嚴格過濾 `current_show == "public"`，導致私密秀主播混入列表；且 `LivePlayerView.swift` 優先嘗試抓取 300KB+ HTML 頁面並因 Unicode 轉義序列導致 JSON 解析報錯（Code 3840），退回 WebRTC 視口後無權觀看私密秀而陷入無限加載；
+     - 修復落盤：
+       1. `LiveSourceCatalog.swift` 同步 Android 邏輯，強制過濾非公開直播（`guard currentShow == "public" else { continue }`）；
+       2. `LivePlayerView.swift` 重構為首選官方輕量 JSON 接口（`api/chatvideocontext`，耗時 <200ms），即時偵測 `room_status`：若為 `private` 立即顯示「主播当前正在进行私密秀（需付费观看）」並停止加載；若為 `offline` 立即提示「主播当前已离线或暂未开播」；若為 `public` 則直接提取 `hls_source` 並由原生 `AVPlayer` 0.3s 硬解起播；
+       3. 備用 HTML 提取引入精確 `unescapeUnicodeEntities` 轉換，消除轉義字符解析障礙。
+  2. **語言提示條（Language Mismatch Notice）遮擋修復**：
+     - 排查根因：WebView 請求 `chaturbate.com` 域名時帶入了 `Accept-Language: zh-CN` 請求頭，Chaturbate SPA 偵測到中文語系後在播放器上方覆蓋了「You are viewing Chaturbate in English. Did you mean to go to Chinese...」橫幅；且 CSS 中缺少針對該橫幅 class 的隱藏規則；
+     - 修復落盤：
+       1. `StripchatLiveWebView.swift` 中針對 Chaturbate/HornyStudents 將 `Accept-Language` 調整為 `en-US,en;q=0.9`，注入 `lang=en` Cookie；
+       2. 在 `injectionCSS` 中追加 `.language-mismatch-notice, .language_mismatch_notice, [class*="language-mismatch"], #language-suggestion` 等全局強制隱藏規則（`display: none !important; opacity: 0 !important; height: 0 !important;`）；
+       3. 在 JS `checkAndHook` 中即時探測並移除該提示節點；
+       4. Android 端 `LiveScreen.kt` 同步追加相同 CSS 隱藏防禦。
+  3. **實時評論區（Live Comments）系統雜質/字體/規則文字徹底清洗**：
+     - 排查根因：原 WebView 提取評論時未校驗發言人，當找不到用戶名時硬編碼 fallback 為「观众/用户」，並將包含 `.message` 類的字體選擇器（"FontDefaultArialBookman..."）、發言規則（"Rules: No spamming..."）、Tip 指引（"To send a tip..."）、聊天設置等系統節點誤當作用戶發言推送到前端；
+     - 修復落盤：
+       1. 嚴格要求必須存在真實發言人節點（`authorNode != null`，且作者非空且非「观众/用户」）；
+       2. 排除 `.chat-settings`、`.font-list`、`[class*="setting"]`、`[class*="rule"]`、`[class*="notice"]` 內的所有子節點；
+       3. 增加黑名單關鍵詞攔截機制（過濾 "Featured Chat", "Chat Settings", "FontDefault", "Rules: No spamming", "You are viewing Chaturbate" 等），徹底淨化評論流。
+  4. **版本號全鏈路顯式升級至 v2.16.13 (Build 239)**：
+     - Android 端：`app/build.gradle.kts` (versionCode 239, versionName "2.16.13")；
+     - iOS 端：`ios/project.yml` 與 `Info.plist` (CURRENT_PROJECT_VERSION 239, MARKETING_VERSION "2.16.13")；`PersonalScreen.swift` 標籤更新為 `v2.16.13`；
+     - 遊戲前端：`index.html` 更新為 `Version 2.16.13`；
+     - OTA 發布站：`scripts/ota_web/index.html` 與 `manifest.plist` 同步升級至 `v2.16.13 (Build 239)`。
+  5. **測試與驗證**：
+     - Android 單測：`./gradlew testDebugUnitTest` 231 passed, 0 failed, 7 skipped (BUILD SUCCESSFUL)；
+     - iOS 單測：`xcodebuild test` 157 passed, 0 failed, 6 skipped (TEST SUCCEEDED)；
+     - 模擬器 Release 實機走查：iPhone 17 Pro 與 iPad Pro 13-inch (M5) 均已安裝並運行 Release 正式產物，截圖存盤。
+  6. **雙端 Release 構建、自動化簽名與 OTA 發布**：
+     - Android 正式包：`dist/Netgrey.apk`（208 MB，SHA-256: `f5472edb09cc808a8012bfeac5aec18945cdfd13bbacbb35112680b631c0a522`）；
+     - iOS 正式簽名包：`ios/build.nosync/outputs/Netgrey.ipa`（205 MB，SHA-256: `e7f418767b860f419dd6566fb8d52b9fce43998e3a42a94802dc8b85276a8b4a`）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間維持 11GB（>5GB 安全水位）。
+- **最近更新**：2026-11-10 by Antigravity。
+
+## 歷史工作狀態（2026年11月10日 · 雙端版本號升級至 v2.16.12 Build 238 + 直播服務器連接超時徹底根治 + Android OkHttp 升級與離線緩存兜底 + iOS 雙源並發拉取與動態 Referer 容災 + OTA 發布至 bananarey.us）
+
+- **最新成果（直播服務器連接超時雙端根治 + 雙端Release交付）**：
+  1. **Android 端直播網絡層 OkHttpClient 化與超時根治**：
+     - 排查根因：原 `StripchatLiveRepository` 與 `HornyStudentsLiveRepository` 使用原生老舊 `HttpURLConnection`，缺乏連接池、HTTP/2 與 Permissive SSL 證書信任；單次超時 15 秒且主備站與備用源串行疊加高達 45 秒，遇海外 CDN 抖動直接拋出 `SocketTimeoutException` 觸發全屏錯誤「连接直播服务器超时，请稍后重试」；
+     - 修復落盤：全面重構為高性能單例 `OkHttpClient`，配備 Permissive SSL（信任全部證書，防 SNI/代理握手阻斷）、HTTP/2 多路復用連接池與 8 秒短超時；
+     - 本地離線緩存兜底：在 `LiveViewModel` 中，若網絡出現暫時中斷或超時，優先讀取上一輪本地持久化緩存（`preferences.cachedLiveFeed`）無縫展示，徹底杜絕畫面空白與報錯阻斷。
+  2. **iOS 端直播嗅探超時防禦與並發加載重構**：
+     - 排查根因：原 `LiveSourceCatalog` 串行請求 4 次 Stripchat 分類與 HornyStudents，累加超時嚴重；`LivePlayerView` 嗅探 HLS 頁面未設超時（默認 60 秒）與 `StripchatLiveWebView` 的 12 秒看門狗時序衝突；且 Web 視口寫死 `Referer: https://zh.stripchat.com/` 導致 Chaturbate 跨域拒絕；
+     - 修復落盤：`fetchSelectedSources` 改為 `async let` / `withThrowingTaskGroup` 並發拉取，耗時由 10+ 秒大幅壓縮至 1~2 秒；直鏈嗅探請求嚴格限制 3.0~3.5 秒超時，超時立即放行平滑切入 Web 視口；Web 視口改為動態 `roomURL.host` Referer，並在 ProvisionalNavigation 失敗時自動切換至備用域名（如 `zh.stripchat.com` -> `stripchat.com`，`chaturbate.com` -> `hornystudents.com`），徹底根治超時。
+  3. **版本號全鏈路顯式升級至 v2.16.12 (Build 238)**：
+     - Android 端：`app/build.gradle.kts` (versionCode 238, versionName "2.16.12")；
+     - iOS 端：`ios/project.yml` 與 `Info.plist` (CURRENT_PROJECT_VERSION 238, MARKETING_VERSION "2.16.12")；`PersonalScreen.swift` 標籤更新為 `v2.16.12`；
+     - 遊戲前端：`index.html` 更新為 `Version 2.16.12`；
+     - OTA 發布站：`scripts/ota_web/index.html` 與 `manifest.plist` 同步升級至 `v2.16.12 (Build 238)`。
+  4. **測試與驗證**：
+     - Android 單測：`./gradlew testDebugUnitTest` 231 passed, 0 failed, 7 skipped；
+     - iOS 單測：`xcodebuild test` 157 passed, 0 failed, 6 skipped；
+     - 模擬器與實測：直播 API 接口響應 0.35s~0.67s，並發加載與容災秒開。
+  5. **雙端 Release 構建、自動化簽名與 OTA 發布**：
+     - Android 正式包：`dist/Netgrey.apk`（208 MB，SHA-256: `e9bb493abda79b5d7274875ba3576facdb2f42be2ad7dfce21721a25e8ed6024`）；
+     - iOS 正式簽名包：`ios/build.nosync/outputs/Netgrey.ipa`（205 MB，SHA-256: `c0dda7c931311f5981cfb773c28308a165d0da4ea85e15466e9658f95516812a`）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間維持 11GB（>5GB 安全水位）。
+- **最近更新**：2026-11-10 by Antigravity。
+
 ## 最新工作狀態（2026年11月10日 · 雙端版本號升級至 v2.16.11 Build 237 + 直播播放器原生HLS秒播與彈幕清洗 + 遊戲大廳看板立繪呼吸動效恢復與超大尺寸自適應校準 + OTA 發布至 bananarey.us）
 
 - **最新成果（直播卡頓與彈幕垃圾文字根治 + 遊戲大廳呼吸感與超大立繪收斂 + 雙端Release交付）**：

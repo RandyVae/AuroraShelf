@@ -158,11 +158,14 @@ class LiveViewModel(
                 }
             }.onFailure { failure ->
                 if (failure is CancellationException) return@onFailure
+                val cached = preferences.cachedLiveFeed(activeSourceId, category.name)
                 mutableUiState.update { current ->
+                    val fallbackItems = if (current.items.isNotEmpty()) current.items else (cached?.items.orEmpty())
                     current.copy(
+                        items = fallbackItems,
                         isLoading = false,
                         isLoadingMore = false,
-                        error = when (failure) {
+                        error = if (fallbackItems.isNotEmpty()) null else when (failure) {
                             is UnknownHostException -> "无法连接直播服务器，请检查网络连接"
                             is SocketTimeoutException -> "连接直播服务器超时，请稍后重试"
                             is SSLHandshakeException -> "直播连接加密失败，请稍后重试"
