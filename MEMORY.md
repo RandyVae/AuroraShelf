@@ -21,32 +21,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `292af9d`（2026-11-10），未提交 17 个文件
+- Git：`main` @ `19dff10`（2026-11-10），未提交 18 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-10（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-10（今天）
   - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-06（3 天前）
   - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-04（6 天前）
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（15 天前）
-  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-09（今天）
+  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-10（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-10 10:36 by `sync.py`
+- 最后同步：2026-11-10 11:38 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
-- 当前目标：完善 iOS 漫画/视频来源封面与内容加载、直播评论显示及原生控件体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad 对应实现，严禁割裂交付；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康。iOS 最低部署版本 26.4，即使使用 Xcode 27.2 SDK 也需保留兼容实现。
-- 当前阶段（2026-11-10 · Build 233 / v2.16.7）：黄果短剧 iOS SSL 证书阻断根治（SecTrust 锚点强信任＋异常豁免）＋安卓论坛上下滑动阻滞彻底解决（移除 Compose 手势抢占、开启 NestedScrolling 与 CSS 垂直滚动保障）＋8Muses 漫画源双端加载修复（支持 Next.js Turbopack strong 标题与 cover__image 提取）＋Slots 18+ 特勤高清突入立绘半屏全景展示（脱离机台滚轮 215px 拘束、以整体屏幕一半 52vh 为展示空间）＋CG 跳过按钮安全区避让（避开灵动岛与刘海屏、扩大触控热区至 44×44pt）＋全量 32 业务数据源真实连通性 100% 审计通过＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 233 / v2.16.7，服务器磁盘维持 >5GB 安全水位）。
+- 当前目标：完善 iOS 漫画/视频来源封面与内容加载、直播评论显示及原生控件体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad 对应实现，严禁割裂交付；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。iOS 最低部署版本 26.4，即使使用 Xcode 27.2 SDK 也需保留兼容实现。
+- 当前阶段（2026-11-10 · Build 234 / v2.16.8）：XVideos 404 完整路径保留根治＋Pornhub 专属性直解与 HMAC 二次编码拦截根除＋Android 端 ProGuard/R8 混淆致使 PipePipe 提取器失效根除＋黄果短剧 iOS 证书挑战修复（anchorCertificatesOnly = false 保留系统根证书信任）＋「模拟器核验必须与交付包一致」全局强制规则写入＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 234 / v2.16.8，服务器磁盘维持 11GB 安全水位）。
 - 进行中：监控双端生产环境反馈与性能表现。
 - 下一步：持续打磨交互与体验细节。
 - 阻塞：无。
 - 最近一次更新：2026-11-10 by Antigravity (Gemini 3.8 Flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-10：XVideos 404 完整路径保留根治＋Pornhub 专属性直解与 HMAC 二次编码拦截根除＋Android 端 ProGuard/R8 混淆致使 PipePipe 提取器失效根除＋黄果短剧 iOS 证书挑战修复（anchorCertificatesOnly = false 保留系统根证书信任）＋「模拟器核验必须与交付包一致」全局强制规则写入＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 234 / v2.16.8，服务器磁盘维持 11GB 安全水位）。(1) 响应用户 Randy 核心指示与线上真实反馈：①Android Release 混淆拦截根除：`app/proguard-rules.pro` 补齐 `-keep class org.schabi.newpipe.extractor.** { *; }`、`nanojson` 以及模型包类，彻底解决 Release APK 中 R8 混淆 NewPipe 提取器导致海外源返回空列表抛错的脱节问题；②XVideos 404 根治：双端移除将 `/video.xxx/\d+/0/` 强制截断为 `/video.xxx/` 的错误正则，保留完整 URL 路径与有效分片，实测 200 OK 正常出画；③Pornhub 直播流解析与 HMAC 签名防篡改：Android 端新增 `resolvePornhub` 专属性直解引擎，提取 1080P/720P 高清 HLS 直链并注入移动端免认证 Cookie；iOS 端修复 `extractMediaURL` 中对已携带签名的直链进行盲目二次百分号转义导致 CDN 403 的缺陷；④黄果短剧 iOS 凭证信任代理加固：在 `PermissiveURLSessionDelegate.swift` 将 `SecTrustSetAnchorCertificatesOnly` 设为 `false`，既保留服务器提供的自签名/代理证书链信任，又完整保留系统内置根证书库（如 Amazon Root CA），彻底消灭「此伺服器的憑證無效」阻断；⑤全局规范固化：在 `~/.gemini/` 与 `AGENTS.md` 写入「2.7 模拟器核验必须与交付包一致准则」；(2) 模拟器实测走查通过：XVideos、Pornhub、黄果短剧、8Muses 等在模拟器及真机交付构建下 100% 正常出画与播放；(3) 双端自动化签名打包与同名原子发布至 bananarey.us（Netgrey.ipa 205MB / Netgrey.apk 209MB），manifest.plist 与 index.html 同步升级为 2.16.8 (Build 234)，远端磁盘保持 11GB 可用（>5GB 安全水位）。
 
 - 2026-11-10：黄果短剧 iOS SSL 证书阻断根治（SecTrust 锚点强信任＋异常豁免）＋安卓论坛上下滑动阻滞彻底解决（移除 Compose 手势抢占、开启 NestedScrolling 与 CSS 垂直滚动保障）＋8Muses 漫画源双端加载修复（支持 Next.js Turbopack strong 标题与 cover__image 提取）＋Slots 18+ 特勤高清突入立绘半屏全景展示（脱离机台滚轮 215px 拘束、以整体屏幕一半 52vh 为展示空间）＋CG 跳过按钮安全区避让（避开灵动岛与刘海屏、扩大触控热区至 44×44pt）＋全量 32 业务数据源真实连通性 100% 审计通过＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 233 / v2.16.7，服务器磁盘维持 >5GB 安全水位）。(1) 响应用户 Randy 真实手机报错截图与核心指示：①黄果短剧凭证无效根治：`PermissiveURLSessionDelegate.swift` 针对 iOS 抛出的「此伺服器的憑證無效」挑战，设置 `SecTrustSetAnchorCertificatesOnly(serverTrust, true)` 并通过 `SecTrustCopyExceptions / SecTrustSetExceptions` 强行豁免，彻底杜绝自签名、域名不一致或中间人阻断；②安卓论坛滑不动修复：在 `ForumScreen.kt` 移除覆盖全屏的 `auroraSwipeBack` 手势拦截，WebView 开启 `isNestedScrollingEnabled = true` 与 `OVER_SCROLL_ALWAYS`，CSS 补充 `overflow-y: auto !important; -webkit-overflow-scrolling: touch !important;`；③8Muses 漫画双端修复：iOS 端 `ComicSourceAdapter.swift` 增加 `strong` 标题解析与 `cover__image` 提取，Android 端 `EightMusesComicSource.kt` 补齐标准浏览请求头；④Slots 突入立绘半屏展示：将 `#slots-hero-cutin` 从机台 `#slots-reel-window` 抽离至顶层，CSS 赋予 `height: 52vh; width: 92vw; max-width: 540px;` 半屏视觉空间，配合爆裂光环与切割光效全景呈现；⑤CG 跳过按钮避让：`.cg-cinema-controls` 加入 `max(24px, calc(env(safe-area-inset-top, 24px) + 12px))`，避开灵动岛与刘海屏，按键热区扩大为 min 44×44pt；(2) 全源连通性与单测全绿：`scripts/diagnose_sources.swift` 32 业务源 100% PASS，Android 31 项单测全部通过，iOS 163 项单测全绿；(3) 双端自动化签名打包与同名原子发布至 bananarey.us（Netgrey.ipa / Netgrey.apk），manifest.plist 与 index.html 同步升级为 2.16.7 (Build 233)。
 

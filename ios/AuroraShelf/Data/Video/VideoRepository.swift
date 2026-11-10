@@ -288,6 +288,7 @@ public final class VideoRepository: ObservableObject {
             throw VideoFeedError.unsupportedSource(source: source.name)
         }
         var request = URLRequest(url: url)
+        request.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
         request.setValue(HTMLVideoSourceAdapter.baseURL(for: source) + "/", forHTTPHeaderField: "Referer")
         request.setValue("text/html,application/json;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
         if source.id == "spankbang" {
@@ -722,6 +723,7 @@ public final class VideoRepository: ObservableObject {
             throw VideoFeedError.invalidURL(source: "黄果短剧")
         }
         var request = URLRequest(url: url)
+        request.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
         request.setValue("https://huangguoai.com/", forHTTPHeaderField: "Referer")
         let data = try await requestFeedData(for: request, source: "黄果短剧")
         guard let html = String(data: data, encoding: .utf8) else {
@@ -1408,6 +1410,7 @@ public final class VideoRepository: ObservableObject {
             throw VideoFeedError.invalidURL(source: source.name)
         }
         var request = URLRequest(url: pageURL)
+        request.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
         request.setValue(referer ?? HTMLVideoSourceAdapter.baseURL(for: source) + "/", forHTTPHeaderField: "Referer")
         request.setValue("text/html,application/xhtml+xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
         if source.id == "spankbang" {
@@ -1621,11 +1624,8 @@ public final class VideoRepository: ObservableObject {
     }
 
     public func resolveXVideosStream(pageUrl: String, title: String) async throws -> PlaybackSourceResult {
-        // 净化 XVideos 链接中的模板占位符（如 /THUMBNUM/），防止 404
-        var cleanUrlStr = pageUrl.replacingOccurrences(of: "/THUMBNUM/", with: "/0/")
-        if let normRegex = try? NSRegularExpression(pattern: #"/video\.([a-zA-Z0-9_-]+)/\d+/(?:THUMBNUM|\d+)/"#) {
-            cleanUrlStr = normRegex.stringByReplacingMatches(in: cleanUrlStr, range: NSRange(location: 0, length: cleanUrlStr.utf16.count), withTemplate: "/video.$1/")
-        }
+        // 净化 XVideos 链接中的模板占位符（仅替换 /THUMBNUM/ 为 /0/，保留完整路径防止 404）
+        let cleanUrlStr = pageUrl.replacingOccurrences(of: "/THUMBNUM/", with: "/0/")
 
         guard let url = URL(string: cleanUrlStr) else {
             throw NSError(domain: "VideoRepository", code: 400, userInfo: [NSLocalizedDescriptionKey: "无效 XVideos 链接"])
@@ -1737,6 +1737,7 @@ public final class VideoRepository: ObservableObject {
         }
 
         var request = URLRequest(url: url)
+        request.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
         request.setValue(HTMLVideoSourceAdapter.baseURL(for: source) + "/", forHTTPHeaderField: "Referer")
         request.setValue("text/html,application/json;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
         if source.id == "spankbang" {

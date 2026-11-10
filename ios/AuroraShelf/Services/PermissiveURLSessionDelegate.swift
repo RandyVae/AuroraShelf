@@ -54,7 +54,7 @@ public final class PermissiveURLSessionDelegate: NSObject, URLSessionDelegate, U
         }
         if !certs.isEmpty {
             SecTrustSetAnchorCertificates(serverTrust, certs as CFArray)
-            SecTrustSetAnchorCertificatesOnly(serverTrust, true)
+            SecTrustSetAnchorCertificatesOnly(serverTrust, false)
         }
 
         // 3. 执行评估并将异常（Exceptions）加入白名单豁免，保障 ServerTrust 凭证百分之百有效放行

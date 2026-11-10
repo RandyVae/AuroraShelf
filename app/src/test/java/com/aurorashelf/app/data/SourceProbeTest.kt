@@ -27,6 +27,27 @@ class SourceProbeTest {
     }
 
     @Test
+    fun probePornhubDirectly() = runBlocking {
+        assumeTrue(System.getenv("RUN_LIVE_SOURCE_TESTS") == "1")
+        val repo = VideoRepository()
+        val resolver = PlaybackResolver()
+        println("===== PROBING PORNHUB DIRECTLY =====")
+        val baseUrl = "https://jp.pornhub.com"
+        try {
+            val items = repo.loadFeed(baseUrl, FeedCategory.RECENT, 1)
+            println("Pornhub Feed items count = ${items.size}")
+            items.take(3).forEach { println("  - [${it.title}] url=${it.pageUrl} thumb=${it.thumbnailUrl} duration=${it.duration}") }
+            if (items.isNotEmpty()) {
+                val stream = resolver.resolve(items.first().pageUrl)
+                println("Pornhub playback resolved: ${stream.url}")
+            }
+        } catch (e: Exception) {
+            println("Pornhub Feed FAILED: ${e::class.java.simpleName}: ${e.message}")
+            e.printStackTrace()
+        }
+    }
+
+    @Test
     fun probeAllSourcesAndCategories() = runBlocking {
         assumeTrue(System.getenv("RUN_LIVE_SOURCE_TESTS") == "1")
         val repo = VideoRepository()

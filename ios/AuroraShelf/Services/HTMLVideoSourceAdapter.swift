@@ -290,7 +290,10 @@ enum HTMLVideoSourceAdapter {
                     .replacingOccurrences(of: "\\u0026", with: "&", options: .caseInsensitive)
                     .replacingOccurrences(of: "\\/", with: "/")
                     .replacingOccurrences(of: "\\&", with: "&")
-                guard let url = URL(string: candidate.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed) ?? candidate, relativeTo: pageURL)?.absoluteURL,
+                    .replacingOccurrences(of: "&amp;", with: "&")
+                let parsedURL = URL(string: candidate, relativeTo: pageURL)?.absoluteURL
+                    ?? (candidate.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed).flatMap { URL(string: $0, relativeTo: pageURL)?.absoluteURL })
+                guard let url = parsedURL,
                       ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
                       isSupportedMediaPath(url.path) else { continue }
                 return url

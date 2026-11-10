@@ -97,6 +97,9 @@ class PlaybackResolver {
         if (ContentSourceCatalog.isXVideos(pageUrl)) {
             return@withContext resolveXVideos(pageUrl, startedAtMs)
         }
+        if (pageUrl.contains("pornhub.com")) {
+            return@withContext resolvePornhub(pageUrl, startedAtMs)
+        }
         if (PipePipeBridge.supports(pageUrl)) {
             runCatching { PipePipeBridge.resolve(pageUrl) }.onSuccess { source ->
                 Log.i(TAG, "resolve PipePipe source host=${runCatching { URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
@@ -444,7 +447,6 @@ class PlaybackResolver {
 
     internal suspend fun resolveXVideos(pageUrl: String, startedAtMs: Long): PlaybackSource = withContext(Dispatchers.IO) {
         val cleanUrl = pageUrl.replace("/THUMBNUM/", "/0/")
-            .replace(Regex("""/video\.([a-zA-Z0-9_-]+)/\d+/(?:THUMBNUM|\d+)/"""), "/video.$1/")
         val html = try {
             Jsoup.connect(cleanUrl)
                 .userAgent(VideoRepository.USER_AGENT)
@@ -481,6 +483,50 @@ class PlaybackResolver {
         }
 
         throw IOException("未找到 XVideos 播放流")
+    }
+
+    internal suspend fun resolvePornhub(pageUrl: String, startedAtMs: Long): PlaybackSource = withContext(Dispatchers.IO) {
+        val html = try {
+            Jsoup.connect(pageUrl)
+                .userAgent(VideoRepository.USER_AGENT)
+                .referrer("https://jp.pornhub.com/")
+                .cookie("age_verified", "1")
+                .cookie("has_access", "1")
+                .cookie("accessAgeDisclaimerPH", "1")
+                .cookie("platform", "mobile")
+                .cookie("cookieConsent", "3")
+                .header("Accept-Language", "ja,en-US;q=0.8,en;q=0.6")
+                .timeout(15_000)
+                .execute()
+                .body()
+        } catch (e: Exception) {
+            throw IOException("無法加載 Pornhub 播放頁: ${e.message}", e)
+        }
+
+        // 1. 提取 mediaDefinitions 中的高畫質 HLS 直鏈
+        val mediaDefRegex = Regex(""""videoUrl"\s*:\s*"([^"]+)"""")
+        val streamCandidates = mediaDefRegex.findAll(html)
+            .map { it.groupValues[1].replace("\\/", "/") }
+            .filter { it.contains(".m3u8") || it.contains(".mp4") }
+            .toList()
+
+        val hlsStream = streamCandidates.firstOrNull { it.contains("1080P") }
+            ?: streamCandidates.firstOrNull { it.contains("720P") }
+            ?: streamCandidates.firstOrNull { it.contains(".m3u8") }
+            ?: streamCandidates.firstOrNull()
+
+        if (hlsStream != null) {
+            return@withContext PlaybackSource(hlsStream, referer = pageUrl).rememberFor(pageUrl, startedAtMs)
+        }
+
+        // 2. 備用：若頁面未直接內嵌 mediaDefinitions，嘗試回退 PipePipe
+        if (PipePipeBridge.supports(pageUrl)) {
+            runCatching { PipePipeBridge.resolve(pageUrl) }.getOrNull()?.let {
+                return@withContext it.rememberFor(pageUrl, startedAtMs)
+            }
+        }
+
+        throw IOException("未找到 Pornhub 播放流")
     }
 
     internal suspend fun resolveBeeg(pageUrl: String, startedAtMs: Long): PlaybackSource = withContext(Dispatchers.IO) {

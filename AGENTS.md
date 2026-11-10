@@ -75,6 +75,13 @@ Check `git status` before editing. Update `.ai` after each meaningful stage. Rec
   2. 必须覆盖多端与不同设备视口断点（iPhone 标准窄屏 393pt、Duo 外屏折叠态 466×678pt、内屏展开态 669×951pt、iPad Pro 宽屏与横竖屏翻转）；
   3. 必须核验核心控制组（如 Slots 下注辅助条、播放器悬浮按键、TabBar 胶囊、设置页列表）的光学居中与自适应排布，确保原生质感与零错位呈现。
 
+## 模拟器核验必须与交付包一致规范（核心强制）
+
+- **构建一致性（核心强制）**：
+  在模拟器中进行全源连通性检查、UI 走查或功能验收时，**严禁使用独立无混淆的 Debug 内部工程或未签名的临时缓存进行检验**。必须采用**与最终推送给用户、发布到 OTA 服务器与 GitHub Releases 相同构建级别、相同混淆配置（Release 模式、开启 R8/ProGuard/代码优化与签名规则）的正式交付包产物**（或直接将打包生成的 Release APK / 签名 App 安装至模拟器中进行实测走查）。
+- **杜绝环境脱节**：
+  严禁出现「模拟器跑 Debug 模式显示正常，但推送给用户的 Release 包因 R8 混淆/裁剪、资源优化或配置差异导致源打不开、UI 崩溃或白屏」的脱节状态。模拟器检验结论必须 100% 代表交付给用户的真实运行体验。
+
 ## Apple UI / UX 持久规范
 
 所有 UI 任务必须遵循本项目的 Apple HIG 产品设计基线，并完成构建、运行和视觉验收。具体规则：[docs/ui/design-system.md](docs/ui/design-system.md)；验收流程：[docs/ui/visual-qa.md](docs/ui/visual-qa.md)。现有项目规则继续有效；平台差异以目标平台原生规范和当前官方文档为准。
