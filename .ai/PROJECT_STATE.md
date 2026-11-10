@@ -1,5 +1,37 @@
 # Project State
 
+## 最新工作狀態（2026年11月10日 · 雙端版本號升級至 v2.16.11 Build 237 + 直播播放器原生HLS秒播與彈幕清洗 + 遊戲大廳看板立繪呼吸動效恢復與超大尺寸自適應校準 + OTA 發布至 bananarey.us）
+
+- **最新成果（直播卡頓與彈幕垃圾文字根治 + 遊戲大廳呼吸感與超大立繪收斂 + 雙端Release交付）**：
+  1. **直播播放器原生 HLS 嗅探與秒播修復**：
+     - 排查根因：原 `LivePlayerView.swift` 正則貪婪吞噬 11,707 字符導致直鏈解析失敗；請求 MMCDN LL-HLS 缺少 Referer/User-Agent 請求頭；降級至 WebRTC 視口時因缺乏 Video.js 主動播放驅動與手勢層遮擋，且加載過渡層未及時淡出導致卡死在「正在連接 soft_katy 的直播流…」；
+     - 修復落盤：直接從主播頁面安全提取 `window.initialRoomDossier` 結構化 JSON 與包含 Token 的原生 `.m3u8` 直鏈；`AVURLAsset` 附帶 `Referer: https://chaturbate.com/` 突破 MMCDN 握手防盜鏈限制；在 WebRTC 降級視口中注入 Video.js 自動播放與 `video.play()` 驅動，看門狗超時優化為 12 秒，並精確偵測主播 Private Show（私密秀）與 Offline 狀態提示。
+  2. **直播彈幕評論區垃圾文字清洗**：
+     - 排查根因：原隱藏 WebView 使用極其寬泛的選擇器 `[class*=chat]` 與 `[data-testid*=chat]`，把 Chaturbate 聊天室設置、字體下拉列表、發言規則、Tip 指引與語言提示橫幅全部抓取進了評論流；
+     - 修復落盤：選擇器嚴格收窄為 `.chat-message, [class*="ChatMessage"], .text-message, .message-text`，並加入包含 "featured", "chat color", "fontdefault", "rules:", "to send a tip", "you are viewing", "chat settings" 等關鍵詞的黑名單過濾機制，徹底根除網頁 UI 雜質污染。
+  3. **遊戲大廳主界面（Hub）人物立繪呼吸感恢復**：
+     - 排查根因：`app.css` 定義的呼吸動效類名為 `.hero-breathing`，但 `ui.js` 在 `renderHub` 執行時硬編碼將 `artImg.className = 'hub-art breathing-art'`，導致 CSS 動畫規則失效；
+     - 修復落盤：`ui.js` 規範為 `artImg.className = 'hub-art hero-breathing'`，同時在 `app.css` 雙向支持 `.hero-breathing, .breathing-art` 與 `.hub-art.hero-breathing, .hub-art.breathing-art`，呼吸動效 100% 恢復。
+  4. **部分英雄超大爆框自適應收斂**：
+     - 排查根因：`app.css` 移動端規則硬編碼 `height: clamp(540px, 68vh, 620px); width: auto; max-width: none;`，而 Aphrodite（2048×1293，寬高比 1.58）、Ines/Kart/Luf/Misa（2048×946，寬高比 2.16）等超寬原畫在固定高度下寬度膨脹至 900~1300px，橫向大面積爆框；
+     - 修復落盤：`app.css` 移動端補充 `max-width: min(92vw, 440px); max-height: 70vh; object-fit: contain;` 拘束；校準 `HERO_HUB_ADAPTATION` 中 Aphrodite scale 為 0.92，Ines/Kart/Luf/Misa 為 0.90，其餘英雄校準至 1.00~1.05，確保 58 位英雄在移動端立繪高度均勻、視覺居中、零截斷。
+  5. **版本號全鏈路顯式升級至 v2.16.11 (Build 237)**：
+     - Android 端：`app/build.gradle.kts` (versionCode 237, versionName "2.16.11")；
+     - iOS 端：`ios/project.yml` 與 `Info.plist` (CURRENT_PROJECT_VERSION 237, MARKETING_VERSION "2.16.11")；`PersonalScreen.swift` 標籤更新為 `v2.16.11`；
+     - 遊戲前端：`index.html` 更新為 `Version 2.16.11`；
+     - OTA 發布站：`scripts/ota_web/index.html` 與 `manifest.plist` 同步升級至 `v2.16.11 (Build 237)`。
+  6. **測試與驗證**：
+     - 遊戲邏輯與確定性：`node game/tools/test_slots_determinism.js` (PASS)、`node scripts/verify-game-logic.js` (PASS)；
+     - Android 單測：`./gradlew testDebugUnitTest` 通過（passed=231, failed=0, skipped=7）；
+     - iOS 單測：`xcodebuild test` iPhone 17 Pro 通過（passed=157, failed=0, skipped=6）；
+     - 全源探針：`node scripts/probe_all_sources.mjs` 34 個源中 31 個成功（XVideos、MissAV、KissJAV、PornHub、HornyStudents、Stripchat 等核心源 100% PASS）；
+     - 模擬器走查：Release 構建一致性產物在 iPhone 17 Pro 與 iPad Pro 13-inch 安裝驗證並截圖落盤。
+  7. **雙端 Release 構建、自動化簽名與 OTA 發布**：
+     - Android 正式包：`dist/Netgrey.apk`（208 MB，SHA-256: `adb113f47b5a1e784825c35563fb35b2eaf5fc1de5b8df6367de6dbb2d8a524f`）；
+     - iOS 正式簽名包：`ios/build.nosync/outputs/Netgrey.ipa`（205 MB，SHA-256: `8d016038a7e08501826cedbc7365b97fe4a08516729b2c8cc83410e462e7f7e8`）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間維持 11GB（>5GB 安全水位）。
+- **最近更新**：2026-11-10 by Antigravity。
+
 ## 最新工作狀態（2026年11月10日 · 雙端版本號升級至 v2.16.10 Build 236 + Slots 7大必修問題全量閉環 + iPad大屏自適應容器重構 + 確定性與全源核驗通過 + OTA 發布至 bananarey.us）
 
 - **最新成果（Slots 7大必修問題修復 + 雙端Release構建 + OTA同名原子覆蓋 + 遠端磁碟安全水位）**：

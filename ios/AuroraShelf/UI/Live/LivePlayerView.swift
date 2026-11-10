@@ -444,24 +444,52 @@ public struct LivePlayerView: View {
             do {
                 var hlsFoundUrl: URL? = nil
 
-                // 1. 优先直接请求 HornyStudents 官方真实主播页面，提取包含鉴权 Token 的原生 hls_source
-                if let roomPageUrl = URL(string: "https://www.hornystudents.com/\(username)/") {
+                // 1. 优先直接请求 Chaturbate / HornyStudents 官方真实主播页面，提取 window.initialRoomDossier 或原生 HLS 直链
+                let candidatePages = [
+                    URL(string: "https://chaturbate.com/\(username)/"),
+                    URL(string: "https://www.hornystudents.com/\(username)/")
+                ].compactMap { $0 }
+
+                for roomPageUrl in candidatePages {
+                    if hlsFoundUrl != nil { break }
                     var roomReq = URLRequest(url: roomPageUrl)
                     roomReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
-                    roomReq.setValue("https://www.hornystudents.com/", forHTTPHeaderField: "Referer")
+                    roomReq.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
+                    roomReq.setValue("agreeterms=1; isAdult=1; hasConfirmedAge=1; lang=en;", forHTTPHeaderField: "Cookie")
+
                     if let (pageData, _) = try? await URLSession.permissive().data(for: roomReq),
                        let html = String(data: pageData, encoding: .utf8) {
-                        let pattern = #"hls_source(?:\\u0022|"):\s*(?:\\u0022|")([^"\\]*(?:\\.[^"\\]*)*)(?:\\u0022|")"#
-                        if let regex = try? NSRegularExpression(pattern: pattern),
-                           let match = regex.firstMatch(in: html, range: NSRange(location: 0, length: (html as NSString).length)) {
-                            let rawStream = (html as NSString).substring(with: match.range(at: 1))
-                                .replacingOccurrences(of: "\\u0026", with: "&")
-                                .replacingOccurrences(of: "\\u002D", with: "-")
-                                .replacingOccurrences(of: "\\u003D", with: "=")
+
+                        // 1.1 从 window.initialRoomDossier 中安全提取结构化 JSON
+                        if let dossierRegex = try? NSRegularExpression(pattern: #"window\.initialRoomDossier\s*=\s*"([^"]+)""#),
+                           let match = dossierRegex.firstMatch(in: html, range: NSRange(location: 0, length: (html as NSString).length)) {
+                            let rawJson = (html as NSString).substring(with: match.range(at: 1))
+                                .replacingOccurrences(of: "\\\"", with: "\"")
+                                .replacingOccurrences(of: "\\\\", with: "\\")
+                                .replacingOccurrences(of: "\\u0022", with: "\"")
                                 .replacingOccurrences(of: "\\/", with: "/")
-                                .replacingOccurrences(of: "\\", with: "")
-                            if let directUrl = URL(string: rawStream) {
+                            if let jsonData = rawJson.data(using: .utf8),
+                               let dossier = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                               let hlsSource = dossier["hls_source"] as? String, !hlsSource.isEmpty,
+                               let directUrl = URL(string: hlsSource) {
                                 hlsFoundUrl = directUrl
+                            }
+                        }
+
+                        // 1.2 从源码中精准嗅探包含鉴权 Token 的原生 .m3u8 直链
+                        if hlsFoundUrl == nil {
+                            let m3u8Pattern = #"https?:\/\/[^"\s\\]+?\.m3u8[^"\s\\]*"#
+                            if let mRegex = try? NSRegularExpression(pattern: m3u8Pattern),
+                               let mMatch = mRegex.firstMatch(in: html, range: NSRange(location: 0, length: (html as NSString).length)) {
+                                let rawM3u8 = (html as NSString).substring(with: mMatch.range)
+                                    .replacingOccurrences(of: "\\u0026", with: "&")
+                                    .replacingOccurrences(of: "\\u002D", with: "-")
+                                    .replacingOccurrences(of: "\\u003D", with: "=")
+                                    .replacingOccurrences(of: "\\/", with: "/")
+                                    .replacingOccurrences(of: "\\", with: "")
+                                if let directUrl = URL(string: rawM3u8) {
+                                    hlsFoundUrl = directUrl
+                                }
                             }
                         }
                     }
@@ -471,7 +499,9 @@ public struct LivePlayerView: View {
                 if hlsFoundUrl == nil {
                     var request = URLRequest(url: apiUrl)
                     request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-                    request.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
+                    request.setValue("https://chaturbate.com/\(username)/", forHTTPHeaderField: "Referer")
+                    request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
+                    request.setValue("agreeterms=1; isAdult=1; hasConfirmedAge=1; lang=en;", forHTTPHeaderField: "Cookie")
 
                     let (data, response) = try await URLSession.permissive().data(for: request)
                     try Task.checkCancellation()
@@ -506,7 +536,12 @@ public struct LivePlayerView: View {
 
     private func startNativePlayback(hlsUrl: URL, requestID: UUID) {
         guard activeStreamRequestID == requestID else { return }
-        let playerItem = AVPlayerItem(url: hlsUrl)
+        let headers: [String: String] = [
+            "Referer": "https://chaturbate.com/",
+            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        ]
+        let asset = AVURLAsset(url: hlsUrl, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        let playerItem = AVPlayerItem(asset: asset)
         let avPlayer = AVPlayer(playerItem: playerItem)
         self.player = avPlayer
 

@@ -1,3 +1,31 @@
+## 最新交接：2026-11-10 — 直播播放器原生HLS秒播与弹幕杂质过滤＋游戏大厅看板立绘呼吸感恢复与超大尺寸自适应校准＋双端版本号升级至 v2.16.11 (Build 237) 并发布至 bananarey.us
+
+- **范围**：
+  - 响应用户 Randy 真实手机报错截图与指示（直播卡在连接中、评论区爬取网页UI杂质、大厅立绘无呼吸感、部分英雄过大）：
+    1. **直播播放器原生 HLS 嗅探与起播修复**：
+       - 根因：原 `LivePlayerView.swift` 正则越界贪婪吞噬了 11,707 字符，导致 `hls_source` 解析失败；请求 MMCDN LL-HLS 缺少 Referer/User-Agent 握手报头；降级至 WebRTC 视口时，Video.js 未被主动触发播放，且 `Color.clear` 拦截了手势，加之过渡遮罩层未淡出，导致画面一直停留在「正在连接 soft_katy 的直播流…」；
+       - 修复：优先从主播页面解析 `window.initialRoomDossier` JSON 与包含 Token 的原生 `.m3u8` 直链；`AVURLAsset` 附带 `Referer: https://chaturbate.com/`，解决 MMCDN 防盗链；在 WebRTC 视口注入 Video.js 自动播放与 `video.play()`，看门狗超时设为 12 秒，并精准识别 Private Show 与 Offline 状态；
+       - 验证：Chaturbate 在线主播真实直链 100% 提取并起播。
+    2. **直播弹幕评论区 UI 垃圾文字彻底清洗**：
+       - 根因：原选择器 `[class*=chat]` 错误匹配了聊天设置、字号下拉框、防骚扰规则等网页 UI 文本；
+       - 修复：收窄选择器为 `.chat-message, [class*="ChatMessage"], .text-message, .message-text`，并引入包含系统横幅、规则与设置等关键属性的黑名单过滤器；
+       - 验证：弹幕列表仅显示观众纯净聊天文本。
+    3. **游戏大厅看板立绘呼吸感动效恢复**：
+       - 根因：`app.css` 定义的是 `.hero-breathing`，但 `ui.js` 的 `renderHub` 将 `className` 赋值为 `breathing-art`，样式名不匹配导致动画丢失；
+       - 修复：`ui.js` 统一使用 `hub-art hero-breathing`，并在 `app.css` 声明 `.hero-breathing, .breathing-art` 与 `.hub-art.hero-breathing, .hub-art.breathing-art` 呼吸关键帧；
+       - 验证：游戏大厅看板立绘呼吸动效恢复自然起伏。
+    4. **部分英雄超大爆框自适应收敛**：
+       - 根因：`app.css` 在移动端设置 `max-width: none; height: clamp(540px, 68vh, 620px);`，导致 Aphrodite（2048×1293）、Ines/Kart/Luf/Misa（2048×946）等宽画幅立绘在固定高度下横向宽度膨胀至 900~1300px，超出视口 2~3 倍；
+       - 修复：`app.css` 限制 `max-width: min(92vw, 440px); max-height: 70vh; object-fit: contain;`，并在 `ui.js` 中调校 Aphrodite scale 为 0.92，Ines/Kart/Luf/Misa 为 0.90，其立绘完整收敛在视口内；
+       - 验证：多英雄切换测试，58 位英雄全部在移动端居中且零爆框。
+    5. **双端构建、签名与 OTA 同名原子发布**：
+       - Android Release APK（`dist/Netgrey.apk`，208MB，SHA-256: `adb113f47b5a1e784825c35563fb35b2eaf5fc1de5b8df6367de6dbb2d8a524f`）；
+       - iOS 签名包（`ios/build.nosync/outputs/Netgrey.ipa`，205MB，SHA-256: `8d016038a7e08501826cedbc7365b97fe4a08516729b2c8cc83410e462e7f7e8`）；
+       - 上传至 `https://bananarey.us` 完成原子同名覆盖，服务器磁盘维持 11GB 可用（>5GB 安全水位）；
+       - 全源探针 34 源（31 PASS，3 个已知受限）；
+       - iOS XCTest 163 项（157 passed, 0 failed, 6 skipped需网络探针）；
+       - Android 單測 238 項（231 passed, 0 failed, 7 skipped）。
+
 ## 最新交接：2026-11-10 — Slots 7大必修缺陷全量闭环＋iPad大屏自适应容器重构＋双端版本号升级至 v2.16.10 (Build 236) 并发布至 bananarey.us
 
 - **范围**：

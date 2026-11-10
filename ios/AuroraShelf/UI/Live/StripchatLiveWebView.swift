@@ -56,7 +56,9 @@ public struct StripchatLiveWebView: UIViewRepresentable {
             ("isAdult", "1", ".hornystudents.com"),
             ("isAdult", "1", ".chaturbate.com"),
             ("hasConfirmedAge", "1", ".hornystudents.com"),
-            ("hasConfirmedAge", "1", ".chaturbate.com")
+            ("hasConfirmedAge", "1", ".chaturbate.com"),
+            ("lang", "en", ".hornystudents.com"),
+            ("lang", "en", ".chaturbate.com")
         ]
         for (name, value, domain) in cookies {
             if let cookie = HTTPCookie(properties: [
@@ -81,6 +83,8 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                 document.cookie = "hasConfirmedAge=1; path=/; domain=.stripchat.com; max-age=31536000";
                 document.cookie = "agreeterms=1; path=/; domain=.hornystudents.com; max-age=31536000";
                 document.cookie = "agreeterms=1; path=/; domain=.chaturbate.com; max-age=31536000";
+                document.cookie = "lang=en; path=/; domain=.hornystudents.com; max-age=31536000";
+                document.cookie = "lang=en; path=/; domain=.chaturbate.com; max-age=31536000";
                 localStorage.setItem("18PlusGenderSelected", JSON.stringify("auto"));
                 localStorage.setItem("18PlusGenderSelected_expires", JSON.stringify(31536000000));
                 localStorage.setItem("isVisitorsAgreementAccepted", "1");
@@ -108,6 +112,10 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         #portal-root, #agreement-root,
         .CookieReminderContentV2, .cookies-banner, .adblocker-notification,
         #close_entrance_terms, #entrance_terms, #entrance_terms_overlay,
+        [id*="language"], [class*="language"], #language-suggestion,
+        .notification-bar, .site-notice, .lang-bar, #banner-container,
+        [class*="chat-settings"], [class*="chat-toolbar"], [class*="font-list"],
+        .user-warning-banner, .site_alert,
         .vjs-control-bar, .vjs-big-play-button, .vjs-loading-spinner,
         [data-testid*="banner"], [data-testid*="chat"], [data-testid*="tip"],
         .related-models, .models-list, .gallery-section, .profile-section,
@@ -184,7 +192,10 @@ public struct StripchatLiveWebView: UIViewRepresentable {
             }
 
             function checkAndHook() {
-                // 1. 自动处理 Cookie 政策 / 进入确认弹层 / 年龄确认
+                // 1. 自动处理 Cookie 政策 / 进入确认弹层 / 年龄确认 / 语言提示条
+                const langBars = document.querySelectorAll('#language-suggestion, [id*="language"], [class*="language-choice"], [class*="language-suggest"], .notification-bar, .site-notice');
+                langBars.forEach(function(b) { try { b.remove(); } catch(e) { b.style.display = 'none'; } });
+
                 const closeEntrance = document.getElementById('close_entrance_terms') || document.querySelector('.close_entrance_terms, #close_entrance_terms, [id*="close_entrance"]');
                 if (closeEntrance) {
                     try { closeEntrance.click(); } catch(e) {}
@@ -207,15 +218,29 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                     try { acceptButtons[0].click(); } catch (e) {}
                 }
 
-                // 2. 自动点击起播按钮
+                // 2. 自动点击起播按钮并驱动 video.play()
                 const playBtns = document.querySelectorAll('.view-cam-play-btn, .vjs-big-play-button, .play-button, [class*="PlayButton"], [class*="playButton"], [class*="play-btn"], [aria-label*="Play"], [aria-label*="播放"]');
                 playBtns.forEach(function(b) {
                     try { b.click(); } catch(e) {}
                 });
+                if (window.videojs) {
+                    try {
+                        const players = window.videojs.getAllPlayers ? window.videojs.getAllPlayers() : [];
+                        players.forEach(function(p) {
+                            if (p && typeof p.play === 'function' && p.paused && p.paused()) {
+                                p.play();
+                            }
+                        });
+                    } catch(e) {}
+                }
 
-                // 3. 侦测离线状态
-                if (document.querySelector('.model-offline, .king-offline, [data-testid="offline-badge"], [class*="ModelOffline"], [class*="offline-banner"]')) {
+                // 3. 侦测离线与私密秀状态
+                if (document.querySelector('.model-offline, .king-offline, [data-testid="offline-badge"], [class*="ModelOffline"], [class*="offline-banner"], #room_status_offline, .room_offline, #offline_broadcaster_badge')) {
                     notifySwift('error', { message: '主播当前离线或处于休息中' });
+                    return;
+                }
+                if (document.querySelector('#private_room, .private-room, #room_status_private, .c-private-show, [class*="private-show"], .private-show-overlay')) {
+                    notifySwift('error', { message: '主播当前正在进行私密秀（Private Show）' });
                     return;
                 }
 
@@ -422,7 +447,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                 }
             }
             playTimeoutTask = task
-            DispatchQueue.main.asyncAfter(deadline: .now() + 25.0, execute: task)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 12.0, execute: task)
         }
 
         public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {

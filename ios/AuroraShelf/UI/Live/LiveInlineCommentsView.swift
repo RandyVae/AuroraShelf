@@ -106,13 +106,16 @@ private struct LiveCommentWebView: UIViewRepresentable {
         let script = """
         (() => {
           const sent = new Set();
+          const blacklist = ['featured', 'chat color', 'fontdefault', 'rules:', 'to send a tip', 'send a message', 'you are viewing', 'chat settings', 'private conversation', 'never contact you', 'notice:', 'welcome to', 'did you mean to go'];
           const emit = () => {
-            const nodes = [...document.querySelectorAll('[class*=message],[class*=chat-message],[data-testid*=message],[data-testid*=chat]')];
-            nodes.slice(-80).forEach((node, index) => {
+            const nodes = [...document.querySelectorAll('.chat-message, [class*="ChatMessage"], .text-message, .message-text, [data-testid*="chat-message"]')];
+            nodes.slice(-60).forEach((node) => {
               const text = (node.innerText || node.textContent || '').replace(/\\s+/g, ' ').trim();
-              if (!text || text.length > 300) return;
+              if (!text || text.length > 250) return;
+              const lower = text.toLowerCase();
+              if (blacklist.some(b => lower.includes(b))) return;
               const authorNode = node.querySelector('[class*=author],[class*=username],[class*=user]');
-              const author = (authorNode?.innerText || '用户').trim().slice(0, 40);
+              const author = (authorNode?.innerText || '观众').trim().slice(0, 30);
               const key = author + '|' + text;
               if (sent.has(key)) return;
               sent.add(key);

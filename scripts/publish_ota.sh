@@ -58,22 +58,22 @@ if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ] || [ -f "${PROJECT_ROOT}/dist/Netgrey.apk"
     if [ -x "${SSHPASS_BIN}" ]; then
       if [ -f "${PROJECT_ROOT}/scripts/ota_web/index.html" ]; then
         echo "上传 OTA 网页 index.html 与 manifest.plist..."
-        "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/index.html" "root@${SERVER_IP}:${REMOTE_DIR}/index.html"
+        "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/index.html" "root@${SERVER_IP}:${REMOTE_DIR}/index.html"
         if [ -f "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" ]; then
-          "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" "root@${SERVER_IP}:${REMOTE_DIR}/manifest.plist"
+          "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" "root@${SERVER_IP}:${REMOTE_DIR}/manifest.plist"
         fi
       fi
       if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ]; then
         echo "上传 iOS 通用包 Netgrey.ipa..."
-        "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${OUTPUT_DIR}/Netgrey.ipa" "root@${SERVER_IP}:${REMOTE_DIR}/Netgrey.ipa"
+        "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${OUTPUT_DIR}/Netgrey.ipa" "root@${SERVER_IP}:${REMOTE_DIR}/Netgrey.ipa"
         sleep 1
       fi
       if [ -f "${PROJECT_ROOT}/dist/Netgrey.apk" ]; then
         echo "上传 Android 正式包 Netgrey.apk..."
-        "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/dist/Netgrey.apk" "root@${SERVER_IP}:${REMOTE_DIR}/Netgrey.apk"
+        "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/dist/Netgrey.apk" "root@${SERVER_IP}:${REMOTE_DIR}/Netgrey.apk"
         sleep 1
       fi
-      "${SSHPASS_BIN}" -p "${SERVER_PASS}" ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "${REMOTE_CLEAN_AND_CHECK}"
+      "${SSHPASS_BIN}" -e ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "${REMOTE_CLEAN_AND_CHECK}"
     else
       if [ -f "${PROJECT_ROOT}/scripts/ota_web/index.html" ]; then
         echo "上传 OTA 网页 index.html 与 manifest.plist..."
