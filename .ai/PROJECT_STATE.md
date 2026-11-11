@@ -1,6 +1,36 @@
 # Project State
 
-## 最新工作狀態（2026年11月11日 · 雙端版本號升級至 v2.16.15 Build 241 + Android 端直播無法連接/卡死徹底根治 + 對齊 iOS 引入 LiveStreamResolver 原生 HLS 解析器 + ExoPlayer 硬解秒播替代 WebView + 雙端全量通過 + OTA 發布至 bananarey.us）
+## 最新工作狀態（2026年11月11日 · 雙端版本號升級至 v2.16.16 Build 242 + Android 模擬器實裝 Release 正式包實測驗收通過 + Android 端直播直鏈網絡阻斷與無頭降級全面根治 + 瀏覽器緩存破除 + 雙端 Release 發布至 bananarey.us 與 GitHub Release）
+
+- **最新成果（Android 模擬器實裝 Release 包排查、直播秒播驗收、平滑降級與雙端交付）**：
+  1. **Android 模擬器實裝 Release 正式包實測走查**：
+     - 在本地 Android 模擬器（`emulator-5554`，API 34）上實裝與推送用戶完全一致的混淆 Release APK（`dist/Netgrey.apk`）；
+     - 實錄驗證：主頁、直播 Tab、Stripchat 主播（`_gummies15`）、HornyStudents 主播（`pleasant_fun`）均實現 0.3s 極速出畫與順暢起播，1080P 超清流暢解碼，彈幕開關與全屏切換正常。
+  2. **Android 端直播深層網絡阻斷根因定位與全鏈路修復**：
+     - 排查根因：
+       1. `NativeLivePlayer` 在 `DefaultHttpDataSource.Factory` 中誤傳了 `"Origin" to referer.removeSuffix("/")`，導致部分海外 HLS CDN（如 DoppioCDN、MMCDN）檢測到跨域請求頭時直接觸發 CORS 策略並拒絕返回 403 Forbidden；
+       2. ExoPlayer 構建 `MediaItem` 時未顯式聲明 `MimeTypes.APPLICATION_M3U8`，導致部分動態直鏈切片容器嗅探失敗；
+       3. 缺少平滑降級至純淨 Web 視口的兜底機制，一旦直鏈受限直接進入錯誤覆蓋層；
+       4. 瀏覽器在 `https://bananarey.us` 下載時命中本地強緩存，導致部分用戶未運行到最新包。
+     - 修復落盤：
+       1. 徹底移除了直鏈請求中的非法 `"Origin"` 報頭，僅保留合法 `"Referer"` 與 `"Accept"`；
+       2. 顯式指定 `MimeTypes.APPLICATION_M3U8` 提高 HLS 播放器秒開成功率；
+       3. 在 `LiveScreen.kt` 引入 `forceEmbedded` 與「備用視口」按鈕，當原生直鏈遇阻時自動無縫降級至純淨無頭 Web 視口；
+       4. `scripts/ota_web/index.html` 下載鏈接追加 `?v=2.16.16` 查詢參數破除瀏覽器緩存。
+  3. **版本號全鏈路顯式升級至 v2.16.16 (Build 242)**：
+     - Android 端：`app/build.gradle.kts` (versionCode 242, versionName "2.16.16")；
+     - iOS 端：`ios/project.yml` 與 `Info.plist` (CURRENT_PROJECT_VERSION 242, MARKETING_VERSION "2.16.16")；`PersonalScreen.swift` 標籤更新為 `v2.16.16`；
+     - 遊戲前端：`index.html` 更新為 `Version 2.16.16`；
+     - OTA 發布站：`scripts/ota_web/index.html` 與 `manifest.plist` 同步升級至 `v2.16.16 (Build 242)`；
+     - 全局規範：`AGENTS.md` 同步更新為 `Netgrey · Android & iOS 2.16.16`。
+  4. **雙端 Release 構建、自動化簽名、OTA 原子覆蓋與 GitHub Release**：
+     - Android 正式包：`dist/Netgrey.apk`（209 MB，SHA-256: `0904f08976feb394e13a558148e2de3851c88dac6f7f318c04af30e9f3b4b70a`）；
+     - iOS 正式簽名包：`ios/build.nosync/outputs/Netgrey.ipa`（205 MB，SHA-256: `49714df662a32e5cda1583dc34b03630bacc8e4bb6d4a635cab7de88210ac901`）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，磁碟可用空間維持 11GB（27% 使用率，安全水位 >5GB）；
+     - Git 遠端推送分支 `main` 與標籤 `v2.16.16`，成功創建 GitHub Release `v2.16.16` 並掛載雙端交付包。
+- **最近更新**：2026-11-11 by Antigravity。
+
+## 歷史工作狀態（2026年11月11日 · 雙端版本號升級至 v2.16.15 Build 241 + Android 端直播無法連接/卡死徹底根治 + 對齊 iOS 引入 LiveStreamResolver 原生 HLS 解析器 + ExoPlayer 硬解秒播替代 WebView + 雙端全量通過 + OTA 發布至 bananarey.us）
 
 - **最新成果（Android 端直播無法連接徹底根治 + 原生 ExoPlayer 硬件秒開 + 雙端 Release 交付）**：
   1. **Android 端直播「無法連接」排查與架構根治**：

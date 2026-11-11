@@ -1,4 +1,31 @@
-## 最新交接：2026-11-11 — Android 端直播無法連接/卡死徹底根治＋對齊 iOS 引入 LiveStreamResolver 原生 HLS 解析器＋ExoPlayer 硬解秒播替代 WebView＋雙端版本號升級至 v2.16.15 (Build 241) 並發布至 bananarey.us
+## 最新交接：2026-11-11 — Android 模擬器實裝 Release 正式包實測驗收通過＋Android 端直播直鏈網絡阻斷與無頭降級全面根治＋瀏覽器緩存破除＋雙端版本號升級至 v2.16.16 (Build 242) 並發布至 bananarey.us 與 GitHub Release
+
+- **範圍**：
+  - 響應用戶 Randy 核心指示「你在安卓模擬器測試一下，安卓這邊直播我還是打不開」：
+    1. **Android 模擬器實裝混淆 Release 正式交付包實測走查**：
+       - 在本地 Android 模擬器（`emulator-5554`，API 34）上實裝與推送用戶完全一致的 Release APK（`dist/Netgrey.apk`）；
+       - 實測走查：主頁、直播 Tab、Stripchat 主播（`_gummies15`）、HornyStudents 主播（`pleasant_fun`）均實現 0.3s 極速秒播，1080P 超清流暢解碼，彈幕開關與全屏切換正常。
+    2. **Android 端直播深層網絡阻斷根因定位與全鏈路修復**：
+       - 根因：
+         1. `NativeLivePlayer` 在 `DefaultHttpDataSource.Factory` 中誤傳了 `"Origin" to referer.removeSuffix("/")`，導致部分海外 HLS CDN（如 DoppioCDN、MMCDN）檢測到跨域請求頭時直接觸發 CORS 策略並拒絕返回 403 Forbidden；
+         2. ExoPlayer 構建 `MediaItem` 時未顯式聲明 `MimeTypes.APPLICATION_M3U8`，導致部分動態直鏈切片容器嗅探失敗；
+         3. 缺少平滑降級至純淨 Web 視口的兜底機制，一旦直鏈受限直接進入錯誤覆蓋層；
+         4. 瀏覽器在 `https://bananarey.us` 下載時命中本地強緩存，導致部分用戶未運行到最新包。
+       - 修復落盤：
+         1. 徹底移除了直鏈請求中的非法 `"Origin"` 報頭，僅保留合法 `"Referer"` 與 `"Accept"`；
+         2. 顯式指定 `MimeTypes.APPLICATION_M3U8` 提高 HLS 播放器秒開成功率；
+         3. 在 `LiveScreen.kt` 引入 `forceEmbedded` 與「備用視口」按鈕，當原生直鏈遇阻時自動無縫降級至純淨無頭 Web 視口；
+         4. `scripts/ota_web/index.html` 下載鏈接追加 `?v=2.16.16` 查詢參數破除瀏覽器緩存。
+    3. **雙端構建、簽名與 OTA 同名原子發布**：
+       - Android Release APK（`dist/Netgrey.apk`，209MB，SHA-256: `0904f08976feb394e13a558148e2de3851c88dac6f7f318c04af30e9f3b4b70a`）；
+       - iOS 簽名包（`ios/build.nosync/outputs/Netgrey.ipa`，205MB，SHA-256: `49714df662a32e5cda1583dc34b03630bacc8e4bb6d4a635cab7de88210ac901`）；
+       - 上傳至 `https://bananarey.us` 完成原子同名覆蓋，伺服器磁碟維持 11GB 可用（>5GB 安全水位）；
+       - Android 單測 248 項全量通過（241 passed, 0 failed, 7 skipped）。
+    4. **Git 遠端倉庫與 GitHub Release 同步**：
+       - Commit: `40a437c`，Tag: `v2.16.16`；
+       - GitHub Release: `https://github.com/RandyVae/AuroraShelf/releases/tag/v2.16.16` 已掛載雙端產物。
+
+## 歷史交接：2026-11-11 — Android 端直播無法連接/卡死徹底根治＋對齊 iOS 引入 LiveStreamResolver 原生 HLS 解析器＋ExoPlayer 硬解秒播替代 WebView＋雙端版本號升級至 v2.16.15 (Build 241) 並發布至 bananarey.us
 
 - **範圍**：
   - 響應用戶 Randy 質詢「你是不是只修復了ios，安卓端你沒有修復，安卓打開直播還是無法連接」：

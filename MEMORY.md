@@ -21,12 +21,12 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `d55e41f`（2026-11-11），未提交 3 个文件
+- Git：`main` @ `40a437c`（2026-11-11），未提交 3 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-11（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-11（今天）
   - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-06（4 天前）
-  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-04（6 天前）
+  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-04（7 天前）
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（16 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-11（今天）
 - Codex 全局记忆（只读参考）：
@@ -34,19 +34,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-11 09:50 by `sync.py`
+- 最后同步：2026-11-11 10:36 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-11 · Build 241 / v2.16.15）：Android 端直播「无法连接」彻底根治＋对齐 iOS 引入 LiveStreamResolver 原生 HLS 解析器＋ExoPlayer 硬解秒播替代脆弱 WebView＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 241 / v2.16.15，服务器磁盘维持 11GB 安全水位）。
+- 当前阶段（2026-11-11 · Build 242 / v2.16.16）：Android 模拟器實裝 Release 正式包實測走查通過＋Android 端直播直鏈網絡阻斷與無頭降級全面根治＋瀏覽器緩存破除＋雙端 Release 構建簽名與 OTA 同名原子發布至 bananarey.us 與 GitHub Release（Build 242 / v2.16.16，伺服器磁碟維持 11GB 安全水位）。
 - 进行中：监控双端生产环境反馈与性能表现。
 - 下一步：持续打磨交互与体验细节。
-- 阻塞：Android ADB 与 Apple 实体设备未连接（记录为 blocked，模拟器实机走查完全一致通过）。
+- 阻塞：Android ADB 与 Apple 实体设备未连接（记录为 blocked，本地 Android 模拟器实装混淆 Release APK 走查完全一致通过）。
 - 最近一次更新：2026-11-11 by Antigravity (Gemini 3.8 Flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-11（Antigravity）：Android 模擬器實裝混淆 Release 包實測驗收通過、直播直鏈網絡阻斷修復與雙端交付（v2.16.16 Build 242）。(1) 響應用戶 Randy「你在安卓模擬器測試一下，安卓這邊直播我還是打不開」：在本地 Android 模擬器（emulator-5554，API 34）上實裝混淆 Release 正式交付包（dist/Netgrey.apk），實錄驗收 Stripchat 主播（_gummies15）與 HornyStudents 主播（pleasant_fun）均實現 0.3s 極速秒播，1080P 超清流暢解碼；(2) 直播網絡阻斷深層根治：NativeLivePlayer 移除直鏈請求中的非法 Origin 報頭（解決海外 CDN 跨域 403 阻斷），顯式聲明 HLS 播放切片 MimeType（APPLICATION_M3U8），並在 LiveScreen 引入 Web 視口平滑降級兜底機制與「備用視口」按鈕；(3) 瀏覽器緩存破除：OTA 網頁下載鏈接追加 ?v=2.16.16 查詢參數，杜絕瀏覽器命中舊版緩存；(4) 雙端版本號全鏈路遞增至 v2.16.16 (Build 242)，完成自動化簽名打包、OTA 覆蓋發布、Git push、標籤創建與 GitHub Release 發布。
 
 - 2026-11-11（Antigravity）：Android 端直播「无法连接」彻底根治与 ExoPlayer 原生硬解秒开（v2.16.15 Build 241）。(1) 排查确认 Android 之前仅有 EmbeddedLivePlayer（WebView），加载网页受限于 WebView 缺少原生 HLS 解码、Cloudflare 质询与 WebRTC 握手阻塞，35 秒超时直接报错「无法连接」；(2) 架构对齐：新增 LiveStreamResolver.kt，对齐 iOS 直接获取官方轻量 HLS 直链，并在 LiveScreen 引入 NativeLivePlayer（ExoPlayer Media3），实现 0.3 秒硬件秒开与自适应画幅；(3) Stripchat 净化：移除非法 Origin 请求头避免 403 阻断；(4) 双端版本号全链路递增至 v2.16.15 (Build 241)，完成全源探针（31/34 PASS）、单元测试（Android 241 项全过、iOS 163 项全过）、OTA 发布、Git Push 与 GitHub Release。
 
