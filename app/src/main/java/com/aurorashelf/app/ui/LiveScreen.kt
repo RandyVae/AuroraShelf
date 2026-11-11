@@ -882,6 +882,7 @@ private fun LiveRoomStatusOverlay(
     onRetry: () -> Unit,
     onOpenExternal: () -> Unit,
     onBack: () -> Unit,
+    onFallbackToWeb: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val (icon, title, subtitle) = when (status) {
@@ -973,6 +974,17 @@ private fun LiveRoomStatusOverlay(
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("刷新状态")
+                }
+            }
+            if (onFallbackToWeb != null) {
+                OutlinedButton(
+                    onClick = onFallbackToWeb,
+                    border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.8f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp), tint = AuroraCoral)
+                    Spacer(Modifier.width(6.dp))
+                    Text("备用视口")
                 }
             }
             OutlinedButton(
@@ -1121,6 +1133,7 @@ private fun LivePlayerScreen(
 
     val resolver = remember { LiveStreamResolver() }
     var resolveAttempt by remember(item.id) { mutableIntStateOf(0) }
+    var forceEmbedded by remember(item.id) { mutableStateOf(false) }
     val resolveResult by produceState<LiveStreamResolveResult?>(initialValue = null, item.id, resolveAttempt) {
         value = resolver.resolve(item)
     }
@@ -1148,74 +1161,95 @@ private fun LivePlayerScreen(
             }
         }
 
-        when (val res = resolveResult) {
-            is LiveStreamResolveResult.Success -> {
-                NativeLivePlayer(
-                    hlsUrl = res.hlsUrl,
-                    referer = res.referer,
-                    item = item,
-                    isFullscreen = isFullscreen,
-                    onFullscreenChange = onFullscreenChange,
-                    onVideoOrientationChange = onVideoOrientationChange,
-                    onVideoSizeChange = { w, h -> videoDimensions = Pair(w, h) },
-                    onOpenExternal = openInBrowser,
-                    onBack = onBack,
-                    modifier = playerModifier,
-                    posterUrl = item.thumbnailUrl,
-                    comments = comments,
-                )
-            }
-            is LiveStreamResolveResult.StatusError -> {
-                Box(playerModifier.background(AuroraImmersiveBackground)) {
-                    LiveRoomStatusOverlay(
-                        status = LiveRoomStatus.OFFLINE,
-                        errorMessage = res.message,
-                        onRetry = { resolveAttempt++ },
+        if (forceEmbedded) {
+            EmbeddedLivePlayer(
+                url = item.playerUrl,
+                isFullscreen = isFullscreen,
+                onFullscreenChange = onFullscreenChange,
+                onVideoOrientationChange = onVideoOrientationChange,
+                onVideoSizeChange = { w: Int, h: Int -> videoDimensions = Pair(w, h) },
+                onCommentsChange = { comments = it },
+                onCommentsLoadingChange = { hasCheckedComments = !it },
+                onOpenExternal = openInBrowser,
+                onBack = onBack,
+                modifier = playerModifier,
+                posterUrl = item.thumbnailUrl,
+                reused = cachedSession,
+                comments = comments,
+                item = item,
+            )
+        } else {
+            when (val res = resolveResult) {
+                is LiveStreamResolveResult.Success -> {
+                    NativeLivePlayer(
+                        hlsUrl = res.hlsUrl,
+                        referer = res.referer,
+                        item = item,
+                        isFullscreen = isFullscreen,
+                        onFullscreenChange = onFullscreenChange,
+                        onVideoOrientationChange = onVideoOrientationChange,
+                        onVideoSizeChange = { w: Int, h: Int -> videoDimensions = Pair(w, h) },
                         onOpenExternal = openInBrowser,
                         onBack = onBack,
+                        onFallbackToWeb = { forceEmbedded = true },
+                        modifier = playerModifier,
+                        posterUrl = item.thumbnailUrl,
+                        comments = comments,
                     )
                 }
-            }
-            is LiveStreamResolveResult.Failure -> {
-                EmbeddedLivePlayer(
-                    url = item.playerUrl,
-                    isFullscreen = isFullscreen,
-                    onFullscreenChange = onFullscreenChange,
-                    onVideoOrientationChange = onVideoOrientationChange,
-                    onVideoSizeChange = { w, h -> videoDimensions = Pair(w, h) },
-                    onCommentsChange = { comments = it },
-                    onCommentsLoadingChange = { hasCheckedComments = !it },
-                    onOpenExternal = openInBrowser,
-                    onBack = onBack,
-                    modifier = playerModifier,
-                    posterUrl = item.thumbnailUrl,
-                    reused = cachedSession,
-                    comments = comments,
-                    item = item,
-                )
-            }
-            null -> {
-                Box(playerModifier.background(AuroraImmersiveBackground)) {
-                    item.thumbnailUrl.takeIf { it.isNotBlank() }?.let { poster ->
-                        AsyncImage(
-                            model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
-                            contentDescription = null,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize(),
+                is LiveStreamResolveResult.StatusError -> {
+                    Box(playerModifier.background(AuroraImmersiveBackground)) {
+                        LiveRoomStatusOverlay(
+                            status = LiveRoomStatus.OFFLINE,
+                            errorMessage = res.message,
+                            onRetry = { resolveAttempt++ },
+                            onOpenExternal = openInBrowser,
+                            onBack = onBack,
+                            onFallbackToWeb = { forceEmbedded = true },
                         )
-                        Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
                     }
-                    CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
-                            .padding(12.dp),
-                    ) {
-                        Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(36.dp)) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White, modifier = Modifier.size(18.dp))
+                }
+                is LiveStreamResolveResult.Failure -> {
+                    EmbeddedLivePlayer(
+                        url = item.playerUrl,
+                        isFullscreen = isFullscreen,
+                        onFullscreenChange = onFullscreenChange,
+                        onVideoOrientationChange = onVideoOrientationChange,
+                        onVideoSizeChange = { w: Int, h: Int -> videoDimensions = Pair(w, h) },
+                        onCommentsChange = { comments = it },
+                        onCommentsLoadingChange = { hasCheckedComments = !it },
+                        onOpenExternal = openInBrowser,
+                        onBack = onBack,
+                        modifier = playerModifier,
+                        posterUrl = item.thumbnailUrl,
+                        reused = cachedSession,
+                        comments = comments,
+                        item = item,
+                    )
+                }
+                null -> {
+                    Box(playerModifier.background(AuroraImmersiveBackground)) {
+                        item.thumbnailUrl.takeIf { it.isNotBlank() }?.let { poster ->
+                            AsyncImage(
+                                model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                            Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
+                        }
+                        CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
+                                .padding(12.dp),
+                        ) {
+                            Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(36.dp)) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
                     }
@@ -1249,6 +1283,7 @@ private fun NativeLivePlayer(
     onVideoSizeChange: ((width: Int, height: Int) -> Unit)?,
     onOpenExternal: () -> Unit,
     onBack: () -> Unit,
+    onFallbackToWeb: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     posterUrl: String? = null,
     comments: List<LiveComment> = emptyList(),
@@ -1340,11 +1375,14 @@ private fun NativeLivePlayer(
             .setDefaultRequestProperties(
                 mapOf(
                     "Referer" to referer,
-                    "Origin" to referer.removeSuffix("/"),
                     "Accept" to "*/*",
                 ),
             )
-        val mediaSource = DefaultMediaSourceFactory(http).createMediaSource(MediaItem.fromUri(hlsUrl))
+        val mediaItem = MediaItem.Builder()
+            .setUri(hlsUrl)
+            .setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
+            .build()
+        val mediaSource = DefaultMediaSourceFactory(http).createMediaSource(mediaItem)
         player.setMediaSource(mediaSource)
         player.prepare()
         player.playWhenReady = true
@@ -1424,6 +1462,7 @@ private fun NativeLivePlayer(
                 },
                 onOpenExternal = onOpenExternal,
                 onBack = onBack,
+                onFallbackToWeb = onFallbackToWeb,
             )
         }
 

@@ -112,7 +112,7 @@ class LiveStreamResolver {
                 }
             }
 
-            LiveStreamResolveResult.StatusError("未检测到可播放的视频流，主播可能已离线")
+            LiveStreamResolveResult.Failure(IOException("未检测到直链，平滑降级至备用视口"))
         } catch (e: Exception) {
             LiveStreamResolveResult.Failure(e)
         }

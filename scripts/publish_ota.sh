@@ -42,7 +42,7 @@ if [ "${TARGET}" != "Android" ] && [ "${TARGET}" != "UploadOnly" ]; then
 fi
 
 # 3. 上传到远程服务器与清理老版本
-SSH_OPTS=(-o StrictHostKeyChecking=no)
+SSH_OPTS=(-o StrictHostKeyChecking=no -o PubkeyAuthentication=no)
 REMOTE_CLEAN_AND_CHECK="chmod 644 ${REMOTE_DIR}/Netgrey.ipa ${REMOTE_DIR}/Netgrey.apk ${REMOTE_DIR}/index.html ${REMOTE_DIR}/manifest.plist 2>/dev/null || true; \
 find ${REMOTE_DIR} -maxdepth 2 -type f \( -name '*.tmp' -o -name '*.old' -o -name '*.bak' -o -name '*~' \) -delete; \
 echo '--- 服务器最新版本清单 ---'; \
