@@ -42,8 +42,8 @@ if [ "${TARGET}" != "Android" ] && [ "${TARGET}" != "UploadOnly" ]; then
 fi
 
 # 3. 上传到远程服务器与清理老版本
-SSH_OPTS=(-o StrictHostKeyChecking=no -o PreferredAuthentications=password -o PubkeyAuthentication=no)
-REMOTE_CLEAN_AND_CHECK="chmod 644 ${REMOTE_DIR}/Netgrey.ipa ${REMOTE_DIR}/Netgrey.apk ${REMOTE_DIR}/index.html 2>/dev/null || true; \
+SSH_OPTS=(-o StrictHostKeyChecking=no)
+REMOTE_CLEAN_AND_CHECK="chmod 644 ${REMOTE_DIR}/Netgrey.ipa ${REMOTE_DIR}/Netgrey.apk ${REMOTE_DIR}/index.html ${REMOTE_DIR}/manifest.plist 2>/dev/null || true; \
 find ${REMOTE_DIR} -maxdepth 2 -type f \( -name '*.tmp' -o -name '*.old' -o -name '*.bak' -o -name '*~' \) -delete; \
 echo '--- 服务器最新版本清单 ---'; \
 ls -lh ${REMOTE_DIR}/Netgrey.*; \
@@ -53,27 +53,26 @@ df -h /"
 if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ] || [ -f "${PROJECT_ROOT}/dist/Netgrey.apk" ]; then
   echo "[3/3] 正在上传最新安装包并清理服务器老版本残留..."
   if [ -n "${SERVER_PASS}" ]; then
-    export SSHPASS="${SERVER_PASS}"
     SSHPASS_BIN="$(command -v sshpass 2>/dev/null || echo "/opt/homebrew/bin/sshpass")"
     if [ -x "${SSHPASS_BIN}" ]; then
       if [ -f "${PROJECT_ROOT}/scripts/ota_web/index.html" ]; then
         echo "上传 OTA 网页 index.html 与 manifest.plist..."
-        "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/index.html" "root@${SERVER_IP}:${REMOTE_DIR}/index.html"
+        "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/index.html" "root@${SERVER_IP}:${REMOTE_DIR}/index.html"
         if [ -f "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" ]; then
-          "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" "root@${SERVER_IP}:${REMOTE_DIR}/manifest.plist"
+          "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" "root@${SERVER_IP}:${REMOTE_DIR}/manifest.plist"
         fi
       fi
       if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ]; then
         echo "上传 iOS 通用包 Netgrey.ipa..."
-        "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${OUTPUT_DIR}/Netgrey.ipa" "root@${SERVER_IP}:${REMOTE_DIR}/Netgrey.ipa"
+        "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${OUTPUT_DIR}/Netgrey.ipa" "root@${SERVER_IP}:${REMOTE_DIR}/Netgrey.ipa"
         sleep 1
       fi
       if [ -f "${PROJECT_ROOT}/dist/Netgrey.apk" ]; then
         echo "上传 Android 正式包 Netgrey.apk..."
-        "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/dist/Netgrey.apk" "root@${SERVER_IP}:${REMOTE_DIR}/Netgrey.apk"
+        "${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" "${PROJECT_ROOT}/dist/Netgrey.apk" "root@${SERVER_IP}:${REMOTE_DIR}/Netgrey.apk"
         sleep 1
       fi
-      "${SSHPASS_BIN}" -e ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "${REMOTE_CLEAN_AND_CHECK}"
+      "${SSHPASS_BIN}" -p "${SERVER_PASS}" ssh "${SSH_OPTS[@]}" "root@${SERVER_IP}" "${REMOTE_CLEAN_AND_CHECK}"
     else
       if [ -f "${PROJECT_ROOT}/scripts/ota_web/index.html" ]; then
         echo "上传 OTA 网页 index.html 与 manifest.plist..."

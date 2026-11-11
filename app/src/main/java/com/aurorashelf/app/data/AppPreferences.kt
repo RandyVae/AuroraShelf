@@ -441,6 +441,7 @@ internal fun encodeLiveCache(cache: CachedLive): String = JSONObject().apply {
                     put("countryCode", item.countryCode)
                     put("isHd", item.isHd)
                     put("playerUrl", item.playerUrl)
+                    item.hlsStreamUrl?.let { put("hlsStreamUrl", it) }
                 })
             }
         },
@@ -465,6 +466,7 @@ internal fun decodeLiveCache(json: String): CachedLive? = runCatching {
                 countryCode = item.optString("countryCode"),
                 isHd = item.optBoolean("isHd"),
                 playerUrl = item.getString("playerUrl"),
+                hlsStreamUrl = item.optString("hlsStreamUrl").takeIf { it.isNotBlank() },
             )
         }.getOrNull()
     }.take(AppPreferences.MAX_LIVE_CACHE_ITEMS)

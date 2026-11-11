@@ -38,6 +38,8 @@ class StripchatLiveRepository {
                 val thumbnail = model.optString("previewUrlThumbSmall").takeIf(::isHttpsUrl)
                     ?: model.optString("avatarUrl").takeIf(::isHttpsUrl)
                     ?: continue
+                val hlsUrl = model.optString("hlsPlaylist").takeIf(::isHttpsUrl)
+                    ?: "https://edge-hls.doppiocdn.media/hls/$id/master/$id.m3u8"
                 add(
                     LiveItem(
                         id = id,
@@ -49,6 +51,7 @@ class StripchatLiveRepository {
                         }.orEmpty(),
                         isHd = model.optBoolean("isHd"),
                         playerUrl = "$siteBase/$username",
+                        hlsStreamUrl = hlsUrl,
                     ),
                 )
             }
@@ -72,7 +75,6 @@ class StripchatLiveRepository {
             .url(address)
             .header("Accept", "application/json")
             .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-            .header("Origin", originBase)
             .header("Referer", "$originBase/")
             .header("User-Agent", VideoRepository.USER_AGENT)
             .build()

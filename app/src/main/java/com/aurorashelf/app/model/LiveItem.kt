@@ -8,6 +8,7 @@ data class LiveItem(
     val countryCode: String,
     val isHd: Boolean,
     val playerUrl: String,
+    val hlsStreamUrl: String? = null,
 )
 
 enum class LiveCategory(

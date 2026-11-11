@@ -145,6 +145,19 @@ import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.aurorashelf.app.data.StripchatLiveRepository
+import com.aurorashelf.app.data.LiveStreamResolveResult
+import com.aurorashelf.app.data.LiveStreamResolver
+import com.aurorashelf.app.data.VideoRepository
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import com.aurorashelf.app.model.LiveCategory
 import com.aurorashelf.app.model.LiveComment
 import com.aurorashelf.app.model.LiveItem
@@ -1105,6 +1118,13 @@ private fun LivePlayerScreen(
             }
         }
     }
+
+    val resolver = remember { LiveStreamResolver() }
+    var resolveAttempt by remember(item.id) { mutableIntStateOf(0) }
+    val resolveResult by produceState<LiveStreamResolveResult?>(initialValue = null, item.id, resolveAttempt) {
+        value = resolver.resolve(item)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1127,22 +1147,82 @@ private fun LivePlayerScreen(
                     .aspectRatio(ratio)
             }
         }
-        EmbeddedLivePlayer(
-            url = item.playerUrl,
-            isFullscreen = isFullscreen,
-            onFullscreenChange = onFullscreenChange,
-            onVideoOrientationChange = onVideoOrientationChange,
-            onVideoSizeChange = { w, h -> videoDimensions = Pair(w, h) },
-            onCommentsChange = { comments = it },
-            onCommentsLoadingChange = { hasCheckedComments = !it },
-            onOpenExternal = openInBrowser,
-            onBack = onBack,
-            modifier = playerModifier,
-            posterUrl = item.thumbnailUrl,
-            reused = cachedSession,
-            comments = comments,
-            item = item,
-        )
+
+        when (val res = resolveResult) {
+            is LiveStreamResolveResult.Success -> {
+                NativeLivePlayer(
+                    hlsUrl = res.hlsUrl,
+                    referer = res.referer,
+                    item = item,
+                    isFullscreen = isFullscreen,
+                    onFullscreenChange = onFullscreenChange,
+                    onVideoOrientationChange = onVideoOrientationChange,
+                    onVideoSizeChange = { w, h -> videoDimensions = Pair(w, h) },
+                    onOpenExternal = openInBrowser,
+                    onBack = onBack,
+                    modifier = playerModifier,
+                    posterUrl = item.thumbnailUrl,
+                    comments = comments,
+                )
+            }
+            is LiveStreamResolveResult.StatusError -> {
+                Box(playerModifier.background(AuroraImmersiveBackground)) {
+                    LiveRoomStatusOverlay(
+                        status = LiveRoomStatus.OFFLINE,
+                        errorMessage = res.message,
+                        onRetry = { resolveAttempt++ },
+                        onOpenExternal = openInBrowser,
+                        onBack = onBack,
+                    )
+                }
+            }
+            is LiveStreamResolveResult.Failure -> {
+                EmbeddedLivePlayer(
+                    url = item.playerUrl,
+                    isFullscreen = isFullscreen,
+                    onFullscreenChange = onFullscreenChange,
+                    onVideoOrientationChange = onVideoOrientationChange,
+                    onVideoSizeChange = { w, h -> videoDimensions = Pair(w, h) },
+                    onCommentsChange = { comments = it },
+                    onCommentsLoadingChange = { hasCheckedComments = !it },
+                    onOpenExternal = openInBrowser,
+                    onBack = onBack,
+                    modifier = playerModifier,
+                    posterUrl = item.thumbnailUrl,
+                    reused = cachedSession,
+                    comments = comments,
+                    item = item,
+                )
+            }
+            null -> {
+                Box(playerModifier.background(AuroraImmersiveBackground)) {
+                    item.thumbnailUrl.takeIf { it.isNotBlank() }?.let { poster ->
+                        AsyncImage(
+                            model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                        Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
+                    }
+                    CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
+                            .padding(12.dp),
+                    ) {
+                        Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(36.dp)) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (!isFullscreen) {
             StreamerInfoBar(
                 item = item,
@@ -1151,9 +1231,407 @@ private fun LivePlayerScreen(
             )
             LiveComments(
                 comments = comments,
-                isLoading = !hasCheckedComments,
+                isLoading = !hasCheckedComments && resolveResult == null,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
+        }
+    }
+}
+
+@Composable
+private fun NativeLivePlayer(
+    hlsUrl: String,
+    referer: String,
+    item: LiveItem,
+    isFullscreen: Boolean,
+    onFullscreenChange: (Boolean) -> Unit,
+    onVideoOrientationChange: (Boolean) -> Unit,
+    onVideoSizeChange: ((width: Int, height: Int) -> Unit)?,
+    onOpenExternal: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    posterUrl: String? = null,
+    comments: List<LiveComment> = emptyList(),
+) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var isLoading by remember(hlsUrl) { mutableStateOf(true) }
+    var isPlaying by remember(hlsUrl) { mutableStateOf(false) }
+    var errorMessage by remember(hlsUrl) { mutableStateOf<String?>(null) }
+    var isPaused by remember(hlsUrl) { mutableStateOf(false) }
+    var isMuted by remember(hlsUrl) { mutableStateOf(false) }
+    var isDanmakuEnabled by rememberSaveable { mutableStateOf(true) }
+    var controlsVisible by remember { mutableStateOf(true) }
+    var feedbackMessage by remember { mutableStateOf<String?>(null) }
+    var reloadAttempt by remember(hlsUrl) { mutableIntStateOf(0) }
+
+    val player = remember(hlsUrl, reloadAttempt) {
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(8_000, 20_000, 500, 1_000)
+            .build()
+        ExoPlayer.Builder(context.applicationContext)
+            .setLoadControl(loadControl)
+            .build()
+    }
+
+    DisposableEffect(player, lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> player.pause()
+                Lifecycle.Event.ON_RESUME -> if (!isPaused) player.play()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            player.release()
+        }
+    }
+
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                when (playbackState) {
+                    Player.STATE_READY -> {
+                        isLoading = false
+                        isPlaying = true
+                        errorMessage = null
+                    }
+                    Player.STATE_BUFFERING -> {
+                        isLoading = true
+                    }
+                    Player.STATE_ENDED -> {
+                        isLoading = false
+                        isPlaying = false
+                        errorMessage = "主播当前已离线或暂未开播"
+                    }
+                    Player.STATE_IDLE -> Unit
+                }
+            }
+
+            override fun onPlayerError(error: PlaybackException) {
+                isLoading = false
+                isPlaying = false
+                errorMessage = "直播流播放异常，请检查网络后点击重试"
+            }
+
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    val isPortrait = videoSize.height > videoSize.width
+                    onVideoOrientationChange(isPortrait)
+                    onVideoSizeChange?.invoke(videoSize.width, videoSize.height)
+                }
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+        }
+    }
+
+    LaunchedEffect(player, hlsUrl, referer, reloadAttempt) {
+        isLoading = true
+        errorMessage = null
+        val http = DefaultHttpDataSource.Factory()
+            .setUserAgent(VideoRepository.USER_AGENT)
+            .setConnectTimeoutMs(15_000)
+            .setReadTimeoutMs(20_000)
+            .setDefaultRequestProperties(
+                mapOf(
+                    "Referer" to referer,
+                    "Origin" to referer.removeSuffix("/"),
+                    "Accept" to "*/*",
+                ),
+            )
+        val mediaSource = DefaultMediaSourceFactory(http).createMediaSource(MediaItem.fromUri(hlsUrl))
+        player.setMediaSource(mediaSource)
+        player.prepare()
+        player.playWhenReady = true
+    }
+
+    LaunchedEffect(controlsVisible, isFullscreen) {
+        if (isFullscreen && controlsVisible) {
+            delay(4000L)
+            controlsVisible = false
+        }
+    }
+
+    LaunchedEffect(feedbackMessage) {
+        if (feedbackMessage != null) {
+            delay(2000L)
+            feedbackMessage = null
+        }
+    }
+
+    BackHandler(enabled = isFullscreen) {
+        onFullscreenChange(false)
+    }
+
+    Box(modifier = modifier.background(AuroraImmersiveBackground)) {
+        AndroidView(
+            factory = { viewContext ->
+                PlayerView(viewContext).apply {
+                    this.player = player
+                    useController = false
+                    keepScreenOn = true
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
+            },
+            update = { playerView ->
+                if (playerView.player !== player) playerView.player = player
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        // Gesture detector to toggle controls
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    controlsVisible = !controlsVisible
+                },
+        )
+
+        // Poster and buffer indicator
+        if (isLoading) {
+            Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground)) {
+                posterUrl?.let { poster ->
+                    AsyncImage(
+                        model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
+                }
+                CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
+            }
+        }
+
+        // Error overlay with Retry
+        if (errorMessage != null && !isLoading) {
+            LiveRoomStatusOverlay(
+                status = LiveRoomStatus.ERROR,
+                errorMessage = errorMessage,
+                onRetry = {
+                    isLoading = true
+                    errorMessage = null
+                    reloadAttempt++
+                },
+                onOpenExternal = onOpenExternal,
+                onBack = onBack,
+            )
+        }
+
+        // Danmaku Layer
+        DanmakuOverlay(
+            comments = comments,
+            enabled = isFullscreen && isDanmakuEnabled,
+            modifier = Modifier.fillMaxSize(),
+        )
+
+        // Floating Toast for Danmaku mode switch
+        AnimatedVisibility(
+            visible = feedbackMessage != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 56.dp),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xDD000000),
+                border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color(0x55FFFFFF)),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Icon(
+                        imageVector = if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
+                        contentDescription = null,
+                        tint = if (isDanmakuEnabled) AuroraCoral else Color.LightGray,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = feedbackMessage ?: "",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+
+        // Top bar
+        AnimatedVisibility(
+            visible = !isFullscreen || controlsVisible,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent),
+                        ),
+                    )
+                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                IconButton(onClick = onBack) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.55f),
+                        modifier = Modifier.size(36.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = if (isFullscreen) "退出全屏" else "返回直播列表",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = item.username,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.width(8.dp))
+                Surface(
+                    color = AuroraCoral,
+                    shape = RoundedCornerShape(3.dp),
+                ) {
+                    Text(
+                        "LIVE",
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isDanmakuEnabled) AuroraCoral.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.65f),
+                    border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color.White.copy(alpha = 0.35f)),
+                    onClick = {
+                        isDanmakuEnabled = !isDanmakuEnabled
+                        feedbackMessage = if (isDanmakuEnabled) "已开启弹幕浮层" else "已开启纯净观看模式（评论已关闭）"
+                    },
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp),
+                        )
+                        Text(
+                            text = if (isDanmakuEnabled) "弹幕 开" else "纯净模式",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
+            }
+        }
+
+        // Bottom control bar
+        if (!isLoading && errorMessage == null) {
+            AnimatedVisibility(
+                visible = !isFullscreen || controlsVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)),
+                            ),
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    IconButton(onClick = {
+                        if (isPaused) {
+                            player.play()
+                            isPaused = false
+                        } else {
+                            player.pause()
+                            isPaused = true
+                        }
+                    }) {
+                        Icon(
+                            if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                            contentDescription = if (isPaused) "继续播放" else "暂停直播",
+                            tint = Color.White,
+                        )
+                    }
+                    IconButton(onClick = {
+                        if (isMuted) {
+                            player.volume = 1f
+                            isMuted = false
+                        } else {
+                            player.volume = 0f
+                            isMuted = true
+                        }
+                    }) {
+                        Icon(
+                            if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                            contentDescription = if (isMuted) "开启声音" else "静音",
+                            tint = Color.White,
+                        )
+                    }
+                    if (isFullscreen) {
+                        IconButton(onClick = {
+                            isDanmakuEnabled = !isDanmakuEnabled
+                            feedbackMessage = if (isDanmakuEnabled) "已开启弹幕浮层" else "已开启纯净观看模式（评论已关闭）"
+                        }) {
+                            Icon(
+                                if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
+                                contentDescription = if (isDanmakuEnabled) "关闭弹幕 (开启纯净模式)" else "开启弹幕",
+                                tint = if (isDanmakuEnabled) AuroraCoral else Color.LightGray,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = { onFullscreenChange(!isFullscreen) }) {
+                        Icon(
+                            if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
+                            contentDescription = if (isFullscreen) "退出全屏" else "全屏播放",
+                            tint = Color.White,
+                        )
+                    }
+                }
+            }
         }
     }
 }
