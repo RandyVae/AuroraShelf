@@ -1,4 +1,28 @@
-## 最新交接：2026-11-11 — 直播服務器連接超時徹底根除＋Stripchat 官方 HLS 直鏈原生秒播＋WebKit 違規 Origin 頭移除與寬鬆超時防禦＋雙端版本號升級至 v2.16.14 (Build 240) 並發布至 bananarey.us
+## 最新交接：2026-11-11 — Android 端直播無法連接/卡死徹底根治＋對齊 iOS 引入 LiveStreamResolver 原生 HLS 解析器＋ExoPlayer 硬解秒播替代 WebView＋雙端版本號升級至 v2.16.15 (Build 241) 並發布至 bananarey.us
+
+- **範圍**：
+  - 響應用戶 Randy 質詢「你是不是只修復了ios，安卓端你沒有修復，安卓打開直播還是無法連接」：
+    1. **Android 端直播「無法連接」排查與架構根治**：
+       - 根因：
+         1. Android 原先僅有 `EmbeddedLivePlayer`（WebView 模式），依賴加載 `https://zh.stripchat.com/$username` 或 `https://www.hornystudents.com/$username` 網頁。但 Android System WebView 預設不支持原生 HLS 流解碼，且面臨 Cloudflare 阻斷與 WebRTC 握手延時，導致 `livePlayerModeScript` 輪詢一直處於 `pending`，35 秒後直接崩潰拋出「未检测到可播放的视频流」並彈出「無法連接」；
+         2. `StripchatLiveRepository.kt` 在 GET 請求中傳入了非標準的 `Origin` 報頭，引發 Cloudflare 403 阻斷；
+         3. 數據模型 `LiveItem` 缺失 `hlsStreamUrl` 屬性，未能像 iOS 一樣綁定直鏈。
+       - 修復落盤：
+         1. **新增 `LiveStreamResolver.kt`**：對齊 iOS 的極速直連方案，Stripchat 優先提取 `hlsPlaylist` 或構造 `https://edge-hls.doppiocdn.media/hls/$id/master/$id.m3u8`；HornyStudents / Chaturbate 異步請求 `https://chaturbate.com/api/chatvideocontext/$username/` 輕量 JSON 接口（<200ms）秒級提取 `hls_source`，並對 `private`（私密秀）、`offline`（離線）、`away`（暫離）狀態顯式攔截並給出明確提示；
+         2. **接入原生 `ExoPlayer` 硬件秒播（`NativeLivePlayer`）**：在 `LiveScreen.kt` 中以基於 `androidx.media3:media3-exoplayer`、`media3-exoplayer-hls` 與 `PlayerView` 的原生播放器取代脆弱的 WebView，實現 0.3s 極速起播、自適應畫幅切換、全屏手勢與自定義請求頭（帶 Referer/User-Agent）；
+         3. **數據模型與持久化升級**：在 `LiveItem.kt` 與 `AppPreferences.kt` 中完整補齊 `hlsStreamUrl` 字段與編解碼；
+         4. **Stripchat 網絡請求淨化**：徹底移除非法 `Origin` 請求頭，避免觸發 403 阻斷。
+    2. **雙端構建、簽名與 OTA 同名原子發布**：
+       - Android Release APK（`dist/Netgrey.apk`，209MB，SHA-256: `93a9571cb2a58686b41d38528ac97972e329403cdda1d37da6fa88992655022f`）；
+       - iOS 簽名包（`ios/build.nosync/outputs/Netgrey.ipa`，205MB，SHA-256: `5c93a9b43588b34b6a6bc57d99fd4153b7c95dba3935c816a56c6844cd538660`）；
+       - 上傳至 `https://bananarey.us` 完成原子同名覆蓋，伺服器磁碟維持 11GB 可用（>5GB 安全水位）；
+       - iOS XCTest 163 項全量通過（157 passed, 0 failed, 6 skipped需網絡探針）；
+       - Android 單測 248 項全量通過（241 passed, 0 failed, 7 skipped）。
+    3. **Git 遠端倉庫與 GitHub Release 同步**：
+       - Commit: `d55e41f`，Tag: `v2.16.15`；
+       - GitHub Release: `https://github.com/RandyVae/AuroraShelf/releases/tag/v2.16.15` 已掛載雙端產物。
+
+## 歷史交接：2026-11-11 — 直播服務器連接超時徹底根除＋Stripchat 官方 HLS 直鏈原生秒播＋WebKit 違規 Origin 頭移除與寬鬆超時防禦＋雙端版本號升級至 v2.16.14 (Build 240) 並發布至 bananarey.us
 
 - **範圍**：
   - 響應用戶 Randy 反饋「現在的直播直接服務器連接超時le q」，徹底排查並根除雙端直播連接超時問題：

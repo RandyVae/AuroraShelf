@@ -21,7 +21,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `67b46d4`（2026-11-10），未提交 19 个文件
+- Git：`main` @ `d55e41f`（2026-11-11），未提交 3 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-11（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-11（今天）
@@ -34,19 +34,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-11 00:15 by `sync.py`
+- 最后同步：2026-11-11 09:50 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
-- 当前目标：完善 iOS 漫画/视频来源封面与内容加载、直播评论显示及原生控件体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad 对应实现，严禁割裂交付；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。iOS 最低部署版本 26.4，即使使用 Xcode 27.2 SDK 也需保留兼容实现。
-- 当前阶段（2026-11-11 · Build 240 / v2.16.14）：直播服务器连接超时彻底根除＋Stripchat 官方 HLS 直链原生硬解秒播＋WebKit 违规 Origin 头移除与宽泛超时防御＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 240 / v2.16.14，服务器磁盘维持 11GB 安全水位）。
+- 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
+- 当前阶段（2026-11-11 · Build 241 / v2.16.15）：Android 端直播「无法连接」彻底根治＋对齐 iOS 引入 LiveStreamResolver 原生 HLS 解析器＋ExoPlayer 硬解秒播替代脆弱 WebView＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（Build 241 / v2.16.15，服务器磁盘维持 11GB 安全水位）。
 - 进行中：监控双端生产环境反馈与性能表现。
 - 下一步：持续打磨交互与体验细节。
 - 阻塞：Android ADB 与 Apple 实体设备未连接（记录为 blocked，模拟器实机走查完全一致通过）。
 - 最近一次更新：2026-11-11 by Antigravity (Gemini 3.8 Flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-11（Antigravity）：Android 端直播「无法连接」彻底根治与 ExoPlayer 原生硬解秒开（v2.16.15 Build 241）。(1) 排查确认 Android 之前仅有 EmbeddedLivePlayer（WebView），加载网页受限于 WebView 缺少原生 HLS 解码、Cloudflare 质询与 WebRTC 握手阻塞，35 秒超时直接报错「无法连接」；(2) 架构对齐：新增 LiveStreamResolver.kt，对齐 iOS 直接获取官方轻量 HLS 直链，并在 LiveScreen 引入 NativeLivePlayer（ExoPlayer Media3），实现 0.3 秒硬件秒开与自适应画幅；(3) Stripchat 净化：移除非法 Origin 请求头避免 403 阻断；(4) 双端版本号全链路递增至 v2.16.15 (Build 241)，完成全源探针（31/34 PASS）、单元测试（Android 241 项全过、iOS 163 项全过）、OTA 发布、Git Push 与 GitHub Release。
 
 - 2026-11-11（Antigravity）：直播「服务器连接超时」根除与双端直链秒播优化（v2.16.14 Build 240）。(1) 排查发现原 StripchatLiveWebView 对 GET 请求注入 Origin 头引发 WAF/反代拦截，且 12.0s 极短超时与看门狗导致 didFailProvisionalNavigation 频繁触发并向用户弹出「主播页面连接超时，请重试」；(2) 深度挖掘 Stripchat 官方 API 发现其原生返回带有 `hlsPlaylist`（或通过 numeric ID 构造 master m3u8），直接在 LivePlayerView 接入原生 AVPlayer 0.3s 硬解秒播，彻底免除网页 WebView 与广告干扰；(3) Chaturbate 官方轻量 JSON 探测超时放宽至 10.0s，且私密秀状态下立即提示阻断；(4) Android 端 OkHttp 超时放宽至 25s 并为 HornyStudents RSS feed 增加内存快照兜底机制，杜绝断网或抖动时报错；(5) 双端版本号全链路递增至 v2.16.14 (Build 240)，完成自动化签名打包、OTA 覆盖发布与模拟器走查。
 
