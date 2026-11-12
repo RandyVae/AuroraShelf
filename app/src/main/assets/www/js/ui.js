@@ -43,6 +43,11 @@
   function heroArt(h, variant) {
     if (!h) return '';
     const a = h.artWeb || {};
+    // 特殊立绘：kart, ines, luf, misa 的 base 是 2048x946 横屏过场，lega 才是真正全身竖版立绘
+    const verticalLegaKeys = ['kart', 'ines', 'luf', 'misa'];
+    if (verticalLegaKeys.includes(h.key)) {
+      return a.lega || a.base || '';
+    }
     if (variant === 'nude') {
       // 18+ 觉醒：优先 nude，无 nude 时使用高露出战术装 lega，兜底 base
       return a.nude || a.lega || a.base || '';
@@ -159,13 +164,13 @@
         belle: { scale: 0.98, y: 0, x: 0 },
         river: { scale: 1.00, y: 0, x: 0 },
         nymeria: { scale: 1.00, y: 0, x: 0 },
-        astara: { scale: 0.80, y: 10, x: 0 },
-        aphrodite: { scale: 0.74, y: 15, x: 0 },
-        ines: { scale: 0.78, y: 15, x: 0 },
-        kart: { scale: 0.78, y: 15, x: 0 },
-        luf: { scale: 0.80, y: 10, x: 0 },
-        misa: { scale: 0.78, y: 15, x: 0 },
-        ariana: { scale: 0.80, y: 10, x: 0 },
+        astara: { scale: 0.96, y: 0, x: 0 },
+        aphrodite: { scale: 0.96, y: 0, x: 0 },
+        ines: { scale: 0.96, y: 0, x: 0 },
+        kart: { scale: 0.96, y: 0, x: 0 },
+        luf: { scale: 0.96, y: 0, x: 0 },
+        misa: { scale: 0.96, y: 0, x: 0 },
+        ariana: { scale: 0.96, y: 0, x: 0 },
       };
       const adapt = HERO_HUB_ADAPTATION[leadKey] || { scale: 1.0, y: 0, x: 0 };
       img.style.setProperty('--hero-scale', String(adapt.scale || 1.0));

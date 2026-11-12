@@ -92,6 +92,9 @@ class GameActivity : ComponentActivity() {
         s.loadsImagesAutomatically = true
         s.mediaPlaybackRequiresUserGesture = false
         s.cacheMode = WebSettings.LOAD_NO_CACHE
+        s.setSupportZoom(false)
+        s.builtInZoomControls = false
+        s.displayZoomControls = false
         val fontScale = resources.configuration.fontScale
         s.textZoom = (fontScale * 100).toInt().coerceIn(100, 150)
         wv.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)

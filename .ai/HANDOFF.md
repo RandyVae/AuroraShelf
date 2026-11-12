@@ -1,4 +1,34 @@
-## 最新交接：2026-11-12 — 雙端直播連接超時與穿透雜質徹底根治＋黃果短劇極速直出修復＋遊戲本地加載與立繪呼吸感/超大尺寸校準＋雙端版本號升級至 v2.16.18 (Build 244) 並發布至 bananarey.us 與 GitHub Release
+## 最新交接：2026-11-12 — 遊戲大廳人物立繪相對居中與下邊緣貼合重構＋屏幕雙擊放大根除（5層立體防禦）＋特殊立绘全身竖屏重映射＋雙端版本號升級至 v2.16.19 (Build 245) 並發布至 bananarey.us 與 GitHub Release
+
+- **範圍**：
+  - 響應用戶 Randy 核心指示「1. 大廳人物立繪顯示異常：部分人物靠右，還有一部分又過於靠下。要以人物立繪的下邊緣和我們最下方的組件對齊，另外人物要居中，使用相對坐標，不要使用絕對坐標。 2. 屏幕雙擊放大問題：在屏幕中敲擊兩下會被放大」：
+    1. **屏幕雙擊放大缺陷徹底根除（5 層立體防禦體系）**：
+       - `index.html`：修改 `<meta name="viewport">` 參數為 `width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover`，徹底廢除原先 `maximum-scale=5`；
+       - `app.css`：在 `html, body` 注入 `touch-action: manipulation; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-text-size-adjust: 100%;`，指示 WebKit 與 Blink 禁止雙擊放大並保留單擊即時響應；
+       - `app.js`：添加全局事件監聽器，雙指 touch 阻斷雙指縮放，快速連擊（≤300ms）阻止雙擊縮放，並攔截 `gesturestart/change/end`；
+       - iOS `GameContainerView.swift`：設置 `webView.scrollView.maximumZoomScale = 1.0`、`minimumZoomScale = 1.0`、`bouncesZoom = false`；`Coordinator` 遵循 `UIScrollViewDelegate` 並實現 `viewForZooming(in:) { return nil }`；遞歸遍歷子視圖禁用所有 `numberOfTapsRequired == 2` 的雙擊手勢識別器；
+       - Android `GameActivity.kt`：顯式注入 WebSettings 防禦 `setSupportZoom(false)`、`builtInZoomControls = false`、`displayZoomControls = false`。
+    2. **大廳人物相對居中與下邊緣組件精準對齊重構**：
+       - `app.css` 重構容器布局：
+         - `.hub-hero-stage`：改為相對彈性容器 `position: absolute; top: calc(var(--safe-t) + 68px); left: 0; right: 0; bottom: calc(var(--safe-b) + 74px); display: flex; flex-direction: column; justify-content: flex-end; align-items: center; pointer-events: none;`，底邊緣 100% 精準貼合底部導航組件頂部；
+         - `.hub-art-wrap`：`position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: flex-end;`；
+         - `.hub-art`：`position: relative; bottom: 0; margin: 0 auto; width: auto; max-width: min(92vw, 440px); height: 100%; max-height: 100%; object-fit: contain; object-position: bottom center; transform-origin: bottom center;`，徹底移除舊有 `right: -2%`、`right: 22%` 等偏右絕對偏移量，實現多端視口絕對水平光學居中；
+         - 統一呼吸動效 `@keyframes heroBreathing`：以人物腳底為錨點產生真實胸腔起伏，移除冗餘覆蓋。
+    3. **特殊英雄過場橫幅至全身豎版立繪重映射與裁切**：
+       - `ui.js` 的 `heroArt`：針對 `kart`, `ines`, `luf`, `misa` 4 位特勤，將大廳看板立繪強制重映射至其對應的 1154x2048 / 1166x2048 / 885x2080 超清全身豎版立繪（`lega.webp`），徹底根除原先加載 2048x946 橫屏 CG 導致的角色縮水過小與靠下問題；
+       - `aphrodite`：將原 2048x1293 超寬展翅立繪按 1080x1293 人物軀幹與光環黃金比例裁切並生成對應 WebP 資源與縮略圖；
+       - `HERO_HUB_ADAPTATION`：全量 62 位英雄光學縮放比例統一歸一化至 0.96~1.00，偏移坐標全部歸零重置（`y: 0, x: 0`）。
+    4. **雙端構建、簽名與 OTA 同名原子發布**：
+       - Android Release APK（`dist/Netgrey.apk`，197MB，SHA-256: `36e25321052d5f3eea369470d868ac58b41e006e05f5d055ff0f00b6194c065d`）；
+       - iOS 簽名包（`ios/build.nosync/outputs/Netgrey.ipa`，193MB，SHA-256: `79f2dc7216696f1d0ef5896dcf3f6a4eaed2521723b6910361796fed2099243a`）；
+       - 上傳至 `https://bananarey.us` 完成原子同名覆蓋，清理遠端碎片，伺服器磁碟維持 11GB 可用（>5GB 安全水位）；
+       - 本地 Android 模擬器（`emulator-5554`）實裝混淆 Release APK 實測走查通過（主頁、我的、遊戲大廳、Kitty/Regina/Mitsuki 切換、雙擊 1.0x 無縮放）；iPhone 17 Pro 與 iPad Pro 13-inch 模擬器 Release 構建實測驗收通過（Aphrodite/Ines/Cartilla/Kitty 水平居中且貼合下邊緣、雙擊無放大）；全源探針 34 個源中 34 個連通（100% 通過率）。
+    5. **Git 遠端倉庫與 GitHub Release 同步**：
+       - 版本號：`v2.16.19 (Build 245)`；
+       - 關聯 Git Tag: `v2.16.19`；
+       - GitHub Release: 掛載雙端 Release 產物。
+
+## 歷史交接：2026-11-12 — 雙端直播連接超時與穿透雜質徹底根治＋黃果短劇極速直出修復＋遊戲本地加載與立繪呼吸感/超大尺寸校準＋雙端版本號升級至 v2.16.18 (Build 244) 並發布至 bananarey.us 與 GitHub Release
 
 - **範圍**：
   - 響應用戶 Randy 反饋「直播卡在正在連接 soft_katy 的直播流畫面、穿透 Chaturbate 語言欄與播放按鈕、評論被菜單與設置項刷屏」、「ios 遊戲加載失敗，黃果也沒有之前加載快了」：

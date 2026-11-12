@@ -1,6 +1,38 @@
 # Project State
 
-## 最新工作狀態（2026年11月12日 · 雙端版本號升級至 v2.16.18 Build 244 + 雙端直播連接超時與穿透雜質徹底根治 + 黃果短劇極速直出修復 + 遊戲本地加載與立繪呼吸感/超大尺寸校準 + 雙端 Release 正式包發布至 bananarey.us 與 GitHub Release）
+## 最新工作狀態（2026年11月12日 · 雙端版本號升級至 v2.16.19 Build 245 + 遊戲大廳人物立繪相對居中與下邊緣貼合重構 + 屏幕雙擊放大徹底根除 + 特殊立繪全身豎版重映射 + 雙端 Release 正式包發布至 bananarey.us 與 GitHub Release）
+
+- **最新成果（立繪居中與貼合對齊、雙擊放大根除、特殊立繪全身化與雙端交付）**：
+  1. **屏幕雙擊放大缺陷徹底根除（5 層立體防禦體系）**：
+     - `index.html`：修改 `<meta name="viewport">` 參數為 `width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover`，徹底廢除原先 `maximum-scale=5`；
+     - `app.css`：在 `html, body` 注入 `touch-action: manipulation; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-text-size-adjust: 100%;`，指示 WebKit 與 Blink 禁止雙擊放大並保留單擊即時響應；
+     - `app.js`：添加全局事件監聽器，雙指 touch 阻斷雙指縮放，快速連擊（≤300ms）阻止雙擊縮放，並攔截 `gesturestart/change/end`；
+     - iOS `GameContainerView.swift`：設置 `webView.scrollView.maximumZoomScale = 1.0`、`minimumZoomScale = 1.0`、`bouncesZoom = false`；`Coordinator` 遵循 `UIScrollViewDelegate` 並實現 `viewForZooming(in:) { return nil }`；遞歸遍歷子視圖禁用所有 `numberOfTapsRequired == 2` 的雙擊手勢識別器；
+     - Android `GameActivity.kt`：顯式注入 WebSettings 防禦 `setSupportZoom(false)`、`builtInZoomControls = false`、`displayZoomControls = false`。
+  2. **大廳人物相對居中與下邊緣組件精準對齊重構**：
+     - `app.css` 重構容器布局：
+         - `.hub-hero-stage`：改為相對彈性容器 `position: absolute; top: calc(var(--safe-t) + 68px); left: 0; right: 0; bottom: calc(var(--safe-b) + 74px); display: flex; flex-direction: column; justify-content: flex-end; align-items: center; pointer-events: none;`，底邊緣 100% 精準貼合底部導航組件頂部；
+         - `.hub-art-wrap`：`position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: flex-end;`；
+         - `.hub-art`：`position: relative; bottom: 0; margin: 0 auto; width: auto; max-width: min(92vw, 440px); height: 100%; max-height: 100%; object-fit: contain; object-position: bottom center; transform-origin: bottom center;`，徹底移除舊有 `right: -2%`、`right: 22%` 等偏右絕對偏移量，實現多端視口絕對水平光學居中；
+         - 統一呼吸動效 `@keyframes heroBreathing`：以人物腳底為錨點產生真實胸腔起伏，移除冗餘覆蓋。
+  3. **特殊英雄過場橫幅至全身豎版立繪重映射與裁切**：
+     - `ui.js` 的 `heroArt`：針對 `kart`, `ines`, `luf`, `misa` 4 位特勤，將大廳看板立繪強制重映射至其對應的 1154x2048 / 1166x2048 / 885x2080 超清全身豎版立繪（`lega.webp`），徹底根除原先加載 2048x946 橫屏 CG 導致的角色縮水過小與靠下問題；
+     - `aphrodite`：將原 2048x1293 超寬展翅立繪按 1080x1293 人物軀幹與光環黃金比例裁切並生成對應 WebP 資源與縮略圖；
+     - `HERO_HUB_ADAPTATION`：全量 62 位英雄光學縮放比例統一歸一化至 0.96~1.00，偏移坐標全部歸零重置（`y: 0, x: 0`）。
+  4. **版本號全鏈路顯式升級至 v2.16.19 (Build 245)**：
+     - Android 端：`app/build.gradle.kts` (versionCode 245, versionName "2.16.19")；
+     - iOS 端：`ios/project.yml` 與 `Info.plist` (CURRENT_PROJECT_VERSION 245, MARKETING_VERSION "2.16.19")；`PersonalScreen.swift` 標籤更新為 `v2.16.19`；
+     - 遊戲前端：`index.html` 更新為 `Version 2.16.19`；
+     - OTA 發布站：`scripts/ota_web/index.html` 與 `manifest.plist` 同步升級至 `v2.16.19 (Build 245)`；
+     - 全局規範：`AGENTS.md` 同步更新為 `Netgrey · Android & iOS 2.16.19`。
+  5. **雙端 Release 構建、自動化簽名、OTA 原子覆蓋與 GitHub Release**：
+     - Android 正式包：`dist/Netgrey.apk`（197 MB，SHA-256: `36e25321052d5f3eea369470d868ac58b41e006e05f5d055ff0f00b6194c065d`）；
+     - iOS 正式簽名包：`ios/build.nosync/outputs/Netgrey.ipa`（193 MB，SHA-256: `79f2dc7216696f1d0ef5896dcf3f6a4eaed2521723b6910361796fed2099243a`）；
+     - 發布至 `https://bananarey.us` 完成同名原子覆蓋，清理遠端碎片，伺服器磁碟維持 11GB 可用（27% 使用率，安全水位 >5GB）；
+     - 全源連通性探針：34 個源中 34 個連通通過（100% 通過率）。
+- **最近更新**：2026-11-12 by Antigravity。
+
+## 歷史工作狀態（2026年11月12日 · 雙端版本號升級至 v2.16.18 Build 244 + 雙端直播連接超時與穿透雜質徹底根治 + 黃果短劇極速直出修復 + 遊戲本地加載與立繪呼吸感/超大尺寸校準 + 雙端 Release 正式包發布至 bananarey.us 與 GitHub Release）
 
 - **最新成果（直播超時與穿透修復、短劇秒出、遊戲安全加載、立繪呼吸感與雙端正式交付）**：
   1. **黃果短劇極速直出修復（iOS + Android）**：

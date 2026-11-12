@@ -31,6 +31,10 @@ struct GameWebViewRepresentable: UIViewRepresentable {
         webView.backgroundColor = UIColor(AuroraColor.canvas)
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.bounces = false
+        webView.scrollView.maximumZoomScale = 1.0
+        webView.scrollView.minimumZoomScale = 1.0
+        webView.scrollView.bouncesZoom = false
+        webView.scrollView.delegate = context.coordinator
         webView.navigationDelegate = context.coordinator
         context.coordinator.webView = webView
 
@@ -61,11 +65,26 @@ struct GameWebViewRepresentable: UIViewRepresentable {
         Coordinator(onExitRequest: onExitRequest, onGameMessage: onGameMessage)
     }
 
-    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+    class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
         weak var webView: WKWebView?
         var lastReloadToken: UUID?
         let onExitRequest: () -> Void
         let onGameMessage: (String) -> Void
+
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            return nil
+        }
+
+        private func disableDoubleTapZoom(in view: UIView) {
+            for gesture in view.gestureRecognizers ?? [] {
+                if let tap = gesture as? UITapGestureRecognizer, tap.numberOfTapsRequired == 2 {
+                    tap.isEnabled = false
+                }
+            }
+            for subview in view.subviews {
+                disableDoubleTapZoom(in: subview)
+            }
+        }
 
         init(onExitRequest: @escaping () -> Void, onGameMessage: @escaping () -> Void) {
             self.onExitRequest = onExitRequest
@@ -128,6 +147,7 @@ struct GameWebViewRepresentable: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            disableDoubleTapZoom(in: webView)
             let args = CommandLine.arguments
             if args.contains("--game-battle") || args.contains("--battle") {
                 webView.evaluateJavaScript("""

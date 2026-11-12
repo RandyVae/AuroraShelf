@@ -2,6 +2,34 @@
 (function () {
   'use strict';
 
+  // 彻底禁用双击放大 (Double-tap to zoom) 与多指捏合缩放手势
+  (function preventDoubleTapZoom() {
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (event) {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+      }
+      lastTouchEnd = now;
+    }, { passive: false });
+
+    document.addEventListener('touchstart', function (event) {
+      if (event.touches.length > 1) {
+        event.preventDefault();
+      }
+    }, { passive: false });
+
+    document.addEventListener('gesturestart', function (event) {
+      event.preventDefault();
+    }, { passive: false });
+    document.addEventListener('gesturechange', function (event) {
+      event.preventDefault();
+    }, { passive: false });
+    document.addEventListener('gestureend', function (event) {
+      event.preventDefault();
+    }, { passive: false });
+  })();
+
   // 原生 iOS / Android 触觉与生命周期桥梁
   const NativeBridge = {
     haptic(style) {

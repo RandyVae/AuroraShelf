@@ -84,6 +84,11 @@ html, body {
   font-size: 16px;
   line-height: 1.45;
   overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 body { overflow: hidden; }
@@ -414,30 +419,67 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
     linear-gradient(180deg, color-mix(in srgb, var(--bg-base) 78%, transparent) 0%, color-mix(in srgb, var(--bg-base) 22%, transparent) 24%, transparent 46%, color-mix(in srgb, var(--bg-base) 45%, transparent) 74%, var(--bg-base) 100%),
     radial-gradient(90% 60% at 70% 30%, transparent 40%, color-mix(in srgb, var(--bg-base) 55%, transparent) 100%);
 }
-.hub-art {
+/* Hub Hero Stage & Standee Art: 相对坐标居中，下边缘与底部导航组件对齐 */
+.hub-hero-stage {
   position: absolute;
-  bottom: 0;
-  right: -2%;
-  height: 82%;
-  max-width: 92%;
-  object-fit: contain;
-  object-position: bottom right;
+  top: calc(var(--safe-t) + 68px);
+  left: 0;
+  right: 0;
+  bottom: calc(var(--safe-b) + 74px);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  pointer-events: none;
   z-index: 1;
+}
+
+.hub-art-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.hub-art {
+  position: relative;
+  bottom: 0;
+  left: auto;
+  right: auto;
+  top: auto;
+  margin: 0 auto;
+  width: auto;
+  max-width: min(92vw, 420px);
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: bottom center;
+  transform-origin: bottom center;
   filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 20px rgba(255, 42, 143, 0.15));
-  mask-image: linear-gradient(180deg, #000 80%, rgba(0, 0, 0, 0.85) 92%, transparent 99%);
-  -webkit-mask-image: linear-gradient(180deg, #000 80%, rgba(0, 0, 0, 0.85) 92%, transparent 99%);
+  mask-image: linear-gradient(180deg, #000 78%, rgba(0, 0, 0, 0.85) 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 78%, rgba(0, 0, 0, 0.85) 90%, transparent 100%);
   pointer-events: none;
   user-select: none;
   transition: opacity 220ms ease;
+  transform: scale(var(--hero-scale, 1));
 }
+
 .hero-breathing,
 .breathing-art {
   animation: heroBreathing 4.6s ease-in-out infinite;
   transform-origin: bottom center;
 }
+
 @keyframes heroBreathing {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-8px) scale(1.022); }
+  0%, 100% {
+    transform: scale(var(--hero-scale, 1));
+  }
+  50% {
+    transform: translateY(-8px) scale(calc(var(--hero-scale, 1) * 1.022));
+  }
 }
 
 /* Hub Hero Switcher Controls */
@@ -782,36 +824,6 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   .path-progress { font-size: 9px; }
   .hub-path-card i { height: 3px; }
 
-  .hub-art {
-    top: auto;
-    bottom: calc(var(--safe-b) + 72px);
-    left: 50%;
-    right: auto;
-    width: auto;
-    max-width: min(90vw, 400px);
-    height: clamp(380px, 56vh, 480px);
-    max-height: 60vh;
-    object-fit: contain;
-    object-position: bottom center;
-    transform-origin: bottom center;
-    transform: translateX(calc(-50% + var(--hero-offset-x, 0px))) translateY(var(--hero-offset-y, 0px)) scale(var(--hero-scale, 1));
-    opacity: 1;
-    mask-image: linear-gradient(180deg, #000 78%, rgba(0, 0, 0, 0.8) 90%, transparent 100%);
-    -webkit-mask-image: linear-gradient(180deg, #000 78%, rgba(0, 0, 0, 0.8) 90%, transparent 100%);
-  }
-  .hub-art.hero-breathing,
-  .hub-art.breathing-art {
-    animation: heroBreathingMobile 4.6s ease-in-out infinite;
-    transform-origin: bottom center;
-  }
-  @keyframes heroBreathingMobile {
-    0%, 100% {
-      transform: translateX(calc(-50% + var(--hero-offset-x, 0px))) translateY(var(--hero-offset-y, 0px)) scale(var(--hero-scale, 1));
-    }
-    50% {
-      transform: translateX(calc(-50% + var(--hero-offset-x, 0px))) translateY(calc(var(--hero-offset-y, 0px) - 8px)) scale(calc(var(--hero-scale, 1) * 1.022));
-    }
-  }
   .hub-bottom { padding-bottom: calc(var(--safe-b) + 8px); }
   .hub-bottom .nav-btn { min-height: 56px; }
   .hub-bottom .nav-btn .sub { display: none; }
@@ -819,7 +831,6 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
 
 @media (min-width: 900px) and (orientation: landscape) {
   .stage { width: 100vw; }
-  .hub-art { right: 22%; height: 90%; }
   .hub-focus { top: 30%; }
 }
 
