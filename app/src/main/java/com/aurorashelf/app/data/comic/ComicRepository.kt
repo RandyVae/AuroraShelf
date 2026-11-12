@@ -53,8 +53,7 @@ class ComicRepository internal constructor(
         synchronized(chapterCache) {
             if (chapterCache.containsKey(key)) return@coroutineScope
         }
-        if (inFlightChapters.containsKey(key)) return@coroutineScope
-        val deferred = async(kotlinx.coroutines.Dispatchers.IO) {
+        val deferred = async(kotlinx.coroutines.Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) {
             try {
                 val pages = source(comic.sourceId).chapter(comic, chapterId)
                 synchronized(chapterCache) {
@@ -65,7 +64,8 @@ class ComicRepository internal constructor(
                 inFlightChapters.remove(key)
             }
         }
-        inFlightChapters[key] = deferred
+        val winner = inFlightChapters.putIfAbsent(key, deferred)
+        (winner ?: deferred).start()
     }
 
     suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage> {

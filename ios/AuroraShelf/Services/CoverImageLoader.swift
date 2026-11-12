@@ -30,6 +30,7 @@ public actor CoverImageLoader {
 
         // 限制內存緩存最大 120 張封面
         memoryCache.countLimit = 120
+        memoryCache.totalCostLimit = 64 * 1024 * 1024
     }
 
     /// 静默预热图片到磁盘与内存缓存
@@ -69,7 +70,7 @@ public actor CoverImageLoader {
 
         // 2. 磁盤緩存命中
         let diskPath = cacheDirectory.appendingPathComponent(cacheKey)
-        if let diskData = try? Data(contentsOf: diskPath), let diskImage = UIImage(data: diskData) {
+        if let diskData = try? Data(contentsOf: diskPath), let diskImage = Self.decodeForDisplay(diskData) {
             memoryCache.setObject(diskImage, forKey: cacheKey as NSString)
             return diskImage
         }
@@ -110,12 +111,12 @@ public actor CoverImageLoader {
                 }
 
                 var finalData = data
-                var parsedImage: UIImage? = UIImage(data: data)
+                var parsedImage: UIImage? = Self.decodeForDisplay(data)
 
                 // 檢查是否為 AES 加密數據（91動漫/黃果二進制加密封面）
                 if parsedImage == nil && (Self.requiresAESDecryption(url: url) || Self.isPossibleEncryptedImage(data)) {
                     if let decrypted = Self.decryptAES128CBC(data: data, key: aesKey, iv: aesIv),
-                       let decImg = UIImage(data: decrypted) {
+                       let decImg = Self.decodeForDisplay(decrypted) {
                         parsedImage = decImg
                         finalData = decrypted
                     }
@@ -136,12 +137,12 @@ public actor CoverImageLoader {
         defer { inFlightTasks[cacheKey] = nil }
 
         if let image = await task.value {
-            memoryCache.setObject(image, forKey: cacheKey as NSString)
+            memoryCache.setObject(image, forKey: cacheKey as NSString, cost: Self.imageCost(image))
             return image
         } else if let title, !title.isEmpty {
             if let fallbackUrl = await DoubanPosterResolver.shared.resolvePosterURL(for: title), fallbackUrl != normalized {
                 if let fallbackImage = await loadImage(from: fallbackUrl, title: nil, baseURL: nil, requestReferer: nil) {
-                    memoryCache.setObject(fallbackImage, forKey: cacheKey as NSString)
+                    memoryCache.setObject(fallbackImage, forKey: cacheKey as NSString, cost: Self.imageCost(fallbackImage))
                     return fallbackImage
                 }
             }
@@ -196,6 +197,23 @@ public actor CoverImageLoader {
     static func cacheKey(for url: String) -> String {
         let digest = SHA256.hash(data: Data(url.utf8))
         return "cover_\(digest.map { String(format: "%02x", $0) }.joined()).img"
+    }
+
+    private static func decodeForDisplay(_ data: Data, maxPixelSize: Int = 1200) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+            kCGImageSourceShouldCacheImmediately: true,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else { return nil }
+        return UIImage(cgImage: image)
+    }
+
+    private static func imageCost(_ image: UIImage) -> Int {
+        guard let cgImage = image.cgImage else { return 0 }
+        return cgImage.bytesPerRow * cgImage.height
     }
 
     static func imageRequest(for url: URL, referer suppliedReferer: String? = nil, forceNoReferer: Bool = false) -> URLRequest {

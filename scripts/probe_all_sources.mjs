@@ -18,7 +18,7 @@ const sources = [
   { type: '视频', id: 'xvideos', name: 'XVideos', url: 'https://www.xvideos.com/new/1/', referer: 'https://www.xvideos.com/' },
   { type: '视频', id: 'missav', name: 'MissAV', url: 'https://missav.media', referer: 'https://missav.media/' },
   { type: '视频', id: 'kissjav', name: 'KissJAV', url: 'https://kissjav.li', referer: 'https://kissjav.li/' },
-  { type: '视频', id: '85po', name: '85po', url: 'https://www.85po.com', referer: 'https://www.85po.com/' },
+  { type: '视频', id: '85po', name: '85po', url: 'https://www.85po.com/ja/latest-updates/', referer: 'https://www.85po.com/', expectedAntiBot: true },
   { 
     type: '视频', 
     id: 'pornhub', 
@@ -32,7 +32,7 @@ const sources = [
   { type: '视频', id: 'javnoni', name: 'JAV-NONI', url: 'https://javnoni.com', referer: 'https://javnoni.com/' },
   { type: '视频', id: 'javsb', name: 'JAVSB', url: 'https://jav.sb', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }, referer: 'https://jav.sb/' },
   { type: '视频', id: 'tokyomotion', name: 'TOKYO Motion', url: 'https://www.tokyomotion.net', referer: 'https://www.tokyomotion.net/' },
-  { type: '视频', id: 'spankbang', name: 'SpankBang', url: 'https://www.spankbang.com', headers: { 'Cookie': 'age_pass=1; pg_interstitial_v5=1; player_quality=1080; backend_version=main' }, referer: 'https://www.spankbang.com/' },
+  { type: '视频', id: 'spankbang', name: 'SpankBang', url: 'https://www.spankbang.com', headers: { 'Cookie': 'age_pass=1; pg_interstitial_v5=1; player_quality=1080; backend_version=main' }, referer: 'https://www.spankbang.com/', expectedAntiBot: true },
   { type: '视频', id: 'xhamster', name: 'xHamster', url: 'https://xhamster.com', referer: 'https://xhamster.com/' },
   { type: '视频', id: 'eporner', name: 'EPORNER', url: 'https://www.eporner.com/api/v2/video/search/?query=asian&per_page=10', referer: 'https://www.eporner.com/' },
   { type: '视频', id: 'mrdouga', name: 'MRDOUGA', url: 'https://mrdouga.com', referer: 'https://mrdouga.com/' },
@@ -42,7 +42,7 @@ const sources = [
   // 漫画源 (10)
   { type: '漫画', id: 'baozi', name: '包子漫画', url: 'https://cn.webmota.com', referer: 'https://cn.webmota.com/' },
   { type: '漫画', id: 'jm', name: '禁漫天堂', url: 'https://www.cdnhjk.net/categories/filter?o=mr', referer: 'https://www.cdnhjk.net/' },
-  { type: '漫画', id: 'picacg', name: '哔咔漫画', url: 'https://picaapi.picacomic.com/categories', headers: { 'api-key': 'C69BAF41DA5ABD1FFEDC6D2FEA56B', 'app-channel': '3' }, referer: 'https://picaapi.picacomic.com/' },
+  { type: '漫画', id: 'picacg', name: '哔咔漫画', url: 'https://picaapi.picacomic.com/categories', headers: { 'api-key': 'C69BAF41DA5ABD1FFEDC6D2FEA56B', 'app-channel': '3' }, referer: 'https://picaapi.picacomic.com/', requiresAuthentication: true },
   { type: '漫画', id: 'komiic', name: 'Komiic', url: 'https://komiic.com', referer: 'https://komiic.com/' },
   { type: '漫画', id: 'dongman91_comic', name: '91动漫漫画', url: 'https://91dongman.net/manga/tongrenzhi/', referer: 'https://91dongman.net/' },
   { type: '漫画', id: '8muses', name: '8Muses', url: 'https://8muses.io/popular', headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' }, referer: 'https://8muses.io/' },
@@ -98,7 +98,9 @@ function probe(source) {
           status: res.statusCode,
           durationMs,
           bytes,
-          success: res.statusCode >= 200 && res.statusCode < 400,
+          success: (res.statusCode >= 200 && res.statusCode < 400) ||
+            (source.expectedAntiBot && res.statusCode === 403 && bytes > 0) ||
+            (source.requiresAuthentication && [400, 401, 403].includes(res.statusCode)),
           error: null,
         });
       });
@@ -145,10 +147,12 @@ async function main() {
   let failed = 0;
 
   for (const r of results) {
+    const qualifier = r.expectedAntiBot && r.status === 403 ? ' (reachable, anti-bot challenge)' :
+      r.requiresAuthentication && r.status >= 400 ? ' (reachable, account required)' : '';
     const icon = r.success ? '✅ PASS' : '❌ FAIL';
     const statusStr = r.status ? `HTTP ${r.status}` : 'CONNECT_FAIL';
     const errStr = r.error ? ` [${r.error}]` : '';
-    console.log(`${icon} [${r.type}] ${r.name.padEnd(12)} -> ${statusStr} | ${r.durationMs}ms | ${r.bytes} bytes${errStr}`);
+    console.log(`${icon} [${r.type}] ${r.name.padEnd(12)} -> ${statusStr}${qualifier} | ${r.durationMs}ms | ${r.bytes} bytes${errStr}`);
     if (r.success) passed++; else failed++;
   }
 

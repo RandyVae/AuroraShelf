@@ -118,6 +118,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         .notification-bar, .site-notice, .lang-bar, #banner-container,
         [class*="chat-settings"], [class*="chat-toolbar"], [class*="font-list"], .c-chat-settings, .chat-settings-holder,
         .user-warning-banner, .site_alert,
+        div[style*="background: rgb(255, 255, 204)"], div[style*="background-color: #fff9d7"],
         .vjs-control-bar, .vjs-big-play-button, .vjs-loading-spinner,
         [data-testid*="banner"], [data-testid*="chat"], [data-testid*="tip"],
         .related-models, .models-list, .gallery-section, .profile-section,
@@ -262,6 +263,21 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                     notifySwift('error', { message: '主播当前正在进行私密秀（需付费观看）' });
                     return;
                 }
+                var docHtml = document.documentElement ? document.documentElement.innerHTML : '';
+                if (docHtml.indexOf('\\u0022room_status\\u0022: \\u0022offline\\u0022') !== -1 ||
+                    docHtml.indexOf('\\u0022room_status\\u0022:\\u0022offline\\u0022') !== -1 ||
+                    docHtml.indexOf('"room_status":"offline"') !== -1 ||
+                    docHtml.indexOf('"room_status": "offline"') !== -1) {
+                    notifySwift('error', { message: '主播当前已离线或暂未开播' });
+                    return;
+                }
+                if (docHtml.indexOf('\\u0022room_status\\u0022: \\u0022private\\u0022') !== -1 ||
+                    docHtml.indexOf('\\u0022room_status\\u0022:\\u0022private\\u0022') !== -1 ||
+                    docHtml.indexOf('"room_status":"private"') !== -1 ||
+                    docHtml.indexOf('"room_status": "private"') !== -1) {
+                    notifySwift('error', { message: '主播当前正在进行私密秀（需付费观看）' });
+                    return;
+                }
 
                 // 4. 确保主推流全屏自适应，撑开所有祖先容器
                 const mainVideo = findMainVideo();
@@ -354,29 +370,35 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                     if (node.dataset.auroraSent) return;
                     node.dataset.auroraSent = 'true';
 
-                    // 排除设置面板、字体列表、规则条、提示栏内的节点
-                    if (node.closest('.chat-settings, .font-list, [class*="setting"], [class*="notice"], [class*="rule"], [class*="toolbar"], [class*="warning"]')) return;
+                    // 排除设置面板、字体列表、规则条、提示栏、语言提示栏内的节点
+                    if (node.closest('.chat-settings, .font-list, [class*="setting"], [class*="notice"], [class*="rule"], [class*="toolbar"], [class*="warning"], [class*="language"], [id*="language"], header, nav, footer, #header')) return;
 
-                    // 必须存在明确的用户名或发言人节点，否则属于系统杂质
-                    var authorNode = node.querySelector('.username, [class*="username"], [class*="user"], .message-username, a[href*="/"]');
+                    // 必须存在明确的聊天用户名或发言人节点，严禁使用宽松链接选择器
+                    var authorNode = node.querySelector('.username, [class*="username"], .message-username, .user-name, [data-testid="chat-author"]');
                     if (!authorNode) return;
                     var author = (authorNode.innerText || authorNode.textContent || '').replace(/[:\\s]+$/, '').trim().slice(0, 30);
-                    if (!author || author === '观众' || author === '用户') return;
+                    if (!author || author === '观众' || author === '用户' || author.length < 2) return;
 
                     var textNode = node.querySelector('.text, [class*="text"], [class*="message-text"], [class*="content"]');
                     var rawText = textNode ? (textNode.innerText || textNode.textContent) : (node.innerText || node.textContent);
                     var text = (rawText || '').replace(author, '').replace(/[:\\s]+/, ' ').trim().replace(/\\s+/g, ' ');
                     if (!text || text.length > 200) return;
 
-                    // 黑名单过滤（杜绝页面提示词泄露）
+                    // 黑名单过滤（杜绝页面提示词、语言通知、字体面板等系统文本泄露）
                     var lowerText = text.toLowerCase();
                     if (lowerText.includes('featured chat') ||
                         lowerText.includes('chat settings') ||
-                        lowerText.includes('viewing chaturbate in') ||
+                        lowerText.includes('viewing chaturbate') ||
                         lowerText.includes('send a message') ||
+                        lowerText.includes('send tip') ||
                         lowerText.includes('no spamming') ||
                         lowerText.includes('fontdefault') ||
-                        lowerText.includes('caution: the chaturbate')) {
+                        lowerText.includes('caution: the chaturbate') ||
+                        lowerText.includes('rules:') ||
+                        lowerText.includes('chinese (simplified)') ||
+                        lowerText.includes('chinese (traditional)') ||
+                        lowerText.includes('continue in english') ||
+                        lowerText.includes('chat color')) {
                         return;
                     }
 

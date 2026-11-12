@@ -787,9 +787,9 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
     left: 50%;
     right: auto;
     width: auto;
-    max-width: min(92vw, 440px);
-    height: clamp(480px, 64vh, 580px);
-    max-height: 70vh;
+    max-width: min(92vw, 420px);
+    height: clamp(440px, 62vh, 540px);
+    max-height: 68vh;
     object-fit: contain;
     object-position: bottom center;
     transform: translateX(calc(-50% + var(--hero-offset-x, 0px))) translateY(var(--hero-offset-y, 0px)) scale(var(--hero-scale, 1));
@@ -806,7 +806,7 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
       transform: translateX(calc(-50% + var(--hero-offset-x, 0px))) translateY(var(--hero-offset-y, 0px)) scale(var(--hero-scale, 1));
     }
     50% {
-      transform: translateX(calc(-50% + var(--hero-offset-x, 0px))) translateY(calc(var(--hero-offset-y, 0px) - 6px)) scale(calc(var(--hero-scale, 1) * 1.006));
+      transform: translateX(calc(-50% + var(--hero-offset-x, 0px))) translateY(calc(var(--hero-offset-y, 0px) - 6px)) scale(var(--hero-scale, 1));
     }
   }
   .hub-bottom { padding-bottom: calc(var(--safe-b) + 8px); }

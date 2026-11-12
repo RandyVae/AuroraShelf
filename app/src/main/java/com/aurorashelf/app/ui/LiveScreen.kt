@@ -1349,6 +1349,7 @@ private fun NativeLivePlayer(
                 isLoading = false
                 isPlaying = false
                 errorMessage = "直播流播放异常，请检查网络后点击重试"
+                onFallbackToWeb?.invoke()
             }
 
             override fun onVideoSizeChanged(videoSize: VideoSize) {

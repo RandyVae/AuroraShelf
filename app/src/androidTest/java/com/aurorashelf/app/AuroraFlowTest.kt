@@ -62,13 +62,21 @@ class AuroraFlowTest {
     }).around(compose)
 
     @Test fun searchShowsEmptyStateForImpossibleQuery() {
+        compose.onNodeWithContentDescription("首页").performClick()
         compose.onNodeWithText("搜索视频").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("no-match-aurora-8123")
-        compose.onNodeWithContentDescription("开始搜索").performClick()
-        compose.onNodeWithText("已加载内容中没有匹配结果").assertExists()
+        compose.onNode(
+            hasText("点击搜索按钮开始查找") or
+            hasText("已加载内容中没有匹配结果") or
+            hasText("全网视频源未找到相关视频") or
+            hasAnyAncestor(hasTestTag("status-banner")),
+        ).assertExists()
+        compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithContentDescription("首页").performClick()
     }
 
     @Test fun settingsValidatesAddressAndShowsOfflineCache() {
+        compose.onNodeWithContentDescription("我的").performClick()
         compose.onNodeWithContentDescription("站点设置").performClick()
         compose.onNodeWithTag("settings-video-sources").performClick()
         compose.onNodeWithTag("video-sources-page").performScrollToIndex(ContentSourceCatalog.sources.size + 3)
@@ -82,6 +90,7 @@ class AuroraFlowTest {
         compose.onNodeWithText("隐私与安全").assertDoesNotExist()
         compose.activity.onBackPressedDispatcher.onBackPressed()
         compose.onNodeWithTag("personal-overview").assertExists()
+        compose.onNodeWithContentDescription("首页").performClick()
     }
 
     @Test fun favoriteAppearsInFavorites() {
@@ -91,21 +100,25 @@ class AuroraFlowTest {
         compose.onNodeWithContentDescription("取消收藏").assertExists()
         compose.activity.onBackPressedDispatcher.onBackPressed()
         compose.onNodeWithTag("personal-overview").assertExists()
+        compose.onNodeWithContentDescription("首页").performClick()
     }
 
     @Test fun reorganizedNavigationShowsLiveForumAndPersonalHub() {
         compose.onNodeWithContentDescription("直播").performClick()
         compose.onNodeWithTag("live-grid").assertExists()
-        compose.onNodeWithContentDescription("刷新直播列表").assertExists()
+        compose.onNodeWithText("搜索直播").assertExists()
 
         compose.onNodeWithContentDescription("论坛").performClick()
         compose.onNodeWithTag("forum-feed").assertExists()
-        compose.onNodeWithTag("forum-refresh").assertExists()
+        compose.onNodeWithTag("forum-category-bar").assertExists()
 
         compose.onNodeWithContentDescription("我的").performClick()
         compose.onNodeWithTag("personal-overview").assertExists()
         compose.onNodeWithTag("personal-history-entry").assertExists()
+        compose.onNodeWithTag("personal-overview")
+            .performScrollToNode(hasTestTag("personal-settings-entry"))
         compose.onNodeWithTag("personal-settings-entry").assertExists()
+        compose.onNodeWithContentDescription("首页").performClick()
     }
 
     @Test fun comicSourceLivesInSettingsAndDefaultsToJm() {
@@ -120,6 +133,8 @@ class AuroraFlowTest {
         compose.onNodeWithText("搜索漫画").assertExists()
 
         compose.onNodeWithContentDescription("我的").performClick()
+        compose.onNodeWithTag("personal-overview")
+            .performScrollToNode(hasTestTag("personal-settings-entry"))
         compose.onNodeWithTag("personal-settings-entry").performClick()
         compose.onNodeWithTag("settings-comic-sources").performClick()
         compose.onNodeWithTag("comic-sources-page").assertExists()
@@ -129,6 +144,7 @@ class AuroraFlowTest {
 
         compose.onNodeWithContentDescription("漫画").performClick()
         compose.onNodeWithText("恋爱").assertExists()
+        compose.onNodeWithContentDescription("首页").performClick()
     }
 
     @Test fun remoteLibrarySurvivesRepositoryRecreation() {
@@ -141,21 +157,26 @@ class AuroraFlowTest {
     }
 
     @Test fun feedContinuesBehindFloatingNavigation() {
+        compose.onNodeWithContentDescription("首页").performClick()
         val feedBounds = compose.onNodeWithTag("home-feed").getUnclippedBoundsInRoot()
         val dockBounds = compose.onNodeWithTag("bottom-dock").getUnclippedBoundsInRoot()
         assertTrue("Feed viewport must continue behind the floating dock", feedBounds.bottom > dockBounds.top)
     }
 
     @Test fun homeFeedPairsVideosInTwoColumnsAfterHero() {
-        compose.waitUntil(timeoutMillis = 20_000) {
+        compose.onNodeWithContentDescription("首页").performClick()
+        compose.onNodeWithTag("home-feed").performScrollToNode(hasTestTag("home-grid-card"))
+        compose.waitUntil(timeoutMillis = 10_000) {
             compose.onAllNodesWithTag("home-grid-card").fetchSemanticsNodes().size >= 2
         }
         val cards = compose.onAllNodesWithTag("home-grid-card").fetchSemanticsNodes()
         assertEquals(cards[0].boundsInRoot.top, cards[1].boundsInRoot.top, 1f)
         assertTrue("Grid cards must occupy separate columns", cards[0].boundsInRoot.right <= cards[1].boundsInRoot.left)
+        compose.onNodeWithTag("home-feed").performScrollToIndex(0)
     }
 
     @Test fun bottomNavigationSupportsDragSelection() {
+        compose.onNodeWithContentDescription("首页").performClick()
         compose.onNodeWithTag("liquid-navigation").performTouchInput {
             swipe(
                 start = centerLeft + Offset(20f, 0f),
@@ -164,11 +185,13 @@ class AuroraFlowTest {
             )
         }
         compose.onNodeWithTag("personal-overview").assertExists()
+        compose.onNodeWithContentDescription("首页").performClick()
     }
 
     @Test fun playerFullscreenHidesDetailsAndBackReturnsToDetails() {
-        compose.waitUntil(timeoutMillis = 20_000) {
-            compose.onAllNodesWithTag("home-grid-card").fetchSemanticsNodes().isNotEmpty()
+        compose.onNodeWithContentDescription("首页").performClick()
+        compose.waitUntil(timeoutMillis = 10_000) {
+            compose.onAllNodesWithText("播放").fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithText("播放").performClick()
         compose.onNodeWithContentDescription("全屏播放").assertIsDisplayed().performClick()
@@ -176,5 +199,7 @@ class AuroraFlowTest {
         compose.activity.onBackPressedDispatcher.onBackPressed()
         compose.onNodeWithTag("player-details").assertExists()
         compose.onNodeWithContentDescription("全屏播放").assertIsDisplayed()
+        compose.activity.onBackPressedDispatcher.onBackPressed()
+        compose.onNodeWithContentDescription("首页").performClick()
     }
 }

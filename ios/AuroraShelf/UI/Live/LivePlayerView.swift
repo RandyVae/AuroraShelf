@@ -462,7 +462,7 @@ public struct LivePlayerView: View {
                 apiReq.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
                 apiReq.setValue("agreeterms=1; isAdult=1; hasConfirmedAge=1; lang=en;", forHTTPHeaderField: "Cookie")
 
-                if let (apiData, apiResp) = try? await URLSession.permissive().data(for: apiReq),
+                if let (apiData, apiResp) = try? await URLSession.permissiveShared.data(for: apiReq),
                    let httpResp = apiResp as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
                    let json = try? JSONSerialization.jsonObject(with: apiData) as? [String: Any] {
                     try Task.checkCancellation()
@@ -503,7 +503,7 @@ public struct LivePlayerView: View {
                         roomReq.setValue("https://chaturbate.com/", forHTTPHeaderField: "Referer")
                         roomReq.setValue("agreeterms=1; isAdult=1; hasConfirmedAge=1; lang=en;", forHTTPHeaderField: "Cookie")
 
-                        if let (pageData, _) = try? await URLSession.permissive().data(for: roomReq),
+                        if let (pageData, _) = try? await URLSession.permissiveShared.data(for: roomReq),
                            let rawHtml = String(data: pageData, encoding: .utf8) {
                             try Task.checkCancellation()
                             guard activeStreamRequestID == requestID else { return }
@@ -518,7 +518,9 @@ public struct LivePlayerView: View {
                                 return
                             }
                             if rawHtml.contains(#""room_status": "offline""#) ||
-                               rawHtml.contains(#"\u0022room_status\u0022: \u0022offline\u0022"#) {
+                               rawHtml.contains(#""room_status":"offline""#) ||
+                               rawHtml.contains(#"\u0022room_status\u0022: \u0022offline\u0022"#) ||
+                               rawHtml.contains(#"\u0022room_status\u0022:\u0022offline\u0022"#) {
                                 self.isLoadingLive = false
                                 self.liveError = "主播当前已离线或暂未开播"
                                 return

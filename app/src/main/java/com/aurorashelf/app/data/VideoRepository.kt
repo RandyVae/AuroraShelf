@@ -56,7 +56,7 @@ class VideoRepository {
                 fetchDocument(requestUrl, baseUrl)
             } catch (error: HttpStatusException) {
                 // Huangguo ranking pages or end-of-feed numbered URLs return 404.
-                if (page > 1 && error.statusCode == 404 && ContentSourceCatalog.isHuangguo(baseUrl)) return@withContext emptyList()
+                if (page > 1 && error.statusCode == 404 && (ContentSourceCatalog.isHuangguo(baseUrl) || ContentSourceCatalog.is91Dongman(baseUrl))) return@withContext emptyList()
                 throw error
             }
             val records = parseDocument(document, baseUrl)

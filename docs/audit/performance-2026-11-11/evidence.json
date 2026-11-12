@@ -1,0 +1,285 @@
+{
+  "commit": "4e6783d0ad489e44078063e5a6dc0e62f4064b53",
+  "version": "2.16.16",
+  "build": 242,
+  "packages": [
+    {
+      "path": "dist/Netgrey.apk",
+      "sha256": "0904f08976feb394e13a558148e2de3851c88dac6f7f318c04af30e9f3b4b70a",
+      "file_bytes": 218640822,
+      "zip_compressed_payload_bytes": 218305875,
+      "game_compressed_bytes": 213568014,
+      "duplicate_groups": 19,
+      "redundant_compressed_bytes": 30510191,
+      "duplicate_files": [
+        [
+          "assets/www/assets/audio/main/fight_lose/fight_lose.m4a",
+          "assets/www/assets/audio/main/fight_lose_old/fight_lose_old.m4a"
+        ],
+        [
+          "assets/www/assets/audio/main/fight_win_old/fight_win_old.m4a",
+          "assets/www/assets/audio/tutorial/fight_win/fight_win.m4a"
+        ],
+        [
+          "assets/www/assets/audio/main/mus_fight4/mus_fight4.m4a",
+          "assets/www/assets/audio/main/mus_fight_2_final/mus_fight_2_final.m4a"
+        ],
+        [
+          "assets/www/assets/heroes/zoechloe/base_thumb.webp",
+          "assets/www/assets/slots/symbol_zoe.webp"
+        ],
+        [
+          "assets/www/assets/slots/button_spin.png",
+          "assets/www/assets/slots/img_20261101_205803_eb1317.png"
+        ],
+        [
+          "assets/www/assets/slots/coin.png",
+          "assets/www/assets/slots/img_20261101_205949_10238c.png"
+        ],
+        [
+          "assets/www/assets/slots/img_20261101_205406_97ecf8.png",
+          "assets/www/assets/slots/symbol_wild.png"
+        ],
+        [
+          "assets/www/assets/slots/img_20261101_205517_b44e25.png",
+          "assets/www/assets/slots/symbol_scatter.png"
+        ],
+        [
+          "assets/www/assets/slots/img_20261101_205553_ceb12c.png",
+          "assets/www/assets/slots/symbol_drone.png"
+        ],
+        [
+          "assets/www/assets/slots/img_20261101_205626_1bb6dd.png",
+          "assets/www/assets/slots/symbol_hilda.png"
+        ],
+        [
+          "assets/www/assets/slots/img_20261101_210025_4d5b5a.png",
+          "assets/www/assets/slots/symbol_frame.png"
+        ],
+        [
+          "assets/www/assets/slots/symbol_ines.webp",
+          "assets/www/assets/symbols/symbol_ines.webp"
+        ],
+        [
+          "assets/www/assets/slots/symbol_kart.webp",
+          "assets/www/assets/symbols/symbol_kart.webp"
+        ],
+        [
+          "assets/www/assets/slots/symbol_luf.webp",
+          "assets/www/assets/symbols/symbol_luf.webp"
+        ],
+        [
+          "assets/www/assets/slots/symbol_misa.webp",
+          "assets/www/assets/symbols/symbol_misa.webp"
+        ],
+        [
+          "assets/www/assets/videos/cg_ch1.mp4",
+          "assets/www/assets/videos/v_comics_maze_2_48.mp4"
+        ],
+        [
+          "assets/www/assets/videos/cg_ch2.mp4",
+          "assets/www/assets/videos/v_comics_maze_3_13.mp4"
+        ],
+        [
+          "assets/www/assets/videos/cg_ch3.mp4",
+          "assets/www/assets/videos/v_comics_maze_3_14.mp4"
+        ],
+        [
+          "assets/www/assets/videos/cg_ch4.mp4",
+          "assets/www/assets/videos/v_comics_maze_3_15.mp4"
+        ]
+      ]
+    },
+    {
+      "path": "ios/build.nosync/outputs/Netgrey.ipa",
+      "sha256": "49714df662a32e5cda1583dc34b03630bacc8e4bb6d4a635cab7de88210ac901",
+      "file_bytes": 214836868,
+      "zip_compressed_payload_bytes": 214375806,
+      "game_compressed_bytes": 211500705,
+      "duplicate_groups": 19,
+      "redundant_compressed_bytes": 30077597,
+      "duplicate_files": [
+        [
+          "Payload/AuroraShelf.app/www/assets/heroes/zoechloe/base_thumb.webp",
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_zoe.webp"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/videos/v_comics_maze_2_48.mp4",
+          "Payload/AuroraShelf.app/www/assets/videos/cg_ch1.mp4"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/videos/cg_ch3.mp4",
+          "Payload/AuroraShelf.app/www/assets/videos/v_comics_maze_3_14.mp4"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/videos/cg_ch2.mp4",
+          "Payload/AuroraShelf.app/www/assets/videos/v_comics_maze_3_13.mp4"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/videos/cg_ch4.mp4",
+          "Payload/AuroraShelf.app/www/assets/videos/v_comics_maze_3_15.mp4"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/audio/tutorial/fight_win/fight_win.m4a",
+          "Payload/AuroraShelf.app/www/assets/audio/main/fight_win_old/fight_win_old.m4a"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/audio/main/mus_fight4/mus_fight4.m4a",
+          "Payload/AuroraShelf.app/www/assets/audio/main/mus_fight_2_final/mus_fight_2_final.m4a"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/audio/main/fight_lose_old/fight_lose_old.m4a",
+          "Payload/AuroraShelf.app/www/assets/audio/main/fight_lose/fight_lose.m4a"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/symbols/symbol_luf.webp",
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_luf.webp"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/symbols/symbol_ines.webp",
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_ines.webp"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/symbols/symbol_kart.webp",
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_kart.webp"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/symbols/symbol_misa.webp",
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_misa.webp"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/slots/img_20261101_205553_ceb12c.png",
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_drone.png"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_wild.png",
+          "Payload/AuroraShelf.app/www/assets/slots/img_20261101_205406_97ecf8.png"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_frame.png",
+          "Payload/AuroraShelf.app/www/assets/slots/img_20261101_210025_4d5b5a.png"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_hilda.png",
+          "Payload/AuroraShelf.app/www/assets/slots/img_20261101_205626_1bb6dd.png"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/slots/img_20261101_205949_10238c.png",
+          "Payload/AuroraShelf.app/www/assets/slots/coin.png"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/slots/img_20261101_205803_eb1317.png",
+          "Payload/AuroraShelf.app/www/assets/slots/button_spin.png"
+        ],
+        [
+          "Payload/AuroraShelf.app/www/assets/slots/symbol_scatter.png",
+          "Payload/AuroraShelf.app/www/assets/slots/img_20261101_205517_b44e25.png"
+        ]
+      ]
+    }
+  ],
+  "android_tests": {
+    "tests": 241,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 7,
+    "passed": 234
+  },
+  "iphone_tests": {
+    "devicesAndConfigurations": [
+      {
+        "device": {
+          "architecture": "arm64",
+          "deviceId": "85A543BE-30D6-41D8-8898-4FC2FE05872B",
+          "deviceName": "iPhone 17 Pro",
+          "modelName": "iPhone 17 Pro",
+          "osBuildNumber": "23E244",
+          "osVersion": "26.4",
+          "platform": "iOS Simulator"
+        },
+        "expectedFailures": 0,
+        "failedTests": 0,
+        "passedTests": 157,
+        "skippedTests": 6,
+        "testPlanConfiguration": {
+          "configurationId": "1",
+          "configurationName": "Test Scheme Action"
+        }
+      }
+    ],
+    "environmentDescription": "AuroraShelf · Built with macOS 27.2",
+    "expectedFailures": 0,
+    "failedTests": 0,
+    "finishTime": 1794383605.463,
+    "passedTests": 157,
+    "result": "Passed",
+    "runtimeWarnings": [],
+    "skippedTests": 6,
+    "startTime": 1794383517.838,
+    "statistics": [],
+    "testFailures": [],
+    "title": "Test - AuroraShelf",
+    "topInsights": [
+      {
+        "category": "Longest Test Runs",
+        "impact": "48% of duration",
+        "text": "1 longest test run with outlier durations exceeding 0.87s (three standard deviations)"
+      }
+    ],
+    "totalTestCount": 163
+  },
+  "ipad_tests": {
+    "devicesAndConfigurations": [
+      {
+        "device": {
+          "architecture": "arm64",
+          "deviceId": "E2CBFDDC-5991-41C8-BF24-CADE93F60653",
+          "deviceName": "iPad Pro 13-inch (M5)",
+          "modelName": "iPad Pro 13-inch (M5)",
+          "osBuildNumber": "23E244",
+          "osVersion": "26.4",
+          "platform": "iOS Simulator"
+        },
+        "expectedFailures": 0,
+        "failedTests": 0,
+        "passedTests": 157,
+        "skippedTests": 6,
+        "testPlanConfiguration": {
+          "configurationId": "1",
+          "configurationName": "Test Scheme Action"
+        }
+      }
+    ],
+    "environmentDescription": "AuroraShelf · Built with macOS 27.2",
+    "expectedFailures": 0,
+    "failedTests": 0,
+    "finishTime": 1794383676.268,
+    "passedTests": 157,
+    "result": "Passed",
+    "runtimeWarnings": [],
+    "skippedTests": 6,
+    "startTime": 1794383643.679,
+    "statistics": [],
+    "testFailures": [],
+    "title": "Test - AuroraShelf",
+    "topInsights": [
+      {
+        "category": "Longest Test Runs",
+        "impact": "49% of duration",
+        "text": "1 longest test run with outlier durations exceeding 1.01s (three standard deviations)"
+      }
+    ],
+    "totalTestCount": 163
+  },
+  "canonical_key_probe": "EP1 [\"https://huangguoai.com/video/123/\", \"https://huangguoai.com/detail/123/\"]\nEP2 [\"https://huangguoai.com/video/123/ep-2/\", \"https://huangguoai.com/detail/123/\", \"https://huangguoai.com/video/123/\"]\nCOLLISION [\"https://huangguoai.com/detail/123/\", \"https://huangguoai.com/video/123/\"]\n",
+  "scope_inventory": {
+    "android": {
+      "files": 82,
+      "lines": 25059
+    },
+    "apple": {
+      "files": 70,
+      "lines": 23594
+    }
+  }
+}

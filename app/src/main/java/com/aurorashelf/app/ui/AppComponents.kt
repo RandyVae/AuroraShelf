@@ -337,6 +337,7 @@ internal fun StatusBanner(message: String, onRefresh: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .testTag("status-banner")
             .padding(horizontal = 24.dp),
     ) {
         Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

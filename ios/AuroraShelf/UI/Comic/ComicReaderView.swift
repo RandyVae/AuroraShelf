@@ -43,7 +43,7 @@ private struct ComicPageImageView: View {
         errorMessage = nil
 
         // 1. 优先读取离线已解密缓存图片（100% 离线秒开、零网络消耗）
-        if let local = ComicDownloadManager.shared.localImage(comicId: comicId, chapterId: chapterId, pageIndex: max(0, pageNumber - 1)) {
+        if let local = await ComicDownloadManager.shared.localImage(comicId: comicId, chapterId: chapterId, pageIndex: max(0, pageNumber - 1)) {
             image = local
             return
         }

@@ -44,10 +44,9 @@ public final class GlobalStartupPrefetchEngine: ObservableObject {
     private func warmupVideoModule() async {
         do {
             let repo = await VideoRepository.shared
-            let currentSource = await repo.currentSource
-            
-            // 预先拉取首屏推荐视频
-            let feed = try await repo.fetchVideosForSource(currentSource, category: "全部", page: 1)
+            // VideoRepository already owns the initial feed request. Reuse its result instead of
+            // issuing a second network request during cold start.
+            let feed = await repo.feedVideos
             
             // 预热前 8 部视频的海报高清图入磁盘与内存缓存
             for video in feed.prefix(8) {
@@ -77,8 +76,6 @@ public final class GlobalStartupPrefetchEngine: ObservableObject {
     private func warmupForumModule() async {
         do {
             let forumRepo = await ForumRepository.shared
-            // 预刷新论坛主列表
-            await forumRepo.loadPosts()
             let posts = await forumRepo.posts
             
             // 预热前 10 篇热帖的封面图片

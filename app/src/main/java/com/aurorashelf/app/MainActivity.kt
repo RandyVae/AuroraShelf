@@ -51,7 +51,9 @@ class MainActivity : ComponentActivity() {
             var introSoundEnabled by remember { mutableStateOf(preferences.introSoundEnabled) }
             // The intro owns the first frames; the app is composed once the lockup is reached so its
             // heavy first composition cannot stall the opening (or when the user skips).
-            var appVisible by rememberSaveable { mutableStateOf(!introVisible) }
+            // Compose the real surface immediately. The intro remains a covering layer, so feed
+            // layout and first-frame work can progress while the film is playing.
+            var appVisible by rememberSaveable { mutableStateOf(true) }
             // The veil covers the app's first composition; it only exists after the intro.
             var veilVisible by rememberSaveable { mutableStateOf(false) }
             var appDrawn by remember { mutableStateOf(!introVisible) }
@@ -79,8 +81,8 @@ class MainActivity : ComponentActivity() {
             }
             AuroraTheme(darkTheme = darkTheme) {
                 Box(Modifier.fillMaxSize()) {
-                    // The app composes and starts loading underneath the intro, so the brand
-                    // moment never delays first paint.
+                    // The app composes underneath the intro so the brand moment never delays
+                    // first paint or network/cache work.
                     if (appVisible) {
                         AuroraShelfApp(viewModel = warmUpViewModel)
                         OnFirstFrame { appDrawn = true }

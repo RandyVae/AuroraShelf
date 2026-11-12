@@ -268,7 +268,8 @@ public final class OfflineDownloadManager: ObservableObject {
         }
         playlistReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
         
-        let (playlistData, _) = try await URLSession.permissive().data(for: playlistReq)
+        let (playlistData, playlistResponse) = try await URLSession.permissiveShared.data(for: playlistReq)
+        try Self.requireSuccessfulMediaResponse(playlistResponse)
         guard let playlistText = String(data: playlistData, encoding: .utf8) else {
             throw NSError(domain: "OfflineDownload", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法解析播放列表"])
         }
@@ -292,7 +293,8 @@ public final class OfflineDownloadManager: ObservableObject {
                 finalMediaPlaylistURL = resolvedURL
                 var varReq = URLRequest(url: resolvedURL)
                 if let ref = referer { varReq.setValue(ref, forHTTPHeaderField: "Referer") }
-                let (varData, _) = try await URLSession.permissive().data(for: varReq)
+                let (varData, variantResponse) = try await URLSession.permissiveShared.data(for: varReq)
+                try Self.requireSuccessfulMediaResponse(variantResponse)
                 if let varText = String(data: varData, encoding: .utf8) {
                     mediaLines = varText.components(separatedBy: .newlines)
                 }
@@ -323,11 +325,8 @@ public final class OfflineDownloadManager: ObservableObject {
             throw NSError(domain: "OfflineDownload", code: -2, userInfo: [NSLocalizedDescriptionKey: "未找到切片内容"])
         }
         
-        let totalCount = segmentOriginalURLs.count
         var downloadedBytes: Int64 = 0
-        
-        // 限制最大缓存切片数量以防无限直播流（点播视频通常为 100~300 片）
-        let targetSegments = Array(segmentOriginalURLs.prefix(360))
+        let targetSegments = segmentOriginalURLs
         
         for (i, segURL) in targetSegments.enumerated() {
             if Task.isCancelled { break }
@@ -338,7 +337,11 @@ public final class OfflineDownloadManager: ObservableObject {
             
             let localSegURL = targetDir.appendingPathComponent("segment_\(i).ts")
             if !fileManager.fileExists(atPath: localSegURL.path) {
-                let (data, _) = try await URLSession.permissive().data(for: segReq)
+                let (data, response) = try await URLSession.permissiveShared.data(for: segReq)
+                try Self.requireSuccessfulMediaResponse(response)
+                guard !data.isEmpty else {
+                    throw NSError(domain: "OfflineDownload", code: -3, userInfo: [NSLocalizedDescriptionKey: "切片为空"])
+                }
                 try data.write(to: localSegURL)
                 downloadedBytes += Int64(data.count)
             } else {
@@ -373,7 +376,8 @@ public final class OfflineDownloadManager: ObservableObject {
         req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
         
         let localFileURL = targetDir.appendingPathComponent("video.mp4")
-        let (tempURL, response) = try await URLSession.permissive().download(for: req)
+        let (tempURL, response) = try await URLSession.permissiveShared.download(for: req)
+        try Self.requireSuccessfulMediaResponse(response)
         
         if fileManager.fileExists(atPath: localFileURL.path) {
             try? fileManager.removeItem(at: localFileURL)
@@ -389,6 +393,13 @@ public final class OfflineDownloadManager: ObservableObject {
             item.totalBytes = size
         }
         saveToDisk()
+    }
+
+    private static func requireSuccessfulMediaResponse(_ response: URLResponse) throws {
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw NSError(domain: "OfflineDownload", code: status, userInfo: [NSLocalizedDescriptionKey: "媒体服务器返回 HTTP \(status)"])
+        }
     }
     
     private func updateItem(id: String, mutate: (inout OfflineDownloadItem) -> Void) {

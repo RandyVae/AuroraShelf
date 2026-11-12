@@ -106,7 +106,7 @@ public struct PersonalScreen: View {
                                         Text("settings.game_title".localized)
                                             .font(.headline)
                                             .foregroundStyle(AuroraColor.textPrimary)
-                                        Text("v2.16.16")
+                                        Text("v2.16.17")
                                             .font(.caption2)
                                             .fontWeight(.bold)
                                             .foregroundStyle(AuroraColor.brand)

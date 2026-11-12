@@ -26,6 +26,15 @@ final class VideoPreloadManagerTests: XCTestCase {
         manager.clearCache()
         XCTAssertNil(manager.cachedResult(for: playbackUrl))
     }
+
+    @MainActor
+    func testHuangguoEpisodeKeysDoNotAliasToEpisodeOne() {
+        let first = Set(VideoPreloadManager.canonicalKeys(for: "https://huangguoai.com/video/123/"))
+        let second = Set(VideoPreloadManager.canonicalKeys(for: "https://huangguoai.com/video/123/ep-2/"))
+        XCTAssertTrue(first.contains("https://huangguoai.com/video/123/"))
+        XCTAssertTrue(second.contains("https://huangguoai.com/video/123/ep-2/"))
+        XCTAssertTrue(first.intersection(second).isEmpty)
+    }
     
     @MainActor
     func testHuavodParserExtractsRatingAndIndependentCardCover() {

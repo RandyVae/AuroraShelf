@@ -113,6 +113,7 @@ class StripchatLiveRepository {
                 .hostnameVerifier { _, _ -> true }
                 .connectTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .callTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .followRedirects(true)
                 .followSslRedirects(true)
                 .retryOnConnectionFailure(true)

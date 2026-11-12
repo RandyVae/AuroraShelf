@@ -299,10 +299,11 @@ private fun ComicLibrary(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize().testTag("comic-library-grid"),
         ) {
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Spacer(Modifier.height(130.dp))
+            }
+
             if (selectedSource?.requiresAuthentication == true && !state.isSourceAuthenticated) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Spacer(Modifier.height(130.dp))
-                }
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     ComicSourceAuthCard(
                         isLoading = state.isAuthorizing,
@@ -310,96 +311,65 @@ private fun ComicLibrary(
                         onAuthenticate = onAuthenticate,
                     )
                 }
+            } else if (state.isLoading && state.comics.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Box(Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = AuroraCoral)
+                    }
+                }
+            } else if (state.error != null && state.comics.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ComicError(message = state.error, onRetry = onRefresh)
+                }
+            } else if (state.comics.isEmpty()) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    ComicEmpty(message = if (state.activeQuery.isBlank()) "当前漫画源暂无内容" else "没有找到相关漫画")
+                }
             } else {
-                if (state.isLoading && state.comics.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Spacer(Modifier.height(130.dp))
+                // Netflix Hero Spotlight for the leading title at item 0 (full bleed)
+                if (state.activeQuery.isBlank()) {
+                    val heroComic = state.comics.first()
+                    item(key = "hero-comic-billboard", span = { GridItemSpan(maxLineSpan) }) {
+                        NetflixComicHeroBillboard(
+                            comic = heroComic,
+                            onRead = { onComic(heroComic) },
+                        )
                     }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Box(Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(color = AuroraCoral)
-                        }
-                    }
-                } else if (state.error != null && state.comics.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Spacer(Modifier.height(130.dp))
-                    }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        ComicError(message = state.error, onRetry = onRefresh)
-                    }
-                } else if (state.comics.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Spacer(Modifier.height(130.dp))
-                    }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        ComicEmpty(message = if (state.activeQuery.isBlank()) "当前漫画源暂无内容" else "没有找到相关漫画")
-                    }
-                } else {
-                    // Netflix Hero Spotlight for the leading title at item 0 (full bleed)
-                    if (state.activeQuery.isBlank()) {
-                        val heroComic = state.comics.first()
-                        item(key = "hero-comic-billboard", span = { GridItemSpan(maxLineSpan) }) {
-                            NetflixComicHeroBillboard(
-                                comic = heroComic,
-                                onRead = { onComic(heroComic) },
-                            )
-                        }
-                    }
+                }
 
-                    // Pinned Categories Strip
-                    val categories = selectedSource?.categories.orEmpty()
-                    if (categories.isNotEmpty()) {
-                        item(key = "comic-pinned-categories", span = { GridItemSpan(maxLineSpan) }) {
-                            CategoryStrip(
-                                testTag = "comic-category-bar",
-                                isScrolled = isScrolled,
-                                applyBackground = false,
-                            ) {
-                                categories.forEach { category ->
-                                    NetflixCategoryChip(
-                                        selected = category.id == state.selectedCategoryId,
-                                        onClick = { onCategory(category.id) },
-                                        label = category.label,
-                                    )
-                                }
+                // Popular Trending Comics Shelf (Apple Books 2:3 Gallery)
+                if (state.comics.size >= 5 && state.activeQuery.isBlank()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        NetflixSectionHeader(
+                            title = "人气精选 TRENDING",
+                            subtitle = "近期读者最爱作品",
+                        )
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            val topComics = state.comics.take(10)
+                            itemsIndexed(topComics) { _, comic ->
+                                ComicFeaturedCard(
+                                    comic = comic,
+                                    onClick = { onComic(comic) },
+                                )
                             }
                         }
                     }
-
-                    // Popular Trending Comics Shelf (Apple Books 2:3 Gallery)
-                    if (state.comics.size >= 5 && state.activeQuery.isBlank()) {
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            NetflixSectionHeader(
-                                title = "人气精选 TRENDING",
-                                subtitle = "近期读者最爱作品",
-                            )
-                        }
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                val topComics = state.comics.take(10)
-                                itemsIndexed(topComics) { _, comic ->
-                                    ComicFeaturedCard(
-                                        comic = comic,
-                                        onClick = { onComic(comic) },
-                                    )
-                                }
-                            }
-                        }
-                        item(span = { GridItemSpan(maxLineSpan) }) {
-                            NetflixSectionHeader(
-                                title = "为你推荐",
-                            )
-                        }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        NetflixSectionHeader(
+                            title = "为你推荐",
+                        )
                     }
+                }
 
-                    val feedComics = if (state.activeQuery.isBlank()) state.comics.drop(1) else state.comics
-                    items(feedComics, key = { "${it.sourceId}:${it.id}" }) { comic ->
-                        ComicCard(comic = comic, onClick = { onComic(comic) })
-                    }
+                val feedComics = if (state.activeQuery.isBlank()) state.comics.drop(1) else state.comics
+                items(feedComics, key = { "${it.sourceId}:${it.id}" }) { comic ->
+                    ComicCard(comic = comic, onClick = { onComic(comic) })
                 }
             }
 
@@ -478,6 +448,22 @@ private fun ComicLibrary(
                         label = if (state.activeQuery.isNotBlank()) state.activeQuery else "搜索漫画",
                         onClick = { isSearchOpen = true },
                     )
+                }
+                val categories = selectedSource?.categories.orEmpty()
+                if (categories.isNotEmpty()) {
+                    CategoryStrip(
+                        testTag = "comic-category-bar",
+                        isScrolled = isScrolled,
+                        applyBackground = false,
+                    ) {
+                        categories.forEach { category ->
+                            NetflixCategoryChip(
+                                selected = category.id == state.selectedCategoryId,
+                                onClick = { onCategory(category.id) },
+                                label = category.label,
+                            )
+                        }
+                    }
                 }
             }
             if (state.isLoading) {

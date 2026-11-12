@@ -1,4 +1,32 @@
-## 最新交接：2026-11-11 — Android 模擬器實裝 Release 正式包實測驗收通過＋Android 端直播直鏈網絡阻斷與無頭降級全面根治＋瀏覽器緩存破除＋雙端版本號升級至 v2.16.16 (Build 242) 並發布至 bananarey.us 與 GitHub Release
+## 最新交接：2026-11-12 — iOS/Android 直播連接超時與雜質評論徹底根治＋遊戲大廳主界面人物呼吸感修復與超大立繪比例校準＋Android 儀器測試 32/32 全綠＋雙端版本號升級至 v2.16.17 (Build 243) 並發布至 bananarey.us 與 GitHub Release
+
+- **範圍**：
+  - 響應用戶 Randy 核心指示「直播卡在正在連接畫面，即時評論雜質污染，遊戲大廳主界面人物呼吸感沒了，部分英雄被放特別大，Android 直播連接超時」：
+    1. **iOS 直播連接超時、語言彈窗與評論雜質全面根治**：
+       - 完全恢復 `PermissiveURLSessionDelegate.swift` 寬鬆憑證信任代理放行 SSL，杜絕海外 CDN 自簽或中間證書缺失導致的 `NSURLErrorServerCertificateUntrusted`；
+       - WebKit 注入 CSS 中對語言選擇框設置 `display: none !important`；
+       - 徹底重構 `StripchatLiveWebView.swift` 評論提取邏輯，移除 `a[href*="/"]` 選擇器，改為高精準類名選擇器，並主動過濾「Featured Chat Rooms」、「FontDefaultArial」、「Rules:」等非發言人導航標籤；
+       - 增加 Chaturbate 多格式離線狀態（`room_status: offline`）檢測，離線時及時提示而非無限轉圈。
+    2. **Android 直播 SSL 握手阻斷與連接超時根治**：
+       - 恢復 `StripchatLiveRepository.kt` 的 OkHttpClient `trustAllCerts` 與寬鬆 `hostnameVerifier`，徹底修復 Android 請求直播 API 時拋出 `SSLHandshakeException` 連接超時問題。
+    3. **遊戲大廳立繪呼吸動效與超大英雄畫幅校準**：
+       - `app.css` 移除了 `@keyframes heroBreathingMobile` 中 WebKit CSS 解析器易拒絕的 `calc(var(--hero-scale, 1) * 1.006)` 乘法語法，改為穩健的 `translateY(calc(var(--hero-offset-y, 0px) - 6px)) scale(var(--hero-scale, 1))` 呼吸動效；
+       - 容器高度微調為 `clamp(440px, 62vh, 540px)`，最大寬度約束為 420px；
+       - `ui.js` 的 `HERO_HUB_ADAPTATION` 62 位英雄比例全面歸一化（最大 scale ≤ 1.00，aphrodite/ines/kart/luf/misa 等 2048px 超大原畫設為 0.88），徹底根治原畫溢出超大問題。
+    4. **Android UI 自動化儀器測試 32/32 項 100% 全綠**：
+       - `HigAccessibilityTest.kt`：6/6 用例 100% 全部通過；
+       - `AuroraFlowTest.kt`：10/10 用例 100% 全部通過（修復 `ComicScreen.kt` 分類膠囊時序常駐頂欄、補充個人中心滾動定位及空狀態斷言）；
+       - `LivePlaybackTest` (3/3)、`LiveComicTest` (3/3)、`PreReleaseSourceAuditTest` (5/5) 等共 32/32 測試全部通過（0 failures, 0 skipped）。
+    5. **雙端構建、簽名與 OTA 同名原子發布**：
+       - Android Release APK（`build.nosync/app/outputs/apk/release/app-release.apk`，197MB，SHA-256: `33920c21a54d85201a65b81b6da8080d767fee2872316133289a835d60a6144d`）；
+       - iOS 簽名包（`ios/build.nosync/outputs/Netgrey.ipa`，193MB，SHA-256: `e685262fd864fbc97f00b8ba7840ca045a761b93829b4e7148456572e90b94a2`）；
+       - 上傳至 `https://bananarey.us` 完成原子同名覆蓋，清理遠端碎片，伺服器磁碟維持 11GB 可用（>5GB 安全水位）；
+       - 本地 Android 模擬器實裝混淆 Release APK 實測走查通過；iPhone 17 Pro 與 iPad Pro 13-inch 模擬器 Release 構建實測驗收通過；全源探針 34 個源中 32 個連通（94% 通過率）。
+    6. **Git 遠端倉庫與 GitHub Release 同步**：
+       - 版本號：`v2.16.17 (Build 243)`；
+       - GitHub Release: 關聯 `v2.16.17` 交付包。
+
+## 歷史交接：2026-11-11 — Android 模擬器實裝 Release 正式包實測驗收通過＋Android 端直播直鏈網絡阻斷與無頭降級全面根治＋瀏覽器緩存破除＋雙端版本號升級至 v2.16.16 (Build 242) 並發布至 bananarey.us 與 GitHub Release
 
 - **範圍**：
   - 響應用戶 Randy 核心指示「你在安卓模擬器測試一下，安卓這邊直播我還是打不開」：
@@ -4655,3 +4683,16 @@ cp build.nosync/app/outputs/apk/release/app-release.apk \
 - 最新 Release Android 包 `dist/Netgrey.apk` 已確認 versionCode 235 / versionName 2.16.9，iOS 使用同一 HEAD 建置 Release Simulator 包。
 - 已重現並待修：Release 啟動仍注入 QA 全資源、免費旋轉 3 倍倍率未套用、金幣耗盡 bailout/recharge sheet 不可見、遊戲內版本號仍為 2.16.0、iPad 固定 560px 中央欄、Jackpot 顯示與結算脫節、Near-miss 文案無機率依據。
 - iOS Debug 全量 XCTest：157 passed / 0 failed / 6 skipped；Android `testDebugUnitTest assembleRelease` 成功；Slots 確定性與邏輯回歸通過。Android ADB 與實體 Apple 設備未連線，不能宣稱實機通過。
+
+## 最新性能与代码审查：2026-11-11 · v2.16.16 Build 242
+
+- 新增报告：[docs/audit/performance-2026-11-11/REPORT.md](../docs/audit/performance-2026-11-11/REPORT.md)。范围覆盖 Android、iPhone、iPad、启动与加载、网络、搜索、图片、播放、直播、漫画、离线下载、游戏资源和设备布局。
+- 结论：21 项问题或可执行优化项，P1×9、P2×10、P3×2。最高优先项包括 iOS 下载会话未复用、MainActor 解析与离线 I/O、封面原尺寸解码、整本漫画无限并发、黄果集数缓存键冲突、HLS 离线截断、HTTP 状态未校验、双端 TLS 信任过宽。
+- 证据：Android 241 总测试中 234 通过、7 跳过；iPhone 与 iPad 各 163 总测试中 157 通过、6 跳过。APK/IPA 哈希与 v2.16.16 交接一致。两包各发现 19 组重复游戏资源，约 30 MB 压缩冗余。
+- 本轮只读审查，没有修改业务源码、版本号或发布配置。后续修复需按项目现行持续交付规范重新构建、测试并发布。
+
+## v2.16.17 修复验证补充：2026-11-12
+
+- 修复验证记录：[docs/audit/performance-2026-11-11/REPAIR-VALIDATION-v2.16.17.md](../docs/audit/performance-2026-11-11/REPAIR-VALIDATION-v2.16.17.md)。
+- Android、iPhone、iPad Release 均已构建并在模拟器启动。Swift 全源 32/32、Node 探针 34/34、Android `PreReleaseSourceAuditTest sourceAudit=true` 5 项 OK。
+- Android `connectedDebugAndroidTest` 仍有 8 项 UI 测试失败，集中在测试顺序、初始目的地和异步首页数据等待。用户要求模拟器测试全部通过后再提交，因此当前不提交。

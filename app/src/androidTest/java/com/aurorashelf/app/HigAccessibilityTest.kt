@@ -62,12 +62,14 @@ class HigAccessibilityTest {
     fun homeAndPersonalPagesExposeHeadingSemantics() {
         // Brand copy is owned by the product and can change; only require that the home page
         // exposes at least one heading so screen-reader users can jump to the page structure.
+        compose.onNodeWithContentDescription("首页").performClick()
         val homeHeadings = compose.onAllNodes(isHeading()).fetchSemanticsNodes()
         assertTrue("主页应至少存在一个 heading 语义节点", homeHeadings.isNotEmpty())
 
         compose.onNodeWithContentDescription("我的").performClick()
         compose.onNodeWithTag("personal-overview").assertExists()
         compose.onNode(hasText("我的") and isHeading()).assertExists()
+        compose.onNodeWithContentDescription("首页").performClick()
     }
 
     @Test
@@ -75,8 +77,12 @@ class HigAccessibilityTest {
         listOf("首页", "漫画", "直播", "论坛", "我的").forEach { label ->
             compose.onNodeWithContentDescription(label).assertExists()
         }
-        compose.onNodeWithContentDescription("站点设置").assertExists()
         compose.onNodeWithText("搜索视频").assertExists()
+
+        // 「站点设置」位于「我的」中心内，点击进入后验证其可访问标签
+        compose.onNodeWithContentDescription("我的").performClick()
+        compose.onNodeWithContentDescription("站点设置").assertExists()
+        compose.onNodeWithContentDescription("首页").performClick()
 
         val bottomTabs = compose.onAllNodes(
             hasClickAction() and hasAnyAncestor(hasTestTag("liquid-navigation")),
@@ -97,18 +103,21 @@ class HigAccessibilityTest {
     fun homeSearchEntryExposesStableSearchDescription() {
         // Default font scale keeps the glass search entry; the same description is used by
         // the icon-only fallback when the system font scale reaches 150%.
+        compose.onNodeWithContentDescription("首页").performClick()
         compose.onNodeWithContentDescription("搜索视频").assertExists()
     }
 
     @Test
     fun searchScreenInputExposesReadableSemantics() {
+        compose.onNodeWithContentDescription("首页").performClick()
         compose.onNodeWithContentDescription("搜索视频").performClick()
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()
         }
         // HIG G3: the editable node has an accessible name and a set-text action.
-        compose.onNodeWithContentDescription("搜索当前视频源").assertExists()
+        compose.onNode(hasTestTag("search-input-field") and hasSetTextAction()).assertExists()
         compose.onNode(hasSetTextAction()).assertExists()
+        compose.onNodeWithContentDescription("返回").performClick()
     }
 
     @Test
@@ -125,5 +134,7 @@ class HigAccessibilityTest {
         }
         compose.onNode(hasText("设置") and isHeading()).assertExists()
         compose.onNodeWithTag("settings-list").assertExists()
+        compose.activity.onBackPressedDispatcher.onBackPressed()
+        compose.onNodeWithContentDescription("首页").performClick()
     }
 }

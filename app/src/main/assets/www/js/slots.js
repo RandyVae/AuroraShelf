@@ -715,8 +715,12 @@
     speechTimer: null,
 
     async init() {
-      const response = await fetch('data/slots.json', { cache: 'no-store' });
-      this.config = await response.json();
+      this.config = (window.APP && APP.data && APP.data.slots) || null;
+      if (!this.config) {
+        const response = await fetch('data/slots.json', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Failed to load slots (${response.status})`);
+        this.config = await response.json();
+      }
       this.bet = this.config.defaultBet || 20;
       this.freeSpins = (window.APP && APP.state && (
         (APP.state.slots && APP.state.slots.freeSpins) ||
@@ -1666,9 +1670,9 @@
         'assets/videos/cg_ch3.mp4',
         'assets/videos/cg_ch4.mp4',
         'assets/videos/v_comics_maze_2_48.mp4',
-        'assets/videos/v_comics_maze_3_13.mp4',
-        'assets/videos/v_comics_maze_3_14.mp4',
-        'assets/videos/v_comics_maze_3_15.mp4',
+        'assets/videos/cg_ch2.mp4',
+        'assets/videos/cg_ch3.mp4',
+        'assets/videos/cg_ch4.mp4',
         'assets/videos/cg_rea_general.mp4',
         'assets/videos/cg_rea_event049.mp4'
       ];
@@ -1680,11 +1684,11 @@
       // 建立特勤/符號與 CG 的特色關聯映射，兼顧專屬感與隨機豐富度
       const symbolPreferred = {
         kitty: ['assets/videos/cg_ch1.mp4', 'assets/videos/v_comics_maze_2_48.mp4'],
-        dominica: ['assets/videos/cg_ch2.mp4', 'assets/videos/v_comics_maze_3_13.mp4'],
-        regina: ['assets/videos/cg_ch3.mp4', 'assets/videos/v_comics_maze_3_14.mp4'],
-        florence: ['assets/videos/cg_ch4.mp4', 'assets/videos/v_comics_maze_3_15.mp4'],
-        zoe_enemy: ['assets/videos/cg_ch3.mp4', 'assets/videos/v_comics_maze_3_14.mp4'],
-        hilda_enemy: ['assets/videos/cg_ch4.mp4', 'assets/videos/v_comics_maze_3_15.mp4'],
+        dominica: ['assets/videos/cg_ch2.mp4', 'assets/videos/cg_ch2.mp4'],
+        regina: ['assets/videos/cg_ch3.mp4', 'assets/videos/cg_ch3.mp4'],
+        florence: ['assets/videos/cg_ch4.mp4', 'assets/videos/cg_ch4.mp4'],
+        zoe_enemy: ['assets/videos/cg_ch3.mp4', 'assets/videos/cg_ch3.mp4'],
+        hilda_enemy: ['assets/videos/cg_ch4.mp4', 'assets/videos/cg_ch4.mp4'],
         kart: ['assets/videos/cg_rea_general.mp4', 'assets/videos/cg_rea_event049.mp4'],
         ines: ['assets/videos/cg_rea_general.mp4'],
         luf: ['assets/videos/cg_rea_event049.mp4'],

@@ -668,12 +668,14 @@ private fun ExpressiveBottomBar(
             ) {
                 if (destination == AppDestination.HOME) {
                     NetflixNLogo(
-                        modifier = Modifier.size(width = 16.dp, height = 22.dp),
+                        modifier = Modifier
+                            .size(width = 16.dp, height = 22.dp)
+                            .semantics { contentDescription = destination.label },
                     )
                 } else {
                     Icon(
                         imageVector = icon,
-                        contentDescription = null, // Text provides the accessible label, avoid duplicate reading
+                        contentDescription = destination.label,
                         tint = if (isTabSelected) Color.White else Color(0xFFA0AAB8),
                         modifier = Modifier.size(22.dp),
                     )

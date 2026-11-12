@@ -68,6 +68,8 @@ public final class ComicDownloadManager: ObservableObject {
     private let baseDir: URL
     private let metaFileURL: URL
     private var inFlightTasks: [String: Task<Void, Never>] = [:]
+    private var activeDownloadCount = 0
+    private let maximumConcurrentDownloads = 2
 
     private init() {
         let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -110,9 +112,11 @@ public final class ComicDownloadManager: ObservableObject {
     }
 
     /// 从本地磁盘直接加载已解密的离线页面图片
-    public func localImage(comicId: String, chapterId: String, pageIndex: Int) -> UIImage? {
+    public func localImage(comicId: String, chapterId: String, pageIndex: Int) async -> UIImage? {
         guard let url = localPageURL(comicId: comicId, chapterId: chapterId, pageIndex: pageIndex),
-              let data = try? Data(contentsOf: url),
+              let data = await Task.detached(priority: .utility, operation: {
+                  try? Data(contentsOf: url)
+              }).value,
               let image = UIImage(data: data) else {
             return nil
         }
@@ -191,6 +195,9 @@ public final class ComicDownloadManager: ObservableObject {
     // MARK: - 核心下载任务调度
 
     private func executeDownload(itemId: String, comic: ComicItem, chapter: ComicChapter) async {
+        await waitForDownloadSlot()
+        activeDownloadCount += 1
+        defer { activeDownloadCount -= 1 }
         updateItem(id: itemId) { $0.status = .resolving }
 
         do {
@@ -253,6 +260,12 @@ public final class ComicDownloadManager: ObservableObject {
                 $0.status = .failed(message: error.localizedDescription)
             }
             saveToDisk()
+        }
+    }
+
+    private func waitForDownloadSlot() async {
+        while activeDownloadCount >= maximumConcurrentDownloads {
+            try? await Task.sleep(for: .milliseconds(50))
         }
     }
 

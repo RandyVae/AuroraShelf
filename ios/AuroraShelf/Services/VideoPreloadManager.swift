@@ -40,6 +40,11 @@ public final class VideoPreloadManager: ObservableObject {
                 }
             }
         } else if url.contains("huangguoai.com") {
+            if url.range(of: #"/ep-\d+"#, options: .regularExpression) != nil {
+                // Episode URLs are already canonical. Do not alias them to the series detail
+                // page or episode 1, otherwise a warm cache can return the wrong stream.
+                return keys
+            }
             if let match = url.range(of: #"/(?:detail|video|play)/(\d+)"#, options: .regularExpression) {
                 let raw = String(url[match])
                 let id = raw.components(separatedBy: "/").filter({ !$0.isEmpty }).last ?? ""

@@ -200,11 +200,15 @@
   async function loadData() {
     const files = ['heroes', 'enemies', 'chapters', 'gacha', 'shop', 'constants', 'strings', 'videos', 'cgs', 'battle', 'skills', 'equipment', 'missions', 'slots'];
     const out = {};
-    for (let i = 0; i < files.length; i++) {
-      const r = await fetch('data/' + files[i] + '.json', { cache: 'no-store' });
-      out[files[i]] = await r.json();
-      UI.setProgress((i + 1) / (files.length + 1));
-    }
+    const responses = await Promise.all(files.map((file) => fetch('data/' + file + '.json', { cache: 'no-store' })));
+    const payloads = await Promise.all(responses.map((response, index) => {
+      if (!response.ok) throw new Error(`Failed to load ${files[index]} (${response.status})`);
+      return response.json();
+    }));
+    payloads.forEach((payload, index) => {
+      out[files[index]] = payload;
+      UI.setProgress((index + 1) / (files.length + 1));
+    });
     try {
       const origRes = await fetch('data/original-assets-manifest.json', { cache: 'no-store' });
       if (origRes.ok) {

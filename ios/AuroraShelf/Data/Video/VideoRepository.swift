@@ -1710,7 +1710,11 @@ public final class VideoRepository: ObservableObject {
                 }
             }
             var collected: [[VideoItem]?] = []
-            for await result in group { collected.append(result) }
+            for await result in group {
+                collected.append(result)
+                let visible = collected.compactMap { $0 }.flatMap { $0 }
+                self.searchResults = visible
+            }
             return collected
         }
         guard currentSearchToken == token else { return }

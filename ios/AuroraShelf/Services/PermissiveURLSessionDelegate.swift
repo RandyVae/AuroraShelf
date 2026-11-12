@@ -75,6 +75,10 @@ public final class PermissiveURLSessionDelegate: NSObject, URLSessionDelegate, U
 }
 
 extension URLSession {
+    /// Reused session for short-lived media and image requests. Reusing the delegate-backed
+    /// session keeps the connection pool warm and avoids creating one URLSession per HLS segment.
+    public static var permissiveShared: URLSession { PermissiveURLSessionStore.shared }
+
     /// 创建自带宽松证书信任代理的 URLSession
     public static func permissive(configuration: URLSessionConfiguration = .default) -> URLSession {
         URLSession(
@@ -83,4 +87,15 @@ extension URLSession {
             delegateQueue: nil
         )
     }
+}
+
+private enum PermissiveURLSessionStore {
+    static let shared: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 30
+        configuration.httpMaximumConnectionsPerHost = 6
+        configuration.requestCachePolicy = .useProtocolCachePolicy
+        return URLSession(configuration: configuration, delegate: PermissiveURLSessionDelegate.shared, delegateQueue: nil)
+    }()
 }
