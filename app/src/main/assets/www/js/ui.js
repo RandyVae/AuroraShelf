@@ -159,13 +159,13 @@
         belle: { scale: 0.98, y: 0, x: 0 },
         river: { scale: 1.00, y: 0, x: 0 },
         nymeria: { scale: 1.00, y: 0, x: 0 },
-        astara: { scale: 1.00, y: 0, x: 0 },
-        aphrodite: { scale: 0.88, y: 0, x: 0 },
-        ines: { scale: 0.88, y: 0, x: 0 },
-        kart: { scale: 0.88, y: 0, x: 0 },
-        luf: { scale: 0.88, y: 0, x: 0 },
-        misa: { scale: 0.88, y: 0, x: 0 },
-        ariana: { scale: 1.00, y: 0, x: 0 },
+        astara: { scale: 0.80, y: 10, x: 0 },
+        aphrodite: { scale: 0.74, y: 15, x: 0 },
+        ines: { scale: 0.78, y: 15, x: 0 },
+        kart: { scale: 0.78, y: 15, x: 0 },
+        luf: { scale: 0.80, y: 10, x: 0 },
+        misa: { scale: 0.78, y: 15, x: 0 },
+        ariana: { scale: 0.80, y: 10, x: 0 },
       };
       const adapt = HERO_HUB_ADAPTATION[leadKey] || { scale: 1.0, y: 0, x: 0 };
       img.style.setProperty('--hero-scale', String(adapt.scale || 1.0));

@@ -197,25 +197,52 @@
     });
   }
 
+  function safeFetchJson(url) {
+    return fetch(url).then((res) => {
+      if (!res.ok && res.status !== 0 && res.status !== 200) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      return res.json();
+    }).catch(() => {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.overrideMimeType('application/json');
+        xhr.open('GET', url, true);
+        xhr.onload = () => {
+          if (xhr.status === 200 || xhr.status === 0) {
+            try {
+              resolve(JSON.parse(xhr.responseText));
+            } catch (err) {
+              reject(err);
+            }
+          } else {
+            reject(new Error(`XHR failed (${xhr.status})`));
+          }
+        };
+        xhr.onerror = () => reject(new Error(`XHR error loading ${url}`));
+        xhr.send(null);
+      });
+    });
+  }
+  window.safeFetchJson = safeFetchJson;
+
   async function loadData() {
     const files = ['heroes', 'enemies', 'chapters', 'gacha', 'shop', 'constants', 'strings', 'videos', 'cgs', 'battle', 'skills', 'equipment', 'missions', 'slots'];
     const out = {};
-    const responses = await Promise.all(files.map((file) => fetch('data/' + file + '.json', { cache: 'no-store' })));
-    const payloads = await Promise.all(responses.map((response, index) => {
-      if (!response.ok) throw new Error(`Failed to load ${files[index]} (${response.status})`);
-      return response.json();
+    await Promise.all(files.map((file, index) => {
+      return safeFetchJson('data/' + file + '.json').then((payload) => {
+        out[file] = payload;
+        UI.setProgress((index + 1) / (files.length + 1));
+        return payload;
+      });
     }));
-    payloads.forEach((payload, index) => {
-      out[files[index]] = payload;
-      UI.setProgress((index + 1) / (files.length + 1));
-    });
     try {
-      const origRes = await fetch('data/original-assets-manifest.json', { cache: 'no-store' });
-      if (origRes.ok) {
-        window.ORIGINAL_ASSETS_MANIFEST = await origRes.json();
-        out['original-assets-manifest'] = window.ORIGINAL_ASSETS_MANIFEST;
+      const origData = await safeFetchJson('data/original-assets-manifest.json');
+      if (origData) {
+        window.ORIGINAL_ASSETS_MANIFEST = origData;
+        out['original-assets-manifest'] = origData;
         // 雙軌動態熱重定向：若特勤在清單中註冊了原創立繪，自動優先掛載原創美術
-        const units = window.ORIGINAL_ASSETS_MANIFEST.units || {};
+        const units = origData.units || {};
         for (const [uKey, uData] of Object.entries(units)) {
           if (uData.artWeb && uData.key) {
             const matchedHero = out.heroes.find((h) => h.key === uData.key);

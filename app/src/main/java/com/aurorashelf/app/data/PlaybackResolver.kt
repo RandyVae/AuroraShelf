@@ -238,21 +238,9 @@ class PlaybackResolver {
             ?: 1
 
         if (dramaId != null) {
-            // 1. 优先调用黄果 Edge 信封网关（300ms 纯净 JSON 直连，与 HGhub 保持一致）
-            val edgePlayUrl = HuangguoEdgeGateway.fetchEpisodePlayUrl(origin, dramaId, episodeNum)
-            if (!edgePlayUrl.isNullOrBlank()) {
-                val cleanUrl = cleanHlsUrl(edgePlayUrl)
-                val source = PlaybackSource(url = cleanUrl, referer = "$origin/")
-                Log.i(TAG, "resolve huangguo edge host=${runCatching { URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
-                return source.rememberFor(pageUrl, startedAtMs)
-            }
-
-            // 2. 备选接口：POST /api/videos/{id}/playback
-            val apiEndpoint = if (episodeNum > 1) {
-                "${origin}/api/videos/$dramaId/episodes/$episodeNum/playback"
-            } else {
-                "${origin}/api/videos/$dramaId/playback"
-            }
+            // 1. 核心优先：直接请求 POST /api/videos/{id}/episodes/{ep}/playback（150ms 极速直签直出，与官方 cyber-video 保持一致）
+            val ep = episodeNum.coerceAtLeast(1)
+            val apiEndpoint = "${origin}/api/videos/$dramaId/episodes/$ep/playback"
             val apiResult = runCatching {
                 val conn = Jsoup.connect(apiEndpoint)
                     .method(org.jsoup.Connection.Method.POST)
@@ -262,7 +250,7 @@ class PlaybackResolver {
                     .header("Origin", origin)
                     .userAgent(VideoRepository.USER_AGENT)
                     .ignoreContentType(true)
-                    .timeout(6_000)
+                    .timeout(5_000)
                     .execute()
                 val body = conn.body()
                 val m3u8Url = Regex(""""main"\s*:\s*"([^"]+)"""").find(body)?.groupValues?.get(1)
@@ -277,6 +265,15 @@ class PlaybackResolver {
             if (apiResult != null) {
                 Log.i(TAG, "resolve huangguo api host=${runCatching { URI(apiResult.url).host }.getOrNull()} type=${mediaType(apiResult.url)}")
                 return apiResult.rememberFor(pageUrl, startedAtMs)
+            }
+
+            // 2. 备用降级：Edge 网关
+            val edgePlayUrl = HuangguoEdgeGateway.fetchEpisodePlayUrl(origin, dramaId, episodeNum)
+            if (!edgePlayUrl.isNullOrBlank()) {
+                val cleanUrl = cleanHlsUrl(edgePlayUrl)
+                val source = PlaybackSource(url = cleanUrl, referer = "$origin/")
+                Log.i(TAG, "resolve huangguo edge host=${runCatching { URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
+                return source.rememberFor(pageUrl, startedAtMs)
             }
         }
 

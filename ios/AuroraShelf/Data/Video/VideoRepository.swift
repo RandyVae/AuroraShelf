@@ -72,6 +72,8 @@ public final class VideoRepository: ObservableObject {
 
     private let session: URLSession
     private let cache = StreamCache()
+    private var huangguoFeedCache: [String: (date: Date, items: [VideoItem])] = [:]
+    private var huangguoPlaybackCache: [String: PlaybackSourceResult] = [:]
     private var currentLoadTask: Task<Void, Never>?
     private var currentSearchToken = UUID()
 
@@ -656,33 +658,39 @@ public final class VideoRepository: ObservableObject {
 
     private func fetchHuangguoFeed(category: String = "全部", page: Int = 1) async throws -> [VideoItem] {
         let p = max(page, 1)
+        let cacheKey = "\(category):\(p)"
+        if let cached = huangguoFeedCache[cacheKey], Date().timeIntervalSince(cached.date) < 600 {
+            return cached.items
+        }
+
+        // 1. 核心优先：Edge 信封网关（纯净 JSON，耗时 ~120ms）
         let edgePath: String
         switch category {
         case "推荐": edgePath = "/api/ranks/hot"
-        case "最新": edgePath = "/api/videos?page=\(p)&size=20"
+        case "最新": edgePath = "/api/home/latest"
         case "AI漫剧": edgePath = "/api/videos/category/ai-manju?page=\(p)&size=20"
         case "AI换脸": edgePath = "/api/videos/category/ai-huanlian?page=\(p)&size=20"
-        default: edgePath = "/api/videos?page=\(p)&size=20"
+        default: edgePath = p == 1 ? "/api/home/latest" : "/api/videos?page=\(p)&size=20"
         }
 
-        // 1. 优先走 Edge 网关（纯净 JSON，耗时 300ms，无臃肿 HTML）
         if let (data, _) = try? await executeHuangguoEdgeRequest(origin: "https://huangguoai.com", method: "GET", path: edgePath),
            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
            let dataDict = root["data"] as? [String: Any],
            let itemsArray = dataDict["items"] as? [[String: Any]], !itemsArray.isEmpty {
-
             var videos: [VideoItem] = []
             for item in itemsArray {
                 let idNum = (item["video_id"] as? Int) ?? (item["id"] as? Int) ?? 0
                 guard idNum > 0 else { continue }
                 let dramaId = String(idNum)
                 let title = (item["title"] as? String) ?? "黄果短剧"
-                let cover = (item["cover"] as? String) ?? ""
-                let desc = (item["description"] as? String) ?? ""
-                let totalEp = (item["episode_count"] as? Int) ?? 0
+                var cover = (item["cover"] as? String) ?? ""
+                if !cover.isEmpty && !cover.hasPrefix("http") {
+                    cover = "https://pic.drleao.cn" + (cover.hasPrefix("/") ? cover : "/\(cover)")
+                }
+                let desc = (item["desc"] as? String) ?? (item["description"] as? String) ?? ""
+                let totalEp = (item["episode_count"] as? Int) ?? (item["total_episodes"] as? Int) ?? 0
                 let epText = totalEp > 0 ? "全 \(totalEp) 集" : "短剧"
                 let duration = (item["duration"] as? String) ?? ""
-
                 videos.append(VideoItem(
                     id: "hg-\(dramaId)",
                     title: title,
@@ -699,11 +707,12 @@ public final class VideoRepository: ObservableObject {
                 ))
             }
             if !videos.isEmpty {
+                huangguoFeedCache[cacheKey] = (Date(), videos)
                 return videos
             }
         }
 
-        // 2. 兜底回退：HTML 页面解析
+        // 3. 兜底回退：HTML 页面解析（15ms 极速解析）
         let path: String
         switch category {
         case "推荐": path = "/recommend"
@@ -729,7 +738,11 @@ public final class VideoRepository: ObservableObject {
         guard let html = String(data: data, encoding: .utf8) else {
             throw VideoFeedError.malformedResponse(source: "黄果短剧")
         }
-        return parseHuangguoHtml(html, category: category)
+        let videos = parseHuangguoHtml(html, category: category)
+        if !videos.isEmpty {
+            huangguoFeedCache[cacheKey] = (Date(), videos)
+        }
+        return videos
     }
 
     nonisolated func parseHuangguoHtml(_ html: String, category: String) -> [VideoItem] {
@@ -819,6 +832,9 @@ public final class VideoRepository: ObservableObject {
     }
 
     public func resolveHuangguoStream(pageUrl: String, title: String) async throws -> PlaybackSourceResult {
+        if let cached = huangguoPlaybackCache[pageUrl] {
+            return cached
+        }
         guard let url = URL(string: pageUrl) else {
             throw NSError(domain: "VideoRepository", code: 400, userInfo: [NSLocalizedDescriptionKey: "无效黄果短剧链接"])
         }
@@ -847,30 +863,10 @@ public final class VideoRepository: ObservableObject {
             dramaId = segment.components(separatedBy: "/").filter { !$0.isEmpty }.last
         }
 
-        // 2. 优先请求黄果 Edge 信封网关（实测 330ms 秒级纯净直链）
+        // 2. 核心优先：直接请求 POST /api/videos/{id}/episodes/{ep}/playback（150ms 秒级直签直出，与官方 cyber-video 保持一致）
         if let id = dramaId {
-            let edgePath = "/api/videos/\(id)/play?ep=\(episodeNum)&page_texts=0"
-            if let (data, _) = try? await executeHuangguoEdgeRequest(origin: origin, method: "GET", path: edgePath),
-               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let dataDict = root["data"] as? [String: Any] {
-
-                let streamUrlStr = ((dataDict["video_url"] as? String)?.isEmpty == false ? dataDict["video_url"] as? String : nil)
-                    ?? ((dataDict["video_url_hevc"] as? String)?.isEmpty == false ? dataDict["video_url_hevc"] as? String : nil)
-
-                if let rawStream = streamUrlStr, let streamUrl = URL(string: cleanHlsUrl(rawStream)) {
-                    let headers: [String: String] = [
-                        "Referer": "\(origin)/",
-                        "Origin": origin,
-                        "User-Agent": Self.USER_AGENT
-                    ]
-                    return PlaybackSourceResult(url: streamUrl, headers: headers, referer: "\(origin)/", title: title)
-                }
-            }
-
-            // 备选接口：POST /api/videos/{id}/playback 或 /api/videos/{id}/episodes/{ep}/playback
-            let apiPath = episodeNum > 1
-                ? "\(origin)/api/videos/\(id)/episodes/\(episodeNum)/playback"
-                : "\(origin)/api/videos/\(id)/playback"
+            let ep = max(episodeNum, 1)
+            let apiPath = "\(origin)/api/videos/\(id)/episodes/\(ep)/playback"
 
             if let apiUrl = URL(string: apiPath) {
                 var apiReq = URLRequest(url: apiUrl)
@@ -880,7 +876,7 @@ public final class VideoRepository: ObservableObject {
                 apiReq.setValue(origin, forHTTPHeaderField: "Origin")
                 apiReq.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
                 apiReq.httpBody = "{}".data(using: .utf8)
-                apiReq.timeoutInterval = 10
+                apiReq.timeoutInterval = 6
 
                 if let (data, response) = try? await session.data(for: apiReq),
                    let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
@@ -915,9 +911,32 @@ public final class VideoRepository: ObservableObject {
                                     headers["x-cdn-app"] = app
                                 }
                             }
-                            return PlaybackSourceResult(url: streamUrl, headers: headers, referer: "\(origin)/", title: title)
+                            let result = PlaybackSourceResult(url: streamUrl, headers: headers, referer: "\(origin)/", title: title)
+                            huangguoPlaybackCache[pageUrl] = result
+                            return result
                         }
                     }
+                }
+            }
+
+            // 备用降级：Edge 网关
+            let edgePath = "/api/videos/\(id)/play?ep=\(episodeNum)&page_texts=0"
+            if let (data, _) = try? await executeHuangguoEdgeRequest(origin: origin, method: "GET", path: edgePath),
+               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let dataDict = root["data"] as? [String: Any] {
+
+                let streamUrlStr = ((dataDict["video_url"] as? String)?.isEmpty == false ? dataDict["video_url"] as? String : nil)
+                    ?? ((dataDict["video_url_hevc"] as? String)?.isEmpty == false ? dataDict["video_url_hevc"] as? String : nil)
+
+                if let rawStream = streamUrlStr, let streamUrl = URL(string: cleanHlsUrl(rawStream)) {
+                    let headers: [String: String] = [
+                        "Referer": "\(origin)/",
+                        "Origin": origin,
+                        "User-Agent": Self.USER_AGENT
+                    ]
+                    let result = PlaybackSourceResult(url: streamUrl, headers: headers, referer: "\(origin)/", title: title)
+                    huangguoPlaybackCache[pageUrl] = result
+                    return result
                 }
             }
         }

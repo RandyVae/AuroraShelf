@@ -14,6 +14,7 @@ public struct LivePlayerView: View {
     @State private var player: AVPlayer?
     @State private var isPlaying: Bool = false
     @State private var isLoadingLive: Bool = true
+    @State private var isWebFallbackActive: Bool = false
     @State private var liveError: String?
     @State private var showControls: Bool = true
     @State private var hideControlsTask: DispatchWorkItem?
@@ -69,7 +70,7 @@ public struct LivePlayerView: View {
                                 player: player,
                                 videoGravity: isFillMode ? .resizeAspectFill : .resizeAspect
                             )
-                        } else {
+                        } else if isWebFallbackActive && liveError == nil {
                             // 纯净无头 WebRTC 视口（原生 AVPlayer 403 握手受限自动平滑降级，或平台专属推流）
                             let defaultRoomUrl: URL = {
                                 if let url = URL(string: stream.roomUrl), !stream.roomUrl.isEmpty { return url }
@@ -405,6 +406,7 @@ public struct LivePlayerView: View {
         let requestID = UUID()
         activeStreamRequestID = requestID
         self.isLoadingLive = true
+        self.isWebFallbackActive = false
         self.liveError = nil
         cleanupLivePlayer(cancelRequest: false)
 
@@ -423,6 +425,7 @@ public struct LivePlayerView: View {
             } else {
                 self.player = nil
                 self.isLoadingLive = false
+                self.isWebFallbackActive = true
                 self.liveError = nil
             }
         } else {
@@ -435,6 +438,7 @@ public struct LivePlayerView: View {
         guard !username.isEmpty,
               let apiUrl = URL(string: "https://chaturbate.com/api/chatvideocontext/\(username)/") else {
             self.isLoadingLive = false
+            self.isWebFallbackActive = false
             self.liveError = "无效的主播用户名"
             return
         }
@@ -471,14 +475,17 @@ public struct LivePlayerView: View {
                     let status = (json["room_status"] as? String)?.lowercased() ?? "public"
                     if status == "private" {
                         self.isLoadingLive = false
+                        self.isWebFallbackActive = false
                         self.liveError = "主播当前正在进行私密秀（需付费观看）"
                         return
                     } else if status == "offline" {
                         self.isLoadingLive = false
+                        self.isWebFallbackActive = false
                         self.liveError = "主播当前已离线或暂未开播"
                         return
                     } else if status == "away" {
                         self.isLoadingLive = false
+                        self.isWebFallbackActive = false
                         self.liveError = "主播暂时离开，请稍后刷新"
                         return
                     }
@@ -514,6 +521,7 @@ public struct LivePlayerView: View {
                                rawHtml.contains(#"\u0022room_status\u0022: \u0022private\u0022"#) ||
                                rawHtml.contains(#"\u0022room_status\u0022:\u0022private\u0022"#) {
                                 self.isLoadingLive = false
+                                self.isWebFallbackActive = false
                                 self.liveError = "主播当前正在进行私密秀（需付费观看）"
                                 return
                             }
@@ -522,7 +530,17 @@ public struct LivePlayerView: View {
                                rawHtml.contains(#"\u0022room_status\u0022: \u0022offline\u0022"#) ||
                                rawHtml.contains(#"\u0022room_status\u0022:\u0022offline\u0022"#) {
                                 self.isLoadingLive = false
+                                self.isWebFallbackActive = false
                                 self.liveError = "主播当前已离线或暂未开播"
+                                return
+                            }
+                            if rawHtml.contains(#""room_status": "away""#) ||
+                               rawHtml.contains(#""room_status":"away""#) ||
+                               rawHtml.contains(#"\u0022room_status\u0022: \u0022away\u0022"#) ||
+                               rawHtml.contains(#"\u0022room_status\u0022:\u0022away\u0022"#) {
+                                self.isLoadingLive = false
+                                self.isWebFallbackActive = false
+                                self.liveError = "主播暂时离开，请稍后刷新"
                                 return
                             }
 
@@ -540,9 +558,10 @@ public struct LivePlayerView: View {
                 }
 
                 guard let finalHlsUrl = hlsFoundUrl else {
-                    // 未直接嗅探到可用直链，平滑降级至纯净 WebRTC 视口起播
+                    // 未直接嗅探到可用直链且主播在线，平滑降级至纯净 WebRTC 视口起播
                     self.player = nil
                     self.isLoadingLive = false
+                    self.isWebFallbackActive = true
                     self.liveError = nil
                     return
                 }
@@ -554,6 +573,7 @@ public struct LivePlayerView: View {
                 // 发生异常时平滑降级至纯净 WebRTC 视口起播
                 self.player = nil
                 self.isLoadingLive = false
+                self.isWebFallbackActive = true
                 self.liveError = nil
             }
         }
@@ -564,13 +584,31 @@ public struct LivePlayerView: View {
         result.reserveCapacity(str.count)
         var index = str.startIndex
         while index < str.endIndex {
-            if str[index] == "\\", str.index(after: index) < str.endIndex, str[str.index(after: index)] == "u" {
-                let uStart = str.index(index, offsetBy: 2)
-                if let uEnd = str.index(uStart, offsetBy: 4, limitedBy: str.endIndex) {
-                    let hex = String(str[uStart..<uEnd])
-                    if let code = UInt32(hex, radix: 16), let scalar = UnicodeScalar(code) {
-                        result.append(Character(scalar))
-                        index = uEnd
+            if str[index] == "\\" {
+                let nextIndex = str.index(after: index)
+                if nextIndex < str.endIndex {
+                    let nextChar = str[nextIndex]
+                    if nextChar == "u" {
+                        let uStart = str.index(index, offsetBy: 2)
+                        if let uEnd = str.index(uStart, offsetBy: 4, limitedBy: str.endIndex) {
+                            let hex = String(str[uStart..<uEnd])
+                            if let code = UInt32(hex, radix: 16), let scalar = UnicodeScalar(code) {
+                                result.append(Character(scalar))
+                                index = uEnd
+                                continue
+                            }
+                        }
+                    } else if nextChar == "/" {
+                        result.append("/")
+                        index = str.index(after: nextIndex)
+                        continue
+                    } else if nextChar == "\"" {
+                        result.append("\"")
+                        index = str.index(after: nextIndex)
+                        continue
+                    } else if nextChar == "\\" {
+                        result.append("\\")
+                        index = str.index(after: nextIndex)
                         continue
                     }
                 }
@@ -609,7 +647,9 @@ public struct LivePlayerView: View {
                     // 原生直链解码失败或 MMCDN 403 握手受限时，全量平滑降级至纯净 WebRTC 视口起播
                     self.player = nil
                     self.isLoadingLive = false
-                    self.liveError = nil
+                    if self.liveError == nil {
+                        self.isWebFallbackActive = true
+                    }
                 }
             }
         }
@@ -630,6 +670,7 @@ public struct LivePlayerView: View {
             streamRequestTask?.cancel()
             streamRequestTask = nil
             activeStreamRequestID = UUID()
+            isWebFallbackActive = false
         }
         itemStatusObserver?.invalidate()
         itemStatusObserver = nil

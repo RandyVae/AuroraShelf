@@ -2628,12 +2628,29 @@ private const val LIVE_VIDEO_SELECTOR = ".web-rtc-player-wrapper video, .player-
 
 private const val LIVE_COMMENTS_SCRIPT = """
 (() => {
+  const isNoise = (text) => {
+    if (!text) return true;
+    const lower = text.toLowerCase();
+    return lower.includes('featured chat rooms') ||
+           lower.includes('chat color') ||
+           lower.includes('fontdefault') ||
+           lower.includes('rules: no spamming') ||
+           lower.includes('viewing chaturbate') ||
+           lower.includes('chat settings') ||
+           lower.includes('private conversation with') ||
+           lower.includes('to send a tip') ||
+           lower.includes('send tip') ||
+           lower.includes('never contact you') ||
+           lower.includes('agreeterms') ||
+           lower.includes('terms of service');
+  };
+
   const stripchatNodes = Array.from(document.querySelectorAll('.message.message-base'));
   const chaturbateNodes = Array.from(document.querySelectorAll('.chat-list li, .msg-text, [data-testid="chat-message"]'));
 
   if (chaturbateNodes.length > 0 && stripchatNodes.length === 0) {
     return chaturbateNodes.slice(-60).map((node, index) => {
-      const userEl = node.querySelector('.username, [class*="user"], a');
+      const userEl = node.querySelector('.username, [class*="username"], [class*="user-name"]');
       const username = (userEl?.textContent || '').replace(/[:\s]+${'$'}/, '').trim();
       const content = node.cloneNode(true);
       content.querySelectorAll('.username, [class*="user"], svg, script, style').forEach(el => el.remove());
@@ -2643,7 +2660,7 @@ private const val LIVE_COMMENTS_SCRIPT = """
         username,
         message,
       };
-    }).filter(item => item.username && item.message);
+    }).filter(item => item.username && item.message && !isNoise(item.message) && !isNoise(item.username));
   }
 
   return stripchatNodes
@@ -2660,7 +2677,7 @@ private const val LIVE_COMMENTS_SCRIPT = """
       username,
       message,
     };
-  }).filter(item => item.username && item.message);
+  }).filter(item => item.username && item.message && !isNoise(item.message) && !isNoise(item.username));
 })()
 """
 

@@ -190,8 +190,10 @@
     onComplete: null,
 
     init() {
-      fetch('data/intro-sequences.json')
-        .then((r) => (r.ok ? r.json() : null))
+      const loadSeq = (typeof window.safeFetchJson === 'function')
+        ? window.safeFetchJson('data/intro-sequences.json')
+        : fetch('data/intro-sequences.json').then((r) => ((r.ok || r.status === 0) ? r.json() : null));
+      loadSeq
         .then((data) => {
           if (data && data.sequences) {
             Object.assign(this.sequences, data.sequences);

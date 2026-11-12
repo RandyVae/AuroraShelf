@@ -539,7 +539,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                         self.parent.onVideoDimension?(CGSize(width: w, height: h))
                     }
                 case "buffering":
-                    if !self.parent.isPlaying {
+                    if !self.parent.isPlaying && self.parent.errorMessage == nil {
                         self.parent.isLoading = true
                     }
                 case "dimension":

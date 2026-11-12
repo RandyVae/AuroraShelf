@@ -95,14 +95,18 @@ class LiveStreamResolver {
                 }.getOrNull()
 
                 if (!pageHtml.isNullOrBlank()) {
-                    if (pageHtml.contains("\"room_status\": \"private\"") || pageHtml.contains("\"room_status\":\"private\"")) {
+                    val unescaped = unescapeUnicode(pageHtml)
+                    if (unescaped.contains("\"room_status\": \"private\"") || unescaped.contains("\"room_status\":\"private\"")) {
                         return@withContext LiveStreamResolveResult.StatusError("主播当前正在进行私密秀（需付费观看）")
                     }
-                    if (pageHtml.contains("\"room_status\": \"offline\"") || pageHtml.contains("\"room_status\":\"offline\"")) {
+                    if (unescaped.contains("\"room_status\": \"offline\"") || unescaped.contains("\"room_status\":\"offline\"")) {
                         return@withContext LiveStreamResolveResult.StatusError("主播当前已离线或暂未开播")
                     }
+                    if (unescaped.contains("\"room_status\": \"away\"") || unescaped.contains("\"room_status\":\"away\"")) {
+                        return@withContext LiveStreamResolveResult.StatusError("主播暂时离开，请稍后刷新")
+                    }
 
-                    val hlsMatch = HLS_REGEX.find(pageHtml)
+                    val hlsMatch = HLS_REGEX.find(unescaped)
                     if (hlsMatch != null) {
                         val matchedUrl = hlsMatch.groupValues[1]
                         if (isHttpsUrl(matchedUrl)) {
@@ -118,12 +122,47 @@ class LiveStreamResolver {
         }
     }
 
+    internal fun unescapeUnicode(input: String): String {
+        val sb = StringBuilder(input.length)
+        var i = 0
+        while (i < input.length) {
+            val c = input[i]
+            if (c == '\\' && i + 1 < input.length) {
+                val next = input[i + 1]
+                if (next == 'u' && i + 5 < input.length) {
+                    val hex = input.substring(i + 2, i + 6)
+                    val code = hex.toIntOrNull(16)
+                    if (code != null) {
+                        sb.append(code.toChar())
+                        i += 6
+                        continue
+                    }
+                } else if (next == '/') {
+                    sb.append('/')
+                    i += 2
+                    continue
+                } else if (next == '"') {
+                    sb.append('"')
+                    i += 2
+                    continue
+                } else if (next == '\\') {
+                    sb.append('\\')
+                    i += 2
+                    continue
+                }
+            }
+            sb.append(c)
+            i++
+        }
+        return sb.toString()
+    }
+
     private fun isHttpsUrl(value: String): Boolean = runCatching {
         val uri = URI(value)
         uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()
     }.getOrDefault(false)
 
     companion object {
-        private val HLS_REGEX = Regex(""""hls_source"\s*:\s*"(https?:\\?/\\?/[^"\s\\]+?\.m3u8[^"\s\\]*)"""")
+        private val HLS_REGEX = Regex(""""hls_source"\s*:\s*"(https?://[^"\s\\]+?\.m3u8[^"\s\\]*)"""")
     }
 }

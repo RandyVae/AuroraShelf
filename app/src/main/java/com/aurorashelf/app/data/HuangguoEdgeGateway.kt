@@ -139,6 +139,38 @@ object HuangguoEdgeGateway {
         episodeNum: Int,
     ): String? {
         val normalizedOrigin = origin.trimEnd('/')
+        val ep = episodeNum.coerceAtLeast(1)
+        // 1. 核心优先：直接请求 POST /api/videos/{id}/episodes/{ep}/playback（150ms 极速直签直出）
+        val apiPath = "$normalizedOrigin/api/videos/$dramaId/episodes/$ep/playback"
+        val directStream = runCatching {
+            val req = Request.Builder()
+                .url(apiPath)
+                .post("{}".toRequestBody(JSON_MEDIA_TYPE))
+                .header("Content-Type", "application/json")
+                .header("Referer", "$normalizedOrigin/video/$dramaId/")
+                .header("Origin", normalizedOrigin)
+                .header("User-Agent", USER_AGENT)
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string()
+                    if (!body.isNullOrBlank()) {
+                        val root = JSONObject(body)
+                        val data = root.optJSONObject("data")
+                        val streams = data?.optJSONObject("streams")
+                        streams?.optString("main")?.takeIf { it.isNotBlank() }
+                            ?: streams?.optString("hevc")?.takeIf { it.isNotBlank() }
+                            ?: streams?.optString("preview")?.takeIf { it.isNotBlank() }
+                    } else null
+                } else null
+            }
+        }.getOrNull()
+
+        if (!directStream.isNullOrBlank()) {
+            return directStream
+        }
+
+        // 2. 备用降级：Edge 网关
         val jsonStr = executeEdgeRequest(
             origin = normalizedOrigin,
             method = "GET",
@@ -169,13 +201,14 @@ object HuangguoEdgeGateway {
     ): List<VideoItem>? {
         val normalizedOrigin = origin.trimEnd('/')
         val p = page.coerceAtLeast(1)
+
         val path = when (category) {
             FeedCategory.CURRENT_HOT -> "/api/ranks/hot"
             FeedCategory.MONTHLY_HOT -> "/api/videos/category/ai-manju?page=$p&size=$size"
             FeedCategory.FAVORITES -> "/api/videos/category/ai-huanlian?page=$p&size=$size"
-            FeedCategory.RECENT -> "/api/videos?page=$p&size=$size"
-            FeedCategory.ALL -> "/api/videos?page=$p&size=$size"
-            else -> "/api/videos?page=$p&size=$size"
+            FeedCategory.RECENT -> if (p == 1) "/api/home/latest" else "/api/videos?page=$p&size=$size"
+            FeedCategory.ALL -> if (p == 1) "/api/home/latest" else "/api/videos?page=$p&size=$size"
+            else -> if (p == 1) "/api/home/latest" else "/api/videos?page=$p&size=$size"
         }
 
         val jsonStr = executeEdgeRequest(
@@ -184,6 +217,36 @@ object HuangguoEdgeGateway {
             path = path,
         ) ?: return null
 
+        return parseItemsJson(jsonStr, normalizedOrigin, category)
+    }
+
+    private fun fetchDirectFeed(
+        url: String,
+        normalizedOrigin: String,
+        category: FeedCategory,
+    ): List<VideoItem>? {
+        return runCatching {
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .header("Referer", "$normalizedOrigin/")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (resp.isSuccessful) {
+                    val body = resp.body?.string()
+                    if (!body.isNullOrBlank()) {
+                        parseItemsJson(body, normalizedOrigin, category)
+                    } else null
+                } else null
+            }
+        }.getOrNull()
+    }
+
+    private fun parseItemsJson(
+        jsonStr: String,
+        normalizedOrigin: String,
+        category: FeedCategory,
+    ): List<VideoItem>? {
         return runCatching {
             val root = JSONObject(jsonStr)
             val data = root.optJSONObject("data") ?: return null
@@ -216,7 +279,7 @@ object HuangguoEdgeGateway {
             }
             result
         }.onFailure {
-            Log.w(TAG, "failed parsing feed category=$category page=$page", it)
+            Log.w(TAG, "failed parsing feed category=$category", it)
         }.getOrNull()
     }
 

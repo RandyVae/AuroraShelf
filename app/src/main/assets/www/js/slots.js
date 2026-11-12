@@ -717,9 +717,13 @@
     async init() {
       this.config = (window.APP && APP.data && APP.data.slots) || null;
       if (!this.config) {
-        const response = await fetch('data/slots.json', { cache: 'no-store' });
-        if (!response.ok) throw new Error(`Failed to load slots (${response.status})`);
-        this.config = await response.json();
+        if (typeof window.safeFetchJson === 'function') {
+          this.config = await window.safeFetchJson('data/slots.json');
+        } else {
+          const response = await fetch('data/slots.json');
+          if (!response.ok && response.status !== 0) throw new Error(`Failed to load slots (${response.status})`);
+          this.config = await response.json();
+        }
       }
       this.bet = this.config.defaultBet || 20;
       this.freeSpins = (window.APP && APP.state && (

@@ -46,8 +46,14 @@ class VideoRepository {
                 }
             }
             if (ContentSourceCatalog.isHuangguo(baseUrl)) {
+                val cacheKey = "$category:$page"
+                val cached = huangguoFeedCache[cacheKey]
+                if (cached != null && System.currentTimeMillis() - cached.first < 10 * 60 * 1000L) {
+                    return@withContext cached.second
+                }
                 val edgeItems = HuangguoEdgeGateway.fetchFeed(baseUrl, category, page)
                 if (edgeItems != null && edgeItems.isNotEmpty()) {
+                    huangguoFeedCache[cacheKey] = Pair(System.currentTimeMillis(), edgeItems)
                     return@withContext edgeItems
                 }
             }
@@ -64,7 +70,9 @@ class VideoRepository {
                 throw IOException("页面已打开，但没有识别到视频条目。请检查站点地址或页面结构。")
             }
             if (ContentSourceCatalog.isHuangguo(baseUrl)) {
-                differentiateHuangguoFeed(records, category)
+                val diffRecords = differentiateHuangguoFeed(records, category)
+                huangguoFeedCache["$category:$page"] = Pair(System.currentTimeMillis(), diffRecords)
+                diffRecords
             } else {
                 records
             }
@@ -623,6 +631,7 @@ class VideoRepository {
     }
 
     companion object {
+        private val huangguoFeedCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<VideoItem>>>()
         private const val REQUEST_TIMEOUT_MS = 15_000
         private const val MIN_TITLE_LENGTH = 2
         const val USER_AGENT =

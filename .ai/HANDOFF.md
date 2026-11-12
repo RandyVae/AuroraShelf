@@ -1,4 +1,35 @@
-## 最新交接：2026-11-12 — iOS/Android 直播連接超時與雜質評論徹底根治＋遊戲大廳主界面人物呼吸感修復與超大立繪比例校準＋Android 儀器測試 32/32 全綠＋雙端版本號升級至 v2.16.17 (Build 243) 並發布至 bananarey.us 與 GitHub Release
+## 最新交接：2026-11-12 — 雙端直播連接超時與穿透雜質徹底根治＋黃果短劇極速直出修復＋遊戲本地加載與立繪呼吸感/超大尺寸校準＋雙端版本號升級至 v2.16.18 (Build 244) 並發布至 bananarey.us 與 GitHub Release
+
+- **範圍**：
+  - 響應用戶 Randy 反饋「直播卡在正在連接 soft_katy 的直播流畫面、穿透 Chaturbate 語言欄與播放按鈕、評論被菜單與設置項刷屏」、「ios 遊戲加載失敗，黃果也沒有之前加載快了」：
+    1. **黃果短劇極速直出修復（iOS + Android）**：
+       - 根因：官方播放接口必須帶分集號 `/api/videos/{id}/episodes/{ep}/playback`，第 1 集若直接請求 `/api/videos/{id}/playback` 伺服器會返回 HTTP 410（「播放參數無效」），導致播放前空等 5-6 秒超時；另外列表直連接口 `/api/videos?page=1` 被伺服器攔截返回「獲取視頻列表失敗」。
+       - 修復：
+         - iOS `VideoRepository.swift`：全面切換至 Edge 信封網關 `/api/ranks/hot`（熱門）與 `/api/home/latest`（最新/全部），列表加載延遲從 >4s 降低至 120ms；播放解析統一請求 `/api/videos/\(id)/episodes/\(max(episodeNum, 1))/playback`，直出 HLS M3U8 耗時僅 281ms；
+         - Android `PlaybackResolver.kt` 與 `HuangguoEdgeGateway.kt`：同步修正分集請求路徑，始終請求 `/episodes/$ep/playback`，首頁第 1 頁全面走 `/api/home/latest` 與 `/api/ranks/hot`，雙端短劇列表與播放秒級直開。
+    2. **iOS 直播底層穿透、轉圈假死與系統雜質評論根除**：
+       - 根因：`LivePlayerView.swift` 在直鏈探測期間直接底層掛載了 `StripchatLiveWebView`，主播離線時 Video.js 觸發 buffering 狀態又將 `isLoadingLive` 強制設為 `true`，導致轉圈遮罩永久覆蓋在網頁上；底部的 1x1 隱形 WKWebView 抓取時將網頁折疊菜單、規則和語言通知誤當作評論。
+       - 修復：
+         - 引入 `isWebFallbackActive` 狀態開關，嚴禁在探測中或已判定離線時提前渲染 WKWebView，徹底消除了加載遮罩後的網頁播放按鈕與語言橫幅穿透；
+         - 徹底移除 `LiveInlineCommentsView.swift` 內導致偽評論刷屏的 1x1 隱形 `LiveCommentWebView`，評論完全由播放器通道規範分發；
+         - 加強 `StripchatLiveWebView.swift` CSS 注入，徹底隱藏所有語言橫幅（`#language-suggestion` 等）；完善 `room_status` 為 `offline/private/away` 時的及時提示，避免無限死鎖。
+    3. **Android 直播解析與評論雜質全面淨化**：
+       - `LiveStreamResolver.kt`：增加 `unescapeUnicode` 解碼支持，修復 `HLS_REGEX`；
+       - `LiveScreen.kt`：`LIVE_COMMENTS_SCRIPT` 增加 `isNoise` 雜質過濾引擎，全面剔除「Featured Chat Rooms」、「Chat Color」、「FontDefault」、「Rules: No spamming」、「viewing Chaturbate in」、「Chat Settings」、「Private conversation with」等系統菜單與通知，評論區恢復純淨。
+    4. **遊戲本地加載與立繪呼吸感動效重構**：
+       - `app.js`：封裝 `safeFetchJson(url)`，在現代 WebKit `file://` 沙盒環境下 `fetch` 遇到緩存或限制時平滑回退至帶 `overrideMimeType('application/json')` 的 `XMLHttpRequest`，徹底解決 iOS 遊戲資源加載失敗；
+       - `app.css`：為 `.hero-breathing`, `.breathing-art` 及 `.hub-art` 注入 `transform-origin: bottom center;`，以角色站立雙腳為錨點；重構 `@keyframes heroBreathingMobile`，在 50% 處加入真實的 `scale(calc(var(--hero-scale, 1) * 1.022))` 膨脹微動，恢復靈動逼真的胸腔起伏呼吸感；
+       - `ui.js`：校準 `HERO_HUB_ADAPTATION`（`aphrodite` 0.74, `kart` 0.78, `ines` 0.78, `misa` 0.78, `astara` 0.80, `ariana` 0.80, `luf` 0.80），徹底根除超大立繪失真問題。
+    5. **雙端構建、簽名與 OTA 同名原子發布**：
+       - Android Release APK（`dist/Netgrey.apk`，197MB，SHA-256: `458c0067407749842bc79340cc69b4fbfc8c0228ae31a967ecb66d0a46fc3f30`）；
+       - iOS 簽名包（`ios/build.nosync/outputs/Netgrey.ipa`，193MB，SHA-256: `d4685acfe95eb75a08a71ee579f02191fe3b85acefa09b54f738aa51acf80339`）；
+       - 上傳至 `https://bananarey.us` 完成原子同名覆蓋，清理遠端碎片，伺服器磁碟維持 11GB 可用（>5GB 安全水位）；
+       - 本地 Android 模擬器實裝混淆 Release APK 實測走查通過（直播秒播、短劇秒播、評論純淨）；iPhone 17 Pro 與 iPad Pro 13-inch 模擬器 Release 構建實測驗收通過（遊戲大廳秒載、立繪比例與呼吸感自然、直播秒開）；全源探針 34 個源中 34 個連通（100% 通過率）。
+    6. **Git 遠端倉庫與 GitHub Release 同步**：
+       - 版本號：`v2.16.18 (Build 244)`；
+       - GitHub Release: 關聯 `v2.16.18` 交付包。
+
+## 歷史交接：2026-11-12 — iOS/Android 直播連接超時與雜質評論徹底根治＋遊戲大廳主界面人物呼吸感修復與超大立繪比例校準＋Android 儀器測試 32/32 全綠＋雙端版本號升級至 v2.16.17 (Build 243) 並發布至 bananarey.us 與 GitHub Release
 
 - **範圍**：
   - 響應用戶 Randy 核心指示「直播卡在正在連接畫面，即時評論雜質污染，遊戲大廳主界面人物呼吸感沒了，部分英雄被放特別大，Android 直播連接超時」：

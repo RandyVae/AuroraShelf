@@ -62,4 +62,14 @@ class LiveStreamResolverTest {
         val result = resolver.resolve(item)
         assertTrue(result is LiveStreamResolveResult.StatusError)
     }
+
+    @Test
+    fun unescapesUnicodeSequencesCorrectly() {
+        val raw = """\u0022hls_source\u0022: \u0022https:\/\/edge4\u002Dsin.live.mmcdn.com\/v1\/llhls.m3u8?token\u003Dabc123\u0026session\u003Dxyz\u0022"""
+        val unescaped = resolver.unescapeUnicode(raw)
+        assertEquals(
+            """"hls_source": "https://edge4-sin.live.mmcdn.com/v1/llhls.m3u8?token=abc123&session=xyz"""",
+            unescaped,
+        )
+    }
 }
