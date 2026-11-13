@@ -1,6 +1,6 @@
 ## 当前状态补充（2026-11-06）
 
-- 2026-11-13：商业化第一阶段账号系统已落地至 v2.16.20 / Build 246。服务器部署 PocketBase 0.40.6（本机 8090，Nginx `/auth-api`），Android/iOS 新增邮箱密码注册登录、退出、会话保存和免费权益预留；匿名视频/直播/漫画/游戏路径保持不变。Android JVM/Release、iOS generic Simulator build/Release archive、认证 API 探针和 OTA 发布均通过。真实邮件验证/找回密码仍待 SMTP 配置与首个 PocketBase 管理员创建。
+- 2026-11-13：商业化第一阶段账号系统已落地至 v2.16.21 / Build 247。服务器部署 PocketBase 0.40.6（本机 8090，Nginx `/auth-api`，根路径 404 已修复），Android/iOS 新增邮箱密码注册登录、退出、会话保存和免费权益预留；匿名视频/直播/漫画/游戏路径保持不变。Android JVM/Release、iOS generic Simulator build/Release archive、认证 API 探针和 OTA 发布均通过。真实邮件验证/找回密码仍待 SMTP 配置与首个 PocketBase 管理员创建。
 
 - 完成 iOS 2.16.0 一輪缺陷審計（只讀，未改源碼）：76 項現存缺陷（P1×12、P2×47、P3×17）＋1 項流程風險，另記錄 2 項審計期間已修復（建置阻斷、專案檔漂移）。報告：`docs/ios/audit-2026-11-06/AUDIT-REPORT.md`（三線明細同目錄 `part-a/b/c-*.md`，證據在 `evidence/`）。主審實測：15:47:46 建置成功、15:49 全量 106 項測試 101 passed／5 skipped／0 failed；審計期間見 15:41 與 15:47 兩次建置失敗（本地化層 `@MainActor` 與 nonisolated 宣告衝突，已由並行會話以 NSLock＋`nonisolated` 修復）。最高優先待修：播放解碼失敗黑屏、無 `isIdleTimerDisabled`、分頁失敗永久鎖死、`SourceSecrets.plist` 隨包分發、9 個測試檔未入 Git。**教訓：工作樹被多會話並行修改時，任何建置／測試結論必須綁定時刻與指紋，並在凍結樹重驗。**
 
@@ -42,7 +42,7 @@
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-13 · Build 246 / v2.16.20）：商业化第一阶段邮箱密码账号系统＋PocketBase 服务器部署＋双端账号入口与免费权益预留＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（服务器磁盘维持 11GB 安全水位）。
+- 当前阶段（2026-11-13 · Build 247 / v2.16.21）：商业化第一阶段邮箱密码账号系统＋PocketBase 服务器部署＋双端账号入口与免费权益预留＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（服务器磁盘维持 11GB 安全水位）。
 - 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，同时监控双端生产环境反馈与性能表现。
 - 下一步：接入用户资料/收藏历史云同步与后续订阅权益接口。
 - 阻塞：Android ADB 与 Apple 实体设备未连接（记录为 blocked，本地 Android 模拟器实装混淆 Release APK 走查完全一致通过；iPhone 17 Pro 與 iPad Pro 13-inch 模擬器 Release 構建實測驗收通過）。

@@ -26,7 +26,7 @@ REMOTE="root@${SERVER_IP}"
   "${PROJECT_ROOT}/server/pocketbase/netgrey-auth-location.conf" \
   "${REMOTE}:/tmp/netgrey-auth-location.conf"
 
-"${SSHPASS_BIN}" -p "${SERVER_PASS}" ssh "${SSH_OPTS[@]}" "${REMOTE}" 'set -e; cp -a /etc/nginx/sites-available/netgrey /etc/nginx/sites-available/netgrey.auth-backup.$(date +%Y%m%d%H%M%S); if ! grep -q "location \^~ /auth-api/" /etc/nginx/sites-available/netgrey; then python3 - <<"PY"
+"${SSHPASS_BIN}" -p "${SERVER_PASS}" ssh "${SSH_OPTS[@]}" "${REMOTE}" 'set -e; cp -a /etc/nginx/sites-available/netgrey /etc/nginx/sites-available/netgrey.auth-backup.$(date +%Y%m%d%H%M%S); python3 - <<"PY"
 from pathlib import Path
 site = Path("/etc/nginx/sites-available/netgrey")
 fragment = Path("/tmp/netgrey-auth-location.conf").read_text()
@@ -34,8 +34,18 @@ text = site.read_text()
 marker = "    location /api/ {"
 if marker not in text:
     raise SystemExit("nginx API location marker missing")
-site.write_text(text.replace(marker, fragment + "\n" + marker, 1))
+if "location = /auth-api" in text:
+    start = text.index("    location = /auth-api")
+    end = text.index("    location /api/ {", start)
+    text = text[:start] + fragment + "\n" + text[end:]
+elif "location ^~ /auth-api/" in text:
+    start = text.index("    location ^~ /auth-api/")
+    end = text.index("    location /api/ {", start)
+    text = text[:start] + fragment + "\n" + text[end:]
+else:
+    text = text.replace(marker, fragment + "\n" + marker, 1)
+site.write_text(text)
 PY
-fi; nginx -t; systemctl reload nginx; rm -f /tmp/netgrey-auth-location.conf; echo auth_proxy=enabled'
+nginx -t; systemctl reload nginx; rm -f /tmp/netgrey-auth-location.conf; echo auth_proxy=enabled'
 
 echo "Auth API proxy enabled at https://bananarey.us/auth-api"
