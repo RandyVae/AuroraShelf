@@ -7,6 +7,7 @@ public struct PersonalScreen: View {
     @ObservedObject private var watchlist = WatchlistStore.shared
     @ObservedObject private var locManager = LocalizationManager.shared
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
+    @ObservedObject private var account = AccountService.shared
     public let onPlayVideo: (VideoItem) -> Void
     
     @State private var showGame: Bool = false
@@ -16,6 +17,7 @@ public struct PersonalScreen: View {
     @State private var showLiveSourceDialog: Bool = false
     @State private var showAirPlayPicker: Bool = false
     @State private var showLanguagePicker: Bool = false
+    @State private var showAccount: Bool = false
     
     public init(onPlayVideo: @escaping (VideoItem) -> Void) {
         self.onPlayVideo = onPlayVideo
@@ -106,7 +108,7 @@ public struct PersonalScreen: View {
                                         Text("settings.game_title".localized)
                                             .font(.headline)
                                             .foregroundStyle(AuroraColor.textPrimary)
-                                        Text("v2.16.19")
+                                        Text("v2.16.20")
                                             .font(.caption2)
                                             .fontWeight(.bold)
                                             .foregroundStyle(AuroraColor.brand)
@@ -144,6 +146,20 @@ public struct PersonalScreen: View {
                     
                     // 3. 源管理与设置列表
                     VStack(spacing: 1) {
+                        Button {
+                            showAccount = true
+                        } label: {
+                            settingRow(
+                                icon: "person.crop.circle",
+                                title: "账号",
+                                value: account.profile?.email ?? "免费注册",
+                                isNavigable: true
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider().overlay(AuroraColor.hairline)
+
                         Button {
                             showVideoSourcePicker = true
                         } label: {
@@ -285,6 +301,9 @@ public struct PersonalScreen: View {
         }
         .sheet(isPresented: $showLanguagePicker) {
             LanguagePickerSheet()
+        }
+        .sheet(isPresented: $showAccount) {
+            AccountView()
         }
         .sheet(isPresented: $showVideoSourcePicker) {
             VideoSourcePickerSheet(selectedSource: videoRepo.currentSource) { src in

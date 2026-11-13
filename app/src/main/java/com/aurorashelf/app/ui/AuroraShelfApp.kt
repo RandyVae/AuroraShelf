@@ -188,7 +188,7 @@ import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
-internal enum class PersonalRoute { OVERVIEW, FAVORITES, HISTORY, SETTINGS }
+internal enum class PersonalRoute { OVERVIEW, FAVORITES, HISTORY, SETTINGS, ACCOUNT }
 
 @Composable
 fun AuroraShelfApp(
@@ -481,6 +481,7 @@ fun AuroraShelfApp(
                     onOpenGame = {
                         context.startActivity(android.content.Intent(context, com.aurorashelf.app.game.GameActivity::class.java))
                     },
+                    onAccount = { personalRoute = PersonalRoute.ACCOUNT },
                 )
             }
         }

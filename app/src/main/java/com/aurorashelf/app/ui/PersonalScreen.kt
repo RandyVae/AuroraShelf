@@ -214,6 +214,7 @@ internal fun PersonalScreen(
     onLiveSource: (String) -> Unit = {},
     onOpenCached: (VideoItem) -> Unit,
     onOpenGame: () -> Unit = {},
+    onAccount: () -> Unit = {},
 ) {
     BackHandler(enabled = route != PersonalRoute.OVERVIEW) { onRoute(PersonalRoute.OVERVIEW) }
     Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
@@ -234,6 +235,7 @@ internal fun PersonalScreen(
                     onHistory = { onRoute(PersonalRoute.HISTORY) },
                     onSettings = { onRoute(PersonalRoute.SETTINGS) },
                     onOpenGame = onOpenGame,
+                    onAccount = onAccount,
                 )
                 PersonalRoute.FAVORITES -> LibraryScreen(
                     title = "我的收藏",
@@ -273,6 +275,7 @@ internal fun PersonalScreen(
                     onBrowseHome = onBrowseHome,
                     onBack = { onRoute(PersonalRoute.OVERVIEW) },
                 )
+                PersonalRoute.ACCOUNT -> AccountScreen(onBack = { onRoute(PersonalRoute.OVERVIEW) })
             }
         }
     }
@@ -290,6 +293,7 @@ private fun PersonalOverview(
     onHistory: () -> Unit,
     onSettings: () -> Unit,
     onOpenGame: () -> Unit = {},
+    onAccount: () -> Unit = {},
 ) {
     LazyColumn(
         contentPadding = PaddingValues(
@@ -420,6 +424,15 @@ private fun PersonalOverview(
         item { SettingsSectionLabel("应用") }
         item {
             SettingsNavigationCard {
+                SettingsNavigationRow(
+                    icon = { Icon(Icons.Default.Person, contentDescription = null, tint = AuroraCoral) },
+                    title = "账号",
+                    supporting = "注册登录并为未来会员服务保留权益接口",
+                    value = "免费注册",
+                    onClick = onAccount,
+                    modifier = Modifier.testTag("personal-account-entry"),
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = Color(0xFF262626))
                 SettingsNavigationRow(
                     icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White) },
                     title = "设置",

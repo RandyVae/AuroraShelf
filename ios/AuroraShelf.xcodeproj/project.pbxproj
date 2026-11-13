@@ -54,6 +54,7 @@
 		7D48812ED84579D10059C1FF /* OfflineDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C15F0D0C87A034F3C112DC9B /* OfflineDownloadManager.swift */; };
 		82C6294CB3B1D5D8E5F45C50 /* ComicProtocolSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F67750CE51CD83989264275 /* ComicProtocolSecrets.swift */; };
 		82DE26D28A7F50B2DDD1E14D /* LiveSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2EDA28E1A7594F0287AA717 /* LiveSourceCatalog.swift */; };
+		847C66B1EF176BC87E33F428 /* AccountService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71591C37AE59CF89B2DB7EF /* AccountService.swift */; };
 		8757BB73DF214D96AE1A3207 /* StorageUsageBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69B08C76DF38E2E1E44D738 /* StorageUsageBarView.swift */; };
 		903A163A0D4C6D077549BE02 /* LiveInlineCommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1DD373C73DD1FC817BCD50 /* LiveInlineCommentsView.swift */; };
 		90ABA578FB1CE018A17F97F5 /* ComicReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813C4C5BB8EB3EA6A44A32E6 /* ComicReaderView.swift */; };
@@ -97,6 +98,7 @@
 		F6CB3BBD0A560C7D611676B2 /* CategoryShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28EE478BBB114A0D104FAD90 /* CategoryShelfView.swift */; };
 		F89EA9CBB7C5FE92616FF5A4 /* AirPlayRoutePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 416C023188BD71D379651DCC /* AirPlayRoutePicker.swift */; };
 		F8A997F081414A41A1535249 /* UniversalVideoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40CCFCDEBDA584EBD485134A /* UniversalVideoEngine.swift */; };
+		F9A78470F30665430241F9CF /* AccountView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EC01515B9AAD281DF23F1CE /* AccountView.swift */; };
 		FAE55830B6B2D72370C816EA /* AuroraDesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33DE80E0929D56787BD4A46 /* AuroraDesignTokens.swift */; };
 		FC60726C4E519E324281E9A3 /* CoverImageLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB1A14ECFCE4B699E846AD54 /* CoverImageLoaderTests.swift */; };
 		FF04079BE64FA92350BD8B7E /* EpisodePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B718BFF6E49F9898D9D0D56 /* EpisodePickerSheet.swift */; };
@@ -146,6 +148,7 @@
 		58364223DCCC8CBACB6C4A77 /* LiveVideoSourceAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVideoSourceAuditTests.swift; sourceTree = "<group>"; };
 		5BBE033BB25CF19AB5ED6C45 /* HTMLVideoSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTMLVideoSourceAdapter.swift; sourceTree = "<group>"; };
 		5BD2A1C5C0222D072DEC2126 /* ComicSourceAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComicSourceAdapter.swift; sourceTree = "<group>"; };
+		5EC01515B9AAD281DF23F1CE /* AccountView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountView.swift; sourceTree = "<group>"; };
 		60F11EC0D8152B62A7DC3805 /* NetgreyLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetgreyLogoView.swift; sourceTree = "<group>"; };
 		613ABA539A826B76628526F3 /* LiveScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveScreen.swift; sourceTree = "<group>"; };
 		61A80A6687D4D2EBB347A010 /* PlaybackProgressStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackProgressStoreTests.swift; sourceTree = "<group>"; };
@@ -206,6 +209,7 @@
 		D0486320AB2AD181FD771D94 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		D31E97B53BDBAA540B54C92D /* SourceFilterBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceFilterBar.swift; sourceTree = "<group>"; };
 		D69B08C76DF38E2E1E44D738 /* StorageUsageBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorageUsageBarView.swift; sourceTree = "<group>"; };
+		D71591C37AE59CF89B2DB7EF /* AccountService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountService.swift; sourceTree = "<group>"; };
 		D9E292EDDA87816B50371992 /* intro_film.mp4 */ = {isa = PBXFileReference; path = intro_film.mp4; sourceTree = "<group>"; };
 		DBE84004541A1C8902072D39 /* AuroraSwipeBackModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuroraSwipeBackModifier.swift; sourceTree = "<group>"; };
 		E2EDA28E1A7594F0287AA717 /* LiveSourceCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSourceCatalog.swift; sourceTree = "<group>"; };
@@ -291,6 +295,7 @@
 		42AB28931CA744114523D043 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				D71591C37AE59CF89B2DB7EF /* AccountService.swift */,
 				CF4F33A276B45953D294FB9D /* ComicDownloadManager.swift */,
 				958009DA2F9C05A45A2F8B5C /* ComicPageImageLoader.swift */,
 				C32FF8887EB9DF3C3730C0B6 /* CoverImageLoader.swift */,
@@ -417,6 +422,7 @@
 		773464D71D0EC5FA33C630DC /* UI */ = {
 			isa = PBXGroup;
 			children = (
+				9317AA1E50BC13940E742069 /* Account */,
 				B841B6BC579B76B65A60C01E /* Comic */,
 				582DA039FA0D1AC1A0F3BF1B /* Components */,
 				813A04022697BE2BF6124980 /* Forum */,
@@ -436,6 +442,14 @@
 				6E76E5B6E0151105F3CED3B1 /* ForumPostDetailView.swift */,
 			);
 			path = Forum;
+			sourceTree = "<group>";
+		};
+		9317AA1E50BC13940E742069 /* Account */ = {
+			isa = PBXGroup;
+			children = (
+				5EC01515B9AAD281DF23F1CE /* AccountView.swift */,
+			);
+			path = Account;
 			sourceTree = "<group>";
 		};
 		A1EDDC61902FB8DA8EDF54B1 /* Game */ = {
@@ -635,6 +649,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				847C66B1EF176BC87E33F428 /* AccountService.swift in Sources */,
+				F9A78470F30665430241F9CF /* AccountView.swift in Sources */,
 				F89EA9CBB7C5FE92616FF5A4 /* AirPlayRoutePicker.swift in Sources */,
 				60CEF5A91F147FC3C9E42E4E /* AppleSpringCardButtonStyle.swift in Sources */,
 				F439A2A8C363D3A054FAEE7F /* AuroraCoverImage.swift in Sources */,
@@ -906,7 +922,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 245;
+				CURRENT_PROJECT_VERSION = 246;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -916,7 +932,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.19;
+				MARKETING_VERSION = 2.16.20;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
@@ -932,7 +948,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 245;
+				CURRENT_PROJECT_VERSION = 246;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -942,7 +958,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.19;
+				MARKETING_VERSION = 2.16.20;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;

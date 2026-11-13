@@ -1,5 +1,13 @@
 # Project State
 
+## 最新工作状态（2026年11月13日 · 账号系统首期上线 · v2.16.20 Build 246）
+
+- 已在 `bananarey.us` 部署 PocketBase 0.40.6 账号服务，监听本机 8090，并通过 Nginx `https://bananarey.us/auth-api` 代理；健康检查与注册参数校验通过，原有 OTA `/api/*` 服务保持不变。
+- Android 与 iOS 均新增邮箱密码注册、登录、退出、会话保存、邮箱验证/密码找回接口预留和免费权益状态显示；匿名视频、直播、漫画、论坛、游戏流程未接入强制登录。
+- 版本号递增为 Android/iOS `2.16.20 / Build 246`，OTA 页面、manifest、游戏内版本同步；双端 Release 包已签名构建并发布到服务器。
+- 验证：Android `testDebugUnitTest` 与 `assembleRelease` 通过；iOS generic Simulator Debug build 与 iOS Release archive/export 通过；认证 API 契约探针通过；远端磁盘剩余约 11GB。
+- 待办：通过 SSH 隧道进入 PocketBase 管理界面创建首个管理员，并配置 SMTP 后再验收真实验证邮件/找回密码；当前不影响注册/登录基础 API 与匿名内容访问。
+
 ## 最新工作狀態（2026年11月12日 · 雙端版本號升級至 v2.16.19 Build 245 + 遊戲大廳人物立繪相對居中與下邊緣貼合重構 + 屏幕雙擊放大徹底根除 + 特殊立繪全身豎版重映射 + 雙端 Release 正式包發布至 bananarey.us 與 GitHub Release）
 
 - **最新成果（立繪居中與貼合對齊、雙擊放大根除、特殊立繪全身化與雙端交付）**：

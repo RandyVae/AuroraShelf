@@ -1,0 +1,21 @@
+[Unit]
+Description=Netgrey account service (PocketBase)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netgrey-auth
+Group=netgrey-auth
+WorkingDirectory=/var/lib/netgrey-pocketbase
+ExecStart=/usr/local/bin/pocketbase serve --http=127.0.0.1:8090 --dir=/var/lib/netgrey-pocketbase/pb_data
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/netgrey-pocketbase
+
+[Install]
+WantedBy=multi-user.target
