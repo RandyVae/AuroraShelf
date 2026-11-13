@@ -20,8 +20,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.aurorashelf.app
         INFOPLIST_FILE: AuroraShelf/Resources/Info.plist
         SWIFT_VERSION: "6.0"
-        CURRENT_PROJECT_VERSION: 247
-        MARKETING_VERSION: "2.16.21"
+        CURRENT_PROJECT_VERSION: 248
+        MARKETING_VERSION: "2.16.22"
         DEVELOPMENT_TEAM: "U4MXHLA3GF"
         CODE_SIGN_STYLE: "Automatic"
         CODE_SIGNING_REQUIRED: "YES"

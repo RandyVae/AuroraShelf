@@ -41,6 +41,9 @@ public struct MainContainerView: View {
                         searchInitialQuery = ""
                         showSearchSheet = true
                     },
+                    onOpenAccount: {
+                        selectedTab = .profile
+                    },
                     onOpenSearchWithKeyword: { keyword in
                         searchInitialQuery = keyword
                         showSearchSheet = true

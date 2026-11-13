@@ -4757,10 +4757,15 @@ cp build.nosync/app/outputs/apk/release/app-release.apk \
 - 修复验证记录：[docs/audit/performance-2026-11-11/REPAIR-VALIDATION-v2.16.17.md](../docs/audit/performance-2026-11-11/REPAIR-VALIDATION-v2.16.17.md)。
 - Android、iPhone、iPad Release 均已构建并在模拟器启动。Swift 全源 32/32、Node 探针 34/34、Android `PreReleaseSourceAuditTest sourceAudit=true` 5 项 OK。
 - Android `connectedDebugAndroidTest` 仍有 8 项 UI 测试失败，集中在测试顺序、初始目的地和异步首页数据等待。用户要求模拟器测试全部通过后再提交，因此当前不提交。
-## 最新交接：2026-11-13 — 商业化第一阶段账号系统（邮箱密码注册登录）与 PocketBase 服务器部署（v2.16.21 / Build 247）
+## 最新交接：2026-11-13 — 商业化第一阶段账号系统（邮箱密码注册登录）与 PocketBase 服务器部署（v2.16.22 / Build 248）
 
 - **后端**：服务器运行 PocketBase 0.40.6 systemd 服务 `netgrey-pocketbase`，本机 `127.0.0.1:8090`；Nginx 新增 `/auth-api/` 代理，未修改现有 OTA Python `/api/*` 路由。
 - **客户端**：Android 新增 `AccountRepository`、`AccountScreen`；iOS 新增 `AccountService`、`AccountView`；认证状态独立保存，匿名用户继续使用全部内容模块。
 - **商业化预留**：账号 `subscriptionStatus` 默认按 `free` 处理，未来可增加权益字段、订阅状态和支付回调，不接入当前视频/直播解析器。
-- **验证**：`./scripts/verify_auth_api.sh` 通过；Android JVM 测试与 Release 构建通过；iOS generic Simulator build 与 Release archive/export 通过；修复 `/auth-api` 根路径 404 后 OTA 已更新至 `v2.16.21 (Build 247)`。
+- **验证**：`./scripts/verify_auth_api.sh` 通过；Android JVM 测试与 Release 构建通过；iOS generic Simulator build 与 Release archive/export 通过；修复 `/auth-api` 根路径 404 后 OTA 已更新至 `v2.16.22 (Build 248)`。
 - **后续**：配置 PocketBase 首个 superuser 与 SMTP，使用真实邮箱完成验证和重置密码 E2E；SMTP 未配置前不得声称邮件链路已验收。
+
+## 2026-11-13 — 注册引导卡片补充（v2.16.22 / Build 248）
+
+- Android 与 iOS 首页新增可跳过的“注册免费账号 / 注册 / 登录”引导卡片，点击进入现有账号页面；视频、直播和内容加载链路未改动。
+- 双端 Release 包已构建并 OTA 发布；Android JVM 测试、iOS generic Simulator build 通过。

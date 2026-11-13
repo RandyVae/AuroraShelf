@@ -47,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
@@ -133,6 +134,7 @@ internal fun HomeScreen(
     state: AuroraUiState,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
+    onOpenAccount: () -> Unit,
     onSource: (String) -> Unit,
     onCategory: (FeedCategory) -> Unit,
     onVideo: (VideoItem) -> Unit,
@@ -211,6 +213,10 @@ internal fun HomeScreen(
                             onFavorite = { onFavorite(it) },
                             onDetails = { onVideo(it) },
                         )
+                    }
+
+                    item(key = "account-onboarding") {
+                        AccountOnboardingCard(onOpenAccount = onOpenAccount)
                     }
 
                     state.message?.let { message ->
@@ -401,6 +407,34 @@ internal fun HomeScreen(
                     )
                 }
             }
+    }
+}
+
+@Composable
+private fun AccountOnboardingCard(onOpenAccount: () -> Unit) {
+    Surface(
+        color = HomeMediaSurfaceVariant,
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, HomeAccent.copy(alpha = 0.35f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .testTag("home-account-onboarding"),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.padding(16.dp),
+        ) {
+            Icon(Icons.Default.Person, contentDescription = null, tint = HomeAccent, modifier = Modifier.size(28.dp))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("注册免费账号", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("同步片单与历史，后续会员权益也会保留在账号中", style = MaterialTheme.typography.bodySmall, color = HomeMuted)
+            }
+            Button(onClick = onOpenAccount, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
+                Text("注册 / 登录")
+            }
+        }
     }
 }
 

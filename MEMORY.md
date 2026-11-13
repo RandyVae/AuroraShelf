@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `1265052`（2026-11-12），未提交 23 个文件
+- Git：`main` @ `48f4aa4`（2026-11-13），未提交 16 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-13（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-13（今天）
@@ -36,13 +36,13 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-13 12:26 by `sync.py`
+- 最后同步：2026-11-13 22:45 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-13 · Build 247 / v2.16.21）：商业化第一阶段邮箱密码账号系统＋PocketBase 服务器部署＋双端账号入口与免费权益预留＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（服务器磁盘维持 11GB 安全水位）。
+- 当前阶段（2026-11-13 · Build 248 / v2.16.22）：商业化第一阶段邮箱密码账号系统＋PocketBase 服务器部署＋双端账号入口与免费权益预留＋双端 Release 构建签名与 OTA 同名原子发布至 bananarey.us（服务器磁盘维持 11GB 安全水位）。
 - 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，同时监控双端生产环境反馈与性能表现。
 - 下一步：接入用户资料/收藏历史云同步与后续订阅权益接口。
 - 阻塞：Android ADB 与 Apple 实体设备未连接（记录为 blocked，本地 Android 模拟器实装混淆 Release APK 走查完全一致通过；iPhone 17 Pro 與 iPad Pro 13-inch 模擬器 Release 構建實測驗收通過）。

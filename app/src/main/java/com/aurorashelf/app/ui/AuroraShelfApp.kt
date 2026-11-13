@@ -381,6 +381,10 @@ fun AuroraShelfApp(
                         personalRoute = PersonalRoute.SETTINGS
                         viewModel.selectDestination(AppDestination.ME)
                     },
+                    onOpenAccount = {
+                        personalRoute = PersonalRoute.ACCOUNT
+                        viewModel.selectDestination(AppDestination.ME)
+                    },
                     onSource = viewModel::saveSourceUrl,
                     onCategory = viewModel::selectCategory,
                     onVideo = viewModel::openVideo,

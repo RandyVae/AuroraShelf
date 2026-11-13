@@ -4,6 +4,7 @@ public struct HomeScreen: View {
     @ObservedObject public var repo = VideoRepository.shared
     public let onPlayVideo: (VideoItem) -> Void
     public let onOpenSearch: () -> Void
+    public let onOpenAccount: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
@@ -36,10 +37,12 @@ public struct HomeScreen: View {
     public init(
         onPlayVideo: @escaping (VideoItem) -> Void,
         onOpenSearch: @escaping () -> Void,
+        onOpenAccount: @escaping () -> Void = {},
         onOpenSearchWithKeyword: ((String) -> Void)? = nil
     ) {
         self.onPlayVideo = onPlayVideo
         self.onOpenSearch = onOpenSearch
+        self.onOpenAccount = onOpenAccount
         self.onOpenSearchWithKeyword = onOpenSearchWithKeyword
     }
 
@@ -70,6 +73,8 @@ public struct HomeScreen: View {
                             onPlayVideo: playVideo,
                             onDetail: { selectedDetailVideo = $0 }
                         )
+
+                        AccountOnboardingCard(onOpenAccount: onOpenAccount)
 
                         // Apple TV 核心层级：流媒体频道与 19 视频源（Channels）
                         ChannelsShelf(
@@ -367,6 +372,43 @@ public struct HomeScreen: View {
                 activePlaybackVideo = v
             }
         }
+    }
+}
+
+private struct AccountOnboardingCard: View {
+    let onOpenAccount: () -> Void
+
+    var body: some View {
+        HStack(spacing: AuroraMetrics.spacingM) {
+            Image(systemName: "person.crop.circle.badge.plus")
+                .font(.title2)
+                .foregroundStyle(AuroraColor.brand)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("注册免费账号")
+                    .font(.headline)
+                    .foregroundStyle(AuroraColor.textPrimary)
+                Text("同步片单与历史，后续会员权益也会保留在账号中")
+                    .font(.caption)
+                    .foregroundStyle(AuroraColor.textSecondary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            Button("注册 / 登录", action: onOpenAccount)
+                .buttonStyle(.borderedProminent)
+                .tint(AuroraColor.brand)
+        }
+        .padding(AuroraMetrics.spacingL)
+        .background(
+            RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                .fill(AuroraColor.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                        .stroke(AuroraColor.brand.opacity(0.35), lineWidth: 1)
+                )
+        )
+        .padding(.horizontal, AuroraMetrics.contentInset)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("注册免费账号，点击进入注册或登录")
     }
 }
 
