@@ -1,15 +1,39 @@
 package com.aurorashelf.app.ui
 
+import android.app.Activity
+import android.content.Context
+import android.media.AudioManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,9 +43,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -44,6 +76,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.aurorashelf.app.R
 import com.aurorashelf.app.data.PlaybackResolver
@@ -53,6 +86,14 @@ import com.aurorashelf.app.ui.theme.AuroraCoral
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import android.util.Log
+import kotlin.math.roundToInt
+
+private data class PlayerHudData(
+    val icon: ImageVector,
+    val text: String,
+    val progress: Float? = null,
+    val id: Long = System.nanoTime(),
+)
 
 /** Native playback of the site's published MP4/HLS source, with no sample-content fallback. */
 @androidx.annotation.OptIn(UnstableApi::class)
@@ -65,6 +106,8 @@ internal fun NativeSitePlayer(
     modifier: Modifier = Modifier,
     onVideoAspectRatioChange: (Float) -> Unit = {},
     onPositionChange: (Long) -> Unit = {},
+    onDurationChange: (Long) -> Unit = {},
+    onControllerVisibilityChange: (Boolean) -> Unit = {},
     onPlaybackEnded: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -96,7 +139,15 @@ internal fun NativeSitePlayer(
     var currentPositionMs by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
     var bufferedPositionMs by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
     var durationMs by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
-    var isControllerVisible by remember(pageUrl) { mutableStateOf(false) }
+    var isControllerVisible by remember(pageUrl) { mutableStateOf(true) }
+    var isPlaying by remember(pageUrl) { mutableStateOf(true) }
+    var isScrubbing by remember(pageUrl) { mutableStateOf(false) }
+    var isFillMode by rememberSaveable(pageUrl) { mutableStateOf(false) }
+    var showRemainingTime by rememberSaveable { mutableStateOf(true) }
+    var playbackSpeed by rememberSaveable(pageUrl) { mutableFloatStateOf(1.0f) }
+    var speedMenuExpanded by remember(pageUrl) { mutableStateOf(false) }
+    var controlInteractionTick by remember(pageUrl) { mutableIntStateOf(0) }
+    var hudState by remember(pageUrl) { mutableStateOf<PlayerHudData?>(null) }
     var shouldResume by rememberSaveable(pageUrl) { mutableStateOf(true) }
     var attempt by remember(pageUrl) { mutableIntStateOf(0) }
     var error by remember(pageUrl) { mutableStateOf<String?>(null) }
@@ -111,7 +162,32 @@ internal fun NativeSitePlayer(
     val videoOrientationChange by rememberUpdatedState(onVideoOrientationChange)
     val videoAspectRatioChange by rememberUpdatedState(onVideoAspectRatioChange)
     val positionChange by rememberUpdatedState(onPositionChange)
+    val durationChange by rememberUpdatedState(onDurationChange)
+    val controllerVisibilityChange by rememberUpdatedState(onControllerVisibilityChange)
     val playbackEndedChange by rememberUpdatedState(onPlaybackEnded)
+
+    LaunchedEffect(isControllerVisible) {
+        controllerVisibilityChange(isControllerVisible)
+    }
+
+    LaunchedEffect(isFullscreen) {
+        isControllerVisible = true
+        controlInteractionTick++
+    }
+
+    LaunchedEffect(isControllerVisible, isPlaying, isScrubbing, subtitleMenuExpanded, speedMenuExpanded, controlInteractionTick) {
+        if (isControllerVisible && isPlaying && !isScrubbing && !subtitleMenuExpanded && !speedMenuExpanded) {
+            delay(3_500L)
+            isControllerVisible = false
+        }
+    }
+
+    LaunchedEffect(hudState?.id) {
+        if (hudState != null) {
+            delay(1_200L)
+            hudState = null
+        }
+    }
 
     val castManager = remember(context) { com.aurorashelf.app.cast.CastManager.getInstance(context) }
     val castState by castManager.castState.collectAsStateWithLifecycle()
@@ -177,11 +253,15 @@ internal fun NativeSitePlayer(
             val current = player.currentPosition.coerceAtLeast(0L)
             val dur = player.duration.coerceAtLeast(0L)
             val buf = player.bufferedPosition.coerceAtLeast(0L)
-            currentPositionMs = current
+            if (!isScrubbing) {
+                currentPositionMs = current
+            }
             durationMs = dur
             bufferedPositionMs = buf
+            isPlaying = player.isPlaying
             position = current
             positionChange(current)
+            durationChange(dur)
             delay(200)
         }
     }
@@ -295,25 +375,136 @@ internal fun NativeSitePlayer(
             .build()
     }
 
+    val audioManager = remember(context) {
+        context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    }
+
+    fun showHud(icon: ImageVector, text: String, progress: Float? = null) {
+        hudState = PlayerHudData(icon = icon, text = text, progress = progress)
+    }
+
+    fun seekRelative(deltaMs: Long) {
+        val maxDur = if (durationMs > 0L) durationMs else 3_600_000L
+        val target = (player.currentPosition + deltaMs).coerceIn(0L, maxDur)
+        player.seekTo(target)
+        currentPositionMs = target
+        controlInteractionTick++
+    }
+
+    fun toggleFillMode() {
+        isFillMode = !isFillMode
+        showHud(
+            icon = Icons.Default.AspectRatio,
+            text = if (isFillMode) "填满屏幕" else "适合屏幕",
+        )
+        controlInteractionTick++
+    }
+
     BackHandler(isFullscreen) { fullscreenChange(false) }
-    Box(modifier.background(Color.Black)) {
+    Box(
+        modifier = modifier
+            .background(Color.Black)
+            .pointerInput(pageUrl, isFullscreen) {
+                detectTapGestures(
+                    onDoubleTap = { offset ->
+                        val w = size.width.toFloat().coerceAtLeast(1f)
+                        when {
+                            offset.x < w * 0.35f -> {
+                                seekRelative(-10_000L)
+                                showHud(Icons.Default.Replay10, "快退 10 秒")
+                            }
+                            offset.x > w * 0.65f -> {
+                                seekRelative(10_000L)
+                                showHud(Icons.Default.Forward10, "快进 10 秒")
+                            }
+                            else -> toggleFillMode()
+                        }
+                    },
+                    onTap = {
+                        isControllerVisible = !isControllerVisible
+                        controlInteractionTick++
+                    },
+                )
+            }
+            .pointerInput(pageUrl, isFullscreen) {
+                if (!isFullscreen) return@pointerInput
+                var gestureSide = 0 // 1 = left (brightness), 2 = right (volume)
+                var accumDeltaY = 0f
+                var initialFraction = 0.5f
+                detectVerticalDragGestures(
+                    onDragStart = { startOffset ->
+                        val w = size.width.toFloat().coerceAtLeast(1f)
+                        accumDeltaY = 0f
+                        if (startOffset.x < w * 0.45f) {
+                            gestureSide = 1
+                            val win = (context as? Activity)?.window
+                            val curB = win?.attributes?.screenBrightness ?: -1f
+                            initialFraction = if (curB in 0.01f..1.0f) curB else 0.5f
+                        } else if (startOffset.x > w * 0.55f) {
+                            gestureSide = 2
+                            val maxVol = (audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15).coerceAtLeast(1)
+                            val curVol = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: (maxVol / 2)
+                            initialFraction = curVol.toFloat() / maxVol.toFloat()
+                        } else {
+                            gestureSide = 0
+                        }
+                    },
+                    onVerticalDrag = { change, dragAmount ->
+                        if (gestureSide == 0) return@detectVerticalDragGestures
+                        change.consume()
+                        accumDeltaY += -dragAmount
+                        val h = size.height.toFloat().coerceAtLeast(200f)
+                        val nextFraction = (initialFraction + (accumDeltaY / (h * 0.65f))).coerceIn(0f, 1f)
+                        if (gestureSide == 1) {
+                            val win = (context as? Activity)?.window
+                            if (win != null) {
+                                val lp = win.attributes
+                                lp.screenBrightness = nextFraction.coerceAtLeast(0.02f)
+                                win.attributes = lp
+                            }
+                            showHud(
+                                icon = Icons.Default.LightMode,
+                                text = "亮度 ${(nextFraction * 100).roundToInt()}%",
+                                progress = nextFraction,
+                            )
+                        } else if (gestureSide == 2) {
+                            val maxVol = (audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15).coerceAtLeast(1)
+                            val targetVol = (nextFraction * maxVol).roundToInt().coerceIn(0, maxVol)
+                            audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, targetVol, 0)
+                            showHud(
+                                icon = if (targetVol == 0) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                                text = "音量 ${(nextFraction * 100).roundToInt()}%",
+                                progress = nextFraction,
+                            )
+                        }
+                    },
+                    onDragEnd = { gestureSide = 0 },
+                    onDragCancel = { gestureSide = 0 },
+                )
+            },
+    ) {
         AndroidView(
-            factory = { viewContext -> PlayerView(viewContext).apply {
-                id = R.id.native_player
-                this.player = player
-                keepScreenOn = true
-                setShowNextButton(false)
-                setShowPreviousButton(false)
-                setFullscreenButtonClickListener { fullscreenChange(it) }
-                setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
-                    isControllerVisible = (visibility == android.view.View.VISIBLE)
-                })
-            } },
+            factory = { viewContext ->
+                PlayerView(viewContext).apply {
+                    id = R.id.native_player
+                    this.player = player
+                    useController = false
+                    keepScreenOn = true
+                    resizeMode = if (isFillMode) {
+                        AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    } else {
+                        AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
+                }
+            },
             update = { playerView ->
-                // AndroidView is retained when an episode changes. Rebind its surface
-                // to the new ExoPlayer or the replacement player will be audio-only.
                 if (playerView.player !== player) playerView.player = player
-                playerView.setFullscreenButtonState(isFullscreen)
+                playerView.useController = false
+                playerView.resizeMode = if (isFillMode) {
+                    AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                } else {
+                    AspectRatioFrameLayout.RESIZE_MODE_FIT
+                }
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -341,63 +532,401 @@ internal fun NativeSitePlayer(
                 }
             }
         }
-        // Hidden entirely when the media declares no text track, so no empty control is shown.
-        // In fullscreen, hidden along with ExoPlayer controller to eliminate residual UI.
-        if (subtitleOptions.isNotEmpty() && (!isFullscreen || isControllerVisible)) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    // Non-fullscreen: below PlayerScreen's 48dp back button; fullscreen: near edge.
-                    .padding(start = 12.dp, top = if (isFullscreen) 12.dp else 64.dp),
-            ) {
-                FilledTonalIconButton(
-                    onClick = { subtitleMenuExpanded = true },
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = Color.Black.copy(alpha = 0.56f),
-                        contentColor = Color.White,
-                    ),
-                    modifier = Modifier.size(44.dp),
+
+        // Apple TV 原生风格控制覆层（顶栏辅助键 + 中央快进退/主播放键 + 底部弹性拖拽时间轴）
+        AnimatedVisibility(
+            visible = isControllerVisible && error == null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                // 顶部与底部可读性暗角渐变（中间完全通透）
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isFullscreen) 96.dp else 72.dp)
+                        .align(Alignment.TopCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Black.copy(alpha = 0.76f), Color.Transparent)
+                            )
+                        ),
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isFullscreen) 110.dp else 80.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f))
+                            )
+                        ),
+                )
+
+                // 顶部控制栏（全屏时包含退出全屏与 4K HDR 徽标；内嵌时右侧工具与 PlayerScreen 顶栏对齐）
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .fillMaxWidth()
+                        .padding(
+                            start = if (isFullscreen) 16.dp else 62.dp,
+                            end = if (isFullscreen) 16.dp else 108.dp,
+                            top = 10.dp,
+                        ),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Subtitles,
-                        contentDescription = "字幕",
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-                DropdownMenu(
-                    expanded = subtitleMenuExpanded,
-                    onDismissRequest = { subtitleMenuExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("关闭字幕") },
-                        trailingIcon = {
-                            if (subtitleOptions.none { it.selected }) {
-                                Icon(Icons.Default.Check, contentDescription = null)
-                            }
-                        },
-                        onClick = {
-                            subtitleMenuExpanded = false
-                            setSubtitlesEnabled(false)
-                        },
-                    )
-                    subtitleOptions.forEach { option ->
-                        DropdownMenuItem(
-                            text = { Text(option.label) },
-                            trailingIcon = {
-                                if (option.selected) {
-                                    Icon(Icons.Default.Check, contentDescription = null)
-                                }
-                            },
+                    if (isFullscreen) {
+                        FilledTonalIconButton(
+                            onClick = { fullscreenChange(false) },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.54f),
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(44.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "退出全屏",
+                            )
+                        }
+                        Surface(
+                            color = Color.White.copy(alpha = 0.18f),
+                            shape = RoundedCornerShape(6.dp),
+                        ) {
+                            Text(
+                                text = "4K HDR",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.weight(1f))
+
+                    // 倍速选择胶囊（Apple TV 0.5x ~ 2.0x）
+                    Box {
+                        Surface(
                             onClick = {
-                                subtitleMenuExpanded = false
-                                selectSubtitle(option)
+                                speedMenuExpanded = true
+                                controlInteractionTick++
                             },
-                        )
+                            shape = RoundedCornerShape(999.dp),
+                            color = Color.Black.copy(alpha = 0.54f),
+                            contentColor = Color.White,
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+                            modifier = Modifier.height(36.dp),
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                            ) {
+                                Text(
+                                    text = if (playbackSpeed == 1.0f) "1.0x" else "${playbackSpeed}x",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                )
+                            }
+                        }
+                        DropdownMenu(
+                            expanded = speedMenuExpanded,
+                            onDismissRequest = { speedMenuExpanded = false },
+                        ) {
+                            listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
+                                DropdownMenuItem(
+                                    text = { Text(if (speed == 1.0f) "正常 (1.0x)" else "${speed}x") },
+                                    trailingIcon = {
+                                        if (playbackSpeed == speed) {
+                                            Icon(Icons.Default.Check, contentDescription = null)
+                                        }
+                                    },
+                                    onClick = {
+                                        speedMenuExpanded = false
+                                        playbackSpeed = speed
+                                        player.setPlaybackSpeed(speed)
+                                        showHud(Icons.Default.Speed, "${speed}x 倍速")
+                                        controlInteractionTick++
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    // 字幕菜单（当视频包含字幕轨时展示）
+                    if (subtitleOptions.isNotEmpty()) {
+                        Box {
+                            FilledTonalIconButton(
+                                onClick = {
+                                    subtitleMenuExpanded = true
+                                    controlInteractionTick++
+                                },
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = Color.Black.copy(alpha = 0.54f),
+                                    contentColor = Color.White,
+                                ),
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Subtitles,
+                                    contentDescription = "字幕",
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = subtitleMenuExpanded,
+                                onDismissRequest = { subtitleMenuExpanded = false },
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("关闭字幕") },
+                                    trailingIcon = {
+                                        if (subtitleOptions.none { it.selected }) {
+                                            Icon(Icons.Default.Check, contentDescription = null)
+                                        }
+                                    },
+                                    onClick = {
+                                        subtitleMenuExpanded = false
+                                        setSubtitlesEnabled(false)
+                                    },
+                                )
+                                subtitleOptions.forEach { option ->
+                                    DropdownMenuItem(
+                                        text = { Text(option.label) },
+                                        trailingIcon = {
+                                            if (option.selected) {
+                                                Icon(Icons.Default.Check, contentDescription = null)
+                                            }
+                                        },
+                                        onClick = {
+                                            subtitleMenuExpanded = false
+                                            selectSubtitle(option)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // 画幅裁切切换（Fit / Fill）
+                    if (isFullscreen) {
+                        FilledTonalIconButton(
+                            onClick = { toggleFillMode() },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.54f),
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(44.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AspectRatio,
+                                contentDescription = if (isFillMode) "适合屏幕" else "填满屏幕",
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
+
+                // 中央播放控制组（快退 10s + 主播放/暂停 + 快进 10s）
+                if (!isLoading) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(if (isFullscreen) 36.dp else 24.dp),
+                        modifier = Modifier.align(Alignment.Center),
+                    ) {
+                        FilledTonalIconButton(
+                            onClick = {
+                                seekRelative(-10_000L)
+                                showHud(Icons.Default.Replay10, "快退 10 秒")
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.52f),
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(if (isFullscreen) 48.dp else 40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Replay10,
+                                contentDescription = "快退 10 秒",
+                                modifier = Modifier.size(if (isFullscreen) 24.dp else 20.dp),
+                            )
+                        }
+
+                        FilledIconButton(
+                            onClick = {
+                                if (player.isPlaying) {
+                                    player.pause()
+                                    isPlaying = false
+                                } else {
+                                    player.play()
+                                    isPlaying = true
+                                }
+                                controlInteractionTick++
+                            },
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = AuroraCoral.copy(alpha = 0.92f),
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(if (isFullscreen) 64.dp else 52.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (isPlaying) "暂停" else "播放",
+                                modifier = Modifier.size(if (isFullscreen) 32.dp else 26.dp),
+                            )
+                        }
+
+                        FilledTonalIconButton(
+                            onClick = {
+                                seekRelative(10_000L)
+                                showHud(Icons.Default.Forward10, "快进 10 秒")
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.52f),
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(if (isFullscreen) 48.dp else 40.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Forward10,
+                                contentDescription = "快进 10 秒",
+                                modifier = Modifier.size(if (isFullscreen) 24.dp else 20.dp),
+                            )
+                        }
+                    }
+                }
+
+                // 底部 Apple TV 时间轴与剩余倒计时控制条
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = if (isFullscreen) 20.dp else 14.dp,
+                            vertical = if (isFullscreen) 16.dp else 8.dp,
+                        ),
+                ) {
+                    Text(
+                        text = formatPlayerTimecode(currentPositionMs),
+                        color = Color.White,
+                        fontSize = if (isFullscreen) 12.sp else 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                    )
+
+                    AppleTvScrubberBar(
+                        currentPositionMs = currentPositionMs,
+                        bufferedPositionMs = bufferedPositionMs,
+                        durationMs = durationMs,
+                        onScrubMove = { previewMs ->
+                            isScrubbing = true
+                            currentPositionMs = previewMs
+                        },
+                        onScrubCommit = { targetMs ->
+                            isScrubbing = false
+                            currentPositionMs = targetMs
+                            player.seekTo(targetMs)
+                            controlInteractionTick++
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(32.dp),
+                    )
+
+                    Text(
+                        text = if (showRemainingTime) {
+                            formatRemainingPlayerTimecode(currentPositionMs, durationMs)
+                        } else {
+                            formatPlayerTimecode(durationMs)
+                        },
+                        color = Color.White.copy(alpha = 0.88f),
+                        fontSize = if (isFullscreen) 12.sp else 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.clickable {
+                            showRemainingTime = !showRemainingTime
+                            controlInteractionTick++
+                        },
+                    )
+
+                    if (isFullscreen) {
+                        FilledTonalIconButton(
+                            onClick = { fullscreenChange(false) },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.54f),
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(36.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FullscreenExit,
+                                contentDescription = "收起全屏",
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
                     }
                 }
             }
         }
-        if (!isFullscreen) {
+
+        // Apple TV 中央动态 HUD 胶囊（音量、亮度、快进退、画幅、倍速）
+        AnimatedVisibility(
+            visible = hudState != null,
+            enter = fadeIn() + scaleIn(initialScale = 0.9f),
+            exit = fadeOut() + scaleOut(targetScale = 0.9f),
+            modifier = Modifier.align(Alignment.Center),
+        ) {
+            hudState?.let { hud ->
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xCC16181F),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    ) {
+                        Icon(
+                            imageVector = hud.icon,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp),
+                        )
+                        Text(
+                            text = hud.text,
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        if (hud.progress != null) {
+                            Box(
+                                modifier = Modifier
+                                    .width(104.dp)
+                                    .height(4.dp)
+                                    .clip(RoundedCornerShape(999.dp))
+                                    .background(Color.White.copy(alpha = 0.24f)),
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(hud.progress.coerceIn(0f, 1f))
+                                        .background(Color.White, RoundedCornerShape(999.dp)),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 仅在非全屏且控制栏隐藏时保留底部 1.5dp 极细分割微线，全屏观影时 100% 零遮挡
+        if (!isFullscreen && !isControllerVisible) {
             PlayerBottomProgressBar(
                 currentPositionMs = currentPositionMs,
                 bufferedPositionMs = bufferedPositionMs,
@@ -407,6 +936,161 @@ internal fun NativeSitePlayer(
             )
         }
     }
+}
+
+@Composable
+private fun AppleTvScrubberBar(
+    currentPositionMs: Long,
+    bufferedPositionMs: Long,
+    durationMs: Long,
+    onScrubMove: (Long) -> Unit,
+    onScrubCommit: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var widthPx by remember { mutableIntStateOf(1) }
+    var isDragging by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+
+    val progressFraction = calculateVideoProgressFraction(currentPositionMs, durationMs)
+    val bufferedFraction = calculateVideoBufferedFraction(bufferedPositionMs, durationMs)
+
+    val trackHeight by animateDpAsState(
+        targetValue = if (isDragging) 8.dp else 4.dp,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+        label = "scrubber-track-height",
+    )
+    val thumbSize by animateDpAsState(
+        targetValue = if (isDragging) 18.dp else 10.dp,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+        label = "scrubber-thumb-size",
+    )
+
+    Box(
+        contentAlignment = Alignment.CenterStart,
+        modifier = modifier
+            .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
+            .pointerInput(durationMs) {
+                detectTapGestures { offset ->
+                    if (durationMs <= 0L) return@detectTapGestures
+                    val fraction = (offset.x / size.width.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
+                    onScrubCommit((fraction * durationMs).toLong())
+                }
+            }
+            .pointerInput(durationMs) {
+                var lastTargetMs = currentPositionMs
+                detectHorizontalDragGestures(
+                    onDragStart = { startOffset ->
+                        if (durationMs <= 0L) return@detectHorizontalDragGestures
+                        isDragging = true
+                        val fraction = (startOffset.x / size.width.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
+                        lastTargetMs = (fraction * durationMs).toLong()
+                        onScrubMove(lastTargetMs)
+                    },
+                    onHorizontalDrag = { change, _ ->
+                        if (durationMs <= 0L) return@detectHorizontalDragGestures
+                        change.consume()
+                        val fraction = (change.position.x / size.width.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
+                        lastTargetMs = (fraction * durationMs).toLong()
+                        onScrubMove(lastTargetMs)
+                    },
+                    onDragEnd = {
+                        if (isDragging) {
+                            isDragging = false
+                            onScrubCommit(lastTargetMs)
+                        }
+                    },
+                    onDragCancel = {
+                        if (isDragging) {
+                            isDragging = false
+                            onScrubCommit(lastTargetMs)
+                        }
+                    },
+                )
+            },
+    ) {
+        // 背景轨道
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(trackHeight)
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color.White.copy(alpha = 0.24f)),
+        ) {
+            if (bufferedFraction > 0.001f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(bufferedFraction)
+                        .background(Color.White.copy(alpha = 0.36f)),
+                )
+            }
+            if (progressFraction > 0.001f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(progressFraction)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(AuroraCoral, Color(0xFFFF5277))
+                            )
+                        ),
+                )
+            }
+        }
+
+        // 滑块圆点
+        val thumbSizePx = with(density) { thumbSize.toPx() }
+        val knobOffsetX = ((widthPx * progressFraction) - thumbSizePx / 2f)
+            .coerceIn(0f, (widthPx - thumbSizePx).coerceAtLeast(0f))
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(knobOffsetX.roundToInt(), 0) }
+                .size(thumbSize)
+                .background(Color.White, CircleShape),
+        )
+
+        // 拖拽时浮起的 Apple TV 时间戳气泡
+        if (isDragging) {
+            val bubbleWidthPx = with(density) { 64.dp.toPx() }
+            val bubbleOffsetX = ((widthPx * progressFraction) - bubbleWidthPx / 2f)
+                .coerceIn(0f, (widthPx - bubbleWidthPx).coerceAtLeast(0f))
+            val bubbleOffsetY = with(density) { (-28).dp.roundToPx() }
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = Color(0xDD1A1C24),
+                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.3f)),
+                modifier = Modifier.offset { IntOffset(bubbleOffsetX.roundToInt(), bubbleOffsetY) },
+            ) {
+                Text(
+                    text = formatPlayerTimecode(currentPositionMs),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+            }
+        }
+    }
+}
+
+private fun formatPlayerTimecode(ms: Long): String {
+    if (ms <= 0L) return "00:00"
+    val totalSecs = ms / 1000L
+    val h = totalSecs / 3600L
+    val m = (totalSecs % 3600L) / 60L
+    val s = totalSecs % 60L
+    return if (h > 0L) {
+        String.format(java.util.Locale.US, "%d:%02d:%02d", h, m, s)
+    } else {
+        String.format(java.util.Locale.US, "%02d:%02d", m, s)
+    }
+}
+
+private fun formatRemainingPlayerTimecode(currentMs: Long, durationMs: Long): String {
+    if (durationMs <= 0L) return "--:--"
+    val remainingMs = (durationMs - currentMs).coerceAtLeast(0L)
+    return "-${formatPlayerTimecode(remainingMs)}"
 }
 
 @Composable

@@ -27,6 +27,12 @@ public struct VideoDetailPlaybackScreen: View {
     @State private var showRemainingTime: Bool = true
     @State private var playbackRate: Float = 1.0
     @State private var isShowingInPlayerEpisodes: Bool = false
+    @State private var isShowingInSight: Bool = false
+    @State private var isScrubbing: Bool = false
+    @State private var isSeeking: Bool = false
+    @State private var subtitleSelectionGroup: AVMediaSelectionGroup? = nil
+    @State private var audioSelectionGroup: AVMediaSelectionGroup? = nil
+    @State private var lastSavedSecond: Int = -1
     
     // 垂直滑动手势模式（左侧亮度、右侧音量）
     private enum PlayerVerticalGestureMode {
@@ -61,6 +67,8 @@ public struct VideoDetailPlaybackScreen: View {
     @ObservedObject private var videoRepo = VideoRepository.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
     public init(video: VideoItem, onDismiss: @escaping () -> Void) {
         self.initialVideo = video
@@ -143,21 +151,6 @@ public struct VideoDetailPlaybackScreen: View {
                     }
                     .zIndex(20)
                 }
-                
-                // HUD 提示胶囊（画幅模式、旋转模式等）
-                if let hud = hudMessage {
-                    Text(hud)
-                        .font(.callout.bold())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.5), radius: 8, y: 3)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .transition(.scale(scale: 0.9).combined(with: .opacity))
-                        .zIndex(30)
-                }
             }
         }
         .ignoresSafeArea()
@@ -173,6 +166,12 @@ public struct VideoDetailPlaybackScreen: View {
         }
         .task(id: currentVideo.id) {
             await loadEpisodes(for: currentVideo)
+        }
+        .onChange(of: isVoiceOverEnabled) { _, enabled in
+            if enabled {
+                hideControlsTask?.cancel()
+                showControls = true
+            }
         }
         .onAppear {
             let args = CommandLine.arguments
@@ -206,6 +205,72 @@ public struct VideoDetailPlaybackScreen: View {
                     isShowingEpisodePicker = false
                 }
             )
+        }
+        .sheet(isPresented: $isShowingInSight) {
+            InSightSheetView(
+                video: currentVideo,
+                currentTime: currentTime,
+                duration: duration,
+                isFillMode: isFillMode,
+                isLandscape: isLandscape,
+                onToggleFillMode: { toggleFillMode() },
+                onToggleOrientation: { toggleOrientation() },
+                onDismiss: { isShowingInSight = false }
+            )
+            .presentationDetents([.fraction(0.55), .large])
+            .presentationDragIndicator(.visible)
+        }
+        .focusable()
+        .focusEffectDisabled()
+        .onKeyPress(.space) {
+            togglePlayPause()
+            return .handled
+        }
+        .onKeyPress(.leftArrow) {
+            seekRelative(-15)
+            showHud(icon: "gobackward.15", text: "快退 15 秒")
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            seekRelative(15)
+            showHud(icon: "goforward.15", text: "快进 15 秒")
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "jJ")) { _ in
+            seekRelative(-15)
+            showHud(icon: "gobackward.15", text: "快退 15 秒")
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "kK")) { _ in
+            togglePlayPause()
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "lL")) { _ in
+            seekRelative(15)
+            showHud(icon: "goforward.15", text: "快进 15 秒")
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "mM")) { _ in
+            toggleMute()
+            return .handled
+        }
+        .onKeyPress(characters: CharacterSet(charactersIn: "fF")) { _ in
+            toggleFillMode()
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            if isFullScreen {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    isFullScreen = false
+                    isLandscape = false
+                    isShowingInPlayerEpisodes = false
+                }
+            } else {
+                cleanupPlayer()
+                onDismiss()
+                dismiss()
+            }
+            return .handled
         }
         .enableSwipeBack(isEnabled: !isFullScreen) {
             cleanupPlayer()
@@ -341,14 +406,14 @@ public struct VideoDetailPlaybackScreen: View {
                         .overlay(Color.black.opacity(0.45))
                     }
                     
-                    // 原生 AVPlayer 渲染视口（支持 Aspect Fit 与 Aspect Fill 满铺）
+                    // 原生 AVPlayer 渲染视口（支持 Aspect Fit 与 Aspect Fill 满铺，以及 Apple TV 三区双击手势）
                     if let activePlayer = player {
                         AuroraPlayerSurface(
                             player: activePlayer,
                             videoGravity: isFillMode ? .resizeAspectFill : .resizeAspect
                         )
-                        .onTapGesture(count: 2) {
-                            toggleFillMode()
+                        .onTapGesture(count: 2) { location in
+                            handleDoubleTap(at: location.x, in: targetWidth)
                         }
                         .onTapGesture(count: 1) {
                             withAnimation(.easeInOut(duration: 0.2)) {
@@ -408,6 +473,42 @@ public struct VideoDetailPlaybackScreen: View {
                 playerControlsOverlay(in: screenGeo, isRotated: isRotated)
                     .transition(.opacity)
             }
+            
+            // Apple TV 悬浮动态 HUD（无论控制栏显隐，均在播放器视口中央唯一呈现）
+            if let msg = hudMessage {
+                VStack(spacing: 8) {
+                    if let icon = hudIcon {
+                        Image(systemName: icon)
+                            .font(.system(size: 26, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                    Text(msg)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                    if let prog = hudProgress {
+                        GeometryReader { pGeo in
+                            ZStack(alignment: .leading) {
+                                Capsule()
+                                    .fill(Color.white.opacity(0.25))
+                                Capsule()
+                                    .fill(Color.white)
+                                    .frame(width: max(0, pGeo.size.width * CGFloat(prog)))
+                            }
+                        }
+                        .frame(width: 110, height: 4)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.4), radius: 14, y: 5)
+                .transition(.scale.combined(with: .opacity))
+                .zIndex(50)
+            }
         }
         .frame(width: targetWidth, height: targetHeight)
         .rotationEffect(isRotated ? .degrees(90) : .zero)
@@ -434,11 +535,12 @@ public struct VideoDetailPlaybackScreen: View {
         let bottomGradientHeight: CGFloat = isRotated ? 90 : (isFullScreen ? max(110, DeviceLayout.safeAreaBottom + 70) : (isPad ? 85 : 75))
 
         ZStack {
-            // 背景全屏轻触与 Apple TV 双侧滑动手势交互层
+            // 背景全屏轻触与 Apple TV 三区双击 / 双侧滑动手势交互层
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture(count: 2) {
-                    toggleFillMode()
+                .onTapGesture(count: 2) { location in
+                    let viewportWidth = isRotated ? screenGeo.size.height : screenGeo.size.width
+                    handleDoubleTap(at: location.x, in: viewportWidth)
                 }
                 .onTapGesture(count: 1) {
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -544,41 +646,6 @@ public struct VideoDetailPlaybackScreen: View {
             .padding(.horizontal, isPad ? 24 : 14)
             .padding(.top, topBarPadding)
             .padding(.bottom, isFullScreen ? max(16, DeviceLayout.safeAreaBottom) : (isPad ? 14 : 8))
-            
-            // Apple TV 悬浮动态 HUD
-            if let msg = hudMessage {
-                VStack(spacing: 8) {
-                    if let icon = hudIcon {
-                        Image(systemName: icon)
-                            .font(.system(size: 26, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                    Text(msg)
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.white)
-                    if let prog = hudProgress {
-                        GeometryReader { pGeo in
-                            ZStack(alignment: .leading) {
-                                Capsule()
-                                    .fill(Color.white.opacity(0.25))
-                                Capsule()
-                                    .fill(Color.white)
-                                    .frame(width: max(0, pGeo.size.width * CGFloat(prog)))
-                            }
-                        }
-                        .frame(width: 110, height: 4)
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.4), radius: 14, y: 5)
-                .transition(.scale.combined(with: .opacity))
-            }
         }
     }
     
@@ -704,6 +771,49 @@ public struct VideoDetailPlaybackScreen: View {
                     .frame(width: isPad ? 42 : 38, height: isPad ? 42 : 38)
                     .glassEffect(.regular.interactive(), in: .circle)
                     .frame(minWidth: 44, minHeight: 44)
+                
+                // Apple TV 字幕与音轨切换菜单（当流内包含多音轨或字幕轨时自动呈现）
+                if canSelectMediaTracks, let item = player?.currentItem {
+                    PlayerMediaTrackMenu(
+                        playerItem: item,
+                        subtitleGroup: subtitleSelectionGroup,
+                        audioGroup: audioSelectionGroup
+                    )
+                }
+                
+                // Apple TV 画中画（PiP）悬浮小窗切换按钮
+                if AVPictureInPictureController.isPictureInPictureSupported() {
+                    Button {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        PictureInPictureManager.shared.toggle()
+                        scheduleHideControls()
+                    } label: {
+                        Image(systemName: PictureInPictureManager.shared.isActive ? "pip.exit" : "pip.enter")
+                            .font(.system(size: isPad ? 15 : 13, weight: .bold))
+                            .frame(width: isPad ? 32 : 26, height: isPad ? 32 : 26)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel("画中画")
+                }
+                
+                // Apple TV InSight 实时音画规格与控制抽屉入口
+                Button {
+                    let impact = UIImpactFeedbackGenerator(style: .light)
+                    impact.impactOccurred()
+                    isShowingInSight = true
+                    scheduleHideControls()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: isPad ? 16 : 14, weight: .bold))
+                        .frame(width: isPad ? 32 : 26, height: isPad ? 32 : 26)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .frame(minWidth: 44, minHeight: 44)
+                .accessibilityLabel("媒体规格与控制")
                 
                 if isFullScreen {
                     // 画幅切换（Aspect Fit / Aspect Fill 满铺）
@@ -888,6 +998,14 @@ public struct VideoDetailPlaybackScreen: View {
                 onSeek: { targetTime in
                     seekTo(time: targetTime)
                     scheduleHideControls()
+                },
+                onEditingChanged: { editing in
+                    isScrubbing = editing
+                    if editing {
+                        hideControlsTask?.cancel()
+                    } else {
+                        scheduleHideControls()
+                    }
                 }
             )
             .frame(height: isPad ? 44 : 36)
@@ -1338,7 +1456,7 @@ public struct VideoDetailPlaybackScreen: View {
                                         }
                                         .padding(8)
                                         
-                                        // 选中播放指示（正在播放时在中央浮起高亮动效）
+                                        // 选中播放指示（正在播放时在中央浮起高亮动效 + 底部 Apple TV 红白实时进度微条）
                                         if isSelected {
                                             ZStack {
                                                 Color.black.opacity(0.4)
@@ -1348,6 +1466,21 @@ public struct VideoDetailPlaybackScreen: View {
                                                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                                                     .font(.system(size: 18, weight: .bold))
                                                     .foregroundStyle(.white)
+                                                
+                                                if duration > 0 {
+                                                    let progress = min(max(currentTime / duration, 0.04), 1.0)
+                                                    VStack {
+                                                        Spacer()
+                                                        ZStack(alignment: .leading) {
+                                                            Rectangle()
+                                                                .fill(Color.white.opacity(0.28))
+                                                                .frame(height: 3.5)
+                                                            Rectangle()
+                                                                .fill(AuroraColor.brand)
+                                                                .frame(width: 250 * CGFloat(progress), height: 3.5)
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -1513,6 +1646,10 @@ public struct VideoDetailPlaybackScreen: View {
     }
     
     private func initPlayer(url: URL, referer: String?, headers: [String: String] = [:]) {
+        // 激活系统级影视播放音频会话（破除物理静音键无声限制，并赋能后台与画中画 PiP）
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+        try? AVAudioSession.sharedInstance().setActive(true)
+        
         var assetOptions: [String: Any] = [:]
         var httpHeaders: [String: String] = [
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)"
@@ -1533,39 +1670,70 @@ public struct VideoDetailPlaybackScreen: View {
         
         let p = AVPlayer(playerItem: playerItem)
         self.player = p
+        self.lastSavedSecond = -1
         
         // 观察时长
-        itemDurationObserver = playerItem.observe(\.duration, options: [.new]) { [self] item, _ in
+        itemDurationObserver = playerItem.observe(\.duration, options: [.new, .initial]) { [self] item, _ in
             let seconds = CMTimeGetSeconds(item.duration)
             if seconds.isFinite && seconds > 0 {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.duration = seconds
                 }
             }
         }
         
         // 观察状态
-        itemStatusObserver = playerItem.observe(\.status, options: [.new]) { [self] item, _ in
-            DispatchQueue.main.async {
-                if item.status == .readyToPlay {
+        itemStatusObserver = playerItem.observe(\.status, options: [.new, .initial]) { [self] item, _ in
+            let status = item.status
+            let errorDesc = item.error?.localizedDescription
+            Task { @MainActor in
+                guard self.player?.currentItem === item else { return }
+                if status == .readyToPlay {
                     self.isPlaying = true
+                    self.loadMediaSelectionGroups(for: item)
+                    // Apple TV Up Next 断点续播：若存在未完成的播放记录，自动跳转至上次观看进度
+                    if let record = self.progressStore.record(for: self.currentVideo),
+                       !record.isManuallyCompleted,
+                       record.positionMs > 3_000,
+                       record.progressRatio < 0.95 {
+                        let resumeSec = Double(record.positionMs) / 1000.0
+                        self.currentTime = resumeSec
+                        let cmTime = CMTime(seconds: resumeSec, preferredTimescale: 600)
+                        p.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+                    }
                     p.play()
+                    if self.playbackRate != 1.0 {
+                        p.rate = self.playbackRate
+                    }
                     UIApplication.shared.isIdleTimerDisabled = true
                     self.scheduleHideControls()
-                } else if item.status == .failed {
-                    self.resolveError = item.error?.localizedDescription ?? "播放器解码失败"
+                } else if status == .failed {
+                    self.resolveError = errorDesc ?? "播放器解码失败"
                     UIApplication.shared.isIdleTimerDisabled = false
                 }
             }
         }
         
-        // 进度观察与末尾连播保底
+        // 进度观察与末尾连播保底（拖拽或 Seek 期间暂停覆写 currentTime，防止进度条跳针）
         let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         timeObserverToken = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [self] time in
             let cur = CMTimeGetSeconds(time)
-            self.currentTime = cur
-            if self.duration > 3.0 && cur >= self.duration - 0.4 {
-                self.handleEpisodePlaybackEnded()
+            Task { @MainActor in
+                guard !self.isScrubbing, !self.isSeeking else { return }
+                guard cur.isFinite && cur >= 0 else { return }
+                self.currentTime = cur
+                let sec = Int(cur)
+                if sec > 2 && sec % 3 == 0 && sec != self.lastSavedSecond && self.duration > 5.0 {
+                    self.lastSavedSecond = sec
+                    self.progressStore.updateProgress(
+                        video: self.currentVideo,
+                        positionMs: Int64(cur * 1000),
+                        durationMs: Int64(self.duration * 1000)
+                    )
+                }
+                if self.duration > 3.0 && cur >= self.duration - 0.4 {
+                    self.handleEpisodePlaybackEnded()
+                }
             }
         }
         
@@ -1579,33 +1747,91 @@ public struct VideoDetailPlaybackScreen: View {
             object: playerItem,
             queue: .main
         ) { [self] _ in
-            self.handleEpisodePlaybackEnded()
+            Task { @MainActor in
+                self.handleEpisodePlaybackEnded()
+            }
         }
         
         scheduleHideControls()
     }
     
+    private var canSelectMediaTracks: Bool {
+        subtitleSelectionGroup?.options.isEmpty == false || (audioSelectionGroup?.options.count ?? 0) > 1
+    }
+    
+    private func loadMediaSelectionGroups(for item: AVPlayerItem) {
+        Task { @MainActor in
+            let subtitleGroup = try? await item.asset.loadMediaSelectionGroup(for: .legible)
+            let audioGroup = try? await item.asset.loadMediaSelectionGroup(for: .audible)
+            guard self.player?.currentItem === item else { return }
+            self.subtitleSelectionGroup = subtitleGroup
+            self.audioSelectionGroup = audioGroup
+        }
+    }
+    
+    private func handleDoubleTap(at x: CGFloat, in width: CGFloat) {
+        let effectiveWidth = max(width, 1)
+        if x < effectiveWidth * 0.35 {
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+            seekRelative(-10)
+            showHud(icon: "gobackward.10", text: "快退 10 秒")
+        } else if x > effectiveWidth * 0.65 {
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+            seekRelative(10)
+            showHud(icon: "goforward.10", text: "快进 10 秒")
+        } else {
+            toggleFillMode()
+        }
+    }
+    
     private func togglePlayPause() {
         guard let p = player else { return }
+        let impact = UIImpactFeedbackGenerator(style: .light)
+        impact.impactOccurred()
         if isPlaying {
             p.pause()
             isPlaying = false
             hideControlsTask?.cancel()
         } else {
             p.play()
+            if playbackRate != 1.0 {
+                p.rate = playbackRate
+            }
             isPlaying = true
             scheduleHideControls()
         }
     }
     
+    private func toggleMute() {
+        guard let p = player else { return }
+        if p.volume > 0 {
+            gestureInitialValue = CGFloat(p.volume)
+            p.volume = 0
+            showHud(icon: "speaker.slash.fill", text: "静音", progress: 0)
+        } else {
+            let restored = Float(gestureInitialValue > 0 ? gestureInitialValue : 0.8)
+            p.volume = restored
+            showHud(icon: "speaker.wave.2.fill", text: "恢复音量", progress: Double(restored))
+        }
+    }
+    
     private func seekTo(time: Double) {
         guard let p = player else { return }
+        isSeeking = true
+        currentTime = time
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
-        p.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        p.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
+            DispatchQueue.main.async {
+                self.isSeeking = false
+            }
+        }
     }
     
     private func seekRelative(_ delta: Double) {
-        let target = min(max(currentTime + delta, 0), duration)
+        let maxDur = duration > 0 ? duration : 3600
+        let target = min(max(currentTime + delta, 0), maxDur)
         seekTo(time: target)
         scheduleHideControls()
     }
@@ -1638,9 +1864,15 @@ public struct VideoDetailPlaybackScreen: View {
     
     private func scheduleHideControls() {
         hideControlsTask?.cancel()
+        guard !isVoiceOverEnabled else {
+            showControls = true
+            return
+        }
         let task = DispatchWorkItem {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                self.showControls = false
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.3)) {
+                if self.isPlaying && !self.isScrubbing {
+                    self.showControls = false
+                }
             }
         }
         hideControlsTask = task
@@ -1649,7 +1881,17 @@ public struct VideoDetailPlaybackScreen: View {
     
     private func cleanupPlayer() {
         UIApplication.shared.isIdleTimerDisabled = false
+        if duration > 5.0 && currentTime > 2.0 && currentTime < duration - 1.0 {
+            progressStore.updateProgress(
+                video: currentVideo,
+                positionMs: Int64(currentTime * 1000),
+                durationMs: Int64(duration * 1000)
+            )
+        }
+        progressStore.flushPendingPersist()
         hideControlsTask?.cancel()
+        subtitleSelectionGroup = nil
+        audioSelectionGroup = nil
         itemStatusObserver?.invalidate()
         itemDurationObserver?.invalidate()
         if let token = didPlayToEndObserverToken {
@@ -1666,6 +1908,7 @@ public struct VideoDetailPlaybackScreen: View {
     
     private func handleEpisodePlaybackEnded() {
         guard !isSwitchingNextEpisode else { return }
+        progressStore.markCompleted(for: currentVideo)
         guard let currentEp = currentEpisode, !episodes.isEmpty else { return }
         if let nextEp = episodes.first(where: { $0.number == currentEp.number + 1 }) {
             isSwitchingNextEpisode = true

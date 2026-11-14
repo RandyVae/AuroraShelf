@@ -1,5 +1,7 @@
 # Active
 
+- [x] 播放器组件与 UI 对标 Apple TV 全方位审查与双端重构（v2.16.27 / Build 253）：iOS 合流双播放器、激活 `.playback` 音频会话、打通 Up Next 断点续播与自动存盘、补齐 PiP / 字幕音轨菜单 / InSight 规格抽屉 / 键盘快捷键、消除双 HUD 重叠与拖拽跳针；Android 重构为 Compose 原生 Apple TV OSD 控制层（`AppleTvScrubberBar` 悬浮时间气泡、剩余时间切换、倍速、画幅 Fit/Zoom、三区双击与左右滑调光调音 HUD、控制栏同步渐隐零遮挡） — 2026-11-14。
+
 - [x] 逐源分类统一与 iPad 横屏 YouTube 双栏布局：Android 完整 kiosk 分类适配、iOS 41 个 XVideos 分类与国际源原站分类收敛、iPad 横屏播放器/推荐双栏、Android 243 项 JVM 单测与 iOS build-for-testing 通过 — 2026-11-14；JAVSB 外部 TLS 阻塞、iOS Simulator runtime 缺失和既有 Android lint 错误已记录。
 
 - [x] 商业化第一阶段账号系统：邮箱密码注册/登录/退出、Android/iOS 会话接入、免费权益状态预留、PocketBase 服务器部署与 `/auth-api` 代理、双端 v2.16.22 / Build 248 Release OTA 发布 — 2026-11-13。

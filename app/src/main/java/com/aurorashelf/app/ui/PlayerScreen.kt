@@ -234,6 +234,8 @@ internal fun PlayerScreen(
     var playbackUrl by remember(video.id) { mutableStateOf(video.pageUrl) }
     var videoAspectRatio by remember(playbackUrl) { mutableStateOf<Float?>(null) }
     var currentPositionMs by rememberSaveable(playbackUrl) { mutableStateOf(0L) }
+    var currentDurationMs by rememberSaveable(playbackUrl) { mutableStateOf(0L) }
+    var isPlayerControllerVisible by remember(playbackUrl) { mutableStateOf(true) }
     var isEpisodePickerVisible by remember(video.id) { mutableStateOf(false) }
     // Flow marker for logcat: the gap from this line to "timing ready" is the tap -> READY time.
     LaunchedEffect(video.id) { Log.i(TAG, "timing player screen opened") }
@@ -469,6 +471,7 @@ internal fun PlayerScreen(
                             cachedVideo = cachedVideo,
                             episodes = episodes,
                             selectedEpisode = selectedEpisode,
+                            currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
                             isEpisodePickerVisible = isEpisodePickerVisible,
                             isCasting = isCasting,
                             onFavorite = onFavorite,
@@ -479,6 +482,7 @@ internal fun PlayerScreen(
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 playbackUrl = episode.pageUrl
                                 currentPositionMs = 0L
+                                currentDurationMs = 0L
                                 isEpisodePickerVisible = false
                                 val activeDevice = (castState as? CastState.Connected)?.device
                                 if (activeDevice != null) {
@@ -518,6 +522,8 @@ internal fun PlayerScreen(
                 onVideoOrientationChange = onVideoOrientationChange,
                 onVideoAspectRatioChange = { videoAspectRatio = it },
                 onPositionChange = { currentPositionMs = it },
+                onDurationChange = { currentDurationMs = it },
+                onControllerVisibilityChange = { isPlayerControllerVisible = it },
                 onPlaybackEnded = {
                     val curNum = selectedEpisode
                     val nextEp = episodes.firstOrNull { it.number == curNum + 1 }
@@ -525,6 +531,7 @@ internal fun PlayerScreen(
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         playbackUrl = nextEp.pageUrl
                         currentPositionMs = 0L
+                        currentDurationMs = 0L
                         val activeDevice = (castState as? CastState.Connected)?.device
                         if (activeDevice != null) {
                             launchCastForUrl(activeDevice, nextEp.pageUrl, nextEp.label, 0L)
@@ -546,26 +553,37 @@ internal fun PlayerScreen(
                     .testTag("native-player-container"),
             )
 
-            if (!isFullscreen) {
+            AnimatedVisibility(
+                visible = !isFullscreen && (isPlayerControllerVisible || isCasting),
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(10.dp),
+            ) {
                 FilledTonalIconButton(
                     onClick = onBack,
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
                         containerColor = Color.Black.copy(alpha = 0.52f),
                         contentColor = Color.White,
                     ),
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .statusBarsPadding()
-                        .padding(10.dp)
-                        .size(44.dp),
+                    modifier = Modifier.size(44.dp),
                 ) {
                     Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
                 }
+            }
+
+            AnimatedVisibility(
+                visible = !isFullscreen && (isPlayerControllerVisible || isCasting),
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(10.dp),
+            ) {
                 Row(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .statusBarsPadding()
-                        .padding(10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     if (isCasting) {
@@ -713,6 +731,7 @@ private fun PlayerDetails(
     cachedVideo: OfflineVideo?,
     episodes: List<PlaybackEpisode>,
     selectedEpisode: Int,
+    currentEpisodeProgress: Float,
     isEpisodePickerVisible: Boolean,
     isCasting: Boolean,
     onFavorite: () -> Unit,
@@ -887,7 +906,7 @@ private fun PlayerDetails(
                                             modifier = Modifier.size(20.dp),
                                         )
                                     }
-                                    // Apple TV 标志性红白进度微条
+                                    // Apple TV 标志性红白实时进度微条
                                     Box(
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
@@ -898,7 +917,7 @@ private fun PlayerDetails(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxHeight()
-                                                .fillMaxWidth(0.5f)
+                                                .fillMaxWidth(currentEpisodeProgress.coerceIn(0.05f, 1f))
                                                 .background(AuroraCoral),
                                         )
                                     }

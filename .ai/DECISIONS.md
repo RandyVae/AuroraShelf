@@ -687,4 +687,15 @@ Evidence:
 - iOS `xcodebuild build-for-testing -destination 'generic/platform=iOS Simulator'` — succeeded; no simulator runtime is installed for executing XCTest or visual captures.
 - `node scripts/probe_all_sources.mjs` — 33/34 reachable; JAVSB TLS failure is an external DNS/network condition (198.18.x.x), not a code-path regression.
 
+## Apple TV player architecture unification and OSD parity (v2.16.27 Build 253)
+
+Date: 2026-11-14
+
+Status: Implemented, unit-tested on Android JVM, and build-verified on iOS 27.2 SDK & Release archives.
+
+Decision:
+1. Unify iOS playback on `VideoDetailPlaybackScreen` and delegate `NativePlayerView` to it, while sharing `PlayerMediaTrackMenu`, `PictureInPictureManager`, `InSightSheetView`, `AVAudioSession` `.playback` mode, and `PlaybackProgressStore` persistence so no Apple TV player capabilities remain stranded in unused views.
+2. Replace Android Media3's default legacy `PlayerView` controller (`useController = false`) with a custom Compose Apple TV OSD overlay (`AppleTvScrubberBar`, `-MM:SS` remaining time toggle, `0.5x~2.0x` speed menu, Fit/Zoom aspect ratio toggle, 3-zone double-tap seek/zoom, and left/right vertical brightness/volume gestures with a central HUD capsule), synchronized with `PlayerScreen`'s top action buttons via `onControllerVisibilityChange` so fullscreen playback is 100% unobstructed when controls auto-hide.
+
+
 

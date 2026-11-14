@@ -1395,9 +1395,9 @@ private fun NativeLivePlayer(
         player.playWhenReady = true
     }
 
-    LaunchedEffect(controlsVisible, isFullscreen) {
-        if (isFullscreen && controlsVisible) {
-            delay(4000L)
+    LaunchedEffect(controlsVisible, isFullscreen, isPaused) {
+        if (controlsVisible && !isPaused) {
+            delay(3_500L)
             controlsVisible = false
         }
     }
@@ -1519,7 +1519,7 @@ private fun NativeLivePlayer(
 
         // Top bar
         AnimatedVisibility(
-            visible = !isFullscreen || controlsVisible,
+            visible = controlsVisible,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
@@ -1613,7 +1613,7 @@ private fun NativeLivePlayer(
         // Bottom control bar
         if (!isLoading && errorMessage == null) {
             AnimatedVisibility(
-                visible = !isFullscreen || controlsVisible,
+                visible = controlsVisible,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -1846,9 +1846,9 @@ private fun EmbeddedLivePlayer(
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     val isPlayerReady = roomStatus == LiveRoomStatus.READY
 
-    LaunchedEffect(controlsVisible, isFullscreen) {
-        if (isFullscreen && controlsVisible) {
-            delay(4000L)
+    LaunchedEffect(controlsVisible, isFullscreen, isPaused) {
+        if (controlsVisible && !isPaused) {
+            delay(3_500L)
             controlsVisible = false
         }
     }
@@ -2245,7 +2245,7 @@ private fun EmbeddedLivePlayer(
 
         // Top Bar in Inline and Fullscreen
         AnimatedVisibility(
-            visible = !isFullscreen || controlsVisible,
+            visible = controlsVisible,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter),
@@ -2342,7 +2342,7 @@ private fun EmbeddedLivePlayer(
         // Bottom control bar
         if (isPlayerReady) {
             AnimatedVisibility(
-                visible = !isFullscreen || controlsVisible,
+                visible = controlsVisible,
                 enter = fadeIn(),
                 exit = fadeOut(),
                 modifier = Modifier.align(Alignment.BottomCenter),

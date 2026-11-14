@@ -1,6 +1,22 @@
 # Project State
 
-## 最新工作状态（2026年11月14日 · 双端播放器原生 SDK 按键样式升级＋原生 SDK 滑动/预测返回过渡 · v2.16.26 Build 252）
+## 最新工作状态（2026年11月14日 · 播放器组件与 UI 全方位审查及对标 Apple TV 重构 · v2.16.27 Build 253）
+
+- **iOS / iPadOS 播放器内核合流与 Apple TV 全功能补齐**（[VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift)、[NativePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/NativePlayerView.swift)、[PlayerScrubberBar.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/PlayerScrubberBar.swift)）：
+  - 消除 `VideoDetailPlaybackScreen` 与 `NativePlayerView` 的双播放器实现分叉，将 `NativePlayerView` 统一委托至 `VideoDetailPlaybackScreen` 并抽出公用 `PlayerMediaTrackMenu`；
+  - 在 `initPlayer` 激活 `AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)`，解决物理静音键开启时播放无声及无法建立画中画会话的问题；
+  - 打通 `PlaybackProgressStore`：起播 `.readyToPlay` 时自动读取上次观看进度（`>3s` 且 `<95%`）断点续播，播放中每 3 秒及 `cleanupPlayer()` 自动持久化进度，播放完毕调用 `markCompleted(for:)`；
+  - 在 `topControlBar` 补齐 **字幕/多音轨菜单（`PlayerMediaTrackMenu`）**、**画中画（PiP `PictureInPictureManager.shared.toggle()`）** 与 **Apple TV `InSight` 实时媒体规格抽屉（`InSightSheetView`）**；
+  - 根除 `body` 与 `playerControlsOverlay` 双重渲染 `hudMessage` 导致的双胶囊重叠缺陷，统一在播放器视口中央渲染唯一带图标与进度条的 Apple TV HUD；
+  - 为 `PlayerScrubberBar` 增加 `onEditingChanged` 回调与 `isSeeking` 锁，根治拖拽进度条松手瞬间时间轴跳回旧位置的跳针问题；
+  - 补齐三区双击手势（左 35% `-10s`、中 30% 画幅切换、右 35% `+10s`）、iPad 实体键盘快捷键（Space / J / K / L / M / F / Esc）、VoiceOver 防自动隐藏以及 iPad 16:9 选集卡片底部红白实时进度条。
+- **Android 播放器重构为 Compose 原生 Apple TV OSD 控制层与手势体系**（[NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt)、[PlayerScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PlayerScreen.kt)、[LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt)）：
+  - 关闭 Media3 `PlayerView` 旧版 XML 控制器（`useController = false`），由统一的 `isControllerVisible`（3.5 秒自动渐隐）同步控制 `PlayerScreen` 顶部返回/投屏/全屏按钮与播放器 OSD 显隐，全屏观影隐藏控制栏后画面 100% 零遮挡；
+  - 实现 Compose 原生 `AppleTvScrubberBar`（支持缓冲轨、珊瑚红播放轨、拖拽时轨道/滑块弹性放大及顶部悬浮 `MM:SS` 时间戳气泡）、点击切换 `-MM:SS` 剩余时间、倍速菜单（`0.5x~2.0x`）、字幕菜单与画幅裁切（`RESIZE_MODE_FIT` / `RESIZE_MODE_ZOOM`）；
+  - 补齐三区双击手势（左 `-10s` / 中切换画幅 / 右 `+10s`）与全屏左半屏亮度、右半屏音量垂直滑动手势及中央 Apple TV HUD 胶囊；
+  - 修复 `PlayerScreen` 选集卡片底部 `0.5f` 硬编码假进度条为真实播放进度，并为 `LiveScreen` 补齐内嵌与全屏统一的 3.5 秒控制栏自动隐藏逻辑。
+
+## 历史工作状态（2026年11月14日 · 双端播放器原生 SDK 按键样式升级＋原生 SDK 滑动/预测返回过渡 · v2.16.26 Build 252）
 
 - **iOS / iPadOS 播放器按键升级为 iOS 27 SDK 原生 Liquid Glass 样式**（[VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift)、[NativePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/NativePlayerView.swift)、[LivePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LivePlayerView.swift)、[LiveDetailView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LiveDetailView.swift)、[PlayerOverlayBar.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/PlayerOverlayBar.swift)、[AirPlayRoutePicker.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/AirPlayRoutePicker.swift)）：
   - 全面移除播放器控制栏、详情工具条与直播浮层的手写 `.ultraThinMaterial` + `.buttonStyle(.plain)` 叠层，分组采用 **`GlassEffectContainer`** 包裹；

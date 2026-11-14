@@ -1,6 +1,6 @@
 # Project
 
-Netgrey · Android & iOS 2.16.26
+Netgrey · Android & iOS 2.16.27
 
 # Objective
 

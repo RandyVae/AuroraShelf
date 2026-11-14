@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `7145eb3`（2026-11-14），未提交 28 个文件
+- Git：`main` @ `dc76d44`（2026-11-14），未提交 17 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-14（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-14（今天）
@@ -36,19 +36,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-14 13:27 by `sync.py`
+- 最后同步：2026-11-14 14:15 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-14 · Build 252 / v2.16.26）：已完成播放器按钮与滑动返回的最新平台原生 SDK 全面升级。(1) iOS/iPadOS 播放器全面采用 iOS 27 SDK 原生 `GlassEffectContainer` + `.buttonStyle(.glass)` / `.buttonStyle(.glassProminent)` + `.buttonBorderShape(...)`；Android 全面采用 Google Material 3 (`1.4.0`) 原生 `FilledTonalIconButton` / `FilledIconButton` / `FilterChip` / `Surface(onClick)`；(2) iOS/iPadOS 移除生硬的 `DragGesture` 瞬切 `dismiss()`，统一交由 `UINavigationController` 原生 `interactivePopGestureRecognizer` 与 iOS 26/27 `interactiveContentPopGestureRecognizer` 驱动；Android 开启 `android:enableOnBackInvokedCallback="true"` 并新增基于 `PredictiveBackHandler` 的 `PredictiveBackContainer` 与无跳闪 `auroraSwipeBack`；(3) Android 单元测试/Lint (`BUILD SUCCESSFUL`)、iOS 27 Simulator SDK 编译测试 (`TEST BUILD SUCCEEDED`)、34 源探测 (`33/34 PASS`) 及 Release OTA 发布 (`bananarey.us`，APK 197M / IPA 193M，磁盘剩余 11G) 全部完成。
+- 当前阶段（2026-11-14 · Build 253 / v2.16.27）：已完成播放器组件与 UI 对标 Apple TV 的全方位审查与双端重构升级。(1) iOS/iPadOS 合流 `VideoDetailPlaybackScreen` 与 `NativePlayerView`，激活 `AVAudioSession .playback` 破除静音键无声限制，打通 `PlaybackProgressStore` 断点续播与每 3 秒自动存盘，顶栏补齐字幕/多音轨菜单（`PlayerMediaTrackMenu`）、画中画（PiP）与 Apple TV `InSight` 规格面板，消除双 HUD 重叠与进度条拖拽跳针，补齐三区双击、iPad 键盘快捷键与选集卡片实时进度条；(2) Android 停用 Media3 旧版默认控制器（`useController = false`），重构为 Compose 原生 Apple TV OSD 控制层（`AppleTvScrubberBar` 悬浮时间气泡、点击切换 `-MM:SS` 剩余时间、`0.5x~2.0x` 倍速、Fit/Zoom 画幅、三区双击与左右滑调光/调音 HUD），并与顶部按钮同步 3.5 秒自动渐隐实现全屏 100% 零遮挡；(3) 双端编译测试、全源探测与 Release OTA 发布全部通过。
 - 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，同时监控双端生产环境反馈与性能表现。
 - 下一步：接入用户资料/收藏历史云同步与后续订阅权益接口。
-- 阻塞：当前机器未安装 iOS Simulator runtime（已通过 `xcodebuild build-for-testing` 与签名真机 Release IPA 归档验证）；JAVSB 在当前网络环境下 TLS 被对端提前断开（34 源中 33 源可达）。
+- 阻塞：当前机器未安装 iOS Simulator runtime（已通过 `xcodebuild build-for-testing` 与签名真机 Release IPA 归档验证）；JAVSB 与禁漫天堂在当前网络节点下偶发连接超时（34 源中 32 源可达）。
 - 最近一次更新：2026-11-14 by Antigravity (Claude Opus)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-14（Antigravity）：播放器组件与 UI 对标 Apple TV 全方位审查与双端重构（v2.16.27 Build 253）。(1) iOS 消除双播放器分裂：将 `NativePlayerView` 统一委托至 `VideoDetailPlaybackScreen`，在 `VideoDetailPlaybackScreen` 激活 `AVAudioSession .playback`、打通 `PlaybackProgressStore` 断点续播与自动存盘、接入 PiP / `PlayerMediaTrackMenu` / `InSightSheetView` / 键盘快捷键，移除根视图重复 HUD 并通过 `onEditingChanged` + `isSeeking` 修复拖拽进度条跳针；(2) Android 原生 Apple TV OSD 重构：关闭 `PlayerView.useController`，实现 Compose 原生顶栏/中区/底栏 `AppleTvScrubberBar`、剩余时间切换、倍速、画幅裁切、三区双击与左右滑亮度/音量 HUD，并同步控制顶栏按钮显隐以保证观影画面零遮挡，同时修复选集卡片 `0.5f` 假进度条与直播内嵌控制栏常驻问题。
 
 - 2026-11-14（Antigravity）：双端播放器按钮升级为最新原生 SDK 样式并改用原生交互式滑动/预测返回（v2.16.26 Build 252）。(1) 按钮原生化：iOS/iPadOS 在 `VideoDetailPlaybackScreen`、`NativePlayerView`、`LivePlayerView`、`LiveDetailView`、`PlayerOverlayBar` 引入 `GlassEffectContainer` + `.buttonStyle(.glass)` / `.buttonStyle(.glassProminent)` 配合 `.environment(\.colorScheme, .dark)`，替换手写 `.ultraThinMaterial` 与 `.buttonStyle(.plain)`；Android 在 `PlayerScreen`、`NativeSitePlayer`、`LiveScreen` 替换为 Material 3 `FilledTonalIconButton` / `FilledIconButton` / `FilterChip` / `Surface(onClick)`；(2) 原生返回过渡：iOS 移除覆盖在 `NavigationStack` 上的生硬 `DragGesture.onEnded`，同时启用 `interactivePopGestureRecognizer` 与 iOS 26/27 `interactiveContentPopGestureRecognizer` 并隔离 `UIScrollView` 横向滚动；Android 开启 `enableOnBackInvokedCallback` 并用 `PredictiveBackHandler`（缩放到 0.88x、按滑动边缘偏移、圆角 28dp 过渡）和无回零跳闪的 `auroraSwipeBack` 替换原统一截断的生硬返回。
 

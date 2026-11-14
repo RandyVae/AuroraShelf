@@ -6,6 +6,7 @@ public struct PlayerScrubberBar: View {
     @Binding public var currentTime: Double
     public let duration: Double
     public let onSeek: (Double) -> Void
+    public var onEditingChanged: ((Bool) -> Void)?
     
     @State private var isScrubbing: Bool = false
     @State private var scrubProgress: CGFloat = 0
@@ -16,11 +17,13 @@ public struct PlayerScrubberBar: View {
     public init(
         currentTime: Binding<Double>,
         duration: Double,
-        onSeek: @escaping (Double) -> Void
+        onSeek: @escaping (Double) -> Void,
+        onEditingChanged: ((Bool) -> Void)? = nil
     ) {
         self._currentTime = currentTime
         self.duration = duration
         self.onSeek = onSeek
+        self.onEditingChanged = onEditingChanged
     }
     
     private var displayTime: Double {
@@ -91,6 +94,7 @@ public struct PlayerScrubberBar: View {
                     .onChanged { value in
                         if !isScrubbing {
                             isScrubbing = true
+                            onEditingChanged?(true)
                             hapticGenerator.prepare()
                         }
                         let clampedX = min(max(value.location.x, 0), width)
@@ -108,7 +112,9 @@ public struct PlayerScrubberBar: View {
                         let clampedX = min(max(value.location.x, 0), width)
                         let percent = width > 0 ? clampedX / width : 0
                         let targetTime = Double(percent) * duration
+                        currentTime = targetTime
                         isScrubbing = false
+                        onEditingChanged?(false)
                         onSeek(targetTime)
                     }
             )

@@ -1,4 +1,22 @@
-## 最新交接：2026-11-14 — 播放器原生 SDK 按键样式（iOS 27 Liquid Glass / Google Material 3）＋双端原生 SDK 滑动与预测返回升级 · v2.16.26 (Build 252)
+## 最新交接：2026-11-14 — 播放器组件与 UI 全方位审查及对标 Apple TV 重构 · v2.16.27 (Build 253)
+
+- **范围**：
+  - 响应 Randy 需求：「对播放器组件以及 UI 进行一次全方位的审查，向 Apple TV 看齐」，完成双端 12 项审查发现的全量改造与发布。
+  1. **iOS / iPadOS（`VideoDetailPlaybackScreen.swift`、`NativePlayerView.swift`、`PlayerScrubberBar.swift`）**：
+     - 合流双播放器实现，激活 `AVAudioSession .playback` + `.moviePlayback` 破除静音键无声限制；
+     - 接入 `PlaybackProgressStore` 断点续播、每 3 秒节流存盘、退出刷盘与播放完结标记；
+     - 顶栏接入 `PlayerMediaTrackMenu`（字幕/多音轨）、`PictureInPictureManager`（PiP 画中画）与 `InSightSheetView`（Apple TV InSight 实时规格面板）；
+     - 移除重复的第 2 个文本 HUD，修复 `PlayerScrubberBar` 拖拽跳针，补齐三区双击手势、iPad 键盘快捷键（Space / J / K / L / M / F / Esc）、VoiceOver 守卫及 iPad 选集卡片底部实时进度微条。
+  2. **Android（`NativeSitePlayer.kt`、`PlayerScreen.kt`、`LiveScreen.kt`）**：
+     - 停用 Media3 旧版默认控制器（`useController = false`），统一由 `isControllerVisible`（3.5s 自动渐隐）同步顶部返回/投屏/全屏按钮与 OSD 控制层，彻底消除全屏观影时的常驻按钮与底部常驻红线遮挡；
+     - 实现 `AppleTvScrubberBar`（缓冲/播放双轨 + 拖拽放大 + 悬浮时间气泡）、`-MM:SS` 剩余倒计时切换、`0.5x~2.0x` 倍速胶囊、画幅 Fit/Zoom 切换、三区双击手势及左右半屏亮度/音量滑动手势 + 中央 HUD；
+     - 修复 `PlayerScreen.kt` 选集卡片 `0.5f` 假进度条为真实播放进度，修复 `LiveScreen.kt` 内嵌模式控制栏不自动隐藏问题。
+  3. **验证与发布（v2.16.27 Build 253）**：
+     - `./gradlew :app:testDebugUnitTest assembleRelease` 与 `xcodebuild build-for-testing`（Simulator 27.2 SDK）全绿通过；
+     - `node scripts/probe_all_sources.mjs`：34 源中 32 源连通；
+     - `./scripts/publish_ota.sh Release`：双端 Release APK 与签名 IPA 上传至 `bananarey.us` 同名原子覆盖，版本号全链路递增至 `v2.16.27 (Build 253)`。
+
+## 历史交接：2026-11-14 — 播放器原生 SDK 按键样式（iOS 27 Liquid Glass / Google Material 3）＋双端原生 SDK 滑动与预测返回升级 · v2.16.26 (Build 252)
 
 - **范围**：
   - 响应 Randy 需求：「播放器的各个按钮样式 iOS 和 iPadOS 直接使用 iOS 27 SDK 自带最新样式，Android 直接使用 Google 提供最新 SDK 样式；同时改进目前生硬的滑动返回，直接使用最新 SDK 原生返回效果」。
