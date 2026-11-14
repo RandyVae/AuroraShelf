@@ -242,3 +242,45 @@ public struct DeviceLayout {
         return (insets.left, insets.right)
     }
 }
+
+/// Adaptive information architecture for the video detail player.
+///
+/// Full-width iPad landscape uses a YouTube-style split surface only when the current
+/// container is wide enough to keep both the player and the recommendation rail useful.
+public enum VideoDetailLayoutMode: Equatable {
+    case stacked
+    case padLandscapeSplit
+}
+
+public struct VideoDetailColumns: Equatable {
+    public let playerFraction: CGFloat
+    public let recommendationFraction: CGFloat
+    private let spacing: CGFloat
+
+    public init(playerFraction: CGFloat = 0.62, recommendationFraction: CGFloat = 0.38, spacing: CGFloat = 0) {
+        self.playerFraction = playerFraction
+        self.recommendationFraction = recommendationFraction
+        self.spacing = spacing
+    }
+
+    public func playerWidth(for totalWidth: CGFloat) -> CGFloat {
+        max(0, totalWidth * playerFraction - spacing / 2)
+    }
+
+    public func recommendationWidth(for totalWidth: CGFloat) -> CGFloat {
+        max(0, totalWidth * recommendationFraction - spacing / 2)
+    }
+}
+
+public enum VideoDetailLayout {
+    public static func mode(size: CGSize, idiom: UIUserInterfaceIdiom) -> VideoDetailLayoutMode {
+        guard idiom == .pad, size.width > size.height, size.width >= 900 else { return .stacked }
+        return .padLandscapeSplit
+    }
+
+    public static func columns(for size: CGSize, idiom: UIUserInterfaceIdiom) -> VideoDetailColumns {
+        mode(size: size, idiom: idiom) == .padLandscapeSplit
+            ? VideoDetailColumns()
+            : VideoDetailColumns(playerFraction: 1, recommendationFraction: 0)
+    }
+}

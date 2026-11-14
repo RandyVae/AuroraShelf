@@ -1,5 +1,7 @@
 # Active
 
+- [x] 逐源分类统一与 iPad 横屏 YouTube 双栏布局：Android 完整 kiosk 分类适配、iOS 41 个 XVideos 分类与国际源原站分类收敛、iPad 横屏播放器/推荐双栏、Android 243 项 JVM 单测与 iOS build-for-testing 通过 — 2026-11-14；JAVSB 外部 TLS 阻塞、iOS Simulator runtime 缺失和既有 Android lint 错误已记录。
+
 - [x] 商业化第一阶段账号系统：邮箱密码注册/登录/退出、Android/iOS 会话接入、免费权益状态预留、PocketBase 服务器部署与 `/auth-api` 代理、双端 v2.16.22 / Build 248 Release OTA 发布 — 2026-11-13。
 - [ ] 配置 PocketBase 首个管理员账号与 SMTP，并完成真实邮箱验证/找回密码 E2E。
 

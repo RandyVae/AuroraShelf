@@ -1,5 +1,15 @@
 # Project State
 
+## 最新工作状态（2026年11月14日 · 逐源分类统一＋iPad 横屏 YouTube 双栏布局 · v2.16.23 Build 249）
+
+- Android 新增 `SourceCategory` 适配层，分类栏现在读取每个 PipePipe 源完整的官方 kiosk ID 清单，不再截断为通用五分类；旧 `FeedCategory` 入口保留给直连源、缓存和既有测试。
+- iOS 统一源分类清单：XVideos 补齐 41 个官方栏目；国际扩展源按其 PipePipe 原站 kiosk 收敛为 latest/popular/recommended（仅有 latest 的源不再显示虚构栏目）；Pornhub、JAVSB、TOKYO Motion 等分类标签与 feed 路由一一对应。
+- iPad 横屏播放页改为 YouTube 式双栏：左侧播放器＋当前视频详情，右侧独立滚动推荐；竖屏、iPhone 和全屏播放继续走原有布局与同一 AVPlayer 实例。
+- 回归验证：Android `testDebugUnitTest` 243 项通过；iOS `build-for-testing` 通过。当前机器无 iOS Simulator runtime，无法执行 XCTest 或截图走查。
+- 全源探针：34 个源中 33 个可达；JAVSB 的 DNS 返回 198.18.x.x，TLS 在当前网络环境被对端提前断开，属于外部连通性阻塞，未改动播放链路。
+- Android `lintDebug` 仍被既有 `LiveScreen.kt` Media3 `UnsafeOptInUsageError` 阻断（14 errors），与本次分类改动无关；未为本任务触碰直播代码。
+- 当前交付包版本已同步到 Android/iOS `2.16.23 / Build 249`，待 Release 构建、OTA 覆盖、Git 提交推送和 GitHub Release。
+
 ## 最新工作状态（2026年11月13日 · 账号系统首期上线与认证入口路由修复 · v2.16.21 Build 247）
 
 - 已在 `bananarey.us` 部署 PocketBase 0.40.6 账号服务，监听本机 8090，并通过 Nginx `https://bananarey.us/auth-api` 代理；根路径 404 已修复，健康检查与注册参数校验通过，原有 OTA `/api/*` 服务保持不变。

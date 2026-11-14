@@ -13,6 +13,7 @@ import com.aurorashelf.app.data.SourceAddress
 import com.aurorashelf.app.model.AppDestination
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.FeedCategory
+import com.aurorashelf.app.model.SourceCategory
 import com.aurorashelf.app.model.VideoItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,7 +28,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 data class AuroraUiState(
     val destination: AppDestination = AppDestination.HOME,
-    val category: FeedCategory = FeedCategory.MONTHLY_HOT,
+    val category: SourceCategory = SourceCategory.FALLBACK,
     val videos: List<VideoItem> = emptyList(),
     val allKnownVideos: List<VideoItem> = emptyList(),
     val favoriteIds: Set<String> = emptySet(),
@@ -53,9 +54,10 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     private var feedJob: Job? = null
     private var nextPage = 1
     private val initialSourceUrl = preferences.sourceUrl
-    private val initialCategory = FeedCategory.availableFor(initialSourceUrl).let { available ->
-        if (available.contains(FeedCategory.MONTHLY_HOT)) FeedCategory.MONTHLY_HOT
-        else available.firstOrNull() ?: FeedCategory.RECENT
+    private val initialCategory = ContentSourceCatalog.sourceCategories(initialSourceUrl).let { available ->
+        available.firstOrNull { it.legacy == FeedCategory.MONTHLY_HOT }
+            ?: available.firstOrNull()
+            ?: SourceCategory.FALLBACK
     }
     private val initialCachedFeed = preferences.cachedFeed()?.takeIf {
         it.sourceUrl == initialSourceUrl &&
@@ -178,9 +180,9 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     private fun isFreshFeed(savedAtMillis: Long): Boolean =
         savedAtMillis > 0 && System.currentTimeMillis() - savedAtMillis in 0..FEED_CACHE_TTL_MS
 
-    private fun applyCachedFeed(sourceUrl: String, category: FeedCategory) {
+    private fun applyCachedFeed(sourceUrl: String, category: SourceCategory) {
         val cached = preferences.cachedFeed() ?: return
-        if (cached.sourceUrl != sourceUrl || cached.categoryPath != category.path) return
+        if (cached.sourceUrl != sourceUrl || cached.categoryPath != category.cacheKey) return
         if (!isFreshFeed(cached.savedAtMillis)) return
         _uiState.update {
             it.copy(
@@ -195,7 +197,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(destination = destination, isSearchOpen = false, selectedVideo = null) }
     }
 
-    fun selectCategory(category: FeedCategory) {
+    fun selectCategory(category: SourceCategory) {
         if (_uiState.value.category == category) return
         _uiState.update { it.copy(category = category) }
         applyCachedFeed(_uiState.value.sourceUrl, category)
@@ -274,8 +276,11 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         if (SourceAddress.error(value) != null) return
         preferences.sourceUrl = value
         val nextSource = preferences.sourceUrl
-        val nextCategory = _uiState.value.category.takeIf(FeedCategory.availableFor(nextSource)::contains)
-            ?: FeedCategory.availableFor(nextSource).first()
+        val availableCategories = ContentSourceCatalog.sourceCategories(nextSource)
+        val previousCategory = _uiState.value.category
+        val nextCategory = availableCategories.firstOrNull { it.id == previousCategory.id }
+            ?: availableCategories.firstOrNull()
+            ?: SourceCategory.FALLBACK
         _uiState.update {
             it.copy(
                 sourceUrl = nextSource,
@@ -302,7 +307,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
             runCatching { repository.loadFeed(snapshot.sourceUrl, snapshot.category, page = 1) }
                 .onSuccess { videos ->
                     nextPage = 2
-                    preferences.saveFeedCache(snapshot.sourceUrl, snapshot.category.path, videos)
+                    preferences.saveFeedCache(snapshot.sourceUrl, snapshot.category.cacheKey, videos)
                     prefetchCovers(videos)
                     prefetchDetails(videos)
                     prefetchLeadingStream(videos)

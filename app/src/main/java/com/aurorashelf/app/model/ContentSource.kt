@@ -13,6 +13,32 @@ data class ContentSource(
     val isDirectDomestic: Boolean = false,
 )
 
+/**
+ * A source-owned category. The legacy [FeedCategory] is retained only for routes that still use
+ * the original direct-source adapters; PipePipe categories are represented by their real kiosk ID.
+ */
+data class SourceCategory(
+    val id: String,
+    val label: String,
+    val path: String? = null,
+    val kioskId: String? = null,
+    val legacy: FeedCategory? = null,
+) {
+    val cacheKey: String
+        get() = legacy?.path ?: kioskId ?: path ?: id
+
+    val isAll: Boolean
+        get() = legacy == FeedCategory.ALL || id.equals("all", ignoreCase = true)
+
+    companion object {
+        val FALLBACK = SourceCategory(
+            id = "all",
+            label = "全部",
+            legacy = FeedCategory.ALL,
+        )
+    }
+}
+
 /** Preset sources shown in the app. The URL field remains an implementation detail. */
 object ContentSourceCatalog {
     const val T91_BASE_URL = "https://h1014.sol148.com"
@@ -96,6 +122,46 @@ object ContentSourceCatalog {
 
     fun serviceName(baseUrl: String): String? = find(baseUrl)?.extractorServiceName
 
+    /**
+     * Returns the exact category set exposed by the selected source. PipePipe sources are driven
+     * by every kiosk ID reported by the extractor; they must never be truncated to a generic
+     * five-item list because the upstream site's taxonomy is source-specific.
+     */
+    fun sourceCategories(baseUrl: String): List<SourceCategory> {
+        val source = find(baseUrl)
+        if (source?.extractorServiceName != null) {
+            return source.kioskIds.distinct().map { kioskId ->
+                val legacy = FeedCategory.entries.firstOrNull { it.xvideosKioskId == kioskId }
+                SourceCategory(
+                    id = kioskId,
+                    label = kioskLabel(kioskId),
+                    path = legacy?.path,
+                    kioskId = kioskId,
+                    legacy = legacy,
+                )
+            }
+        }
+
+        val categories = FeedCategory.availableFor(baseUrl).map { category ->
+            SourceCategory(
+                id = category.xvideosKioskId ?: category.name.lowercase(),
+                label = category.displayLabel(baseUrl),
+                path = category.path,
+                legacy = category,
+            )
+        }
+        return categories.ifEmpty { listOf(SourceCategory.FALLBACK) }
+    }
+
+    fun category(baseUrl: String, legacy: FeedCategory): SourceCategory =
+        sourceCategories(baseUrl).firstOrNull { it.legacy == legacy }
+            ?: SourceCategory(
+                id = legacy.xvideosKioskId ?: legacy.name.lowercase(),
+                label = legacy.displayLabel(baseUrl),
+                path = legacy.path,
+                legacy = legacy,
+            )
+
     fun kioskId(baseUrl: String, category: FeedCategory): String? {
         val source = find(baseUrl) ?: return null
         if (isXVideos(baseUrl)) {
@@ -106,7 +172,10 @@ object ContentSourceCatalog {
         return source.kioskIds.getOrNull(category.ordinal)
     }
 
-    fun kioskLabel(baseUrl: String, category: FeedCategory): String? = when (kioskId(baseUrl, category)) {
+    fun kioskLabel(baseUrl: String, category: FeedCategory): String? =
+        kioskId(baseUrl, category)?.let(::kioskLabel)
+
+    fun kioskLabel(kioskId: String?): String = when (kioskId) {
         "latest" -> "最新"
         "best" -> "热门"
         "chinese" -> "中文"
@@ -150,8 +219,13 @@ object ContentSourceCatalog {
         "asmr" -> "ASMR"
         "popular" -> "热门"
         "recommended" -> "推荐"
-        null -> null
-        else -> kioskId(baseUrl, category)?.replaceFirstChar { it.titlecase() }
+        null -> "全部"
+        else -> kioskId
+            .replace('-', ' ')
+            .replace('_', ' ')
+            .split(' ')
+            .filter(String::isNotBlank)
+            .joinToString(" ") { token -> token.replaceFirstChar { it.titlecase() } }
     }
 
     private fun host(value: String): String? = runCatching {

@@ -2,6 +2,7 @@ package com.aurorashelf.app.data
 
 import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.ContentSourceCatalog
+import com.aurorashelf.app.model.SourceCategory
 import com.aurorashelf.app.model.VideoItem
 import java.io.IOException
 import java.net.URI
@@ -24,11 +25,15 @@ import org.jsoup.parser.Parser
 
 class VideoRepository {
     suspend fun loadFeed(baseUrl: String, category: FeedCategory, page: Int = 1): List<VideoItem> =
+        loadFeed(baseUrl, ContentSourceCatalog.category(baseUrl, category), page)
+
+    suspend fun loadFeed(baseUrl: String, category: SourceCategory, page: Int = 1): List<VideoItem> =
         withContext(Dispatchers.IO) {
             require(SourceAddress.error(baseUrl) == null) { "站点地址无效" }
             require(page >= 1) { "页码必须从 1 开始" }
+            val legacyCategory = category.legacy ?: FeedCategory.RECENT
             if (ContentSourceCatalog.isBeeg(baseUrl)) {
-                return@withContext loadBeegFeed(category, page)
+                return@withContext loadBeegFeed(legacyCategory, page)
             }
             if (ContentSourceCatalog.isPipePipe(baseUrl)) {
                 // MissAV blocks the extractor's generic desktop request with a challenge page;
@@ -46,12 +51,12 @@ class VideoRepository {
                 }
             }
             if (ContentSourceCatalog.isHuangguo(baseUrl)) {
-                val cacheKey = "$category:$page"
+                val cacheKey = "${category.cacheKey}:$page"
                 val cached = huangguoFeedCache[cacheKey]
                 if (cached != null && System.currentTimeMillis() - cached.first < 10 * 60 * 1000L) {
                     return@withContext cached.second
                 }
-                val edgeItems = HuangguoEdgeGateway.fetchFeed(baseUrl, category, page)
+                val edgeItems = HuangguoEdgeGateway.fetchFeed(baseUrl, legacyCategory, page)
                 if (edgeItems != null && edgeItems.isNotEmpty()) {
                     huangguoFeedCache[cacheKey] = Pair(System.currentTimeMillis(), edgeItems)
                     return@withContext edgeItems
@@ -70,8 +75,8 @@ class VideoRepository {
                 throw IOException("页面已打开，但没有识别到视频条目。请检查站点地址或页面结构。")
             }
             if (ContentSourceCatalog.isHuangguo(baseUrl)) {
-                val diffRecords = differentiateHuangguoFeed(records, category)
-                huangguoFeedCache["$category:$page"] = Pair(System.currentTimeMillis(), diffRecords)
+                val diffRecords = differentiateHuangguoFeed(records, legacyCategory)
+                huangguoFeedCache["${category.cacheKey}:$page"] = Pair(System.currentTimeMillis(), diffRecords)
                 diffRecords
             } else {
                 records
@@ -210,6 +215,25 @@ class VideoRepository {
         if (page > 1) {
             params += "page=$page"
         }
+        return URI(
+            categoryUrl.scheme,
+            categoryUrl.rawUserInfo,
+            categoryUrl.host,
+            categoryUrl.port,
+            categoryUrl.rawPath,
+            params.joinToString("&").takeIf { it.isNotBlank() },
+            categoryUrl.rawFragment,
+        ).toString()
+    }
+
+    internal fun pageUrl(baseUrl: String, category: SourceCategory, page: Int): String {
+        category.legacy?.let { return pageUrl(baseUrl, it, page) }
+        val rawPath = category.path ?: category.id
+        val categoryUrl = URI("$baseUrl/").resolve(rawPath)
+        val params = categoryUrl.rawQuery.orEmpty().split('&').filter { it.isNotBlank() }
+            .filterNot { it.substringBefore('=').equals("page", ignoreCase = true) }
+            .toMutableList()
+        if (page > 1) params += "page=$page"
         return URI(
             categoryUrl.scheme,
             categoryUrl.rawUserInfo,

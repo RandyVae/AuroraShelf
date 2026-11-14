@@ -249,7 +249,17 @@ final class UniversalVideoEngineTests: XCTestCase {
         let allURL = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: source, category: "全部"))
 
         XCTAssertEqual(allURL.path, "/best")
-        XCTAssertEqual(source.categories, ["全部"])
+        XCTAssertEqual(source.categories, ["最新"])
+    }
+
+    func testVideoSourceCatalogKeepsSourceOwnedCategoryIDsUnique() {
+        XCTAssertEqual(VideoSourceCatalog.xvideos.categoryDefinitions.count, 41)
+        XCTAssertEqual(
+            Set(VideoSourceCatalog.xvideos.categoryDefinitions.map(\.id)).count,
+            VideoSourceCatalog.xvideos.categoryDefinitions.count
+        )
+        XCTAssertEqual(VideoSourceCatalog.beeg.categories, ["精选", "自拍", "日本", "熟女", "亚洲"])
+        XCTAssertEqual(VideoSourceCatalog.spankbang.categories, ["最新"])
     }
 
     func testHTMLVideoSourceAdapterPageTwoRoutesMatchSiteConventions() throws {
@@ -311,6 +321,19 @@ final class UniversalVideoEngineTests: XCTestCase {
         let missavPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.missav, category: "最新发布", page: 2))
         XCTAssertEqual(missavPage2.path, "/cn/new")
         XCTAssertEqual(missavPage2.query, "page=2")
+    }
+
+    func testSourceOwnedKioskLabelsResolveToDistinctUpstreamRoutes() throws {
+        let pornHubLatest = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.pornhub, category: "最新"))
+        let pornHubPopular = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.pornhub, category: "热门"))
+        let pornHubRecommended = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.pornhub, category: "推荐"))
+        XCTAssertEqual(pornHubLatest.path, "/video")
+        XCTAssertEqual(URLComponents(url: pornHubLatest, resolvingAgainstBaseURL: false)?.query, "o=cm")
+        XCTAssertEqual(URLComponents(url: pornHubPopular, resolvingAgainstBaseURL: false)?.query, "o=mv&t=m")
+        XCTAssertEqual(URLComponents(url: pornHubRecommended, resolvingAgainstBaseURL: false)?.query, "o=tr&t=m")
+
+        let javsbRecommended = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.javsb, category: "推荐"))
+        XCTAssertEqual(javsbRecommended.path, "/ja/label/rank/by/score.html")
     }
 
     func testEPORNERFeedDecoderUsesLiveAPIFields() throws {

@@ -332,10 +332,10 @@ public final class VideoRepository: ObservableObject {
     private func fetch91DongmanFeed(category: String = "全部", page: Int = 1) async throws -> [VideoItem] {
         let path: String
         switch category {
-        case "连载番剧": path = "/anime/lifan/"
-        case "剧场版", "3D动漫": path = "/anime/3d/"
-        case "完结经典", "AI动漫": path = "/anime/ai/"
-        case "里番特区": path = "/anime/lifan/"
+        case "里番", "连载番剧", "里番特区": path = "/anime/lifan/"
+        case "3D动漫", "剧场版": path = "/anime/3d/"
+        case "AI动漫", "完结经典": path = "/anime/ai/"
+        case "排行": path = "/ranking/"
         default: path = "/anime/"
         }
 
@@ -494,7 +494,7 @@ public final class VideoRepository: ObservableObject {
         case "自拍": tag = "amateur"
         case "日本": tag = "japanese"
         case "亚洲": tag = "asian"
-        case "欧美": tag = "milf"
+        case "熟女": tag = "milf"
         default: tag = "index"
         }
 

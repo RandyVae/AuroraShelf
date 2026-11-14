@@ -15,12 +15,16 @@ enum HTMLVideoSourceAdapter {
         switch source.id {
         case "missav":
             let isChinese = category.contains("中字") || category.contains("字幕") || category.contains("中文")
-            route = category.contains("热门") || category.contains("精选") ? "/cn/release" : isChinese ? "/cn/chinese-subtitle" : "/cn/new"
+            route = category.contains("热门") || category.contains("精选") ? "/cn/release" :
+                category.contains("推荐") ? "/cn" :
+                isChinese ? "/cn/chinese-subtitle" : "/cn/new"
         case "85po":
             let base = category.contains("热") || category.contains("精选") ? "/ja/most-popular" : category.contains("推荐") ? "/ja/top-rated" : "/ja/latest-updates"
             route = page == 1 ? "\(base)/" : "\(base)/\(page)/"
         case "pornhub":
-            route = category.contains("热") ? "/video?o=ht" : category.contains("4K") ? "/video?c=298" : "/video?o=cm"
+            route = category.contains("热") ? "/video?o=mv&t=m" :
+                category.contains("推荐") ? "/video?o=tr&t=m" :
+                category.contains("4K") ? "/video?c=298" : "/video?o=cm"
         case "javnoni":
             let isChinese = category.contains("热") || category.contains("中字") || category.contains("字幕") || category.contains("中文")
             let base = isChinese ? "/archives/category/uncensored" : category.contains("推荐") ? "/archives/tag/japan" : ""
@@ -28,7 +32,7 @@ enum HTMLVideoSourceAdapter {
         case "javsb":
             if category.contains("排行") || category.contains("热") {
                 route = page == 1 ? "/ja/label/rank/by/hits_week.html" : "/ja/label/rank/by/hits_week/page/\(page).html"
-            } else if category.contains("精选") {
+            } else if category.contains("精选") || category.contains("推荐") {
                 route = page == 1 ? "/ja/label/rank/by/score.html" : "/ja/label/rank/by/score/page/\(page).html"
             } else if category.contains("最新") {
                 route = page == 1 ? "/ja/label/rank/by/time.html" : "/ja/label/rank/by/time/page/\(page).html"
@@ -36,7 +40,7 @@ enum HTMLVideoSourceAdapter {
                 route = page == 1 ? "/ja/" : "/ja/label/rank/by/hits_week/page/\(page).html"
             }
         case "tokyomotion":
-            route = category.contains("评分") || category.contains("收藏") ? "/videos?sort=rating" : category.contains("热") ? "/videos?sort=popular" : "/videos"
+            route = category.contains("评分") || category.contains("收藏") || category.contains("推荐") ? "/videos?sort=rating" : category.contains("热") ? "/videos?sort=popular" : "/videos"
         case "kissjav":
             let sortBy = category.contains("热") || category.contains("热门") ? "?sort_by=video_viewed" : category.contains("新") ? "" : "?sort_by=rating"
             let pathPrefix = category.contains("新") ? "/latest-updates" : "/most-popular"

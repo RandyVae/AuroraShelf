@@ -2,6 +2,7 @@ package com.aurorashelf.app.data
 
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.FeedCategory
+import com.aurorashelf.app.model.SourceCategory
 import com.aurorashelf.app.model.VideoItem
 import com.aurorashelf.app.ui.CoverImageLoader
 import java.io.IOException
@@ -21,11 +22,15 @@ internal object PipePipeBridge {
     @Volatile private var isInitialized = false
 
     fun loadFeed(baseUrl: String, category: FeedCategory, page: Int): List<VideoItem> {
+        return loadFeed(baseUrl, ContentSourceCatalog.category(baseUrl, category), page)
+    }
+
+    fun loadFeed(baseUrl: String, category: SourceCategory, page: Int): List<VideoItem> {
         initialize()
         val source = ContentSourceCatalog.find(baseUrl) ?: throw IOException("未找到所选视频源")
-        Log.i(TAG, "loadFeed service=${source.extractorServiceName} category=${category.name} page=$page")
-        val kioskId = ContentSourceCatalog.kioskId(baseUrl, category)
-            ?: throw IOException("该视频源不支持分类：${category.displayLabel(baseUrl)}")
+        Log.i(TAG, "loadFeed service=${source.extractorServiceName} category=${category.id} label=${category.label} page=$page")
+        val kioskId = category.kioskId ?: ContentSourceCatalog.kioskId(baseUrl, category.legacy ?: FeedCategory.RECENT)
+            ?: throw IOException("该视频源不支持分类：${category.label}")
         val extractor = service(source.extractorServiceName).kioskList.getExtractorById(kioskId, null)
         extractor.fetchPage()
         var result = extractor.initialPage

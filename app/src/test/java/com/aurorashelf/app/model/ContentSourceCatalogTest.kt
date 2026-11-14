@@ -45,4 +45,13 @@ class ContentSourceCatalogTest {
             }
         }
     }
+
+    @Test
+    fun sourceCategoriesExposeEveryOfficialPipePipeKiosk() {
+        ContentSourceCatalog.sources.filter { it.extractorServiceName != null }.forEach { source ->
+            val categories = ContentSourceCatalog.sourceCategories(source.baseUrl)
+            assertEquals(source.kioskIds, categories.mapNotNull(SourceCategory::kioskId))
+            assertEquals(source.kioskIds.distinct().size, categories.size)
+        }
+    }
 }

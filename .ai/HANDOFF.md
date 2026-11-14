@@ -4769,3 +4769,11 @@ cp build.nosync/app/outputs/apk/release/app-release.apk \
 
 - Android 与 iOS 首页新增可跳过的“注册免费账号 / 注册 / 登录”引导卡片，点击进入现有账号页面；视频、直播和内容加载链路未改动。
 - 双端 Release 包已构建并 OTA 发布；Android JVM 测试、iOS generic Simulator build 通过。
+## 最新交接：2026-11-14 — 逐源分类统一＋iPad 横屏 YouTube 双栏布局（v2.16.23 Build 249）
+
+- **分类统一**：Android `ContentSourceCatalog.sourceCategories()` 直接使用 PipePipe 每个服务报告的完整 kiosk ID；`AuroraViewModel`、首页分类栏、缓存键和 `VideoRepository` 已接入稳定的 `SourceCategory`，播放解析器没有改动。
+- **iOS 分类统一**：`VideoSourceCatalog` 增加稳定分类 ID；XVideos 显示 41 个官方栏目；MissAV/KissJAV/85po/Pornhub/JAV-NONI/JAVSB/TOKYO Motion 等按原站 latest/popular/recommended；SpankBang、xHamster、EPORNER、OHentai、XNXX 只保留实际存在的 latest 栏目。`HTMLVideoSourceAdapter` 路由测试覆盖 Pornhub/JAVSB 等易错映射。
+- **iPad 横屏**：`VideoDetailPlaybackScreen` 使用容器尺寸判断 iPad 横屏。横屏普通播放页为左 62% 播放器/详情、右 38% 独立推荐栏；竖屏和 iPhone 保留原纵向结构；全屏和 AVPlayer 解析链路未改变。
+- **验证**：`./gradlew testDebugUnitTest` 243 项通过；iOS `xcodebuild build-for-testing ... generic/platform=iOS Simulator` 成功。当前 Xcode 没有安装任何 Simulator runtime，iOS XCTest/实际截图不能执行。
+- **联网证据**：`node scripts/probe_all_sources.mjs` 33/34 可达；唯一异常为 JAVSB，当前 DNS 返回保留网段 198.18.x.x，TLS 握手被对端提前断开。
+- **已知基线问题**：`lintDebug` 仍有既有 `LiveScreen.kt` Media3 opt-in 14 errors；本次未修改直播代码，避免影响现有直播可用性。

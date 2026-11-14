@@ -671,4 +671,20 @@ Evidence:
 - `grep -rn "VideoSourceService" ios/` 實測為 0；
 - `grep -rn "onCast" ios/AuroraShelf` 實測為 0。
 
+## Source-owned video taxonomy and iPad landscape player layout
+
+Date: 2026-11-14
+
+Status: Implemented, Android JVM-tested, and iOS build-tested; runtime iPad visual acceptance is pending a simulator runtime.
+
+Decision:
+1. Keep `FeedCategory` as a compatibility layer for direct domestic routes and persisted cache keys, but expose PipePipe categories through a new `SourceCategory` model backed by every extractor kiosk ID. This removes the old `DEFAULT_5.take(...)` truncation without changing playback resolution.
+2. Keep iOS source category labels source-owned and route-tested. International sources use only the latest/popular/recommended kiosks their vendored extractor exposes; XVideos keeps the full 41-category source taxonomy. Unsupported labels are not fabricated.
+3. Use a container-size-driven `VideoDetailLayout` on iPad. Full-width landscape uses a 62/38 player/detail-to-recommendation split with independent scrolling; portrait, compact windows, and iPhone keep the stacked layout. The existing AVPlayer and resolver remain single-instance and unchanged.
+
+Evidence:
+- Android `./gradlew testDebugUnitTest` — 243 tests passed.
+- iOS `xcodebuild build-for-testing -destination 'generic/platform=iOS Simulator'` — succeeded; no simulator runtime is installed for executing XCTest or visual captures.
+- `node scripts/probe_all_sources.mjs` — 33/34 reachable; JAVSB TLS failure is an external DNS/network condition (198.18.x.x), not a code-path regression.
+
 

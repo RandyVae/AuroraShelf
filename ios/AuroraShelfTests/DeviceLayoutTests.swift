@@ -77,4 +77,26 @@ final class DeviceLayoutTests: XCTestCase {
         XCTAssertEqual(columnCount(for: 669), 3, "iPhone Duo 内屏双联展开态应呈现 3 列大图卡片")
         XCTAssertEqual(columnCount(for: 834), 4, "iPad Pro 竖屏应呈现 4 列海报卡片")
     }
+
+    func testVideoDetailUsesYouTubeSplitLayoutOnlyForPadLandscape() {
+        XCTAssertEqual(
+            VideoDetailLayout.mode(size: CGSize(width: 1366, height: 1024), idiom: .pad),
+            .padLandscapeSplit
+        )
+        XCTAssertEqual(
+            VideoDetailLayout.mode(size: CGSize(width: 1024, height: 1366), idiom: .pad),
+            .stacked
+        )
+        XCTAssertEqual(
+            VideoDetailLayout.mode(size: CGSize(width: 852, height: 393), idiom: .phone),
+            .stacked
+        )
+    }
+
+    func testVideoDetailLandscapeColumnsKeepPlayerAndRecommendationsVisible() {
+        let columns = VideoDetailLayout.columns(for: CGSize(width: 1366, height: 1024), idiom: .pad)
+        XCTAssertEqual(columns.playerFraction, 0.62, accuracy: 0.001)
+        XCTAssertEqual(columns.recommendationFraction, 0.38, accuracy: 0.001)
+        XCTAssertGreaterThan(columns.recommendationWidth(for: 1366), 480)
+    }
 }

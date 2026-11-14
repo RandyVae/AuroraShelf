@@ -13,6 +13,17 @@ public struct VideoSourceDefinition: Identifiable, Hashable, Sendable {
     public let baseUrl: String
     public let categories: [String]
     public let isDirectConnect: Bool
+
+    /// Stable source-owned IDs used by tests and future route migrations while the repository
+    /// keeps its public category API source-compatible with existing saved state.
+    public var categoryDefinitions: [VideoSourceCategory] {
+        categories.map { label in
+            VideoSourceCategory(
+                id: VideoSourceCatalog.categoryID(for: self, label: label),
+                label: label
+            )
+        }
+    }
     
     public init(
         id: String,
@@ -30,6 +41,16 @@ public struct VideoSourceDefinition: Identifiable, Hashable, Sendable {
         self.baseUrl = baseUrl
         self.categories = categories
         self.isDirectConnect = isDirectConnect
+    }
+}
+
+public struct VideoSourceCategory: Identifiable, Hashable, Sendable {
+    public let id: String
+    public let label: String
+
+    public init(id: String, label: String) {
+        self.id = id
+        self.label = label
     }
 }
 
@@ -74,7 +95,7 @@ public enum VideoSourceCatalog {
         group: .direct,
         description: "番剧分类列表 · 支持加密封面解码",
         baseUrl: "https://91dongman.net",
-        categories: ["全部", "连载番剧", "剧场版", "完结经典", "里番特区"],
+        categories: ["全部", "里番", "3D动漫", "AI动漫", "排行"],
         isDirectConnect: true
     )
     
@@ -85,7 +106,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "REST API 视频列表 · 原站播放信息",
         baseUrl: "https://beeg.com",
-        categories: ["全部", "精选", "日本", "自拍", "亚洲", "欧美"],
+        categories: ["精选", "自拍", "日本", "熟女", "亚洲"],
         isDirectConnect: false
     )
     
@@ -96,7 +117,12 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点分类列表 · 视频详情页解析",
         baseUrl: "https://www.xvideos.com",
-        categories: ["全部", "热播", "最佳", "自拍", "日本", "亚洲", "4K超清"],
+        categories: [
+            "最新", "热门", "中文", "自拍", "亚洲", "认证", "AI", "熟女", "少女", "巨乳",
+            "美臀", "巨屌", "口交", "肛交", "潮吹", "内射", "颜射", "丝袜", "内衣", "金发",
+            "棕发", "红发", "黑人", "拉丁", "印度", "阿拉伯", "跨种族", "女同", "双性", "女王",
+            "群交", "家庭", "绿帽", "丰满", "成熟", "独角戏", "油压", "拳交", "扩肛", "网络直播", "ASMR"
+        ],
         isDirectConnect: false
     )
     
@@ -107,7 +133,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点检索列表 · 原站详情页解析",
         baseUrl: "https://missav.media",
-        categories: ["全部", "最新发布", "热门中字", "无码流出", "VR专区"],
+        categories: ["最新", "热门", "推荐"],
         isDirectConnect: false
     )
     
@@ -117,7 +143,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点检索列表 · 原站详情页解析",
         baseUrl: "https://kissjav.li",
-        categories: ["全部", "热门", "新片", "无码", "中文字幕"],
+        categories: ["最新", "热门", "推荐"],
         isDirectConnect: false
     )
     
@@ -127,7 +153,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "日文列表与搜索 · 原站详情页解析",
         baseUrl: "https://www.85po.com",
-        categories: ["全部", "最近更新", "精选热播", "高清画质"],
+        categories: ["最新", "热门", "推荐"],
         isDirectConnect: false
     )
     
@@ -137,7 +163,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "区域站点列表与搜索 · 原站详情页解析",
         baseUrl: "https://jp.pornhub.com",
-        categories: ["全部", "认证精选", "热门榜单", "4K超清", "中文字幕"],
+        categories: ["最新", "热门", "推荐"],
         isDirectConnect: false
     )
     
@@ -147,7 +173,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点分类与搜索列表 · 原站详情页解析",
         baseUrl: "https://javnoni.com",
-        categories: ["全部", "最新上线", "中文字幕", "素人企划"],
+        categories: ["最新", "热门", "推荐"],
         isDirectConnect: false
     )
     
@@ -157,7 +183,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "榜单与搜索列表 · 原站详情页解析",
         baseUrl: "https://jav.sb",
-        categories: ["全部", "精选", "排行", "最新"],
+        categories: ["最新", "热门", "推荐"],
         isDirectConnect: false
     )
     
@@ -167,7 +193,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "视频列表与搜索 · 原站详情页解析",
         baseUrl: "https://www.tokyomotion.net",
-        categories: ["全部", "最新", "最高评分", "最多收藏"],
+        categories: ["最新", "热门", "推荐"],
         isDirectConnect: false
     )
     
@@ -177,7 +203,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://www.spankbang.com",
-        categories: ["全部", "4K 60FPS", "当下热门", "精选特辑"],
+        categories: ["最新"],
         isDirectConnect: false
     )
     
@@ -187,7 +213,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://xhamster.com",
-        categories: ["全部", "最佳视频", "最新发布", "本地精选"],
+        categories: ["最新"],
         isDirectConnect: false
     )
     
@@ -197,7 +223,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "JSON API 视频列表与搜索",
         baseUrl: "https://www.eporner.com",
-        categories: ["全部", "4K 超清", "最受喜爱", "本周热门"],
+        categories: ["最新"],
         isDirectConnect: false
     )
     
@@ -207,7 +233,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://mrdouga.com",
-        categories: ["全部", "推荐", "热门", "新番"],
+        categories: ["最新", "热门"],
         isDirectConnect: false
     )
     
@@ -217,7 +243,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://ohentai.org",
-        categories: ["全部", "人气推荐", "新番速递", "全集连载"],
+        categories: ["最新"],
         isDirectConnect: false
     )
     
@@ -227,7 +253,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "官方榜单列表 · 原站详情页解析",
         baseUrl: "https://www.xnxx.com",
-        categories: ["全部"],
+        categories: ["最新"],
         isDirectConnect: false
     )
     
@@ -268,6 +294,29 @@ public enum VideoSourceCatalog {
 
     public static func isSupported(_ source: VideoSourceDefinition) -> Bool {
         supportedSourceIDs.contains(source.id)
+    }
+
+    public static func categoryID(for source: VideoSourceDefinition, label: String) -> String {
+        if source.id == xvideos.id {
+            let ids = [
+                "最新": "latest", "热门": "best", "中文": "chinese", "自拍": "amateur", "亚洲": "asian",
+                "认证": "verified", "AI": "ai", "熟女": "milf", "少女": "teen", "巨乳": "big-tits",
+                "美臀": "big-ass", "巨屌": "big-cock", "口交": "blowjob", "肛交": "anal", "潮吹": "squirting",
+                "内射": "creampie", "颜射": "cumshot", "丝袜": "stockings", "内衣": "lingerie", "金发": "blonde",
+                "棕发": "brunette", "红发": "redhead", "黑人": "black", "拉丁": "latina", "印度": "indian",
+                "阿拉伯": "arab", "跨种族": "interracial", "女同": "lesbian", "双性": "bi", "女王": "femdom",
+                "群交": "gangbang", "家庭": "family", "绿帽": "cuckold", "丰满": "bbw", "成熟": "mature",
+                "独角戏": "solo", "油压": "oiled", "拳交": "fisting", "扩肛": "gapes", "网络直播": "cam", "ASMR": "asmr"
+            ]
+            return ids[label] ?? label.lowercased()
+        }
+        switch label {
+        case "全部": return "all"
+        case "最新", "最新发布", "最近更新", "最新上线": return "latest"
+        case "热门", "热门中字", "热门榜单", "当下热门", "精选热播", "排行": return "popular"
+        case "推荐", "精选", "认证精选", "最高评分", "最受喜爱", "人气推荐": return "recommended"
+        default: return label.lowercased()
+        }
     }
     
     public static func find(by id: String) -> VideoSourceDefinition {

@@ -93,7 +93,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aurorashelf.app.model.FeedCategory
+import com.aurorashelf.app.model.SourceCategory
+import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.VideoItem
 import com.aurorashelf.app.ui.theme.AuroraBrandAccentDeep
 import com.aurorashelf.app.ui.theme.AuroraCoral
@@ -136,7 +137,7 @@ internal fun HomeScreen(
     onSettings: () -> Unit,
     onOpenAccount: () -> Unit,
     onSource: (String) -> Unit,
-    onCategory: (FeedCategory) -> Unit,
+    onCategory: (SourceCategory) -> Unit,
     onVideo: (VideoItem) -> Unit,
     onFavorite: (VideoItem) -> Unit,
     onRefresh: () -> Unit,
@@ -459,9 +460,9 @@ private fun HomeHeader(
 
 @Composable
 private fun CategoryBar(
-    selected: FeedCategory,
+    selected: SourceCategory,
     sourceUrl: String,
-    onCategory: (FeedCategory) -> Unit,
+    onCategory: (SourceCategory) -> Unit,
     modifier: Modifier = Modifier,
     isScrolled: Boolean = false,
 ) {
@@ -471,12 +472,12 @@ private fun CategoryBar(
         isScrolled = isScrolled,
         applyBackground = false,
     ) {
-        FeedCategory.availableFor(sourceUrl).forEach { category ->
+        ContentSourceCatalog.sourceCategories(sourceUrl).forEach { category ->
             NetflixCategoryChip(
                 selected = selected == category,
                 onClick = { onCategory(category) },
-                label = category.displayLabel(sourceUrl),
-                hasDropdown = category == FeedCategory.ALL,
+                label = category.label,
+                hasDropdown = category.isAll,
             )
         }
     }

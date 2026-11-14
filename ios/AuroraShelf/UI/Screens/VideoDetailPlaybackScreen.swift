@@ -74,43 +74,51 @@ public struct VideoDetailPlaybackScreen: View {
     
     public var body: some View {
         GeometryReader { screenGeo in
+            let layoutMode = VideoDetailLayout.mode(size: screenGeo.size, idiom: UIDevice.current.userInterfaceIdiom)
             ZStack(alignment: .top) {
                 AuroraColor.canvas.ignoresSafeArea()
-                
-                VStack(spacing: 0) {
-                    // 1. 顶部播放器视口（支持原位动态展开至全屏，同一个 AVPlayer 实例不中断）
-                    topPlayerContainer(in: screenGeo)
-                        .zIndex(10)
-                    
-                    // 2. 下方可滚动详情、选集与推荐内容（全屏时平滑折叠退场）
-                    if !isFullScreen {
-                        ScrollView(.vertical, showsIndicators: false) {
-                            VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
-                                // 视频主标题与信息
-                                headerInfoSection
-                                    .padding(.top, AuroraMetrics.spacingM)
-                                
-                                // 核心操作工具栏（收藏、缓存、选集、分享）
-                                actionToolbarSection
-                                
-                                // 选集列表（多集剧集）
-                                if !episodes.isEmpty || isLoadingEpisodes {
-                                    episodesShelfSection
-                                }
-                                
-                                // 剧情简介折叠区
-                                synopsisSection
-                                
-                                // 下方其他视频推荐
-                                if !relatedVideos.isEmpty {
-                                    relatedVideosSection
-                                }
-                                
-                                Spacer().frame(height: 60)
+
+                if layoutMode == .padLandscapeSplit && !isFullScreen {
+                    let columns = VideoDetailLayout.columns(for: screenGeo.size, idiom: UIDevice.current.userInterfaceIdiom)
+                    let playerWidth = columns.playerWidth(for: screenGeo.size.width)
+                    let recommendationWidth = columns.recommendationWidth(for: screenGeo.size.width)
+                    let playerHeight = min(playerWidth * 9.0 / 16.0, screenGeo.size.height * 0.62)
+
+                    // iPad 横屏采用 YouTube 式双栏：左侧保持播放器与当前视频上下文，右侧独立滚动推荐。
+                    HStack(alignment: .top, spacing: 0) {
+                        VStack(spacing: 0) {
+                            topPlayerContainer(in: screenGeo, width: playerWidth, height: playerHeight)
+                                .zIndex(10)
+
+                            ScrollView(.vertical, showsIndicators: false) {
+                                detailScrollContent(includeRecommendations: false)
                             }
-                            .padding(.horizontal, AuroraMetrics.contentInset)
                         }
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .frame(width: playerWidth)
+
+                        Rectangle()
+                            .fill(AuroraColor.hairline)
+                            .frame(width: 1)
+
+                        ScrollView(.vertical, showsIndicators: false) {
+                            landscapeRecommendationRail
+                        }
+                        .frame(width: recommendationWidth)
+                    }
+                    .transition(.opacity)
+                } else {
+                    VStack(spacing: 0) {
+                        // 1. 顶部播放器视口（支持原位动态展开至全屏，同一个 AVPlayer 实例不中断）
+                        topPlayerContainer(in: screenGeo)
+                            .zIndex(10)
+
+                        // 2. 下方可滚动详情、选集与推荐内容（全屏时平滑折叠退场）
+                        if !isFullScreen {
+                            ScrollView(.vertical, showsIndicators: false) {
+                                detailScrollContent(includeRecommendations: true)
+                            }
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
                     }
                 }
                 
@@ -205,19 +213,97 @@ public struct VideoDetailPlaybackScreen: View {
             dismiss()
         }
     }
+
+    @ViewBuilder
+    private func detailScrollContent(includeRecommendations: Bool) -> some View {
+        VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
+            headerInfoSection
+                .padding(.top, AuroraMetrics.spacingM)
+
+            actionToolbarSection
+
+            if !episodes.isEmpty || isLoadingEpisodes {
+                episodesShelfSection
+            }
+
+            synopsisSection
+
+            if includeRecommendations && !relatedVideos.isEmpty {
+                relatedVideosSection
+            }
+
+            Spacer().frame(height: 60)
+        }
+        .padding(.horizontal, AuroraMetrics.contentInset)
+    }
+
+    private var landscapeRecommendationRail: some View {
+        VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
+            Text("更多推荐")
+                .font(.title3.bold())
+                .foregroundStyle(AuroraColor.textPrimary)
+
+            ForEach(relatedVideos.prefix(20)) { related in
+                Button {
+                    switchToVideo(related)
+                } label: {
+                    HStack(alignment: .top, spacing: 12) {
+                        AuroraCoverImage(
+                            url: related.coverUrl,
+                            title: related.title,
+                            sourceBaseURL: related.coverBaseURL,
+                            aspectRatio: 16.0 / 9.0,
+                            contentMode: .fill,
+                            cornerRadius: 10
+                        )
+                        .frame(width: 168, height: 94)
+                        .clipped()
+
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(related.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AuroraColor.textPrimary)
+                                .multilineTextAlignment(.leading)
+
+                            Text(related.sourceName)
+                                .font(.caption)
+                                .foregroundStyle(AuroraColor.textSecondary)
+
+                            if !related.duration.isEmpty {
+                                Text(related.duration)
+                                    .font(.caption2)
+                                    .foregroundStyle(AuroraColor.textTertiary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .hoverEffect(.highlight)
+                .frame(minHeight: 94)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 20)
+        .padding(.bottom, 48)
+    }
     
     // MARK: - 1. 顶部播放器视口（内嵌 / 全屏通用）
     
     @ViewBuilder
-    private func topPlayerContainer(in screenGeo: GeometryProxy) -> some View {
+    private func topPlayerContainer(in screenGeo: GeometryProxy, width: CGFloat? = nil, height: CGFloat? = nil) -> some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
         let isPhysicallyLandscape = screenGeo.size.width > screenGeo.size.height
         // iPad 端依靠机身感应全向自然旋转，严禁施加 90 度强制逆向视图旋转
         let isRotated = !isPad && isFullScreen && isLandscape && !isPhysicallyLandscape
-        let targetWidth = isRotated ? screenGeo.size.height : screenGeo.size.width
+        let targetWidth = isRotated ? screenGeo.size.height : (width ?? screenGeo.size.width)
         let safeTop = DeviceLayout.safeAreaTop(in: screenGeo.size)
         let needsTopOffset = !isFullScreen && !isLandscape && !isPad
         let targetHeight: CGFloat = {
+            if let height, !isFullScreen {
+                return height
+            }
             if isFullScreen {
                 return isRotated ? screenGeo.size.width : screenGeo.size.height
             }
@@ -321,7 +407,7 @@ public struct VideoDetailPlaybackScreen: View {
         .frame(width: targetWidth, height: targetHeight)
         .rotationEffect(isRotated ? .degrees(90) : .zero)
         .frame(
-            width: isFullScreen ? screenGeo.size.width : screenGeo.size.width,
+            width: isFullScreen ? screenGeo.size.width : (width ?? screenGeo.size.width),
             height: isFullScreen ? screenGeo.size.height : targetHeight,
             alignment: .top
         )
