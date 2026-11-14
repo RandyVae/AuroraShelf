@@ -5,6 +5,7 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.LinkedHashMap
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
@@ -300,11 +301,30 @@ class PlaybackResolver {
     }
 
     private fun isMediaUrl(url: String): Boolean {
+        if (isAdOrPreviewUrl(url)) return false
         val path = runCatching { java.net.URI(url).path.orEmpty().lowercase() }.getOrDefault("")
         return MEDIA_EXTENSIONS.any(path::endsWith)
     }
 
+    private fun isAdOrPreviewUrl(url: String): Boolean {
+        val parsed = runCatching { URI(url) }.getOrNull()
+        val host = parsed?.host?.lowercase(Locale.US).orEmpty()
+        val path = parsed?.path?.lowercase(Locale.US) ?: url.lowercase(Locale.US)
+        if (path.contains("/preview.mp4") || path.endsWith("/preview") || path.contains("/vast") || path.contains("/preroll")) {
+            return true
+        }
+        return BLOCKED_AD_HOSTS.any { adHost -> host == adHost || host.endsWith(".$adHost") }
+    }
+
     internal fun parse(page: Document): PlaybackSource? {
+        val pageLocation = page.location().ifBlank { page.baseUri() }
+        // MissAV pages wrap the real HLS stream inside packed JS while secondary
+        // preview <video> elements may reference teaser clips; prioritize HLS extraction first.
+        if (ContentSourceCatalog.isMissAv(pageLocation)) {
+            extractMissAvHls(page.html())?.let {
+                return PlaybackSource(it, pageLocation)
+            }
+        }
         for (video in page.select("video")) {
             val references = mutableListOf(video.attr("src"))
             references += video.select("source[src]").map { it.attr("src") }
@@ -316,8 +336,10 @@ class PlaybackResolver {
                     references += Jsoup.parseBodyFragment(html).select("source[src]").map { it.attr("src") }
                 }
             }
-            references.firstNotNullOfOrNull { SourceAddress.resolve(page.baseUri(), it) }?.let {
-                return PlaybackSource(it, page.location().ifBlank { page.baseUri() })
+            references.firstNotNullOfOrNull { ref ->
+                SourceAddress.resolve(page.baseUri(), ref)?.takeUnless(::isAdOrPreviewUrl)
+            }?.let {
+                return PlaybackSource(it, pageLocation)
             }
         }
         val dataAttributes = page.select("[data-play-src], [data-video-src], [data-video-url]")
@@ -327,8 +349,10 @@ class PlaybackResolver {
                     element.attr("data-video-src").ifBlank { element.attr("data-video-url") }
                 }
             }
-        dataAttributes.firstNotNullOfOrNull { SourceAddress.resolve(page.baseUri(), it) }?.let {
-            return PlaybackSource(it, page.location().ifBlank { page.baseUri() })
+        dataAttributes.firstNotNullOfOrNull { ref ->
+            SourceAddress.resolve(page.baseUri(), ref)?.takeUnless(::isAdOrPreviewUrl)
+        }?.let {
+            return PlaybackSource(it, pageLocation)
         }
 
         page.select("script#videoInitialData[type=application/json], script[type=application/json]")
@@ -341,8 +365,10 @@ class PlaybackResolver {
                 val episodeBlock = JSON_EPISODES.find(data)?.groupValues?.get(1).orEmpty()
                 directSources + JSON_STRING.findAll(episodeBlock).map { decodeJson(it.groupValues[2]) }
             }
-            .firstNotNullOfOrNull { SourceAddress.resolve(page.baseUri(), it) }?.let {
-                return PlaybackSource(it, page.location().ifBlank { page.baseUri() })
+            .firstNotNullOfOrNull { ref ->
+                SourceAddress.resolve(page.baseUri(), ref)?.takeUnless(::isAdOrPreviewUrl)
+            }?.let {
+                return PlaybackSource(it, pageLocation)
             }
 
         page.select("script[type=application/ld+json]")
@@ -353,14 +379,12 @@ class PlaybackResolver {
             .firstNotNullOfOrNull { reference ->
                 SourceAddress.resolve(page.baseUri(), reference)?.takeIf(::isMediaUrl)
             }?.let {
-                return PlaybackSource(it, page.location().ifBlank { page.baseUri() })
+                return PlaybackSource(it, pageLocation)
             }
 
-        // MissAV publishes HLS metadata in the page HTML, sometimes URL-escaped and
-        // sometimes packed into pipe-separated JavaScript tokens.
-        if (ContentSourceCatalog.isMissAv(page.location().ifBlank { page.baseUri() })) {
+        if (ContentSourceCatalog.isMissAv(pageLocation)) {
             extractMissAvHls(page.html())?.let {
-                return PlaybackSource(it, page.location().ifBlank { page.baseUri() })
+                return PlaybackSource(it, pageLocation)
             }
         }
         return null
@@ -380,13 +404,16 @@ class PlaybackResolver {
         val parts = packed.split('|').asReversed()
         for (index in 0..parts.size - 8) {
             if (parts[index] !in setOf("http", "https")) continue
-            val candidate = buildString {
-                append(parts[index]); append("://")
-                append(parts[index + 1]); append('.'); append(parts[index + 2]); append('/')
-                append(parts.subList(index + 3, index + 8).joinToString("-"))
-                append("/playlist.m3u8")
+            for (hostParts in 2..4) {
+                val uuidStart = index + hostParts + 1
+                if (uuidStart + 4 >= parts.size) break
+                val hostSegments = (1..hostParts).map { parts[index + it] }
+                if (hostSegments.any { it.isBlank() }) continue
+                val uuidSegments = parts.subList(uuidStart, uuidStart + 5)
+                if (uuidSegments.any { it.length < 4 }) continue
+                val candidate = "${parts[index]}://${hostSegments.joinToString(".")}/${uuidSegments.joinToString("-")}/playlist.m3u8"
+                if (isValidHlsUrl(candidate)) return candidate
             }
-            if (isValidHlsUrl(candidate)) return candidate
         }
         return null
     }
@@ -398,6 +425,7 @@ class PlaybackResolver {
         .replace("&amp;", "&")
 
     private fun isValidHlsUrl(value: String): Boolean = runCatching {
+        if (isAdOrPreviewUrl(value)) return@runCatching false
         val uri = URI(value)
         uri.scheme in setOf("http", "https") && !uri.host.isNullOrBlank() && uri.path.lowercase().endsWith(".m3u8")
     }.getOrDefault(false)
@@ -733,6 +761,11 @@ class PlaybackResolver {
         private val JSON_STRING = Regex("""\"([^\"]+)\"\s*:\s*\"((?:\\\\.|[^\"\\\\])*)\"""")
         private val JSON_EPISODES = Regex("""\"epPlaySrcs\"\s*:\s*\{(.*?)\}""", setOf(RegexOption.DOT_MATCHES_ALL))
         private val MEDIA_EXTENSIONS = setOf(".m3u8", ".mp4", ".m4v", ".webm", ".mov", ".mkv", ".ts")
+        private val BLOCKED_AD_HOSTS = setOf(
+            "tsyndicate.com", "exoclick.com", "realsrv.com", "trafficjunky.net",
+            "juicyads.com", "popads.net", "doubleclick.net", "googlesyndication.com",
+            "biomanos.org", "benchform.org",
+        )
         private val DIRECT_HLS = Regex("""https?://[^\"'\s<>]+?\.m3u8[^\"'\s<>]*""", RegexOption.IGNORE_CASE)
         private val ENCODED_HLS = Regex("""https?%3A(?:%2F){2}[^\"'\s<>]+?\.m3u8[^\"'\s<>]*""", RegexOption.IGNORE_CASE)
         private val PACKED_HLS = Regex("""'m3u8(.*?)video""", RegexOption.DOT_MATCHES_ALL)

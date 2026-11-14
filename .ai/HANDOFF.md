@@ -4784,6 +4784,23 @@ cp build.nosync/app/outputs/apk/release/app-release.apk \
     3. **雙端 Release 構建、自動化簽名與 OTA 原子覆蓋**：
        - Android Release APK（197MB）與 iOS 簽名 IPA（194MB）同名原子覆蓋至 `bananarey.us`；伺服器磁碟維持 11GB 可用（29% 使用率）。
 
+## 最新交接：2026-11-14 — MissAV 封面加載與防廣告/預覽片攔截修復＋詳情頁右側推薦欄收窄適配 YouTube 比例（v2.16.25 / Build 251）
+
+- **問題與根因（已驗證）**：
+  1. **MissAV 封面無法加載**：
+     - iOS `HTMLVideoSourceAdapter.parseHTMLFeed` 在實時 `missav.media` 頁面頂部與頁腳抓入 40 個空封面導航鏈接（`today-hot`、`fc2`、`actresses/ranking`、`site/*` 等），佔據 Hero / Top10 / 前排網格，同時選圖邏輯未跳過 `/img/flags/` 與 `data:image` 佔位圖；`CoverImageLoader.swift` 將 `fourhoi.com` 預設 Referer 設為觸發 403 的 `missav123.com` 且未覆蓋 `mrstcdn.store`；
+     - Android `MissAvParsingHelper.toThumbnailUrl` 硬編碼返回已失效（HTTP 403）的 `fourhoi.com/.../cover-n.jpg`；`MissAvKioskLinkHandlerFactory` / `MissAvStreamLinkHandlerFactory` 未接收 `missav.media`；`VideoRepository.kt` 缺少 `cn` 路徑語言且未攔截上述分類鏈接與國旗圖片。
+  2. **MissAV 視頻內容播放廣告 / 預覽片**：
+     - 上述分類頁無 packed `.m3u8` 僅有 `<video data-src=".../preview.mp4">`，原解析流程在點開分類條目或原始 HTML 時會命中 `preview.mp4` 預覽/廣告；
+     - Android `PlaybackResolver.extractMissAvHls` 與 `MissAvParsingHelper.extractHlsUrl` 假定域名嚴格為兩段，解析實時 `surrit.mrstcdn.store` 會拼出無效地址且 `parse()` 先於 `extractMissAvHls` 執行。
+  3. **視頻詳情頁右側推薦欄過寬**：
+     - `DeviceLayoutProfile.swift` 原設置為 `0.62 / 0.38`（1366pt 橫屏右側達 519pt）。參照 YouTube 桌面/平板分欄比例調整為 `0.70 / 0.30`（收窄約 21%，約 410pt），`VideoDetailPlaybackScreen.swift` 右側縮略圖同步隨欄寬縮放（118~152pt 16:9，標題限 3 行）。
+- **驗證與發布**：
+  - Android：`./gradlew testDebugUnitTest --console=plain` PASS；
+  - iOS：`xcodebuild build-for-testing ... generic/platform=iOS Simulator` PASS；`swiftc` 實測實時 `missav.media` 4 類目列表全部 0 空封面、封面 HTTP 200、播放鏈接全出 `surrit.mrstcdn.store/.../playlist.m3u8`；
+  - 全源連通性：`node scripts/probe_all_sources.mjs` 33/34 可達（JAVSB 本機 TLS 被對端斷開）；
+  - OTA 發布：`./scripts/publish_ota.sh Release` 成功更新 `v2.16.25 (Build 251)` 至 `https://bananarey.us`（APK 197MB / IPA 194MB，伺服器可用空間 11GB）。
+
 ## 歷史交接：2026-11-14 — 逐源分类统一＋iPad 横屏 YouTube 双栏布局（v2.16.23 Build 249）
 
 - **分类统一**：Android `ContentSourceCatalog.sourceCategories()` 直接使用 PipePipe 每个服务报告的完整 kiosk ID；`AuroraViewModel`、首页分类栏、缓存键和 `VideoRepository` 已接入稳定的 `SourceCategory`，播放解析器没有改动。

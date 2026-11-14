@@ -27,7 +27,12 @@ public final class MissAvStreamLinkHandlerFactory extends LinkHandlerFactory {
     @Override
     public boolean onAcceptUrl(final String url) {
         return url != null
-                && (url.contains("missav.ws/") || url.contains("missav.ai/"))
+                && (url.contains("missav.media/")
+                || url.contains("missav.ws/")
+                || url.contains("missav.ai/")
+                || url.contains("missav123.com/"))
+                && !url.endsWith("missav.media")
+                && !url.endsWith("missav.media/")
                 && !url.endsWith("missav.ws")
                 && !url.endsWith("missav.ws/");
     }

@@ -436,7 +436,7 @@ public final class MissAvParsingHelper {
             return "";
         }
         final String normalizedId = extractPlainId(id).toLowerCase();
-        return "https://fourhoi.com/" + normalizedId + "/cover-n.jpg";
+        return "https://fourhoi.mrstcdn.store/" + normalizedId + "/cover-t.jpg";
     }
 
     public static boolean isVideoId(final String id) {
@@ -457,8 +457,8 @@ public final class MissAvParsingHelper {
             return url;
         }
         final String normalizedHost = url.replaceFirst(
-                "^https?://(?:www\\.)?missav\\.(?:ai|wa)", BASE_URL);
-        return normalizedHost.replaceFirst("/(?:en|zh|tw|ko|th|vi|id|ms|de|fr|es|pt)/",
+                "^https?://(?:www\\.)?missav(?:\\.(?:ai|wa|ws|media)|123\\.com)", BASE_URL);
+        return normalizedHost.replaceFirst("/(?:cn|en|zh|tw|ko|th|vi|id|ms|de|fr|es|pt)/",
                 "/" + DEFAULT_LANGUAGE + "/");
     }
 
@@ -623,12 +623,38 @@ public final class MissAvParsingHelper {
         }
         for (int i = 0; i + 7 < parts.size(); i++) {
             if ("http".equals(parts.get(i)) || "https".equals(parts.get(i))) {
-                final String candidate = parts.get(i) + "://" + parts.get(i + 1) + "."
-                        + parts.get(i + 2) + "/" + parts.get(i + 3) + "-" + parts.get(i + 4)
-                        + "-" + parts.get(i + 5) + "-" + parts.get(i + 6) + "-"
-                        + parts.get(i + 7) + "/playlist.m3u8";
-                if (isValidHlsUrl(candidate)) {
-                    return candidate;
+                for (int hostParts = 2; hostParts <= 4 && i + hostParts + 5 < parts.size(); hostParts++) {
+                    final StringBuilder hostBuilder = new StringBuilder();
+                    boolean validHost = true;
+                    for (int h = 1; h <= hostParts; h++) {
+                        final String segment = parts.get(i + h);
+                        if (segment.isEmpty()) {
+                            validHost = false;
+                            break;
+                        }
+                        if (h > 1) {
+                            hostBuilder.append('.');
+                        }
+                        hostBuilder.append(segment);
+                    }
+                    if (!validHost) {
+                        continue;
+                    }
+                    final int uuidStart = i + hostParts + 1;
+                    final String u1 = parts.get(uuidStart);
+                    final String u2 = parts.get(uuidStart + 1);
+                    final String u3 = parts.get(uuidStart + 2);
+                    final String u4 = parts.get(uuidStart + 3);
+                    final String u5 = parts.get(uuidStart + 4);
+                    if (u1.length() < 4 || u2.length() < 4 || u3.length() < 4
+                            || u4.length() < 4 || u5.length() < 4) {
+                        continue;
+                    }
+                    final String candidate = parts.get(i) + "://" + hostBuilder + "/"
+                            + u1 + "-" + u2 + "-" + u3 + "-" + u4 + "-" + u5 + "/playlist.m3u8";
+                    if (isValidHlsUrl(candidate)) {
+                        return candidate;
+                    }
                 }
             }
         }

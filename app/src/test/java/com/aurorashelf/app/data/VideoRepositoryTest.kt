@@ -335,4 +335,25 @@ class VideoRepositoryTest {
         assertEquals("https://91dongman.net/anime/lifan/8799/", item.pageUrl)
         assertEquals("https://pic.example/cover.jpg", item.thumbnailUrl)
     }
+
+    @Test
+    fun parsesMissAvCnCardsAndSkipsFlagsAndCategoryHubs() {
+        val document = Jsoup.parse(
+            """
+            <a href="/cn/today-hot"><img src="/cover.jpg" alt="Today Hot"></a>
+            <a href="/cn/fc2"><img src="/fc2.jpg" alt="FC2"></a>
+            <a href="/cn/ssis-001">
+              <img src="/img/flags/cn.svg" alt="flag">
+              <img src="data:image/png;base64,iVBOR" data-src="https://fourhoi.mrstcdn.store/ssis-001/cover-t.jpg" alt="SSIS-001 正片">
+            </a>
+            """.trimIndent(),
+            "https://missav.media/cn/new",
+        )
+
+        val item = VideoRepository().parseDocument(document, "https://missav.media").single()
+
+        assertEquals("SSIS-001 正片", item.title)
+        assertEquals("https://missav.media/cn/ssis-001", item.pageUrl)
+        assertEquals("https://fourhoi.mrstcdn.store/ssis-001/cover-t.jpg", item.thumbnailUrl)
+    }
 }

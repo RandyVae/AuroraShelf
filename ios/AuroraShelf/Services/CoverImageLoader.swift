@@ -96,13 +96,21 @@ public actor CoverImageLoader {
                    !data.isEmpty {
                     rawData = data
                 } else {
-                    // 防盗链与 CDN 容灾重试：尝试无 Referer 纯净拉取
+                    // 防盗链与 CDN 容灾重试：尝试无 Referer 纯净拉取，或 MissAV 旧域名 fourhoi.com 切换至 fourhoi.mrstcdn.store
                     let noRefererRequest = Self.imageRequest(for: url, referer: nil, forceNoReferer: true)
                     if let (data, response) = try? await session.data(for: noRefererRequest),
                        let httpResp = response as? HTTPURLResponse,
                        (200...299).contains(httpResp.statusCode),
                        !data.isEmpty {
                         rawData = data
+                    } else if let fallbackMissAvURL = Self.missAvFallbackURL(for: url) {
+                        let fallbackRequest = Self.imageRequest(for: fallbackMissAvURL, referer: "https://missav.media/")
+                        if let (data, response) = try? await session.data(for: fallbackRequest),
+                           let httpResp = response as? HTTPURLResponse,
+                           (200...299).contains(httpResp.statusCode),
+                           !data.isEmpty {
+                            rawData = data
+                        }
                     }
                 }
 
@@ -194,6 +202,16 @@ public actor CoverImageLoader {
         return clean
     }
 
+    static func missAvFallbackURL(for url: URL) -> URL? {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let host = components.host?.lowercased(),
+              host == "fourhoi.com" || host.hasSuffix(".fourhoi.com") else {
+            return nil
+        }
+        components.host = "fourhoi.mrstcdn.store"
+        return components.url
+    }
+
     static func cacheKey(for url: String) -> String {
         let digest = SHA256.hash(data: Data(url.utf8))
         return "cover_\(digest.map { String(format: "%02x", $0) }.joined()).img"
@@ -247,8 +265,8 @@ public actor CoverImageLoader {
             defaultReferer = "https://ohentai.org/"
         } else if host == "pornhub.com" || host.hasSuffix(".pornhub.com") || host.hasSuffix(".phncdn.com") {
             defaultReferer = "https://jp.pornhub.com/"
-        } else if host == "fourhoi.com" || host.hasSuffix(".fourhoi.com") || host == "missav123.com" || host.hasSuffix(".missav123.com") {
-            defaultReferer = "https://missav123.com/"
+        } else if ["fourhoi.com", "mrstcdn.store", "missav.media", "missav.ws", "missav.ai", "missav123.com"].contains(where: { host == $0 || host.hasSuffix(".\($0)") }) {
+            defaultReferer = "https://missav.media/"
         } else if host == "jav.sb" || host.hasSuffix(".jav.sb") {
             defaultReferer = "https://jav.sb/"
         } else if host == "javnoni.com" || host.hasSuffix(".javnoni.com") {

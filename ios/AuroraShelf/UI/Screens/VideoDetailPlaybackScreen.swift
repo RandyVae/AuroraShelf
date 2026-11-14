@@ -101,7 +101,7 @@ public struct VideoDetailPlaybackScreen: View {
                             .frame(width: 1)
 
                         ScrollView(.vertical, showsIndicators: false) {
-                            landscapeRecommendationRail
+                            landscapeRecommendationRail(width: recommendationWidth)
                         }
                         .frame(width: recommendationWidth)
                     }
@@ -237,8 +237,11 @@ public struct VideoDetailPlaybackScreen: View {
         .padding(.horizontal, AuroraMetrics.contentInset)
     }
 
-    private var landscapeRecommendationRail: some View {
-        VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
+    private func landscapeRecommendationRail(width: CGFloat) -> some View {
+        let horizontalPadding: CGFloat = 14
+        let thumbWidth = min(152, max(118, (width - horizontalPadding * 2 - 10) * 0.43))
+        let thumbHeight = (thumbWidth * 9.0 / 16.0).rounded()
+        return VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
             Text("更多推荐")
                 .font(.title3.bold())
                 .foregroundStyle(AuroraColor.textPrimary)
@@ -247,7 +250,7 @@ public struct VideoDetailPlaybackScreen: View {
                 Button {
                     switchToVideo(related)
                 } label: {
-                    HStack(alignment: .top, spacing: 12) {
+                    HStack(alignment: .top, spacing: 10) {
                         AuroraCoverImage(
                             url: related.coverUrl,
                             title: related.title,
@@ -256,13 +259,14 @@ public struct VideoDetailPlaybackScreen: View {
                             contentMode: .fill,
                             cornerRadius: 10
                         )
-                        .frame(width: 168, height: 94)
+                        .frame(width: thumbWidth, height: thumbHeight)
                         .clipped()
 
                         VStack(alignment: .leading, spacing: 6) {
                             Text(related.title)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(AuroraColor.textPrimary)
+                                .lineLimit(3)
                                 .multilineTextAlignment(.leading)
 
                             Text(related.sourceName)
@@ -281,10 +285,10 @@ public struct VideoDetailPlaybackScreen: View {
                 }
                 .buttonStyle(.plain)
                 .hoverEffect(.highlight)
-                .frame(minHeight: 94)
+                .frame(minHeight: thumbHeight)
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, horizontalPadding)
         .padding(.top, 20)
         .padding(.bottom, 48)
     }

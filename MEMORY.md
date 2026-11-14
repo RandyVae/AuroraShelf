@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `78ce734`（2026-11-14），未提交 12 个文件
+- Git：`main` @ `4e92b75`（2026-11-14），未提交 26 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-14（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-14（今天）
@@ -36,19 +36,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-14 10:31 by `sync.py`
+- 最后同步：2026-11-14 11:35 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-14 · Build 249 / v2.16.23）：逐源视频分类统一＋iPad 横屏 YouTube 双栏播放器已实现；Android/iOS Release 构建签名并 OTA 原子覆盖发布至 bananarey.us（服务器磁盘维持 11GB 安全水位）。34 个源中 33 个可达，JAVSB 为外部 DNS/TLS 阻塞；iOS Simulator runtime 缺失导致 XCTest/截图走查待补。
+- 当前阶段（2026-11-14 · Build 251 / v2.16.25）：已完成 MissAV 封面加载（iOS 过滤 40 个无封面导航/分类链接＋切换 `Referer: https://missav.media/` 与 `mrstcdn.store`；Android 替换失效 403 的 `fourhoi.com` 为 `fourhoi.mrstcdn.store` 并补全 `missav.media` 与 `cn` 支持）、防广告/预览片拦截（双端优先提取 packed HLS `.m3u8`、适配多段域名 `surrit.mrstcdn.store` 并拦截 `preview.mp4`/广告域名）及 iPad 视频详情页右侧推荐栏收窄适配（`0.70 / 0.30` 对齐 YouTube Watch 页比例，缩略图随栏宽自适应）；双端单元测试、实时 `missav.media` 抓包验证及 Release OTA 构建发布（`bananarey.us`，APK 197MB / IPA 194MB，远端磁盘剩余 11GB）全部通过。
 - 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，同时监控双端生产环境反馈与性能表现。
 - 下一步：接入用户资料/收藏历史云同步与后续订阅权益接口。
-- 阻塞：Android ADB 与 Apple 实体设备未连接（记录为 blocked，本地 Android 模拟器实装混淆 Release APK 走查完全一致通过；iPhone 17 Pro 與 iPad Pro 13-inch 模擬器 Release 構建實測驗收通過）。
-- 最近一次更新：2026-11-14 by Codex
+- 阻塞：当前机器未安装 iOS Simulator runtime（已通过 `xcodebuild build-for-testing`、`swiftc` 实机直连脚本及签名真机 IPA 归档验证）；JAVSB 在当前网络环境下 TLS 被对端提前断开（34 源中 33 源可达）。
+- 最近一次更新：2026-11-14 by Antigravity (gpt-5 / antigravity)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-14（Antigravity）：MissAV 封面与去广告/预览片拦截全端修复＋iPad 详情页右侧推荐栏收窄适配（v2.16.25 Build 251）。(1) 封面修复：MissAV `fourhoi.com` 返回 403 而有效封面位于 `fourhoi.mrstcdn.store/{code}/cover-t.jpg`，且 `missav.media` 在携带 `Referer: https://missav123.com/` 时返回 403；双端切换 Referer 至 `https://missav.media/` 并增加 `fourhoi.com -> fourhoi.mrstcdn.store` 容灾回退，同时 iOS/Android 列表解析过滤顶部/页脚约 40 个无封面导航与分类链接及国旗图标；(2) 防广告/预览片：MissAV 实时 `.m3u8` 位于 `surrit.mrstcdn.store` 且 packed 脚本含多段域名，Android 原生两段拼接与未受理 `missav.media` 会导致解析失败；双端统一优先解包 packed HLS、适配 2~4 段域名并显式屏蔽 `/preview.mp4` 及广告宿主；(3) 详情页分栏：`DeviceLayoutProfile.swift` 将 `VideoDetailColumns` 从 `0.62 / 0.38` 调整为 `0.70 / 0.30`（收窄约 1/5 对齐 YouTube Watch 页比例），`landscapeRecommendationRail` 缩略图按栏宽自适应缩放防挤压截断。
 
 - 2026-11-12（Antigravity）：遊戲大廳人物立繪相對居中與下邊緣貼合重構、屏幕雙擊放大根除、特殊立繪全身豎版重映射與雙端交付（v2.16.19 Build 245）。(1) 屏幕雙擊放大根除（5層防禦）：index.html 修改 viewport 為 user-scalable=no, maximum-scale=1.0；app.css 注入 touch-action: manipulation 禁止雙擊縮放；app.js 阻斷雙指與快速連擊（≤300ms）；iOS GameContainerView 設置 maximumZoomScale/minimumZoomScale=1.0、viewForZooming 返回 nil 並禁用雙擊手勢識別器；Android GameActivity 注入 WebSettings setSupportZoom(false)；(2) 大廳人物立繪相對居中與貼合對齊：app.css 重構 .hub-hero-stage 為相對彈性容器，底部為 calc(var(--safe-b) + 74px) 精準貼合底部導航欄頂部，.hub-art 水平光學居中 margin: 0 auto 並以雙腳為錨點呼吸；(3) 特殊立繪全身豎版化：kart, ines, luf, misa 在 heroArt 中重映射至其 1154x2048 / 1166x2048 / 885x2080 全身豎版立繪（lega.webp），aphrodite 按 1080x1293 軀幹黃金比例裁切，62 位英雄比例歸一化至 0.96~1.00，坐標全部歸零（y:0, x:0）；(4) 雙端版本號全鏈路遞增至 v2.16.19 (Build 245)，完成 Release 打包、OTA 覆蓋發布、Git push 與 GitHub Release。
 
@@ -129,6 +131,8 @@
 - 最近一次更新：2026-11-08 by Antigravity (gemini-3.8-flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-14（Antigravity）：MissAV 封面与去广告/预览片拦截全端修复＋iPad 详情页右侧推荐栏收窄适配（v2.16.25 Build 251）。(1) 封面修复：MissAV `fourhoi.com` 返回 403 而有效封面位于 `fourhoi.mrstcdn.store/{code}/cover-t.jpg`，且 `missav.media` 在携带 `Referer: https://missav123.com/` 时返回 403；双端切换 Referer 至 `https://missav.media/` 并增加 `fourhoi.com -> fourhoi.mrstcdn.store` 容灾回退，同时 iOS/Android 列表解析过滤顶部/页脚约 40 个无封面导航与分类链接及国旗图标；(2) 防广告/预览片：MissAV 实时 `.m3u8` 位于 `surrit.mrstcdn.store` 且 packed 脚本含多段域名，Android 原生两段拼接与未受理 `missav.media` 会导致解析失败；双端统一优先解包 packed HLS、适配 2~4 段域名并显式屏蔽 `/preview.mp4` 及广告宿主；(3) 详情页分栏：`DeviceLayoutProfile.swift` 将 `VideoDetailColumns` 从 `0.62 / 0.38` 调整为 `0.70 / 0.30`（收窄约 1/5 对齐 YouTube Watch 页比例），`landscapeRecommendationRail` 缩略图按栏宽自适应缩放防挤压截断。
 
 - 2026-11-11（Antigravity）：直播「服务器连接超时」根除与双端直链秒播优化（v2.16.14 Build 240）。(1) 排查发现原 StripchatLiveWebView 对 GET 请求注入 Origin 头引发 WAF/反代拦截，且 12.0s 极短超时与看门狗导致 didFailProvisionalNavigation 频繁触发并向用户弹出「主播页面连接超时，请重试」；(2) 深度挖掘 Stripchat 官方 API 发现其原生返回带有 `hlsPlaylist`（或通过 numeric ID 构造 master m3u8），直接在 LivePlayerView 接入原生 AVPlayer 0.3s 硬解秒播，彻底免除网页 WebView 与广告干扰；(3) Chaturbate 官方轻量 JSON 探测超时放宽至 10.0s，且私密秀状态下立即提示阻断；(4) Android 端 OkHttp 超时放宽至 25s 并为 HornyStudents RSS feed 增加内存快照兜底机制，杜绝断网或抖动时报错；(5) 双端版本号全链路递增至 v2.16.14 (Build 240)，完成自动化签名打包、OTA 覆盖发布与模拟器走查。
 

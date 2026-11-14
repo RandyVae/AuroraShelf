@@ -699,4 +699,47 @@ final class UniversalVideoEngineTests: XCTestCase {
             throw XCTSkip("Upstream huangguoai live endpoint unreachable: \(error)")
         }
     }
+
+    func testMissAvFeedFiltersHubLinksAndPrefersPackedHlsOverPreviewAndAds() {
+        let feedHTML = """
+        <nav>
+          <a href="/cn/today-hot">今日热门</a>
+          <a href="/cn/fc2">FC2</a>
+          <a href="/cn/site/123av">123AV</a>
+          <a href="/cn/actresses/ranking">女优排行</a>
+        </nav>
+        <div class="thumbnail">
+          <a href="/cn/ssis-001" title="Real Feature Video">
+            <img src="data:image/png;base64,iVBOR" data-src="https://fourhoi.mrstcdn.store/ssis-001/cover-t.jpg" alt="Real Feature Video">
+          </a>
+        </div>
+        """
+        let videos = HTMLVideoSourceAdapter.parseHTMLFeed(feedHTML, source: VideoSourceCatalog.missav, category: "全部")
+        XCTAssertEqual(videos.map(\.title), ["Real Feature Video"])
+        XCTAssertEqual(videos.map(\.coverUrl), ["https://fourhoi.mrstcdn.store/ssis-001/cover-t.jpg"])
+
+        let detailHTML = """
+        <video src="https://fourhoi.mrstcdn.store/ssis-001/preview.mp4"></video>
+        <video src="https://ads.tsyndicate.com/vast/promo.mp4"></video>
+        <script>
+        eval(function(p,a,c,k,e,d){e=function(c){return c.toString(36)};if(!''.replace(/^/,String)){while(c--){d[c.toString(a)]=k[c]||c.toString(a)}k=[function(e){return d[e]}];e=function(){return'\\\\w+'};c=1};while(c--){if(k[c]){p=p.replace(new RegExp('\\\\b'+e(c)+'\\\\b','g'),k[c])}}return p}('e=\\'8://7.6/5-4-3-2-1/d.0\\';',15,15,'m3u8|d20308920041|9c38|411c|45a1|0c73d32d|mrstcdn.store|surrit|https|video|1280x720|source1280|842x480|playlist|source'.split('|'),0,{}))
+        </script>
+        """
+        let mediaURL = HTMLVideoSourceAdapter.extractMediaURL(
+            from: detailHTML,
+            pageURL: URL(string: "https://missav.media/cn/ssis-001")!
+        )
+        XCTAssertEqual(
+            mediaURL?.absoluteString,
+            "https://surrit.mrstcdn.store/0c73d32d-45a1-411c-9c38-d20308920041/playlist.m3u8"
+        )
+
+        let previewOnlyHTML = #"<video data-src="https://fourhoi.mrstcdn.store/ssis-001/preview.mp4"></video>"#
+        XCTAssertNil(
+            HTMLVideoSourceAdapter.extractMediaURL(
+                from: previewOnlyHTML,
+                pageURL: URL(string: "https://missav.media/cn/ssis-001")!
+            )
+        )
+    }
 }

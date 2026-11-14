@@ -317,7 +317,7 @@ class VideoRepository {
             if (huavodItems.isNotEmpty()) return huavodItems
         }
         if (ContentSourceCatalog.isMissAv(baseUrl)) {
-            return document.select("a[href*=/ja/], a[href*=/en/]")
+            return document.select("a[href*=/cn/], a[href*=/ja/], a[href*=/en/]")
                 .asSequence()
                 .mapNotNull { it.toMissAvVideoItem(baseUrl) }
                 .distinctBy(VideoItem::pageUrl)
@@ -357,7 +357,14 @@ class VideoRepository {
     }
 
     private fun Element.toMissAvVideoItem(baseUrl: String): VideoItem? {
-        val image = selectFirst("img[data-src], img[src]") ?: return null
+        val image = select("img")
+            .firstOrNull { img ->
+                val ref = img.attr("data-src").ifBlank { img.attr("src") }.trim().lowercase()
+                ref.isNotEmpty() &&
+                    !ref.startsWith("data:image") &&
+                    !ref.startsWith("javascript:") &&
+                    !ref.contains("/img/flags/")
+            } ?: return null
         val pageUrl = SourceAddress.resolve(documentBase(baseUrl), attr("href").trim()) ?: return null
         val pathParts = runCatching { URI(pageUrl).path.trim('/').split('/') }.getOrDefault(emptyList())
         if (pathParts.size != 2 || pathParts.first() !in MISSAV_LANGUAGES || pathParts.last() in MISSAV_RESERVED_PATHS) {
@@ -368,7 +375,12 @@ class VideoRepository {
         }.trim().let { Parser.unescapeEntities(it, false) }.replace(Regex("\\s+"), " ")
         if (title.length < MIN_TITLE_LENGTH) return null
         val thumbnailReference = image.attr("data-src").ifBlank { image.attr("src") }
+            .takeIf { ref ->
+                val lower = ref.trim().lowercase()
+                lower.isNotEmpty() && !lower.startsWith("data:image") && !lower.contains("/img/flags/")
+            } ?: return null
         val thumbnail = SourceAddress.resolve(documentBase(baseUrl), thumbnailReference)?.takeIf(String::isNotBlank)
+            ?: return null
 
         return VideoItem(
             id = pageUrl.sha256(),
@@ -663,9 +675,18 @@ class VideoRepository {
         private val DURATION_REGEX = Regex("\\b\\d{1,2}:\\d{2}(?::\\d{2})?\\b")
         private val AUTHOR_REGEX = Regex("(?:作者|上传者)[:：]\\s*([^\\s·|]+)")
         private val VIEWS_REGEX = Regex("(?:热度|观看|播放)[:：]?\\s*([\\d,.万]+)")
-        private val MISSAV_LANGUAGES = setOf("ja", "en")
+        private val MISSAV_LANGUAGES = setOf("cn", "ja", "en")
         private val MISSAV_RESERVED_PATHS = setOf(
-            "popular", "recommended", "new", "genres", "actresses", "makers", "labels", "series",
+            "popular", "recommended", "new", "release", "search", "vip",
+            "chinese-subtitle", "uncensored-leak", "english-subtitle",
+            "today-hot", "weekly-hot", "monthly-hot",
+            "siro", "luxu", "gana", "maan", "scute", "ara",
+            "fc2", "heyzo", "tokyohot", "1pondo", "caribbeancom", "caribbeancompr",
+            "10musume", "pacopacomama", "gachinco", "xxxav", "marriedslash",
+            "naughty4610", "naughty0930", "madou", "twav", "furuke", "klive", "clive",
+            "saved", "playlists", "history", "contact", "ads", "terms", "privacy",
+            "upload", "articles", "login", "register", "forgot-password",
+            "genres", "actresses", "makers", "labels", "series", "ranking", "vr",
         )
 
         private fun String.sha256(): String = MessageDigest.getInstance("SHA-256")

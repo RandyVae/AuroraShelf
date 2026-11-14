@@ -380,4 +380,27 @@ class PlaybackResolverTest {
         val highMp4 = Regex("""html5player\.setVideoUrlHigh\('([^']+)'\)""").find(mockHtml)?.groupValues?.get(1)
         assertEquals("https://mp4-gcore.xvideos-cdn.com/test/mp4_sd.mp4?secure=high", highMp4)
     }
+
+    @Test fun missAvResolvesPackedMrstcdnAndRejectsPreviewAndAds() {
+        val resolver = PlaybackResolver()
+        val page = Jsoup.parse(
+            """
+            <video src="https://fourhoi.mrstcdn.store/ssis-001/preview.mp4"></video>
+            <script>
+            eval(function(p,a,c,k,e,d){e=function(c){return c};if(!''.replace(/^/,String)){while(c--){d[c]=k[c]||c}k=[function(e){return d[e]}];e=function(){return'\\w+'};c=1};while(c--){if(k[c]){p=p.replace(new RegExp('\\b'+e(c)+'\\b','g'),k[c])}}return p}('f=\'8://7.6/5-4-3-2-1/e.0\';',16,16,'m3u8|d20308920041|9c38|411c|45a1|0c73d32d|mrstcdn.store|surrit|https|video|720|source1280|480|source842|playlist|source'.split('|'),0,{}))
+            </script>
+            """.trimIndent(),
+            "https://missav.media/cn/ssis-001",
+        )
+        assertEquals(
+            "https://surrit.mrstcdn.store/0c73d32d-45a1-411c-9c38-d20308920041/playlist.m3u8",
+            resolver.parse(page)?.url,
+        )
+
+        val previewOnlyPage = Jsoup.parse(
+            """<video src="https://fourhoi.mrstcdn.store/ssis-001/preview.mp4"></video>""",
+            "https://missav.media/cn/ssis-001",
+        )
+        assertNull(resolver.parse(previewOnlyPage))
+    }
 }

@@ -1,6 +1,27 @@
 # Project State
 
-## 最新工作状态（2026年11月14日 · 视频源 404 根治＋XVideos 41 分类路由与分页精准校准 · v2.16.24 Build 250）
+## 最新工作状态（2026年11月14日 · MissAV 封面加载与防广告/预览片拦截全端修复＋iPad 详情页右侧推荐栏收窄适配 YouTube 比例 · v2.16.25 Build 251）
+
+- **MissAV 封面与播放内容修复（iOS + Android）**：
+  1. **iOS 封面与去广告/预览片修复**（[HTMLVideoSourceAdapter.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HTMLVideoSourceAdapter.swift)、[CoverImageLoader.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/CoverImageLoader.swift)）：
+     - 过滤 `missav` 列表中 40 余个无封面的顶部导航/分类/页脚链接（`today-hot`、`weekly-hot`、`monthly-hot`、`siro`、`fc2`、`1pondo`、`site/*`、`actresses/*`、`genres/*` 等），并忽略国旗图标（`/img/flags/`）与 Alpine `data:image` 占位图，在存在有效封面条目时剔除空封面导航节点；
+     - `extractMediaURL` 优先检索解包后的 packed JS（`.m3u8`），并显式拦截 `/preview.mp4` 及广告域名（`tsyndicate.com`、`exoclick.com`、`biomanos.org`、`benchform.org` 等），避免误播短预告或广告视频；
+     - `CoverImageLoader` 将 MissAV/fourhoi/mrstcdn 默认 `Referer` 统一修正为 `https://missav.media/`（原 `missav123.com` 触发 403），并增加旧 `fourhoi.com` -> `fourhoi.mrstcdn.store` 容灾回退。
+  2. **Android 封面与多段域名 packed HLS 修复**（[MissAvParsingHelper.java](file:///Users/itou/Documents/ChatGPT/91pron/third_party/pipepipe-extractor/extractor/src/main/java/org/schabi/newpipe/extractor/services/missav/MissAvParsingHelper.java)、[VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt)、[PlaybackResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PlaybackResolver.kt)、[CoverImageLoader.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/CoverImageLoader.kt)）：
+     - 将失效 403 的 `fourhoi.com/.../cover-n.jpg` 切换为可用的 `fourhoi.mrstcdn.store/.../cover-t.jpg`，并在 `CoverImageLoader.kt` 增加 `Referer: https://missav.media/` 及 `fourhoi.com -> fourhoi.mrstcdn.store` 容灾回退；
+     - `MissAvKioskLinkHandlerFactory` 与 `MissAvStreamLinkHandlerFactory` 补全 `missav.media`、`missav123.com`；
+     - `MissAvParsingHelper.extractHlsUrl` 与 `PlaybackResolver.extractMissAvHls` 支持 2~4 段域名（如 `surrit.mrstcdn.store`），`PlaybackResolver.parse` 优先提取 MissAV packed `.m3u8` 并屏蔽 `/preview.mp4` 及广告宿主。
+- **视频详情页右侧推荐栏收窄适配（参照 YouTube）**：
+  - [DeviceLayoutProfile.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Theme/DeviceLayoutProfile.swift)：`VideoDetailColumns` 默认比例由 `0.62 / 0.38` 调整为 `0.70 / 0.30`（右侧推荐栏宽度收窄约 21%，在 1366pt iPad 横屏下约 410pt，贴近 YouTube Watch 页边栏比例）；
+  - [VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift)：`landscapeRecommendationRail` 缩略图按栏宽自适应缩放（118~152pt 16:9），标题固定最多 3 行排版，防止窄栏挤压截断。
+- **全量验证与交付（v2.16.25 Build 251）**：
+  - `./gradlew testDebugUnitTest --console=plain`：PASS（含 MissAV 列表过滤、packed `surrit.mrstcdn.store` HLS 提取及防 `preview.mp4` 回归单测）；
+  - `xcodebuild build-for-testing ... -destination "generic/platform=iOS Simulator"`：PASS；
+  - `swiftc` 实测修改后 `HTMLVideoSourceAdapter.swift` 抓取实时 `https://missav.media`（`/cn/new`、`/cn/release`、`/cn`、`/ja/search/ssis`）：空封面数为 0，封面全部 HTTP 200 JPEG，播放全部提取至 `https://surrit.mrstcdn.store/.../playlist.m3u8`；
+  - `node scripts/probe_all_sources.mjs`：34 源中 33 源可达（JAVSB 受本机网络 TLS 断开阻塞）；
+  - `./scripts/publish_ota.sh Release`：Android `Netgrey.apk` (197MB) 与 iOS 签名 `Netgrey.ipa` (194MB) 构建上传成功，远端磁盘剩余 11GB（29% 使用率）。
+
+## 历史工作状态（2026年11月14日 · 视频源 404 根治＋XVideos 41 分类路由与分页精准校准 · v2.16.24 Build 250）
 
 - **404 根因排查与修复（已验证）**：
   1. **XVideos 41 分类路由与分页校准（iOS）**：

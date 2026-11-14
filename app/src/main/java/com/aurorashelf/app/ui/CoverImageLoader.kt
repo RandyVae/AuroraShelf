@@ -169,9 +169,18 @@ internal object CoverImageLoader {
     /** Downloads one cover, keeping the previous UA/Referer/Origin/Accept and AES semantics. */
     private fun download(address: String, referer: String): ByteArray? = runCatching {
         val normalizedAddress = normalizeThumbnailUrl(address)
+        fetchCoverBytes(normalizedAddress, referer)?.let { return@runCatching it }
+        missAvFallbackUrl(normalizedAddress)?.let { fallbackAddress ->
+            fetchCoverBytes(fallbackAddress, "https://missav.media/")?.let { return@runCatching it }
+        }
+        null
+    }.getOrNull()
+
+    private fun fetchCoverBytes(normalizedAddress: String, referer: String): ByteArray? {
         val huangguoCover = isHuangguoCover(normalizedAddress, referer)
         val encryptedCover = isEncryptedCover(normalizedAddress, referer)
         val cryptoConfig = if (huangguoCover) currentConfig(referer) else FALLBACK_CONFIG
+        val isMissAvCover = isMissAvCoverRequest(normalizedAddress, referer)
         val request = Request.Builder()
             .url(normalizedAddress)
             .header("Accept", ACCEPT_HEADER)
@@ -190,10 +199,13 @@ internal object CoverImageLoader {
                 } else if (referer.contains("xvideos") || normalizedAddress.contains("xvideos")) {
                     header("Referer", "https://www.xvideos.com/")
                     header("Origin", "https://www.xvideos.com")
+                } else if (isMissAvCover) {
+                    header("Referer", "https://missav.media/")
+                    header("Origin", "https://missav.media")
                 }
             }
             .build()
-        httpClient.newCall(request).execute().use { response ->
+        return httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@use null
             val bytes = response.body?.bytes() ?: return@use null
             if (looksLikeImage(bytes)) return@use bytes
@@ -204,6 +216,25 @@ internal object CoverImageLoader {
             } else {
                 bytes
             }
+        }
+    }
+
+    internal fun isMissAvCoverRequest(address: String, referer: String): Boolean {
+        val lowerAddr = address.lowercase(Locale.US)
+        val lowerRef = referer.lowercase(Locale.US)
+        return lowerAddr.contains("fourhoi") ||
+            lowerAddr.contains("mrstcdn.store") ||
+            lowerAddr.contains("missav") ||
+            lowerRef.contains("missav")
+    }
+
+    internal fun missAvFallbackUrl(address: String): String? = runCatching {
+        val uri = URI(address)
+        val host = uri.host?.lowercase(Locale.US) ?: return@runCatching null
+        if (host == "fourhoi.com" || host.endsWith(".fourhoi.com")) {
+            URI(uri.scheme, uri.userInfo, "fourhoi.mrstcdn.store", uri.port, uri.rawPath, uri.rawQuery, uri.rawFragment).toString()
+        } else {
+            null
         }
     }.getOrNull()
 

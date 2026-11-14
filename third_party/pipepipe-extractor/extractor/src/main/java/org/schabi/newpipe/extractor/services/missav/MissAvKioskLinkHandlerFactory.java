@@ -45,6 +45,10 @@ public final class MissAvKioskLinkHandlerFactory extends ListLinkHandlerFactory 
 
     @Override
     public boolean onAcceptUrl(final String url) {
-        return url != null && url.contains("missav.ws");
+        return url != null
+                && (url.contains("missav.media")
+                || url.contains("missav.ws")
+                || url.contains("missav.ai")
+                || url.contains("missav123.com"));
     }
 }

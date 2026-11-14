@@ -257,7 +257,7 @@ public struct VideoDetailColumns: Equatable {
     public let recommendationFraction: CGFloat
     private let spacing: CGFloat
 
-    public init(playerFraction: CGFloat = 0.62, recommendationFraction: CGFloat = 0.38, spacing: CGFloat = 0) {
+    public init(playerFraction: CGFloat = 0.70, recommendationFraction: CGFloat = 0.30, spacing: CGFloat = 0) {
         self.playerFraction = playerFraction
         self.recommendationFraction = recommendationFraction
         self.spacing = spacing

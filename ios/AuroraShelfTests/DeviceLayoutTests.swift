@@ -95,8 +95,9 @@ final class DeviceLayoutTests: XCTestCase {
 
     func testVideoDetailLandscapeColumnsKeepPlayerAndRecommendationsVisible() {
         let columns = VideoDetailLayout.columns(for: CGSize(width: 1366, height: 1024), idiom: .pad)
-        XCTAssertEqual(columns.playerFraction, 0.62, accuracy: 0.001)
-        XCTAssertEqual(columns.recommendationFraction, 0.38, accuracy: 0.001)
-        XCTAssertGreaterThan(columns.recommendationWidth(for: 1366), 480)
+        XCTAssertEqual(columns.playerFraction, 0.70, accuracy: 0.001)
+        XCTAssertEqual(columns.recommendationFraction, 0.30, accuracy: 0.001)
+        XCTAssertGreaterThan(columns.recommendationWidth(for: 1366), 360)
+        XCTAssertLessThanOrEqual(columns.recommendationWidth(for: 1366), 420)
     }
 }

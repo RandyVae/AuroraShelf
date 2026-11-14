@@ -213,12 +213,42 @@ enum HTMLVideoSourceAdapter {
             let cardHTML = cardContext(in: nsHTML, around: anchor.range)
             let imageHTML = cardHTML.isEmpty ? body : cardHTML
             let bodyRange = NSRange(location: 0, length: (imageHTML as NSString).length)
-            let imageMatch = imageRegex.firstMatch(in: imageHTML, range: bodyRange)
-            let imageAttributes = imageMatch.map { (imageHTML as NSString).substring(with: $0.range(at: 1)) } ?? ""
-            let imageValues = attributeValues(imageAttributes, regex: attributeRegex)
-            let rawCover = ["data-poster", "data-original", "data-src", "data-thumb", "data-lazy-src", "data-sfwthumb", "data-mediumthumb", "poster", "src"]
-                .compactMap { imageValues[$0] ?? values[$0] }
-                .first { !$0.isEmpty && !$0.hasPrefix("data:image") } ?? ""
+            let imageMatches = imageRegex.matches(in: imageHTML, range: bodyRange)
+            var imageValues: [String: String] = [:]
+            var rawCover = ""
+            for imageMatch in imageMatches {
+                let candidateAttributes = (imageHTML as NSString).substring(with: imageMatch.range(at: 1))
+                let candidateValues = attributeValues(candidateAttributes, regex: attributeRegex)
+                let candidateCover = ["data-poster", "data-original", "data-src", "data-thumb", "data-lazy-src", "data-sfwthumb", "data-mediumthumb", "poster", "src"]
+                    .compactMap { candidateValues[$0] }
+                    .first { value in
+                        let lower = value.lowercased()
+                        return !value.isEmpty
+                            && !lower.hasPrefix("data:image")
+                            && !lower.hasPrefix("javascript:")
+                            && !lower.contains("/img/flags/")
+                            && !lower.contains("preview.mp4")
+                    }
+                if let candidateCover {
+                    imageValues = candidateValues
+                    rawCover = candidateCover
+                    break
+                } else if imageValues.isEmpty {
+                    imageValues = candidateValues
+                }
+            }
+            if rawCover.isEmpty {
+                rawCover = ["data-poster", "data-original", "data-src", "data-thumb", "data-lazy-src", "data-sfwthumb", "data-mediumthumb", "poster", "src"]
+                    .compactMap { values[$0] }
+                    .first { value in
+                        let lower = value.lowercased()
+                        return !value.isEmpty
+                            && !lower.hasPrefix("data:image")
+                            && !lower.hasPrefix("javascript:")
+                            && !lower.contains("/img/flags/")
+                            && !lower.contains("preview.mp4")
+                    } ?? ""
+            }
             let cleanRawCover = decodeHTML(rawCover).trimmingCharacters(in: .whitespacesAndNewlines)
             let encodedRawCover = cleanRawCover.contains(" ") ? cleanRawCover.replacingOccurrences(of: " ", with: "%20") : cleanRawCover
             let cover = URL(string: encodedRawCover, relativeTo: URL(string: pageBase))?.absoluteURL.absoluteString ?? ""
@@ -263,6 +293,9 @@ enum HTMLVideoSourceAdapter {
                 sourceName: source.name
             ))
         }
+        if source.id == "missav", items.contains(where: { !$0.coverUrl.isEmpty }) {
+            return items.filter { !$0.coverUrl.isEmpty }
+        }
         return items
     }
 
@@ -272,7 +305,7 @@ enum HTMLVideoSourceAdapter {
             .replacingOccurrences(of: "\\u002F", with: "/", options: .caseInsensitive)
             .replacingOccurrences(of: "\\u0026", with: "&", options: .caseInsensitive)
         let unpacked = unpackLegacyPlayerScripts(in: normalized)
-        let searchableHTML = normalized + "\n" + unpacked
+        let searchableHTML = unpacked.isEmpty ? normalized : unpacked + "\n" + normalized
         let patterns = [
             // EPORNER's page exposes signed CDN files through a short-lived
             // download redirect. Resolve that route instead of the stale
@@ -299,7 +332,8 @@ enum HTMLVideoSourceAdapter {
                     ?? (candidate.addingPercentEncoding(withAllowedCharacters: .urlFragmentAllowed).flatMap { URL(string: $0, relativeTo: pageURL)?.absoluteURL })
                 guard let url = parsedURL,
                       ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
-                      isSupportedMediaPath(url.path) else { continue }
+                      isSupportedMediaPath(url.path),
+                      !isAdOrPreviewMediaURL(url) else { continue }
                 return url
             }
         }
@@ -328,6 +362,23 @@ enum HTMLVideoSourceAdapter {
             .split(separator: "/").last?.split(separator: ".").last.map(String.init)?.lowercased()
         return ["m3u8", "mp4"].contains(extensionName)
             || path.range(of: #"/vsrc/(?:sd|hd)/[A-Za-z0-9]+$"#, options: .regularExpression) != nil
+    }
+
+    private static func isAdOrPreviewMediaURL(_ url: URL) -> Bool {
+        let host = url.host?.lowercased() ?? ""
+        let path = url.path.lowercased()
+        if path.contains("/preview.mp4") || url.lastPathComponent.lowercased().hasPrefix("preview.") {
+            return true
+        }
+        if path.contains("/vast") || path.contains("/preroll") || path.contains("/ad_vast") {
+            return true
+        }
+        let blockedAdHosts = [
+            "tsyndicate.com", "exoclick.com", "realsrv.com", "trafficjunky.net",
+            "juicyads.com", "popads.net", "doubleclick.net", "googlesyndication.com",
+            "biomanos.org", "benchform.org"
+        ]
+        return blockedAdHosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") })
     }
 
     private static func unpackLegacyPlayerScripts(in html: String) -> String {
@@ -421,8 +472,26 @@ enum HTMLVideoSourceAdapter {
         case "missav":
             let components = path.split(separator: "/")
             guard components.count >= 2 else { return false }
+            let nonVideoSections: Set<String> = [
+                "actresses", "genres", "makers", "labels", "series", "site", "cast",
+                "tags", "search", "playlists", "articles", "user", "account", "auth"
+            ]
+            if components.dropLast().contains(where: { nonVideoSections.contains(String($0)) }) {
+                return false
+            }
             let last = String(components.last ?? "")
-            let reserved = ["vip", "search", "popular", "release", "new", "chinese-subtitle", "uncensored-leak", "actresses", "genres", "makers"]
+            let reserved: Set<String> = [
+                "vip", "search", "popular", "release", "new", "recommended",
+                "chinese-subtitle", "uncensored-leak", "english-subtitle",
+                "today-hot", "weekly-hot", "monthly-hot",
+                "siro", "luxu", "gana", "maan", "scute", "ara",
+                "fc2", "heyzo", "tokyohot", "1pondo", "caribbeancom", "caribbeancompr",
+                "10musume", "pacopacomama", "gachinco", "xxxav", "marriedslash",
+                "naughty4610", "naughty0930", "madou", "twav", "furuke", "klive", "clive",
+                "saved", "playlists", "history", "contact", "ads", "terms", "privacy",
+                "upload", "articles", "login", "register", "forgot-password",
+                "actresses", "genres", "makers", "labels", "series", "ranking", "vr"
+            ]
             return !reserved.contains(last)
         case "85po": return path.contains("/v/")
         case "pornhub": return url.path.contains("view_video.php") && url.query?.contains("viewkey=") == true
