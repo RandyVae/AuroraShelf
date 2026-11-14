@@ -367,7 +367,7 @@ final class UniversalVideoEngineTests: XCTestCase {
                 source.id
             )
         }
-        XCTAssertEqual(VideoSourceCatalog.searchableSources.count, 18)
+        XCTAssertEqual(VideoSourceCatalog.searchableSources.count, 19)
         XCTAssertFalse(VideoSourceCatalog.searchableSourceIDs.contains(VideoSourceCatalog.beeg.id))
     }
 

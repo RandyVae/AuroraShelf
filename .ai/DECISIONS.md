@@ -697,5 +697,21 @@ Decision:
 1. Unify iOS playback on `VideoDetailPlaybackScreen` and delegate `NativePlayerView` to it, while sharing `PlayerMediaTrackMenu`, `PictureInPictureManager`, `InSightSheetView`, `AVAudioSession` `.playback` mode, and `PlaybackProgressStore` persistence so no Apple TV player capabilities remain stranded in unused views.
 2. Replace Android Media3's default legacy `PlayerView` controller (`useController = false`) with a custom Compose Apple TV OSD overlay (`AppleTvScrubberBar`, `-MM:SS` remaining time toggle, `0.5x~2.0x` speed menu, Fit/Zoom aspect ratio toggle, 3-zone double-tap seek/zoom, and left/right vertical brightness/volume gestures with a central HUD capsule), synchronized with `PlayerScreen`'s top action buttons via `onControllerVisibilityChange` so fullscreen playback is 100% unobstructed when controls auto-hide.
 
+## 134X (`134x.com`) TanStack Start / Seroval native source integration (v2.16.29 Build 255)
+
+Date: 2026-11-14
+
+Status: Implemented, unit-tested, live-verified on Android R8 Release APK and iOS/iPadOS Release Simulators, and published via OTA.
+
+Decision:
+1. Integrate `https://134x.com` via a native TanStack Start `_serverFn` Seroval codec (`X134Repository.kt` on Android, `X134SourceService.swift` on iOS) instead of brittle WebView/HTML scraping, mapping `latest` (`最新`), `popular` (`热门`), `featured` (`精选`), cursor pagination, site search, and per-tweet detail hydration (`za`) with 6-way bounded concurrency, 15-minute LRU caching, automatic `AppShell-*.js` function-hash refresh on HTTP 400/404/500, and SSR detail HTML fallback.
+2. Unescape Seroval JS string escapes (`\n`, `\r`, `\t`, `\"`, `\'`, `\\`, `\uXXXX`, `\xXX`) at the wire decode boundary in both adapters and decode HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`, `&apos;`) in `cleanTweetTitle` so tweet titles never render literal `\n` escape sequences on cards or detail headers.
+3. Expand the unified video catalog to 20 sources (`19` searchable including `134x`) while keeping single-episode short-circuiting and explicit HLS `.m3u8` MIME/Referer detection in Android `PlaybackResolver`, `NativeSitePlayer`, and `OfflineCacheManager` plus iOS `VideoRepository`.
+
+Evidence:
+- Android: `RUN_LIVE_SOURCE_TESTS=1 ./gradlew testDebugUnitTest --tests "com.aurorashelf.app.data.X134RepositoryTest"` (5 passed, 0 failed), `./gradlew testDebugUnitTest lintDebug assembleRelease` (`BUILD SUCCESSFUL`), and `netgrey_phone` R8 Release APK live feed/detail/HLS playback verification.
+- iOS / iPadOS: `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1 TEST_RUNNER_IOS_LIVE_SOURCE_IDS=134x` (`LIVE_VIDEO_SOURCE 134x items=20 cover=decoded playback=resolved error=none`), `X134SourceServiceTests` (3 executed, 1 skipped live, 0 failed), Release Simulator screenshots on `iPhone 18 Pro` & `iPad Pro 13-inch (M5)`.
+- Source probe: `node scripts/probe_all_sources.mjs` (`134X -> HTTP 200 | 878ms | 21147 bytes`, 33/35 total reachable).
+
 
 

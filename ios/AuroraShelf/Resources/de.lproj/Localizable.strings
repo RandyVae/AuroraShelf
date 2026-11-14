@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "Videos, Anime, Manga oder Codes suchen";
-"search.concurrent_hint" = "Parallele Suche in 19 Videoquellen";
+"search.concurrent_hint" = "Parallele Suche in 20 Videoquellen";
 "search.no_results" = "Keine Ergebnisse gefunden";
 "search.searching" = "Suche läuft…";
 "search.history" = "Suchverlauf";

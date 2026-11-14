@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "動画、アニメ、マンガ、品番を検索";
-"search.concurrent_hint" = "19の動画ソースを一括検索";
+"search.concurrent_hint" = "20の動画ソースを一括検索";
 "search.no_results" = "検索結果がありません";
 "search.searching" = "検索中…";
 "search.history" = "検索履歴";

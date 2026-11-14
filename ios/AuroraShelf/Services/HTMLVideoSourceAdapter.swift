@@ -139,6 +139,9 @@ enum HTMLVideoSourceAdapter {
         case "eporner":
             components = URLComponents(string: baseURL(for: source) + "/api/v2/video/search/")
             components?.queryItems = [URLQueryItem(name: "query", value: query), URLQueryItem(name: "per_page", value: "24"), URLQueryItem(name: "page", value: String(page))]
+        case "134x":
+            components = URLComponents(string: baseURL(for: source) + "/search")
+            components?.queryItems = [URLQueryItem(name: "q", value: query), URLQueryItem(name: "page", value: String(page))]
         case "ohentai":
             components = URLComponents(string: baseURL(for: source) + "/search.php")
             components?.queryItems = [URLQueryItem(name: "k", value: query)]
@@ -172,6 +175,7 @@ enum HTMLVideoSourceAdapter {
         case "spankbang": return "https://www.spankbang.com"
         case "xhamster": return "https://xhamster.com"
         case "eporner": return "https://www.eporner.com"
+        case "134x": return "https://134x.com"
         case "mrdouga": return "https://mrdouga.com"
         case "ohentai": return "https://ohentai.org"
         case "xnxx": return "https://www.xnxx.com"

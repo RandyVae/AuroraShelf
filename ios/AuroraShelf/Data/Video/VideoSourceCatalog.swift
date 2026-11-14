@@ -109,6 +109,17 @@ public enum VideoSourceCatalog {
         categories: ["精选", "自拍", "日本", "熟女", "亚洲"],
         isDirectConnect: false
     )
+
+    // 134X
+    public static let x134 = VideoSourceDefinition(
+        id: "134x",
+        name: "134X",
+        group: .overseas,
+        description: "无广告高清长视频 · X 长片直连",
+        baseUrl: "https://134x.com",
+        categories: ["最新", "热门", "精选"],
+        isDirectConnect: false
+    )
     
     // XVideos
     public static let xvideos = VideoSourceDefinition(
@@ -257,18 +268,18 @@ public enum VideoSourceCatalog {
         isDirectConnect: false
     )
     
-    // 全量 19 个视频源列表（与 Android 端 100% 对齐）
+    // 全量 20 个视频源列表（与 Android 端 100% 对齐）
     public static let allSources: [VideoSourceDefinition] = [
         huavod, huangguo, porn91, dongman91,
-        beeg, xvideos, missav, kissjav,
+        beeg, x134, xvideos, missav, kissjav,
         po85, pornhub, javnoni, javsb,
         tokyomotion, spankbang, xhamster,
         eporner, mrdouga, ohentai, xnxx
     ]
 
-    /// Sources with a dedicated repository flow (including the two structured API adapters).
+    /// Sources with a dedicated repository flow (including structured API adapters).
     public static let dedicatedAdapterSourceIDs: Set<String> = [
-        huavod.id, huangguo.id, porn91.id, dongman91.id, beeg.id, xvideos.id, eporner.id
+        huavod.id, huangguo.id, porn91.id, dongman91.id, beeg.id, x134.id, xvideos.id, eporner.id
     ]
 
     /// Sources routed through the shared HTML list/detail parser.

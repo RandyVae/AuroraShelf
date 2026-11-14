@@ -1,4 +1,20 @@
-## 最新交接：2026-11-14 — 全项目 Bug 审查、多形态模拟器实测加固与双端交付 · v2.16.28 (Build 254)
+## 最新交接：2026-11-14 — 新增无广告极速长视频源 134X（134x.com）双端原生接入与 Release 验证交付 · v2.16.29 (Build 255)
+
+- **范围**：
+  - 响应 Randy 需求：「新增一个视频源 `134x.com`，这个网站没有广告加载也快」，完成 `134x.com` 协议分析、Android/iOS/iPadOS 原生适配器接入、多端 Release 级模拟器实测与 `v2.16.29 (Build 255)` 发布。
+  1. **协议逆向与双端核心实现**：
+     - Android：新增 [X134Repository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/X134Repository.kt) 与 [X134RepositoryTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/data/X134RepositoryTest.kt)，更新 [ContentSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/ContentSource.kt)、[VideoItem.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/VideoItem.kt)、[VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt)、[PlaybackResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PlaybackResolver.kt)、[OfflineCacheManager.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/OfflineCacheManager.kt)、[NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt)；
+     - iOS/iPadOS：新增 [X134SourceService.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/X134SourceService.swift) 与 [X134SourceServiceTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/X134SourceServiceTests.swift)，更新 [VideoSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoSourceCatalog.swift)、[VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift)、[HTMLVideoSourceAdapter.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HTMLVideoSourceAdapter.swift)、[ChannelsShelf.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/ChannelsShelf.swift)、12 套 `.lproj/Localizable.strings` 及对应测试；
+     - 协议要点：通过 `_serverFn`（`7cd2...` / `25c2...` / `51bd...` / `9c9b...`）请求 Seroval 格式 JSON，支持 `AppShell-*.js` 函数哈希自动刷新与 SSR 降级，6 并发 `za` 详情水合高清 `pbs.twimg.com` 封面及 `video.twimg.com` HLS `.m3u8` / `.mp4`，并修复 Seroval `t=1` 字符串字面 `\n`/`\"`/`\uXXXX` 与 `&amp;` 实体显示问题。
+  2. **多端 Release 模拟器实测与验证**：
+     - Android：使用 R8 混淆签名 `dist/Netgrey.apk`（`206,860,171` bytes）在 `netgrey_phone` 实测「最新 / 精选」列表、推荐流与多部 134X 视频原生 HLS 硬解播放（Media3 `c2.goldfish.h264.decoder`），复测确认标题 `\n` 彻底消除；`RUN_LIVE_SOURCE_TESTS=1 X134RepositoryTest`、`testDebugUnitTest`、`lintDebug`、`assembleRelease` 全过；
+     - iOS / iPadOS：Simulator Release 包在 `iPhone 18 Pro`（Home、搜索抽屉 `19 个可搜索源`、播放器浮层播放）与 `iPad Pro 13-inch (M5)`（Channels 20 源高亮、Top Hits、原生播放与 4 列推荐流）实测截图确认无截断错位、真实推文标题与画面播放正常；`LiveVideoSourceAuditTests` 针对 `134x` 实时通过（`items=20 cover=decoded playback=resolved error=none`）；全量 172 项 XCTest 中 7 项默认跳过，外部 `ComicRepositoryTests.testBaoziLiveFetchComicsChaptersAndPages` 出现 1 次 CDN `httpStatus(403)` 波动，其余全绿；
+     - 全源探测：`node scripts/probe_all_sources.mjs` 35 源中 33 源可达（`134X` HTTP 200 / 878ms），仅既有 `javsb` TLS 断连与 `jm` 脚本 `API code=401`。
+  3. **发布状态（v2.16.29 Build 255）**：
+     - 版本号已全链路升级至 `2.16.29 / Build 255`（Android Gradle、iOS `project.yml`/`pbxproj`/`Info.plist`、Web 游戏 `index.html`、`ota_web/index.html`、`manifest.plist`、`AGENTS.md`）；
+     - `./scripts/publish_ota.sh Release` 完成 `bananarey.us` 单版本原子覆盖发布，`https://bananarey.us/`、`manifest.plist`、`Netgrey.apk`（`206,860,171` bytes）、`Netgrey.ipa`（`202,532,614` bytes）实测全部 `HTTP/1.1 200 OK`，远端磁盘可用 `11G`（29%）。
+
+## 历史交接：2026-11-14 — 全项目 Bug 审查、多形态模拟器实测加固与双端交付 · v2.16.28 (Build 254)
 
 - **范围**：
   - 响应 Randy 需求：「全面审查项目 Bug 并要在模拟器实测（全量覆盖 Android、iOS/iPadOS 与共享 Web 游戏）」，完成全项目缺陷排查与 Release 级实测交付。

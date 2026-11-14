@@ -40,7 +40,7 @@ class PlaybackResolver {
         require(SourceAddress.resolve(detailUrl, detailUrl) != null) { "视频页面地址无效" }
         val cached = episodeCache.get(detailUrl)
         val episodes = cached ?: (
-            if (ContentSourceCatalog.isBeeg(detailUrl)) {
+            if (ContentSourceCatalog.isBeeg(detailUrl) || ContentSourceCatalog.is134x(detailUrl)) {
                 listOf(PlaybackEpisode(1, "正片", detailUrl))
             } else if (ContentSourceCatalog.isHuavod(detailUrl)) {
                 val parsedHuavod = parseHuavodEpisodes(fetch(detailUrl), detailUrl)
@@ -85,6 +85,9 @@ class PlaybackResolver {
         }
         if (ContentSourceCatalog.isBeeg(pageUrl)) {
             return@withContext resolveBeeg(pageUrl, startedAtMs)
+        }
+        if (ContentSourceCatalog.is134x(pageUrl)) {
+            return@withContext X134Repository.resolvePlayback(pageUrl).rememberFor(pageUrl, startedAtMs)
         }
         if (ContentSourceCatalog.is91Dongman(pageUrl)) {
             return@withContext resolve91Dongman(pageUrl, startedAtMs)
@@ -295,7 +298,10 @@ class PlaybackResolver {
     }
 
     private fun mediaType(url: String): String = when {
-        url.substringBefore('?').lowercase().endsWith(".m3u8") -> "hls"
+        url.substringBefore('?').lowercase().endsWith(".m3u8") ||
+            url.contains(".m3u8", ignoreCase = true) ||
+            url.contains("%2Em3u8", ignoreCase = true) ||
+            url.contains("/api/hls", ignoreCase = true) -> "hls"
         url.substringBefore('?').lowercase().endsWith(".mp4") -> "mp4"
         else -> "unknown"
     }

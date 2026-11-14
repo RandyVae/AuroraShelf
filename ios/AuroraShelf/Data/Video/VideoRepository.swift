@@ -275,6 +275,8 @@ public final class VideoRepository: ObservableObject {
             return try await fetchRealHuavodFeed(category: category, page: page)
         case VideoSourceCatalog.beeg.id:
             return try await fetchBeegFeed(category: category, page: page)
+        case VideoSourceCatalog.x134.id:
+            return try await X134SourceService.shared.fetchFeed(category: category, page: page)
         case VideoSourceCatalog.xvideos.id:
             return try await UniversalVideoEngine.fetchXVideosFeed(category: category, session: session, page: page)
         case VideoSourceCatalog.eporner.id:
@@ -1393,7 +1395,12 @@ public final class VideoRepository: ObservableObject {
             return PlaybackSourceResult(url: streamURL, referer: "https://beeg.com/", title: video.title)
         }
 
-        // 5. XVideos 真实 HLS / MP4 播放流
+        // 5. 134X 高清无广告长视频（_serverFn + Twitter HLS/MP4）
+        if sourceID == VideoSourceCatalog.x134.id {
+            return try await X134SourceService.shared.resolvePlayback(pageUrl: video.playbackUrl, title: video.title)
+        }
+
+        // 6. XVideos 真实 HLS / MP4 播放流
         if sourceID == VideoSourceCatalog.xvideos.id {
             return try await resolveXVideosStream(pageUrl: video.playbackUrl, title: video.title)
         }
@@ -1775,6 +1782,10 @@ public final class VideoRepository: ObservableObject {
         guard VideoSourceCatalog.isSupported(source),
               let url = HTMLVideoSourceAdapter.searchURL(for: source, query: query) else {
             throw VideoFeedError.unsupportedSource(source: source.name)
+        }
+
+        if source.id == VideoSourceCatalog.x134.id {
+            return try await X134SourceService.shared.search(query: query)
         }
 
         var request = URLRequest(url: url)

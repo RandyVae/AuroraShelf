@@ -35,6 +35,9 @@ class VideoRepository {
             if (ContentSourceCatalog.isBeeg(baseUrl)) {
                 return@withContext loadBeegFeed(legacyCategory, page)
             }
+            if (ContentSourceCatalog.is134x(baseUrl)) {
+                return@withContext X134Repository.loadFeed(legacyCategory, page)
+            }
             if (ContentSourceCatalog.isPipePipe(baseUrl)) {
                 // MissAV blocks the extractor's generic desktop request with a challenge page;
                 // keep its proven mobile HTML adapter as a transparent fallback.
@@ -137,6 +140,9 @@ class VideoRepository {
             if (ContentSourceCatalog.isBeeg(baseUrl)) {
                 return@withContext searchBeeg(query, page)
             }
+            if (ContentSourceCatalog.is134x(baseUrl)) {
+                return@withContext X134Repository.search(query, page)
+            }
             if (ContentSourceCatalog.is91Dongman(baseUrl)) {
                 val encodedQuery = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8.name())
                 val searchPath = if (page <= 1) {
@@ -217,7 +223,7 @@ class VideoRepository {
 
     internal fun pageUrl(baseUrl: String, category: FeedCategory, page: Int): String {
         val categoryUrl = URI("$baseUrl/").resolve(categoryPath(baseUrl, category, page))
-        if (ContentSourceCatalog.isHuangguo(baseUrl) || ContentSourceCatalog.isHuavod(baseUrl) || ContentSourceCatalog.isBeeg(baseUrl) || ContentSourceCatalog.is91Dongman(baseUrl)) return categoryUrl.toString()
+        if (ContentSourceCatalog.isHuangguo(baseUrl) || ContentSourceCatalog.isHuavod(baseUrl) || ContentSourceCatalog.isBeeg(baseUrl) || ContentSourceCatalog.is134x(baseUrl) || ContentSourceCatalog.is91Dongman(baseUrl)) return categoryUrl.toString()
         val params = categoryUrl.rawQuery.orEmpty().split('&').filter { it.isNotBlank() }
             .filterNot { it.substringBefore('=').equals("page", ignoreCase = true) }
             .toMutableList()
@@ -255,6 +261,14 @@ class VideoRepository {
     }
 
     private fun categoryPath(baseUrl: String, category: FeedCategory, page: Int): String {
+        if (ContentSourceCatalog.is134x(baseUrl)) {
+            val basePath = when (category) {
+                FeedCategory.CURRENT_HOT -> "/popular"
+                FeedCategory.MONTHLY_HOT -> "/featured"
+                else -> "/"
+            }
+            return if (page <= 1) basePath else "$basePath?page=$page"
+        }
         if (ContentSourceCatalog.isBeeg(baseUrl)) {
             val tag = when (category) {
                 FeedCategory.RECENT -> "index"

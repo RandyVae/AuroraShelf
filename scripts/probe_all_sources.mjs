@@ -15,6 +15,14 @@ const sources = [
   { type: '视频', id: '91porn', name: '91视频', url: 'https://h1014.sol148.com/index.php', referer: 'https://h1014.sol148.com/' },
   { type: '视频', id: '91dongman', name: '91动漫', url: 'https://91dongman.net', referer: 'https://91dongman.net/' },
   { type: '视频', id: 'beeg', name: 'Beeg', url: 'https://beeg.com/api/v6/index/main/0/pc', referer: 'https://beeg.com/' },
+  {
+    type: '视频',
+    id: '134x',
+    name: '134X',
+    url: 'https://134x.com/_serverFn/7cd2fdc202217221aea24ce98c8911133744658e2b912656f645ea53849d6f17?payload=%7B%22t%22%3A%7B%22t%22%3A10%2C%22i%22%3A0%2C%22p%22%3A%7B%22k%22%3A%5B%22data%22%5D%2C%22v%22%3A%5B%7B%22t%22%3A10%2C%22i%22%3A1%2C%22p%22%3A%7B%22k%22%3A%5B%22page%22%5D%2C%22v%22%3A%5B%7B%22t%22%3A0%2C%22s%22%3A1%7D%5D%7D%2C%22o%22%3A0%7D%5D%7D%2C%22o%22%3A0%7D%2C%22f%22%3A127%2C%22m%22%3A%5B%5D%7D',
+    headers: { 'Accept': 'application/json', 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', 'Sec-Fetch-Dest': 'empty', 'x-tsr-serverFn': 'true' },
+    referer: 'https://134x.com/'
+  },
   { type: '视频', id: 'xvideos', name: 'XVideos', url: 'https://www.xvideos.com/new/1/', referer: 'https://www.xvideos.com/' },
   { type: '视频', id: 'missav', name: 'MissAV', url: 'https://missav.media', referer: 'https://missav.media/' },
   { type: '视频', id: 'kissjav', name: 'KissJAV', url: 'https://kissjav.li', referer: 'https://kissjav.li/' },

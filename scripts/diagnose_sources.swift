@@ -33,6 +33,7 @@ let probes: [SourceProbe] = [
     SourceProbe(type: "视频", name: "91视频", id: "91porn", url: "https://h1014.sol148.com/index.php", headers: ["Referer": "https://h1014.sol148.com/"]),
     SourceProbe(type: "视频", name: "91动漫", id: "91dongman", url: "https://91dongman.net/"),
     SourceProbe(type: "视频", name: "Beeg", id: "beeg", url: "https://beeg.com/api/v6/index/main/0/pc"),
+    SourceProbe(type: "视频", name: "134X", id: "134x", url: "https://134x.com/popular"),
     SourceProbe(type: "视频", name: "XVideos", id: "xvideos", url: "https://www.xvideos.com/new/1/"),
     SourceProbe(type: "视频", name: "MissAV", id: "missav", url: "https://missav.media/new"),
     SourceProbe(type: "视频", name: "KissJAV", id: "kissjav", url: "https://kissjav.li/most-popular/?sort_by=rating"),

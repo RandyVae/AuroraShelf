@@ -1,6 +1,19 @@
 # Project State
 
-## 最新工作状态（2026年11月14日 · 全项目 Bug 审查与双端模拟器实测加固 · v2.16.28 Build 254）
+## 最新工作状态（2026年11月14日 · 新增无广告极速长视频源 134X 双端原生接入与交付 · v2.16.29 Build 255）
+
+- **Android 134X（`134x.com`）原生适配器与全链路接入**（[X134Repository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/X134Repository.kt)、[ContentSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/ContentSource.kt)、[VideoItem.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/VideoItem.kt)、[VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt)、[PlaybackResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PlaybackResolver.kt)、[OfflineCacheManager.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/OfflineCacheManager.kt)、[NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt)）：
+  - 新增 `X134Repository` 封装 OkHttp 连接池、Seroval Wire 编解码器（`t=0,1,2,4,9,10,11` ＋ 线性字符串反转义）、`AppShell-*.js` 动态哈希自动刷新、cursor 翻页缓存、6 路并发 `za` 详情元信息水合与 15 分钟 LRU 缓存；
+  - 支持「最新 / 热门 / 精选」三分类、站内搜索、高清 Twitter 封面与 `video.twimg.com` HLS `.m3u8` / MP4 直链，并在播放器与离线缓存打通扩展 HLS MIME 识别及单集正片直开。
+- **iOS / iPadOS 134X（`134x.com`）原生适配器与 20 源目录对齐**（[X134SourceService.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/X134SourceService.swift)、[VideoSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoSourceCatalog.swift)、[VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift)、[HTMLVideoSourceAdapter.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HTMLVideoSourceAdapter.swift)、[ChannelsShelf.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/ChannelsShelf.swift)）：
+  - 新增 Swift 6 严格并发 `X134SourceService` actor 与 `X134SerovalCodec`（含 `unescapeSerovalString` 与 `cleanTweetTitle` HTML 实体清洗），支持最新/热门/精选与站内搜索并发聚合；
+  - 更新视频源目录至 20 源（可搜索 19 源）、补齐 `ChannelsShelf` 视觉徽章（`"bolt.circle.fill"` / monogram `"134"`）及 12 套本地化文案。
+- **实测与交付（v2.16.29 Build 255）**：
+  - 双端 Release 模拟器首轮验收发现标题包含 Seroval 字面 `\n`，同步修补双端 Seroval 字符串转义解码后于 Android（`netgrey_phone` R8 签名 `Netgrey.apk`）与 iPhone 18 Pro / iPad Pro 13-inch Simulator Release 包实测首页、分类、详情与 H.264/AAC 视频出画均无 `\n`、无错位；
+  - 验证：Android `X134RepositoryTest`（`RUN_LIVE_SOURCE_TESTS=1`）5/5 通过、全量 `testDebugUnitTest` 250 项（242 通过 / 8 跳过 / 0 失败）、`lintDebug` 0 error、`assembleRelease` 全绿；iOS `LiveVideoSourceAuditTests` 针对 `134x` 实时通过（`items=20 cover=decoded playback=resolved`），`X134SourceServiceTests` 3 项 0 失败（1 skip live），全量 `xcodebuild test` 执行 172 项中视频与核心套件 0 失败（7 项默认跳过，预存 `ComicRepositoryTests.testBaoziLiveFetchComicsChaptersAndPages` 受外部 CDN 偶发 403 影响）；`probe_all_sources.mjs` 35 源中 33 源可达（`134X` 878ms HTTP 200）；
+  - OTA 与版本同步：版本号全面升级至 `2.16.29 (Build 255)`，`./scripts/publish_ota.sh Release` 已将 `Netgrey.apk`（`206,860,171` bytes）与签名 `Netgrey.ipa`（`202,532,614` bytes）原子覆盖至 `https://bananarey.us`（HTTPS `200 OK`，磁盘可用 `11G`）。
+
+## 历史工作状态（2026年11月14日 · 全项目 Bug 审查与双端模拟器实测加固 · v2.16.28 Build 254）
 
 - **Android 全链路加固与 UI 修复**（[PlayerScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PlayerScreen.kt)、[PersonalScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PersonalScreen.kt)、[HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt)、[MainActivity.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/MainActivity.kt)）：
   - 排查并修复冷启动/论坛 ANR 隐患，优化日间主题首屏状态栏高对比度与 `1920x1200` 平板 Hero 响应式高度；

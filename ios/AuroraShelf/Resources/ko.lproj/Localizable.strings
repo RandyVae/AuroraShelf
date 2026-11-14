@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "비디오, 애니, 만화, 품번 검색";
-"search.concurrent_hint" = "19개 비디오 소스 동시 검색";
+"search.concurrent_hint" = "20개 비디오 소스 동시 검색";
 "search.no_results" = "검색 결과 없음";
 "search.searching" = "검색 중…";
 "search.history" = "검색 기록";

@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "Search videos, anime, comics or codes";
-"search.concurrent_hint" = "Search across 19 video sources concurrently";
+"search.concurrent_hint" = "Search across 20 video sources concurrently";
 "search.no_results" = "No Results Found";
 "search.searching" = "Searching...";
 "search.history" = "Search History";

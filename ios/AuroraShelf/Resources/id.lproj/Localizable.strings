@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "Cari video, anime, komik atau kode";
-"search.concurrent_hint" = "Cari simultan di 19 sumber video";
+"search.concurrent_hint" = "Cari simultan di 20 sumber video";
 "search.no_results" = "Tidak ada hasil";
 "search.searching" = "Sedang mencari…";
 "search.history" = "Riwayat pencarian";

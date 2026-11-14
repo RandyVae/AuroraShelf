@@ -147,6 +147,13 @@ public struct ChannelVisualSpec: Sendable {
                 gradientColors: [Color(rgb: 0x002171), Color(rgb: 0x0D47A1)],
                 accentColor: Color(rgb: 0x82B1FF)
             )
+        case "134x":
+            // 134X：极简黑曜石 + 极光蔚蓝闪电
+            return ChannelVisualSpec(
+                iconName: "bolt.circle.fill",
+                gradientColors: [Color(rgb: 0x0D1117), Color(rgb: 0x1F2937)],
+                accentColor: Color(rgb: 0x38BDF8)
+            )
         default:
             return ChannelVisualSpec(
                 iconName: "tv.fill",
@@ -186,6 +193,7 @@ private struct ChannelGlyph: View {
         case "mrdouga": return "MD"
         case "ohentai": return "OH"
         case "xnxx": return "XX"
+        case "134x": return "134"
         default: return "TV"
         }
     }

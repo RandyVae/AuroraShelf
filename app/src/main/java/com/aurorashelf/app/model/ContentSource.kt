@@ -48,6 +48,7 @@ object ContentSourceCatalog {
     const val BEEG_BASE_URL = "https://beeg.com"
     const val T91DONGMAN_BASE_URL = "https://91dongman.net"
     const val MISSAV_BASE_URL = "https://missav.media"
+    const val X134_BASE_URL = "https://134x.com"
     // Keep cold start on the source that does not require a timed playback token.
     // Huavod remains available in the picker, but its signed player handshake can
     // legitimately reject an immediate first request while the token is too early.
@@ -59,6 +60,7 @@ object ContentSourceCatalog {
         ContentSource("huavod", "华视影院", "海量影视与综艺 · 官方直连", HUAVOD_BASE_URL, isDirectDomestic = true),
         ContentSource("91dongman", "91动漫", "海量里番、3D与AI动漫 · 官方直连", T91DONGMAN_BASE_URL, isDirectDomestic = true),
         ContentSource("beeg", "Beeg", "极简高清流媒体 · 海外直连/代理", BEEG_BASE_URL, isDirectDomestic = false),
+        ContentSource("134x", "134X", "无广告高清长视频 · X 长片直连", X134_BASE_URL, isDirectDomestic = false),
     )
 
     private fun serviceDescription(serviceName: String): String = when (serviceName) {
@@ -111,6 +113,7 @@ object ContentSourceCatalog {
         isHuavod(pageUrl) -> "华视影院"
         is91Dongman(pageUrl) -> "91动漫"
         isBeeg(pageUrl) -> "Beeg"
+        is134x(pageUrl) -> "134X"
         isXVideos(pageUrl) -> "XVideos"
         isMissAv(pageUrl) -> "MissAV"
         else -> host(pageUrl) ?: "其他视频源"
@@ -125,6 +128,8 @@ object ContentSourceCatalog {
     fun isHuavod(baseUrl: String): Boolean = host(baseUrl) in setOf("huavod.com", "huaren.live", "huarenok.com")
 
     fun isBeeg(baseUrl: String): Boolean = host(baseUrl) in setOf("beeg.com", "externulls.com")
+
+    fun is134x(baseUrl: String): Boolean = host(baseUrl) == "134x.com"
 
     fun is91Dongman(baseUrl: String): Boolean = host(baseUrl) in setOf("91dongman.net", "91dongman.com")
 

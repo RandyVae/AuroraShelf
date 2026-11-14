@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "搜尋影視、動漫、漫畫或番號";
-"search.concurrent_hint" = "在 19 個視頻源並發搜尋";
+"search.concurrent_hint" = "在 20 個視頻源並發搜尋";
 "search.no_results" = "無搜尋結果";
 "search.searching" = "正在搜尋…";
 "search.history" = "搜尋歷史";

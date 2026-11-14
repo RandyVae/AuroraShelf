@@ -1276,7 +1276,10 @@ internal fun isPortraitVideo(
 }
 
 private fun mediaType(url: String): String = when {
-    url.substringBefore('?').lowercase().endsWith(".m3u8") -> "hls"
+    url.substringBefore('?').lowercase().endsWith(".m3u8") ||
+        url.contains(".m3u8", ignoreCase = true) ||
+        url.contains("%2Em3u8", ignoreCase = true) ||
+        url.contains("/api/hls", ignoreCase = true) -> "hls"
     url.substringBefore('?').lowercase().endsWith(".mp4") -> "mp4"
     else -> "unknown"
 }

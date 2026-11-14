@@ -427,7 +427,10 @@ class OfflineCacheManager private constructor(context: Context) {
             id in pendingIds
 
         private fun mimeType(url: String): String? = when {
-            url.substringBefore('?').lowercase().endsWith(".m3u8") -> MimeTypes.APPLICATION_M3U8
+            url.substringBefore('?').lowercase().endsWith(".m3u8") ||
+                url.contains(".m3u8", ignoreCase = true) ||
+                url.contains("%2Em3u8", ignoreCase = true) ||
+                url.contains("/api/hls", ignoreCase = true) -> MimeTypes.APPLICATION_M3U8
             url.substringBefore('?').lowercase().endsWith(".mp4") -> MimeTypes.VIDEO_MP4
             else -> null
         }

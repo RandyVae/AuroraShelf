@@ -89,6 +89,14 @@ enum class FeedCategory(val label: String, val path: String, val xvideosKioskId:
                 else -> label
             }
         }
+        if (ContentSourceCatalog.is134x(baseUrl)) {
+            return when (this) {
+                RECENT -> "最新"
+                CURRENT_HOT -> "热门"
+                MONTHLY_HOT -> "精选"
+                else -> label
+            }
+        }
         if (!ContentSourceCatalog.isHuangguo(baseUrl)) return label
         return when (this) {
             RECENT -> "最新"
@@ -116,6 +124,9 @@ enum class FeedCategory(val label: String, val path: String, val xvideosKioskId:
         fun availableFor(baseUrl: String): List<FeedCategory> {
             if (ContentSourceCatalog.isXVideos(baseUrl)) {
                 return XVIDEOS_CATEGORIES
+            }
+            if (ContentSourceCatalog.is134x(baseUrl)) {
+                return listOf(RECENT, CURRENT_HOT, MONTHLY_HOT)
             }
             val source = ContentSourceCatalog.find(baseUrl)
             return if (source?.extractorServiceName != null) {
