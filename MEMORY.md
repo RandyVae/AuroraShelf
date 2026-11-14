@@ -46,7 +46,7 @@
 - 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，同时监控双端生产环境反馈与性能表现。
 - 下一步：接入用户资料/收藏历史云同步与后续订阅权益接口。
 - 阻塞：Android ADB 与 Apple 实体设备未连接（记录为 blocked，本地 Android 模拟器实装混淆 Release APK 走查完全一致通过；iPhone 17 Pro 與 iPad Pro 13-inch 模擬器 Release 構建實測驗收通過）。
-- 最近一次更新：2026-11-13 by Codex
+- 最近一次更新：2026-11-14 by Codex
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
 
