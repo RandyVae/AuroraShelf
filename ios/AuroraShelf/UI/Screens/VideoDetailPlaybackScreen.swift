@@ -6,11 +6,13 @@ import Combine
 public struct VideoDetailPlaybackScreen: View {
     public let initialVideo: VideoItem
     public let onDismiss: () -> Void
+    public var onOpenSearchKeyword: ((String) -> Void)? = nil
     
     @State private var currentVideo: VideoItem
     @State private var episodes: [PlaybackEpisode] = []
     @State private var currentEpisode: PlaybackEpisode?
     @State private var isLoadingEpisodes: Bool = false
+    @State private var detailMetadata: VideoDetailMetadata? = nil
     @State private var isDescriptionExpanded: Bool = false
     @State private var isShowingEpisodePicker: Bool = false
     
@@ -70,10 +72,15 @@ public struct VideoDetailPlaybackScreen: View {
     @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverEnabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     
-    public init(video: VideoItem, onDismiss: @escaping () -> Void) {
+    public init(
+        video: VideoItem,
+        onDismiss: @escaping () -> Void,
+        onOpenSearchKeyword: ((String) -> Void)? = nil
+    ) {
         self.initialVideo = video
         self._currentVideo = State(initialValue: video)
         self.onDismiss = onDismiss
+        self.onOpenSearchKeyword = onOpenSearchKeyword
     }
     
     private var relatedVideos: [VideoItem] {
@@ -90,7 +97,8 @@ public struct VideoDetailPlaybackScreen: View {
                     let columns = VideoDetailLayout.columns(for: screenGeo.size, idiom: UIDevice.current.userInterfaceIdiom)
                     let playerWidth = columns.playerWidth(for: screenGeo.size.width)
                     let recommendationWidth = columns.recommendationWidth(for: screenGeo.size.width)
-                    let playerHeight = min(playerWidth * 9.0 / 16.0, screenGeo.size.height * 0.62)
+                    let safeTop = DeviceLayout.safeAreaTop(in: screenGeo.size)
+                    let playerHeight = min(playerWidth * 9.0 / 16.0, screenGeo.size.height * 0.62) + safeTop
 
                     // iPad 横屏采用 YouTube 式双栏：左侧保持播放器与当前视频上下文，右侧独立滚动推荐。
                     HStack(alignment: .top, spacing: 0) {
@@ -164,7 +172,13 @@ public struct VideoDetailPlaybackScreen: View {
             await startPlayback(for: currentVideo)
         }
         .task(id: currentVideo.id) {
-            await loadEpisodes(for: currentVideo)
+            detailMetadata = nil
+            async let episodesTask: Void = loadEpisodes(for: currentVideo)
+            async let metaTask = videoRepo.fetchDetailMetadata(for: currentVideo)
+            let (_, fetchedMeta) = await (episodesTask, metaTask)
+            if !Task.isCancelled {
+                detailMetadata = fetchedMeta
+            }
         }
         .onChange(of: isVoiceOverEnabled) { _, enabled in
             if enabled {
@@ -288,6 +302,10 @@ public struct VideoDetailPlaybackScreen: View {
                 episodesShelfSection
             }
 
+            if let meta = detailMetadata, !meta.directors.isEmpty || !meta.actors.isEmpty {
+                castCrewSection(metadata: meta)
+            }
+
             synopsisSection
 
             if includeRecommendations && !relatedVideos.isEmpty {
@@ -365,7 +383,7 @@ public struct VideoDetailPlaybackScreen: View {
         let isRotated = !isPad && isFullScreen && isLandscape && !isPhysicallyLandscape
         let targetWidth = isRotated ? screenGeo.size.height : (width ?? screenGeo.size.width)
         let safeTop = DeviceLayout.safeAreaTop(in: screenGeo.size)
-        let needsTopOffset = !isFullScreen && !isLandscape && !isPad
+        let needsTopOffset = !isFullScreen && (!isLandscape || isPad)
         let targetHeight: CGFloat = {
             if let height, !isFullScreen {
                 return height
@@ -375,7 +393,7 @@ public struct VideoDetailPlaybackScreen: View {
             }
             if isPad {
                 // iPad 宽屏内嵌态：严格限制播放器黄金视口高度，留出 >= 50% 竖向空间展现选集与简介，根治下半部被挤压问题
-                return min(screenGeo.size.height * 0.48, 440)
+                return min(screenGeo.size.height * 0.48, 440) + safeTop
             }
             return (screenGeo.size.width * 9.0 / 16.0) + safeTop
         }()
@@ -1113,6 +1131,25 @@ public struct VideoDetailPlaybackScreen: View {
                         .background(AuroraColor.brand.opacity(0.12), in: Capsule())
                 }
             }
+
+            if let meta = detailMetadata {
+                let pills = [meta.year, meta.area].filter { !$0.isEmpty } + meta.tags
+                if !pills.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Array(pills.prefix(10).enumerated()), id: \.offset) { _, pill in
+                                Text(pill)
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(AuroraColor.textSecondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(AuroraColor.surfaceCard, in: Capsule())
+                                    .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 0.75))
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     
@@ -1536,29 +1573,112 @@ public struct VideoDetailPlaybackScreen: View {
         }
     }
     
-    // MARK: - 5. 剧情简介折叠区
-    
+    // MARK: - 5. 演职员阵容与基本介绍
+
+    @ViewBuilder
+    private func castCrewSection(metadata: VideoDetailMetadata) -> some View {
+        let crewItems: [(name: String, role: String, icon: String)] =
+            metadata.directors.map { ($0, "导演", "megaphone.fill") } +
+            metadata.actors.map { ($0, "主演", "person.crop.circle.fill") }
+
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("演员表")
+                    .font(.headline)
+                    .foregroundStyle(AuroraColor.textPrimary)
+                Spacer()
+                if onOpenSearchKeyword != nil {
+                    Text("轻点检索相关作品")
+                        .font(.caption2)
+                        .foregroundStyle(AuroraColor.textTertiary)
+                }
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 10) {
+                    ForEach(Array(crewItems.enumerated()), id: \.offset) { _, member in
+                        let chipBody = HStack(spacing: 7) {
+                            Image(systemName: member.icon)
+                                .font(.caption)
+                                .foregroundStyle(member.role == "导演" ? AuroraColor.brand : AuroraColor.textSecondary)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(member.name)
+                                    .font(.caption.bold())
+                                    .foregroundStyle(AuroraColor.textPrimary)
+                                    .lineLimit(1)
+                                Text(member.role)
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(AuroraColor.textSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(AuroraColor.hairline, lineWidth: 1)
+                        )
+                        .frame(minHeight: 44)
+
+                        if let onSearch = onOpenSearchKeyword {
+                            Button {
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                cleanupPlayer()
+                                onSearch(member.name)
+                            } label: {
+                                chipBody
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            chipBody
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private var synopsisSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("简介")
+        VStack(alignment: .leading, spacing: 8) {
+            Text("基本介绍")
                 .font(.headline)
                 .foregroundStyle(AuroraColor.textPrimary)
-            
-            let description = currentVideo.subtitle.isEmpty ? "本片由 \(currentVideo.sourceName) 官方源直连分发，支持硬件解码出画与离线缓存下载。" : currentVideo.subtitle
-            Text(description)
-                .font(.subheadline)
-                .foregroundStyle(AuroraColor.textSecondary)
-                .lineLimit(isDescriptionExpanded ? nil : 3)
-            
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isDescriptionExpanded.toggle()
+
+            let metaSynopsis = detailMetadata?.synopsis.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let fallbackSubtitle = currentVideo.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            let description: String = {
+                if !metaSynopsis.isEmpty { return metaSynopsis }
+                if !fallbackSubtitle.isEmpty { return fallbackSubtitle }
+                return "本片由 \(currentVideo.sourceName) 源站直连分发。"
+            }()
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(description)
+                    .font(.subheadline)
+                    .foregroundStyle(AuroraColor.textSecondary)
+                    .lineSpacing(3)
+                    .lineLimit(isDescriptionExpanded ? nil : 4)
+
+                if description.count > 75 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isDescriptionExpanded.toggle()
+                        }
+                    } label: {
+                        Text(isDescriptionExpanded ? "收起" : "展开全部")
+                            .font(.caption.bold())
+                            .foregroundStyle(AuroraColor.brand)
+                    }
                 }
-            } label: {
-                Text(isDescriptionExpanded ? "收起" : "展开全部")
-                    .font(.caption.bold())
-                    .foregroundStyle(AuroraColor.brand)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(12)
+            .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(AuroraColor.hairline, lineWidth: 0.75)
+            )
         }
     }
     

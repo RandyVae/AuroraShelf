@@ -59,7 +59,7 @@ enum HTMLVideoSourceAdapter {
             let query = isPopular ? "?sort_by=video_viewed" : ""
             route = page == 1 ? "\(pathPrefix)/\(query)" : "\(pathPrefix)/\(page)/\(query)"
         case "ohentai":
-            route = category.contains("人气") ? "/popular/" : category.contains("新") ? "/latest/" : "/"
+            route = "/"
         case "xnxx":
             // XNXX's current kiosk is /best/; /new/ returns 404 on the live site.
             // When page > 1, path-index as /best/\(page) without appending query parameters.

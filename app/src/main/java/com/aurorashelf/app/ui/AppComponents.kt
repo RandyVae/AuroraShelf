@@ -440,7 +440,9 @@ internal fun MediaImage(video: VideoItem, modifier: Modifier = Modifier) {
         key3 = attempt,
     ) {
         value = video.thumbnailUrl?.let { url ->
-            withContext(Dispatchers.IO) { CoverImageLoader.load(url, video.pageUrl) }
+            withContext(Dispatchers.IO) {
+                CoverImageLoader.load(url, video.pageUrl, title = video.title)
+            }
         }
         isLoading = false
     }

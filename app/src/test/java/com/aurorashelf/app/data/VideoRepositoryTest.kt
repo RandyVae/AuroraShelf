@@ -1,5 +1,6 @@
 package com.aurorashelf.app.data
 
+import com.aurorashelf.app.model.FeedCategory
 import org.jsoup.Jsoup
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -194,6 +195,32 @@ class VideoRepositoryTest {
     }
 
     @Test
+    fun ignoresHuavodTimeTitleFt4WhenNoNumericScoreExists() {
+        val document = Jsoup.parse(
+            """
+            <div class="public-list-box">
+              <div class="public-list-div">
+                <a class="public-list-exp" href="/voddetail/204741.html" title="折月亮">
+                  <img src="https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2931851430.jpg" />
+                  <span class="public-prt">豆瓣热榜</span>
+                </a>
+              </div>
+              <div class="public-list-button">
+                <a class="time-title hide ft4" href="/voddetail/204741.html" title="折月亮">折月亮</a>
+              </div>
+            </div>
+            """.trimIndent(),
+            "https://huavod.com/vodshow/2.html",
+        )
+
+        val items = VideoRepository().parseDocument(document, "https://huavod.com")
+
+        assertEquals(1, items.size)
+        assertEquals("折月亮", items.single().title)
+        assertEquals("豆瓣热榜", items.single().views)
+    }
+
+    @Test
     fun beegCategoryPathsAndLabels() {
         val repository = VideoRepository()
         assertEquals(
@@ -355,5 +382,75 @@ class VideoRepositoryTest {
         assertEquals("SSIS-001 正片", item.title)
         assertEquals("https://missav.media/cn/ssis-001", item.pageUrl)
         assertEquals("https://fourhoi.mrstcdn.store/ssis-001/cover-t.jpg", item.thumbnailUrl)
+    }
+
+    @Test
+    fun parses91DongmanRankingMobileRowsAndSkipsPlaceholders() {
+        val html = """
+            <div class="dm-ranking-mobile-row">
+              <a class="dm-ranking-mobile-row__main" href="/anime/lifan/9012/">
+                <img src="/static/placeholder.png" data-src="https://pic.drleao.cn/rank/9012.jpg" alt="排行测试动漫">
+                <div class="dm-ranking-mobile-row__title">排行测试动漫</div>
+                <span class="dm-ranking-mobile-row__badge">排行榜</span>
+                <span class="dm-ranking-mobile-row__meta">9.8万</span>
+                <span class="dm-ranking-mobile-row__duration">22:10</span>
+              </a>
+            </div>
+        """.trimIndent()
+        val doc = Jsoup.parse(html, "https://91dongman.net/ranking/")
+        val items = VideoRepository().parseDocument(doc, "https://91dongman.net")
+        assertEquals(1, items.size)
+        val item = items.single()
+        assertEquals("9012", item.id)
+        assertEquals("排行测试动漫", item.title)
+        assertEquals("https://pic.drleao.cn/rank/9012.jpg", item.thumbnailUrl)
+    }
+
+    @Test
+    fun parsesHuavodNonAdHeroSlidesAndUpgradesDoubanPosterCovers() {
+        val homeHtml = """
+            <div class="swiper-wrapper">
+              <div class="swiper-slide">
+                <a href="/advertiser" target="_blank">
+                  <div class="slide-time-img3 slide-time-img3--ad" style="background-image: url('https://ad.example/ad.jpg')"></div>
+                </a>
+              </div>
+              <div class="swiper-slide">
+                <a href="/voddetail/204741.html" title="折月亮">
+                  <div class="slide-time-img3 mask-1" style="background-image: url('https://puui.qpic.cn/media_img/lena/PICf1e680_1800_800/0')"></div>
+                  <div class="slide-info">
+                    <div class="slide-info-type"><span>电影</span></div>
+                    <h3 class="slide-info-title">折月亮</h3>
+                  </div>
+                </a>
+              </div>
+            </div>
+            <div class="public-list-box">
+              <a href="/voddetail/204741.html" title="折月亮">
+                <img data-src="https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2931851430.jpg" />
+              </a>
+              <span class="ft4">9.1</span>
+            </div>
+            <div class="public-list-box">
+              <a href="/voddetail/204158.html" title="眩晕">
+                <img data-original="https://dbzy.tv/upload/vod/20261016-1/dead.jpg" />
+              </a>
+              <span class="ft4">7.5</span>
+            </div>
+        """.trimIndent()
+        val repo = VideoRepository()
+        val doc = Jsoup.parse(homeHtml, "https://huavod.com/")
+        val slides = repo.parseHuavodHeroSlides(doc, "https://huavod.com")
+        assertEquals(1, slides.size)
+        assertEquals("204741", slides.single().vodId)
+        assertEquals("https://puui.qpic.cn/media_img/lena/PICf1e680_1800_800/0", slides.single().bannerUrl)
+
+        val cards = repo.parseDocument(doc, "https://huavod.com")
+        assertEquals(2, cards.size)
+        assertEquals("https://img3.doubanio.com/view/photo/l_ratio_poster/public/p2931851430.jpg", cards[0].thumbnailUrl)
+        assertEquals("https://img9.doubanio.com/view/photo/l_ratio_poster/public/p2932533736.jpg", cards[1].thumbnailUrl)
+
+        val enriched = repo.enrichHuavodWithHeroSlides(cards, slides, FeedCategory.RECENT)
+        assertEquals("https://puui.qpic.cn/media_img/lena/PICf1e680_1800_800/0", enriched.first().heroThumbnailUrl)
     }
 }

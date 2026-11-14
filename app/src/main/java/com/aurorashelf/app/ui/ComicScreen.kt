@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,7 +56,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -111,6 +114,7 @@ import coil3.compose.AsyncImage
 import coil3.imageLoader
 import coil3.network.NetworkHeaders
 import coil3.network.httpHeaders
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.transformations
 import kotlinx.coroutines.Dispatchers
@@ -158,6 +162,9 @@ internal fun ComicScreen(
     onDownloadChapter: ((ComicChapter) -> Unit)? = null,
     onDownloadAll: (() -> Unit)? = null,
     downloadedChapters: List<com.aurorashelf.app.data.comic.DownloadedComicChapter> = emptyList(),
+    onCancelOpening: () -> Unit = {},
+    onDismissDetailsError: () -> Unit = {},
+    onRetryOpening: () -> Unit = {},
 ) {
     Surface(
         color = MaterialTheme.colorScheme.background,
@@ -215,22 +222,74 @@ internal fun ComicScreen(
     }
 
     if (state.isDetailsLoading) {
+        val blockerInteraction = remember { MutableInteractionSource() }
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.65f)),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.65f))
+                .clickable(
+                    interactionSource = blockerInteraction,
+                    indication = null,
+                    onClick = {},
+                ),
         ) {
             Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 6.dp,
             ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.padding(24.dp).size(30.dp),
-                    strokeWidth = 3.dp,
-                    color = AuroraCoral,
-                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 22.dp),
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        strokeWidth = 3.dp,
+                        color = AuroraCoral,
+                    )
+                    Text(
+                        text = "正在加载章节…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    state.pendingComicForRetry?.title?.takeIf { it.isNotBlank() }?.let { comicTitle ->
+                        Text(
+                            text = comicTitle,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                    TextButton(onClick = onCancelOpening) {
+                        Text("取消")
+                    }
+                }
             }
         }
+    }
+
+    if (state.detailsError != null) {
+        AlertDialog(
+            onDismissRequest = onDismissDetailsError,
+            title = { Text("无法打开漫画") },
+            text = { Text(state.detailsError) },
+            confirmButton = {
+                if (state.pendingComicForRetry != null) {
+                    TextButton(onClick = onRetryOpening) {
+                        Text("重试")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissDetailsError) {
+                    Text("取消")
+                }
+            },
+        )
     }
 }
 
@@ -1064,8 +1123,20 @@ private fun ComicReader(
         ) {
             if (state.isReaderLoading) {
                 item {
-                    Box(Modifier.fillMaxWidth().height(420.dp), contentAlignment = Alignment.Center) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 140.dp),
+                    ) {
                         CircularProgressIndicator(color = Color.White)
+                        Text("正在加载章节…", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
+                        OutlinedButton(
+                            onClick = onBack,
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                        ) {
+                            Text("取消并返回")
+                        }
                     }
                 }
             } else if (state.readerError != null) {
@@ -1076,8 +1147,43 @@ private fun ComicReader(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 120.dp),
                     ) {
                         Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color.White, modifier = Modifier.size(42.dp))
-                        Text(state.readerError, color = Color.White, style = MaterialTheme.typography.bodyLarge)
-                        Button(onClick = onRetry) { Text("重试") }
+                        Text(
+                            state.readerError,
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = onRetry) { Text("重试") }
+                            OutlinedButton(
+                                onClick = onBack,
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            ) {
+                                Text("返回漫画列表")
+                            }
+                        }
+                    }
+                }
+            } else if (reader.pages.isEmpty()) {
+                item {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 120.dp),
+                    ) {
+                        Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color.White, modifier = Modifier.size(42.dp))
+                        Text("此章节暂时没有可显示的图片。", color = Color.White, style = MaterialTheme.typography.bodyLarge)
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Button(onClick = onRetry) { Text("重新加载") }
+                            OutlinedButton(
+                                onClick = onBack,
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                            ) {
+                                Text("返回漫画列表")
+                            }
+                        }
                     }
                 }
             } else {
@@ -1201,6 +1307,10 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
                     .memoryCacheKey("${resolved.imageUrl}#segments=${resolved.verticalSegments}")
                     .diskCacheKey(resolved.imageUrl)
                     .apply {
+                        if (retryKey > 0) {
+                            memoryCachePolicy(CachePolicy.WRITE_ONLY)
+                            diskCachePolicy(CachePolicy.WRITE_ONLY)
+                        }
                         if (resolved.verticalSegments > 1) {
                             size(coil3.size.Size.ORIGINAL)
                             transformations(JmUnscrambleTransformation(resolved.verticalSegments))

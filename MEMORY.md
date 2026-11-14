@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `1989200`（2026-11-14），未提交 43 个文件
+- Git：`main` @ `45bab85`（2026-11-14），未提交 65 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-14（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-14（今天）
@@ -36,19 +36,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-14 18:24 by `sync.py`
+- 最后同步：2026-11-14 21:30 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-14 · Build 255 / v2.16.29）：已完成新增无广告极速长视频源 **134X（`https://134x.com`）** 的 Android 与 iOS/iPadOS 原生全功能接入、Release 级双端模拟器实测与 OTA/Git 发布。(1) 协议逆向与原生适配器：针对 `134x.com`（TanStack Start + React SSR）逆向 `_serverFn` Seroval 有线协议（`latest` / `popular` / `featured` 分类、cursor 分页、站内搜索、单条推文高清封面 `pbs.twimg.com` 与 `video.twimg.com` HLS `.m3u8` / MP4 直链解析），在双端分别新增 `X134Repository.kt` 与 `X134SourceService.swift`，内建 6 并发元信息水合、15 分钟 LRU 缓存、`AppShell-*.js` 函数哈希自动刷新、Seroval 字符串转义与 HTML 实体解码（修正真机 Release 实测发现的标题 `\n` 字面显示问题）及 SSR 页面降级解析；(2) 双端目录、UI 与播放链路：将视频源目录扩展至 20 源（全网聚合搜索 19 源），支持「最新 / 热门 / 精选」三分栏与单集正片直开播放；(3) 验证与交付：Android `X134RepositoryTest` 含 `RUN_LIVE_SOURCE_TESTS=1` 5/5 全通、全量 `testDebugUnitTest` 250 项（242 通过 / 8 默认跳过 / 0 失败）、`lintDebug`（0 error）与 `assembleRelease` 全通，iOS `X134SourceServiceTests`（3 项 0 失败，1 跳过 live）与 `LiveVideoSourceAuditTests`（`134x`：`items=20 cover=decoded playback=resolved`）通过、`xcodebuild test` 172 项中 7 项默认跳过、视频相关套件 0 失败（外部 `ComicRepositoryTests.testBaoziLiveFetchComicsChaptersAndPages` 出现 1 次 CDN `httpStatus(403)` 波动），Android Release APK 与 iOS Simulator Release 在手机/平板实测出画播放与标题正常，`./scripts/publish_ota.sh Release` 已双端原子发布（`Netgrey.apk` 206,860,171 bytes、`Netgrey.ipa` 202,532,614 bytes，远端 `bananarey.us` 仅留唯一最新版、磁盘可用 11G）。
-- 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，同时监控双端生产环境与新增 `134X` 源线上稳定性。
+- 当前阶段（2026-11-14 · Build 256 / v2.16.30）：已完成漫画卡死与导航消失根治、全源连通性与解析修复、iPad/Android 平板直播详情页 YouTube 式双栏适配、华视影院（`huavod.com`）高清 Hero/封面升级与详请页演员表/基本介绍匹配、双端 Release 模拟器实测验收与 OTA 发布。(1) 漫画防卡死与导航持久化：双端重构漫画加载与取消机制（Android 章节加载浮层提供可点击「取消」并保留底栏 Dock 与返回堆栈，iOS 确保失败/取消退回不丢导航且不阻断后续漫画打开）；(2) 平板直播双栏与安全区避让：Android 平板与 iPad 横屏直播详情页适配 YouTube 式左右双栏（播放器＋聊天室/更多直播），同时修复 iPad 非全屏态下播放器避让 iPadOS 顶部状态栏安全区；(3) 华视高清封面与详请元数据：双端修复 `.slide-time-img3` 单引号样式匹配与 Douban 高清封面兜底，过滤 `<a class="time-title hide ft4">` 片名误当评分碰撞，并修复 `<span class="slash">/</span>` 导致的演员表首人截断，精准呈现多演员「演员表」、导演、年份、地区、分类标签与「基本介绍」；(4) 验证与交付：最后一次修改后 Android `testDebugUnitTest`（42 套件 257 项：0 失败 0 错误 8 跳过）、`lintDebug`（0 error，HTML 报告 19 warnings）、`assembleRelease`（`dist/Netgrey.apk` `206,876,555` bytes）与 iOS `AuroraShelfTests`（177 项：0 失败 7 跳过）及 Simulator Release 编译全通，双端 Release 实机级模拟器截图复核通过；`./scripts/publish_ota.sh Release` 完成 `bananarey.us` 原子覆盖（`Netgrey.apk` `206,876,555` bytes / `Netgrey.ipa` `202,630,841` bytes，HTTPS `200 OK`，远端磁盘可用 `11G`）。
+- 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，并持续跟踪各外部站点源可用性。
 - 下一步：接入用户资料/收藏历史云同步与后续订阅权益接口。
-- 阻塞：`node scripts/probe_all_sources.mjs` 35 源中 33 源可达（`134X` HTTP 200 / 878ms），`javsb` 因本机网络 TLS 断连、`jm` 因脚本 `API code=401` 失败；iOS `ComicRepositoryTests.testBaoziLiveFetchComicsChaptersAndPages` 外部 CDN 偶发 HTTP 403。
+- 阻塞：`JAVSB`（`jav.sb` 本机 TLS 握手断连/终止）与 `SpankBang`（`diagnose_sources.swift` 返回 HTTP 403）为外部网络或反爬限制；`禁漫天堂` 在 Node 脚本因缺少协议密钥返回 `API code=401`（原生双端实测通过）；`Chaturbate` 为上游空流/需浏览器流、`哔咔` 需配置协议凭据；上述受限情况已保留清晰可测边界并在报告中声明。
 - 最近一次更新：2026-11-14 by Antigravity (Claude Opus)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-14（Antigravity）：漫画卡死恢复、全源加固、平板直播双栏、华视高清封面及演员表/基本介绍精准解析（v2.16.30 Build 256）。(1) 漫画非阻塞加载与导航恢复：漫画加载态保留底部主导航与取消入口，取消或失败后立即清理活跃加载态与锁定状态，保证返回与继续点开其他漫画畅通；(2) iPad / 平板直播双栏与安全区避让：参照视频详情页比例为直播详情接入横屏双栏布局，并在 `LivePlayerView`、`LiveDetailView` 与 `VideoDetailPlaybackScreen` 统一采用 `needsTopOffset = !isFullScreen && (!isLandscape || isPad)` 配合 `+ safeTop` 高度补偿，杜绝 iPad 非全屏顶部画面与系统状态栏重叠；(3) 华视精准解析加固：双端限制 `.ft4` 评分为数值型 `<i/span>` 或 `.public-list-prb` 子节点，避免将 `<a class="time-title hide ft4">` 片名误作评分显示，同时移除 `extractPeopleRow` 与 `.detail-info span` 对 `<span class="slash">/</span>` 的截断，完整解析华视详情页多名演员与基本介绍，全端实测截屏验收通过。
 
 - 2026-11-14（Antigravity）：新增无广告极速长视频源 `134X`（`134x.com`）双端原生接入与协议解码加固（v2.16.29 Build 255）。(1) 放弃脆性 HTML 整页抓取，直接解析 `134x.com` 的 TanStack Start `_serverFn` Seroval 编解码协议（含引用回填 `t=4/9/10/11`），自动追踪首页 `AppShell-*.js` 内的 `handler(fn("<hash>"))` 函数索引防前端发版失效；(2) 双端实现 6 路并发 `za` 详情水合与 15 分钟缓存，补全首页卡片缺少的高清 Twitter 海报（`pbs.twimg.com`）与主清晰度 HLS/MP4 直链，同时为单集资源跳过无意义二级剧集爬取、直接在播放器注入 HLS MIME 类型与站内 `Referer`；(3) Android/iOS Release 模拟器首轮截屏实测发现标题直接显示 Seroval `t=1` 字符串内的字面 `\n`，随即在双端 Seroval 解码器与 `cleanTweetTitle` 补齐线性 JS 转义逆向与 HTML 实体解码，复测确认标题、多分类切换与播放彻底正常。
 

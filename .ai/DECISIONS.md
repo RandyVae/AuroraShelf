@@ -713,5 +713,20 @@ Evidence:
 - iOS / iPadOS: `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1 TEST_RUNNER_IOS_LIVE_SOURCE_IDS=134x` (`LIVE_VIDEO_SOURCE 134x items=20 cover=decoded playback=resolved error=none`), `X134SourceServiceTests` (3 executed, 1 skipped live, 0 failed), Release Simulator screenshots on `iPhone 18 Pro` & `iPad Pro 13-inch (M5)`.
 - Source probe: `node scripts/probe_all_sources.mjs` (`134X -> HTTP 200 | 878ms | 21147 bytes`, 33/35 total reachable).
 
+## Comic hang recovery, iPad/Tablet live 2-pane layout, Huavod HD covers & slash-safe cast extraction (v2.16.30 Build 256)
+
+Date: 2026-11-14
+
+Status: Implemented, regression unit-tested, live-verified on Android R8 Release APK and iOS/iPadOS Release Simulators, and published via OTA.
+
+Decision:
+1. Keep navigation chrome mounted during comic chapter fetches on both Android (`ComicScreen.kt` / `ComicViewModel.kt`) and iOS (`ComicsScreen.swift` / `ComicReaderView.swift`), provide an explicit cancel action, and clear active load/error locks cleanly on failure or dismissal so subsequent comic opens never stall.
+2. Mirror the YouTube-style landscape 2-pane layout for Live Detail on iPad (`LiveDetailView.swift`) and Android tablets (`LiveScreen.kt`), and update `needsTopOffset = !isFullScreen && (!isLandscape || isPad)` plus `+ safeTop` player height compensation across `LivePlayerView.swift`, `LiveDetailView.swift`, and `VideoDetailPlaybackScreen.swift` so iPad portrait/split non-fullscreen players never collide with the iPadOS status bar.
+3. Harden Huavod parsing by restricting `.ft4` rating extraction to numeric `<i/span>` or `.public-list-prb` nodes (excluding `<a class="time-title hide ft4">`) and preventing `<span class="slash">/</span>` / `.detail-info span` from truncating actor lists after the first actor in `VideoRepository.swift`, `VideoRepository.kt`, and `PlaybackResolver.kt`.
+
+Evidence:
+- Android: `./gradlew testDebugUnitTest lintDebug assembleRelease --console=plain` (`42 suites, 257 tests: 0 failures, 0 errors, 8 skipped`, `dist/Netgrey.apk` `206,876,555` bytes) plus `netgrey_phone` R8 Release APK verification (Huavod feed/detail cast & intro, `1800x2560` tablet landscape 2-pane Live Detail, Comics cancel/back recovery & reader).
+- iOS / iPadOS: `xcodebuild test ... -only-testing:AuroraShelfTests` (`177 tests executed, 7 skipped, 0 failures`), Release simulator build succeeded, and visual verification on `iPhone 18 Pro` (Huavod multi-actor cast & HD covers, 91动漫 Comic Reader) & `iPad Pro 13-inch (M5)` (Live Detail status-bar clearance & Huavod Detail).
+
 
 

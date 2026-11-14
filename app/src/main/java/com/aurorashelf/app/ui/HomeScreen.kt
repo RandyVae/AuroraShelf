@@ -551,8 +551,12 @@ private fun NetflixHeroBillboard(
             .height(heroHeight)
             .clickable(role = Role.Button, onClick = { onDetails(video) }),
     ) {
+        val heroVideo = remember(video) {
+            val heroUrl = video.heroThumbnailUrl
+            if (heroUrl.isNullOrBlank()) video else video.copy(thumbnailUrl = heroUrl)
+        }
         MediaImage(
-            video = video,
+            video = heroVideo,
             modifier = Modifier.fillMaxSize(),
         )
 

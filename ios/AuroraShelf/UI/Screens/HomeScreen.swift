@@ -366,10 +366,22 @@ public struct HomeScreen: View {
             }
         }
         .navigationDestination(item: $activePlaybackVideo) { video in
-            VideoDetailPlaybackScreen(video: video) {
-                activePlaybackVideo = nil
-                playerCoordinator.dismiss()
-            }
+            VideoDetailPlaybackScreen(
+                video: video,
+                onDismiss: {
+                    activePlaybackVideo = nil
+                    playerCoordinator.dismiss()
+                },
+                onOpenSearchKeyword: { keyword in
+                    activePlaybackVideo = nil
+                    playerCoordinator.dismiss()
+                    if let onKeyword = onOpenSearchWithKeyword {
+                        onKeyword(keyword)
+                    } else {
+                        onOpenSearch()
+                    }
+                }
+            )
             .toolbar(.hidden, for: .tabBar)
             .toolbar(.hidden, for: .navigationBar)
             .navigationBarHidden(true)

@@ -54,14 +54,18 @@ internal class GedeComixComicSource : ComicSource {
         val desc = document.selectFirst(".description-summary, .manga-excerpt")?.text()?.trim().orEmpty()
         val tags = document.select(".genres-content a, .mg_genres a").map { it.text().trim() }.filter(String::isNotBlank)
 
-        val chapters = document.select("li.wp-manga-chapter a").mapIndexed { index, a ->
+        val chapters = document.select("li.wp-manga-chapter a").mapNotNull { a ->
             val href = a.attr("href").trim()
-            val chapTitle = a.text().trim().ifBlank { "第 ${index + 1} 话" }
+            if (href.isBlank() || href == "#" || href.startsWith("javascript:", ignoreCase = true) || a.hasClass("c-new-tag")) {
+                return@mapNotNull null
+            }
+            val chapTitle = a.text().trim()
+            if (chapTitle.isBlank()) return@mapNotNull null
             ComicChapter(
                 id = href,
                 title = chapTitle,
             )
-        }.ifEmpty {
+        }.distinctBy(ComicChapter::id).ifEmpty {
             listOf(ComicChapter(id = url, title = "全本"))
         }
 
@@ -91,6 +95,8 @@ internal class GedeComixComicSource : ComicSource {
             val src = img.attr("data-src").trim().takeIf(String::isNotBlank)
                 ?: img.attr("src").trim().takeIf(String::isNotBlank)
                 ?: return@mapNotNull null
+            val lower = src.lowercase()
+            if (lower.contains("gedecomix-logo") || lower.contains("/logo")) return@mapNotNull null
             ComicPage(
                 imageUrl = ComicHttp.resolve(BASE_URL, src) ?: src,
                 referer = chapterUrl,

@@ -313,14 +313,16 @@ fun AuroraShelfApp(
 
     BackHandler(
         enabled = state.selectedVideo != null || state.isSearchOpen || state.destination != AppDestination.HOME ||
-            comicState.reader != null || comicState.details != null || forumState.selectedPost != null ||
-            liveState.selectedItem != null,
+            comicState.reader != null || comicState.details != null || comicState.isDetailsLoading ||
+            comicState.detailsError != null || forumState.selectedPost != null || liveState.selectedItem != null,
     ) {
         when {
             state.selectedVideo != null && isPlayerFullscreen -> isPlayerFullscreen = false
             state.selectedVideo != null -> viewModel.closeVideo()
             state.isSearchOpen -> viewModel.setSearchOpen(false)
             state.destination == AppDestination.COMICS && comicState.reader != null -> comicViewModel.closeReader()
+            state.destination == AppDestination.COMICS && comicState.isDetailsLoading -> comicViewModel.cancelOpeningComic()
+            state.destination == AppDestination.COMICS && comicState.detailsError != null -> comicViewModel.dismissDetailsError()
             state.destination == AppDestination.COMICS && comicState.details != null -> comicViewModel.closeDetails()
             state.destination == AppDestination.LIVE && isLiveFullscreen -> isLiveFullscreen = false
             state.destination == AppDestination.LIVE && liveState.selectedItem != null -> {
@@ -434,6 +436,9 @@ fun AuroraShelfApp(
                         onDownloadChapter = comicViewModel::downloadChapter,
                         onDownloadAll = comicViewModel::downloadAllChapters,
                         downloadedChapters = comicDownloadedChapters,
+                        onCancelOpening = comicViewModel::cancelOpeningComic,
+                        onDismissDetailsError = comicViewModel::dismissDetailsError,
+                        onRetryOpening = comicViewModel::retryOpeningComic,
                     )
                 }
 
@@ -452,6 +457,7 @@ fun AuroraShelfApp(
                         onRefresh = liveViewModel::refresh,
                         onLoadMore = liveViewModel::loadMore,
                         onOpen = liveViewModel::open,
+                        onSelectItem = liveViewModel::open,
                         onClose = {
                             isLiveFullscreen = false
                             isCurrentLivePortrait = null

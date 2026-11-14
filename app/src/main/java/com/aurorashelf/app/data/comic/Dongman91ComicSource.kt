@@ -98,7 +98,16 @@ internal class Dongman91ComicSource : ComicSource {
             val src = img.attr("data-src").trim().takeIf(String::isNotBlank)
                 ?: img.attr("src").trim().takeIf(String::isNotBlank)
                 ?: return@mapNotNull null
-            if (!src.contains("upload") && !src.contains("pic.")) return@mapNotNull null
+            val lower = src.lowercase()
+            if (lower.contains("/static/web/images/reader/") ||
+                lower.contains("cover-placeholder") ||
+                lower.endsWith("logo.png")
+            ) {
+                return@mapNotNull null
+            }
+            if (!lower.contains("upload") && !lower.contains("pic.") && !lower.contains("drleao.")) {
+                return@mapNotNull null
+            }
             ComicPage(
                 imageUrl = ComicHttp.resolve(BASE_URL, src) ?: src,
                 referer = readerUrl,

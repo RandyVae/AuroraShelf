@@ -27,7 +27,15 @@ public struct ComicPage: Identifiable, Hashable, Sendable {
         resolutionUrl: String? = nil,
         verticalSegments: Int = 0
     ) {
-        self.id = resolutionUrl ?? imageUrl
+        let trimmedResolution = resolutionUrl?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedImage = imageUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let trimmedResolution, !trimmedResolution.isEmpty {
+            self.id = trimmedResolution
+        } else if !trimmedImage.isEmpty {
+            self.id = trimmedImage
+        } else {
+            self.id = UUID().uuidString
+        }
         self.imageUrl = imageUrl
         self.referer = referer
         self.headers = headers

@@ -18,8 +18,8 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 /** Minimal cookie-free network implementation for the vendored PipePipe extractor. */
 internal class PipePipeDownloader : Downloader() {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(22, TimeUnit.SECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
         .build()
@@ -36,7 +36,11 @@ internal class PipePipeDownloader : Downloader() {
         return try {
             client.newCall(request).execute()
         } catch (failure: IOException) {
-            if (request.method !in IDEMPOTENT_METHODS || !failure.isTransientTransportFailure()) throw failure
+            val isRetryableTimeout = failure is java.net.SocketTimeoutException &&
+                !request.url.host.equals("jav.sb", ignoreCase = true)
+            if (request.method !in IDEMPOTENT_METHODS || (!failure.isTransientTransportFailure() && !isRetryableTimeout)) {
+                throw failure
+            }
             client.newCall(request).execute()
         }
     }

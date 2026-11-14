@@ -133,22 +133,49 @@ public struct ComicReaderView: View {
                             } description: {
                                 Text(loadError)
                             } actions: {
-                                Button("重试", systemImage: "arrow.clockwise") {
-                                    loadPages()
+                                HStack(spacing: AuroraMetrics.spacingM) {
+                                    Button("重试", systemImage: "arrow.clockwise") {
+                                        loadPages()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+
+                                    Button("返回漫画列表", systemImage: "chevron.backward") {
+                                        dismissReader()
+                                    }
+                                    .buttonStyle(.bordered)
                                 }
-                                .buttonStyle(.borderedProminent)
                             }
                             .tint(AuroraColor.brand)
                             .frame(maxWidth: .infinity, minHeight: 300)
                         } else if isLoading {
-                            ProgressView("正在加载章节…")
-                                .frame(maxWidth: .infinity, minHeight: 300)
+                            VStack(spacing: AuroraMetrics.spacingM) {
+                                ProgressView("正在加载章节…")
+                                Button("取消并返回") {
+                                    dismissReader()
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(AuroraColor.brand)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 300)
                         } else if pages.isEmpty {
-                            ContentUnavailableView(
-                                "本章没有页面",
-                                systemImage: "photo",
-                                description: Text("此章节暂时没有可显示的图片。")
-                            )
+                            ContentUnavailableView {
+                                Label("本章没有页面", systemImage: "photo")
+                            } description: {
+                                Text("此章节暂时没有可显示的图片。")
+                            } actions: {
+                                HStack(spacing: AuroraMetrics.spacingM) {
+                                    Button("重新加载", systemImage: "arrow.clockwise") {
+                                        loadPages()
+                                    }
+                                    .buttonStyle(.borderedProminent)
+
+                                    Button("返回漫画列表", systemImage: "chevron.backward") {
+                                        dismissReader()
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
+                            }
+                            .tint(AuroraColor.brand)
                             .frame(maxWidth: .infinity, minHeight: 300)
                         } else {
                             if isTwoPageSpread && horizontalSizeClass == .regular {
@@ -231,6 +258,7 @@ public struct ComicReaderView: View {
                     }
                 }
                 .onTapGesture {
+                    guard !shouldKeepControlsVisible else { return }
                     withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
                         showControls.toggle()
                     }
@@ -238,12 +266,12 @@ public struct ComicReaderView: View {
             }
             
             VStack {
-                if showControls {
+                if showControls || shouldKeepControlsVisible {
                     PlayerOverlayBar(
                         title: comic.title,
                         subtitle: currentChapter.map { "\($0.title) · 连载瀑布流" } ?? "章节不可用",
                         onDismiss: {
-                            onDismiss()
+                            dismissReader()
                         }
                     ) {
                     HStack(spacing: 8) {
@@ -338,7 +366,7 @@ public struct ComicReaderView: View {
 
                 Spacer()
 
-                if showControls {
+                if showControls && !shouldKeepControlsVisible {
                     // 底部当前章节指示胶囊（采用原生 Liquid Glass）
                     HStack {
                         Text(currentChapter.map { "\($0.title) · 连载瀑布流" } ?? "章节不可用")
@@ -355,6 +383,7 @@ public struct ComicReaderView: View {
             .zIndex(10)
         }
         .ignoresSafeArea()
+        .toolbar(.hidden, for: .navigationBar)
         .preferredColorScheme(readerTheme.isDark ? .dark : .light)
         .onAppear {
             loadPages()
@@ -363,9 +392,17 @@ public struct ComicReaderView: View {
             pageLoadTask?.cancel()
         }
         .enableSwipeBack {
-            pageLoadTask?.cancel()
-            onDismiss()
+            dismissReader()
         }
+    }
+
+    private var shouldKeepControlsVisible: Bool {
+        isLoading || loadError != nil || pages.isEmpty
+    }
+
+    private func dismissReader() {
+        pageLoadTask?.cancel()
+        onDismiss()
     }
     
     private func switchChapter(to newIndex: Int, proxy: ScrollViewProxy) {
@@ -421,6 +458,12 @@ public struct ComicReaderView: View {
         self.isLoading = true
         loadError = nil
         pageLoadTask = Task {
+            defer {
+                if activePageLoadID == requestID {
+                    isLoading = false
+                    pageLoadTask = nil
+                }
+            }
             do {
                 let loaded = try await ComicRepository.shared.fetchChapterPages(comicId: comic.id, sourceId: comic.sourceId, chapterId: chapter.id)
                 guard !Task.isCancelled, activePageLoadID == requestID else { return }
@@ -442,15 +485,12 @@ public struct ComicReaderView: View {
                     }
                     if !localPages.isEmpty {
                         self.pages = localPages
-                        self.isLoading = false
                         self.loadError = nil
                         return
                     }
                 }
                 loadError = error.localizedDescription
             }
-            isLoading = false
-            pageLoadTask = nil
         }
     }
 

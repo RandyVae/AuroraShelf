@@ -50,8 +50,9 @@ public struct LivePlayerView: View {
 
     public var body: some View {
         GeometryReader { geo in
+            let isPad = UIDevice.current.userInterfaceIdiom == .pad
             let safeTop = max(topSafeArea, DeviceLayout.safeAreaTop(in: geo.size))
-            let needsTopOffset = !isFullScreen && !isLandscape
+            let needsTopOffset = !isFullScreen && (!isLandscape || isPad)
 
             ZStack(alignment: .top) {
                 // 背景纯黑
@@ -211,8 +212,9 @@ public struct LivePlayerView: View {
     // MARK: - 顶部控制栏
     @ViewBuilder
     private func topControlsBar(in geo: GeometryProxy) -> some View {
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
         let safeTop = max(topSafeArea, DeviceLayout.safeAreaTop(in: geo.size))
-        let topPadding: CGFloat = isLandscape ? 16 : (safeTop + 6)
+        let topPadding: CGFloat = isPad ? max(20, safeTop + 6) : (isLandscape ? 16 : (safeTop + 6))
         let gradientHeight: CGFloat = max(topPadding + 64, 130)
 
         ZStack(alignment: .top) {

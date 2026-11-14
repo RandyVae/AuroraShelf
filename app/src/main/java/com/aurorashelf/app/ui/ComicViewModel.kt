@@ -16,11 +16,13 @@ import java.security.cert.CertPathValidatorException
 import javax.net.ssl.SSLHandshakeException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 
 data class ComicReaderSession(
     val details: ComicDetails,
@@ -44,6 +46,8 @@ data class ComicUiState(
     val error: String? = null,
     val details: ComicDetails? = null,
     val isDetailsLoading: Boolean = false,
+    val detailsError: String? = null,
+    val pendingComicForRetry: ComicSummary? = null,
     val reader: ComicReaderSession? = null,
     val isReaderLoading: Boolean = false,
     val readerError: String? = null,
@@ -78,6 +82,8 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     private var listJob: Job? = null
     private var detailsJob: Job? = null
     private var readerJob: Job? = null
+    private var detailsRequestToken: Long = 0L
+    private var readerRequestToken: Long = 0L
 
     /** Loads the comic feed once the comics tab is actually shown; safe to call repeatedly. */
     fun ensureLoaded() {
@@ -91,6 +97,8 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         listJob?.cancel()
         detailsJob?.cancel()
         readerJob?.cancel()
+        detailsRequestToken++
+        readerRequestToken++
         val firstCategory = repository.availableSources.find { it.id == sourceId }
             ?.categories?.firstOrNull()?.id.orEmpty()
         mutableUiState.update {
@@ -103,7 +111,12 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                 canLoadMore = true,
                 error = null,
                 details = null,
+                isDetailsLoading = false,
+                detailsError = null,
+                pendingComicForRetry = null,
                 reader = null,
+                isReaderLoading = false,
+                readerError = null,
                 isSourceAuthenticated = repository.isAuthenticated(sourceId),
                 isAuthorizing = false,
                 authError = null,
@@ -148,6 +161,10 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun selectCategory(categoryId: String) {
         if (categoryId == mutableUiState.value.selectedCategoryId) return
+        detailsJob?.cancel()
+        readerJob?.cancel()
+        detailsRequestToken++
+        readerRequestToken++
         val sourceId = mutableUiState.value.selectedSourceId
         val cached = preferences.cachedComicFeed(sourceId, categoryId)
         mutableUiState.update {
@@ -157,6 +174,13 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                 activeQuery = "",
                 comics = cached?.comics ?: it.comics,
                 page = if (cached != null) 1 else 0,
+                details = null,
+                isDetailsLoading = false,
+                detailsError = null,
+                pendingComicForRetry = null,
+                reader = null,
+                isReaderLoading = false,
+                readerError = null,
             )
         }
         loadFirstPage("")
@@ -219,26 +243,90 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun openComic(comic: ComicSummary) {
         detailsJob?.cancel()
+        val requestToken = ++detailsRequestToken
         detailsJob = viewModelScope.launch {
-            mutableUiState.update { it.copy(isDetailsLoading = true, error = null) }
-            runCatching { repository.details(comic) }
+            mutableUiState.update {
+                it.copy(
+                    isDetailsLoading = true,
+                    detailsError = null,
+                    pendingComicForRetry = comic,
+                    error = null,
+                )
+            }
+            runCatching { withTimeout(16_000L) { repository.details(comic) } }
                 .onSuccess { details ->
-                    mutableUiState.update { it.copy(details = details, isDetailsLoading = false) }
-                    // 静默预热第 1 话，用户点击「开始阅读」时 0ms 瞬间进入
-                    if (details.chapters.isNotEmpty()) {
-                        launch { runCatching { repository.prewarmChapter(details.comic, details.chapters[0].id) } }
+                    if (detailsRequestToken != requestToken) return@onSuccess
+                    if (details.chapters.isEmpty()) {
+                        mutableUiState.update {
+                            it.copy(
+                                isDetailsLoading = false,
+                                detailsError = "此漫画来源暂未提供章节列表。",
+                            )
+                        }
+                        return@onSuccess
                     }
+                    mutableUiState.update {
+                        it.copy(
+                            details = details,
+                            isDetailsLoading = false,
+                            detailsError = null,
+                            pendingComicForRetry = null,
+                        )
+                    }
+                    // 静默预热第 1 话，用户点击「开始阅读」时 0ms 瞬间进入
+                    launch { runCatching { repository.prewarmChapter(details.comic, details.chapters[0].id) } }
                 }
                 .onFailure { failure ->
-                    if (failure is CancellationException) return@onFailure
-                    mutableUiState.update { it.copy(isDetailsLoading = false, error = failure.userMessage()) }
+                    if (failure is CancellationException && failure !is TimeoutCancellationException) return@onFailure
+                    if (detailsRequestToken != requestToken) return@onFailure
+                    mutableUiState.update {
+                        it.copy(
+                            isDetailsLoading = false,
+                            detailsError = failure.userMessage(),
+                        )
+                    }
                 }
         }
     }
 
+    fun cancelOpeningComic() {
+        detailsJob?.cancel()
+        detailsRequestToken++
+        mutableUiState.update {
+            it.copy(
+                isDetailsLoading = false,
+                detailsError = null,
+                pendingComicForRetry = null,
+            )
+        }
+    }
+
+    fun dismissDetailsError() {
+        mutableUiState.update {
+            it.copy(
+                detailsError = null,
+                pendingComicForRetry = null,
+            )
+        }
+    }
+
+    fun retryOpeningComic() {
+        val comic = mutableUiState.value.pendingComicForRetry ?: return
+        openComic(comic)
+    }
+
     fun closeDetails() {
         detailsJob?.cancel()
-        mutableUiState.update { it.copy(details = null, isDetailsLoading = false, error = null) }
+        detailsRequestToken++
+        mutableUiState.update {
+            it.copy(
+                details = null,
+                isDetailsLoading = false,
+                detailsError = null,
+                pendingComicForRetry = null,
+                error = null,
+            )
+        }
     }
 
     fun openChapter(index: Int) {
@@ -264,6 +352,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun closeReader() {
         readerJob?.cancel()
+        readerRequestToken++
         mutableUiState.update { it.copy(reader = null, isReaderLoading = false, readerError = null) }
     }
 
@@ -366,6 +455,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
 
+        val requestToken = ++readerRequestToken
         mutableUiState.update {
             it.copy(
                 reader = ComicReaderSession(details, index, emptyList()),
@@ -374,8 +464,9 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         readerJob = viewModelScope.launch {
-            runCatching { repository.chapter(details.comic, chapter.id) }
+            runCatching { withTimeout(18_000L) { repository.chapter(details.comic, chapter.id) } }
                 .onSuccess { pages ->
+                    if (readerRequestToken != requestToken) return@onSuccess
                     mutableUiState.update {
                         it.copy(
                             reader = ComicReaderSession(details, index, pages),
@@ -388,7 +479,8 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 .onFailure { failure ->
-                    if (failure is CancellationException) return@onFailure
+                    if (failure is CancellationException && failure !is TimeoutCancellationException) return@onFailure
+                    if (readerRequestToken != requestToken) return@onFailure
                     // 网络失败时，若本地有部分或全部缓存图片，进行兜底恢复
                     val localPages = downloadManager.getLocalPages(details.comic, chapter)
                     if (localPages.isNotEmpty()) {
@@ -422,6 +514,8 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     private fun Throwable.userMessage(): String {
         val causes = generateSequence(this as Throwable?) { it.cause }.toList()
         return when {
+            causes.any { it is TimeoutCancellationException || it is java.net.SocketTimeoutException } ->
+                "漫画源响应超时，请稍后重试或切换来源"
             causes.any { it is SSLHandshakeException || it is CertPathValidatorException } ->
                 "漫画源证书验证失败，请切换来源或稍后重试"
             causes.any { it is UnknownHostException } ->

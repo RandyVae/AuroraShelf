@@ -54,6 +54,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -173,6 +174,7 @@ import com.aurorashelf.app.model.ContentSource
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.ComicSourceInfo
 import com.aurorashelf.app.model.FeedCategory
+import com.aurorashelf.app.model.VideoDetailMetadata
 import com.aurorashelf.app.model.VideoItem
 import com.aurorashelf.app.data.SourceAddress
 import com.aurorashelf.app.data.PlaybackEpisode
@@ -240,6 +242,9 @@ internal fun PlayerScreen(
         val startedAtMs = System.currentTimeMillis()
         value = runCatching { PlaybackResolver().resolveEpisodes(video.pageUrl) }.getOrDefault(emptyList())
         Log.i(TAG, "timing episodes from player screen ms=${System.currentTimeMillis() - startedAtMs} count=${value.size}")
+    }
+    val detailMetadata by produceState<VideoDetailMetadata?>(initialValue = null, key1 = video.pageUrl) {
+        value = runCatching { PlaybackResolver().resolveDetails(video) }.getOrNull()
     }
     val selectedEpisode = episodes.firstOrNull { it.pageUrl == playbackUrl }?.number ?: 1
     val selectedEpisodeLabel = episodes.firstOrNull { it.pageUrl == playbackUrl }?.label
@@ -598,6 +603,7 @@ internal fun PlayerScreen(
                                     isFavorite = isFavorite,
                                     cachedVideo = cachedVideo,
                                     episodes = episodes,
+                                    detailMetadata = detailMetadata,
                                     selectedEpisode = selectedEpisode,
                                     currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
                                     isEpisodePickerVisible = isEpisodePickerVisible,
@@ -672,6 +678,7 @@ internal fun PlayerScreen(
                                 isFavorite = isFavorite,
                                 cachedVideo = cachedVideo,
                                 episodes = episodes,
+                                detailMetadata = detailMetadata,
                                 selectedEpisode = selectedEpisode,
                                 currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
                                 isEpisodePickerVisible = isEpisodePickerVisible,
@@ -854,6 +861,7 @@ private fun PlayerDetails(
     isFavorite: Boolean,
     cachedVideo: OfflineVideo?,
     episodes: List<PlaybackEpisode>,
+    detailMetadata: VideoDetailMetadata?,
     selectedEpisode: Int,
     currentEpisodeProgress: Float,
     isEpisodePickerVisible: Boolean,
@@ -864,6 +872,7 @@ private fun PlayerDetails(
     onToggleEpisodes: () -> Unit,
     onEpisode: (PlaybackEpisode) -> Unit,
 ) {
+    var isIntroExpanded by remember(video.id) { mutableStateOf(false) }
     val cacheStateDescription = when (cachedVideo?.state) {
         OfflineCacheState.RESOLVING -> "正在解析视频地址"
         OfflineCacheState.QUEUED -> "已加入缓存队列"
@@ -910,6 +919,36 @@ private fun PlayerDetails(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (detailMetadata != null) {
+            val pills = buildList {
+                detailMetadata.year.takeIf { it.isNotBlank() }?.let(::add)
+                detailMetadata.area.takeIf { it.isNotBlank() }?.let(::add)
+                addAll(detailMetadata.tags.filter { it.isNotBlank() })
+            }.distinct()
+            if (pills.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                ) {
+                    pills.take(10).forEach { badge ->
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        ) {
+                            Text(
+                                text = badge,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
@@ -1070,6 +1109,99 @@ private fun PlayerDetails(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
+        if (detailMetadata != null && (detailMetadata.directors.isNotEmpty() || detailMetadata.actors.isNotEmpty())) {
+            val crewEntries = buildList {
+                detailMetadata.directors.forEach { add("导演" to it) }
+                detailMetadata.actors.forEach { add("主演" to it) }
+            }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("player-cast-section"),
+            ) {
+                Text(
+                    text = "演员表",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.semantics { heading() },
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    items(crewEntries, key = { "${it.first}-${it.second}" }) { (role, name) ->
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = if (role == "导演") AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(15.dp),
+                                )
+                                Text(
+                                    text = "$name · $role",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        val synopsis = detailMetadata?.synopsis.orEmpty().trim()
+        if (synopsis.isNotBlank()) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("player-intro-section"),
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(14.dp),
+                ) {
+                    Text(
+                        text = "基本介绍",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.semantics { heading() },
+                    )
+                    Text(
+                        text = synopsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        lineHeight = 19.sp,
+                        maxLines = if (isIntroExpanded) Int.MAX_VALUE else 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (synopsis.length > 72) {
+                        Text(
+                            text = if (isIntroExpanded) "收起" else "展开全文",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = AuroraCoral,
+                            modifier = Modifier.clickable { isIntroExpanded = !isIntroExpanded },
                         )
                     }
                 }

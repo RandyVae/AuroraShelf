@@ -10,17 +10,49 @@ public actor DoubanPosterResolver {
     private let session: URLSession
     private var inFlightQueries: [String: Task<String?, Never>] = [:]
 
-    /// 华视源已确认死链（dbzy.tv / dbzy5.com）的高清官方豆瓣海报映射表（0延迟秒级命中）
+    /// 华视源已确认死链（dbzy.tv / dbzy5.com）的高清官方豆瓣海报映射表（0延迟秒级命中，统一使用大图规格）
     private let staticCoverMap: [String: String] = [
-        "眩晕": "https://img9.doubanio.com/view/photo/s_ratio_poster/public/p2932533736.jpg",
-        "给阿嬷的情书": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2931851430.jpg",
-        "地球超新鲜第二季": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2933553320.jpg",
-        "地球超新鲜 第二季": "https://img3.doubanio.com/view/photo/s_ratio_poster/public/p2933553320.jpg",
-        "不能笑的孤独粉丝见面会": "https://asset.doubanio.com/cuphead/movie-static/pics/tv_default_small.png",
-        "寻梦环游记": "https://img1.doubanio.com/view/photo/s_ratio_poster/public/p2503997609.jpg",
-        "疯狂动物城2": "https://img9.doubanio.com/view/photo/s_ratio_poster/public/p2928373804.jpg",
-        "霜花店": "https://img9.doubanio.com/view/photo/s_ratio_poster/public/p453856276.jpg"
+        "眩晕": "https://img9.doubanio.com/view/photo/l_ratio_poster/public/p2932533736.jpg",
+        "给阿嬷的情书": "https://img3.doubanio.com/view/photo/l_ratio_poster/public/p2931851430.jpg",
+        "地球超新鲜第二季": "https://img3.doubanio.com/view/photo/l_ratio_poster/public/p2933553320.jpg",
+        "地球超新鲜 第二季": "https://img3.doubanio.com/view/photo/l_ratio_poster/public/p2933553320.jpg",
+        "寻梦环游记": "https://img1.doubanio.com/view/photo/l_ratio_poster/public/p2503997609.jpg",
+        "疯狂动物城2": "https://img9.doubanio.com/view/photo/l_ratio_poster/public/p2928373804.jpg",
+        "霜花店": "https://img9.doubanio.com/view/photo/l_ratio_poster/public/p453856276.jpg"
     ]
+
+    /// 将豆瓣缩略图 URL 升级为高清大图，并过滤默认占位图标
+    public static func upgradePosterURL(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let lower = trimmed.lowercased()
+        let placeholderTokens = [
+            "tv_default_small",
+            "tv_default_large",
+            "movie_default_small",
+            "movie_default_large",
+            "/cuphead/movie-static/pics/"
+        ]
+        if placeholderTokens.contains(where: { lower.contains($0) }) {
+            return nil
+        }
+        guard lower.contains("doubanio.com") || lower.contains("douban.com") else {
+            return trimmed
+        }
+        var upgraded = trimmed
+        let replacements = [
+            "/view/photo/s_ratio_poster/",
+            "/view/photo/m_ratio_poster/",
+            "/view/photo/sqxs/",
+            "/view/photo/ipst/",
+            "/view/photo/thumb/",
+            "/view/photo/small/"
+        ]
+        for token in replacements {
+            upgraded = upgraded.replacingOccurrences(of: token, with: "/view/photo/l_ratio_poster/", options: .caseInsensitive)
+        }
+        return upgraded
+    }
 
     private init() {
         let paths = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
@@ -38,11 +70,13 @@ public actor DoubanPosterResolver {
             memoryCache.setObject(v as NSString, forKey: k as NSString)
         }
 
-        // 加载磁盘缓存
+        // 加载磁盘缓存（自动剔除默认占位图并升级旧缩略图规格）
         if let data = try? Data(contentsOf: cacheFile),
            let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
             for (k, v) in dict {
-                memoryCache.setObject(v as NSString, forKey: k as NSString)
+                if let upgraded = Self.upgradePosterURL(v) {
+                    memoryCache.setObject(upgraded as NSString, forKey: k as NSString)
+                }
             }
         }
     }
@@ -50,7 +84,10 @@ public actor DoubanPosterResolver {
     /// 同步高速匹配（优先内存与内置静态映射表）
     public nonisolated func quickLookup(for title: String) -> String? {
         let clean = sanitizeTitle(title)
-        return staticCoverMap[clean] ?? staticCoverMap[title]
+        if let match = staticCoverMap[clean] ?? staticCoverMap[title] {
+            return Self.upgradePosterURL(match)
+        }
+        return nil
     }
 
     /// 异步解析海报（支持内存、磁盘缓存与动态网络检索）
@@ -59,13 +96,15 @@ public actor DoubanPosterResolver {
         guard !clean.isEmpty else { return nil }
 
         // 1. 静态映射表
-        if let direct = staticCoverMap[clean] ?? staticCoverMap[title] {
-            return direct
+        if let direct = staticCoverMap[clean] ?? staticCoverMap[title],
+           let upgraded = Self.upgradePosterURL(direct) {
+            return upgraded
         }
 
         // 2. 内存缓存
-        if let cached = memoryCache.object(forKey: clean as NSString) as String? {
-            return cached
+        if let cached = memoryCache.object(forKey: clean as NSString) as String?,
+           let upgraded = Self.upgradePosterURL(cached) {
+            return upgraded
         }
 
         // 3. 去重并发任务
@@ -98,12 +137,16 @@ public actor DoubanPosterResolver {
                     return nil
                 }
 
-                // 优先寻找标题完全匹配或首个有 img 的项目
+                // 优先寻找标题完全匹配且非默认占位图的高清海报
                 var bestImg: String? = nil
                 for item in list {
-                    if let img = item["img"] as? String, !img.isEmpty {
-                        bestImg = img
+                    if let rawImg = item["img"] as? String,
+                       let upgradedImg = Self.upgradePosterURL(rawImg) {
+                        if bestImg == nil {
+                            bestImg = upgradedImg
+                        }
                         if let itemTitle = item["title"] as? String, itemTitle == clean {
+                            bestImg = upgradedImg
                             break
                         }
                     }

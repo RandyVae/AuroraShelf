@@ -84,8 +84,8 @@ internal object ComicHttp {
             val connection = URL(currentUrl).openConnection() as HttpURLConnection
             try {
                 connection.requestMethod = method
-                connection.connectTimeout = 15_000
-                connection.readTimeout = 25_000
+                connection.connectTimeout = 12_000
+                connection.readTimeout = 15_000
                 connection.instanceFollowRedirects = true
                 connection.setRequestProperty("User-Agent", VideoRepository.USER_AGENT)
                 connection.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9")

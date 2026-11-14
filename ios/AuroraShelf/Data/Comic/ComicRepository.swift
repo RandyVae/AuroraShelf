@@ -76,6 +76,7 @@ public final class ComicRepository: ObservableObject {
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 25
         config.httpAdditionalHeaders = [
             "User-Agent": ComicSourceAdapter.userAgent
         ]
@@ -613,7 +614,7 @@ public final class ComicRepository: ObservableObject {
         }
         let response = try await request(url, headers: ComicSourceAdapter.requestHeaders(sourceID: "ikmmh", referer: "https://ymcdnyfqdapp.ikmmh.com/"))
         let path = url.lastPathComponent
-        guard let chaptersURL = URL(string: "https://ymcdnyfqdapp.ikmmh.com/api/comic/zyz/chapters?ph=1&tempid=3&zpid=\(path)&page=0&line=48&orderby=desc") else {
+        guard let chaptersURL = URL(string: "https://ymcdnyfqdapp.ikmmh.com/api/comic/zyz/chapters?ph=1&tempid=3&zpid=\(path)&page=0&line=200&orderby=desc") else {
             throw ComicFetchError.invalidURL
         }
         let chapterResponse = try await request(chaptersURL, headers: ComicSourceAdapter.requestHeaders(sourceID: "ikmmh", referer: url.absoluteString))
@@ -824,55 +825,83 @@ public final class ComicRepository: ObservableObject {
 
     public func fetchChapterPages(comicId: String, sourceId: String, chapterId: String) async throws -> [ComicPage] {
         let key = "\(sourceId):\(comicId):\(chapterId)"
-        if let cached = chapterCache[key] {
+        if let cached = chapterCache[key], !cached.isEmpty {
             return cached
         }
-        if let ongoing = inFlightChapterTasks[key] {
-            return try await ongoing.task.value
-        }
-        let taskToken = UUID()
-        let task = Task<[ComicPage], Error> {
-            let pages: [ComicPage]
-            switch sourceId {
-            case "baozi":
-                pages = try await fetchChapterPages(comicId: comicId, chapterId: chapterId)
-            case "copy":
-                pages = try await fetchCopyPages(comicId: comicId, chapterId: chapterId)
-            case "komiic":
-                pages = try await fetchKomiicPages(comicId: comicId, chapterId: chapterId)
-            case "jm":
-                pages = try await fetchJMPages(chapterId: chapterId)
-            case "picacg":
-                pages = try await fetchPicacgPages(comicId: comicId, chapterId: chapterId)
-            case "8muses":
-                let count = min(max(Int(chapterId) ?? 1, 1), 1_000)
-                let base = "https://8muses.io/g/\(comicId)"
-                pages = ComicSourceAdapter.eightMusesPageURLs(comicID: comicId, count: count).map { url in
-                    ComicPage(imageUrl: url.absoluteString, referer: base, headers: ComicSourceAdapter.requestHeaders(sourceID: sourceId, referer: base))
+        let taskToken: UUID
+        let task: Task<[ComicPage], Error>
+        if let ongoing = inFlightChapterTasks[key], !ongoing.task.isCancelled {
+            taskToken = ongoing.id
+            task = ongoing.task
+        } else {
+            let newToken = UUID()
+            let created = Task<[ComicPage], Error> { [weak self] in
+                guard let self else { throw CancellationError() }
+                defer {
+                    if self.inFlightChapterTasks[key]?.id == newToken {
+                        self.inFlightChapterTasks[key] = nil
+                    }
                 }
-            case "ehentai":
-                pages = try await fetchEHentaiPages(comicId: comicId)
-            case "ikmmh":
-                pages = try await fetchIkmmhPages(chapterId: chapterId)
-            default:
-                guard let source = ComicSourceCatalog.allSources.first(where: { $0.id == sourceId }),
-                      let sourceURL = URL(string: source.baseUrl),
-                      let url = URL(string: chapterId, relativeTo: sourceURL)?.absoluteURL else { throw ComicFetchError.invalidURL }
-                let response = try await request(url, headers: ComicSourceAdapter.requestHeaders(sourceID: sourceId, referer: source.baseUrl))
-                pages = ComicSourceAdapter.parseImagePages(response.body, baseURL: response.finalURL, referer: response.finalURL.absoluteString, sourceID: sourceId)
+                return try await self.performWithTimeout(
+                    seconds: 18,
+                    timeoutMessage: "加载章节图片超时，请检查网络或切换漫画源后重试。"
+                ) {
+                    try await self.loadChapterPagesUncached(comicId: comicId, sourceId: sourceId, chapterId: chapterId)
+                }
+            }
+            inFlightChapterTasks[key] = (id: newToken, task: created)
+            taskToken = newToken
+            task = created
+        }
+
+        do {
+            let pages = try await awaitTask(
+                task,
+                seconds: 19,
+                timeoutMessage: "加载章节图片超时，请检查网络或切换漫画源后重试。",
+                cancelWorkOnCancel: true
+            )
+            if !pages.isEmpty {
+                chapterCache[key] = pages
             }
             return pages
-        }
-        inFlightChapterTasks[key] = (id: taskToken, task: task)
-        defer {
+        } catch {
             if inFlightChapterTasks[key]?.id == taskToken {
                 inFlightChapterTasks[key] = nil
             }
+            throw error
         }
+    }
 
-        let pages = try await task.value
-        chapterCache[key] = pages
-        return pages
+    private func loadChapterPagesUncached(comicId: String, sourceId: String, chapterId: String) async throws -> [ComicPage] {
+        switch sourceId {
+        case "baozi":
+            return try await fetchChapterPages(comicId: comicId, chapterId: chapterId)
+        case "copy":
+            return try await fetchCopyPages(comicId: comicId, chapterId: chapterId)
+        case "komiic":
+            return try await fetchKomiicPages(comicId: comicId, chapterId: chapterId)
+        case "jm":
+            return try await fetchJMPages(chapterId: chapterId)
+        case "picacg":
+            return try await fetchPicacgPages(comicId: comicId, chapterId: chapterId)
+        case "8muses":
+            let count = min(max(Int(chapterId) ?? 1, 1), 1_000)
+            let base = "https://8muses.io/g/\(comicId)"
+            return ComicSourceAdapter.eightMusesPageURLs(comicID: comicId, count: count).map { url in
+                ComicPage(imageUrl: url.absoluteString, referer: base, headers: ComicSourceAdapter.requestHeaders(sourceID: sourceId, referer: base))
+            }
+        case "ehentai":
+            return try await fetchEHentaiPages(comicId: comicId)
+        case "ikmmh":
+            return try await fetchIkmmhPages(chapterId: chapterId)
+        default:
+            guard let source = ComicSourceCatalog.allSources.first(where: { $0.id == sourceId }),
+                  let sourceURL = URL(string: source.baseUrl),
+                  let url = URL(string: chapterId, relativeTo: sourceURL)?.absoluteURL else { throw ComicFetchError.invalidURL }
+            let response = try await request(url, headers: ComicSourceAdapter.requestHeaders(sourceID: sourceId, referer: source.baseUrl))
+            return ComicSourceAdapter.parseImagePages(response.body, baseURL: response.finalURL, referer: response.finalURL.absoluteString, sourceID: sourceId)
+        }
     }
 
     private func fetchIkmmhPages(chapterId: String) async throws -> [ComicPage] {
@@ -1053,7 +1082,12 @@ public final class ComicRepository: ObservableObject {
     }
 
     public func fetchComicDetails(_ comic: ComicItem) async throws -> ComicItem {
-        let updatedComic = try await attachChapters(to: comic)
+        let updatedComic = try await performWithTimeout(
+            seconds: 16,
+            timeoutMessage: "加载漫画章节超时，请检查网络或切换漫画源后重试。"
+        ) {
+            try await self.attachChapters(to: comic)
+        }
         try Task.checkCancellation()
         if let index = comics.firstIndex(where: { $0.id == comic.id && $0.sourceId == comic.sourceId }) {
             comics[index] = updatedComic
@@ -1063,6 +1097,117 @@ public final class ComicRepository: ObservableObject {
             prewarmChapter(sourceId: updatedComic.sourceId, comicId: updatedComic.id, chapterId: firstChapter.id)
         }
         return updatedComic
+    }
+
+    private func performWithTimeout<T: Sendable>(
+        seconds: TimeInterval,
+        timeoutMessage: String,
+        operation: @escaping @MainActor () async throws -> T
+    ) async throws -> T {
+        let workTask = Task<T, Error> {
+            try await operation()
+        }
+        return try await awaitTask(
+            workTask,
+            seconds: seconds,
+            timeoutMessage: timeoutMessage,
+            cancelWorkOnCancel: true
+        )
+    }
+
+    private func awaitTask<T: Sendable>(
+        _ workTask: Task<T, Error>,
+        seconds: TimeInterval,
+        timeoutMessage: String,
+        cancelWorkOnCancel: Bool
+    ) async throws -> T {
+        try Task.checkCancellation()
+        let box = AsyncTimeoutBox<T>()
+        let waiterTask = Task<Void, Never> {
+            do {
+                let value = try await workTask.value
+                box.finish(.success(value), cancelWork: false)
+            } catch {
+                box.finish(.failure(error), cancelWork: false)
+            }
+        }
+        let timeoutTask = Task<Void, Never> {
+            do {
+                try await Task.sleep(for: .seconds(seconds))
+                waiterTask.cancel()
+                box.finish(.failure(ComicFetchError.networkError(timeoutMessage)), cancelWork: true)
+            } catch {
+                // Sleep cancelled on completion or external cancellation
+            }
+        }
+        box.attach(workTask: workTask, timeoutTask: timeoutTask)
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                box.configure(continuation: continuation)
+            }
+        } onCancel: {
+            waiterTask.cancel()
+            box.finish(.failure(CancellationError()), cancelWork: cancelWorkOnCancel)
+        }
+    }
+
+    private final class AsyncTimeoutBox<T: Sendable>: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<T, Error>?
+        private var pendingResult: Result<T, Error>?
+        private var isCompleted = false
+        private var workTask: Task<T, Error>?
+        private var timeoutTask: Task<Void, Never>?
+
+        func configure(continuation: CheckedContinuation<T, Error>) {
+            lock.lock()
+            if let result = pendingResult {
+                pendingResult = nil
+                lock.unlock()
+                continuation.resume(with: result)
+                return
+            }
+            self.continuation = continuation
+            lock.unlock()
+        }
+
+        func attach(workTask: Task<T, Error>, timeoutTask: Task<Void, Never>) {
+            lock.lock()
+            if isCompleted {
+                lock.unlock()
+                timeoutTask.cancel()
+                return
+            }
+            self.workTask = workTask
+            self.timeoutTask = timeoutTask
+            lock.unlock()
+        }
+
+        func finish(_ result: Result<T, Error>, cancelWork: Bool) {
+            lock.lock()
+            guard !isCompleted else {
+                lock.unlock()
+                return
+            }
+            isCompleted = true
+            let cont = continuation
+            continuation = nil
+            let tTask = timeoutTask
+            let wTask = workTask
+            timeoutTask = nil
+            workTask = nil
+            if cont == nil {
+                pendingResult = result
+            }
+            lock.unlock()
+
+            tTask?.cancel()
+            if cancelWork {
+                wTask?.cancel()
+            }
+            cont?.resume(with: result)
+        }
     }
 
     private func attachChapters(to comic: ComicItem) async throws -> ComicItem {

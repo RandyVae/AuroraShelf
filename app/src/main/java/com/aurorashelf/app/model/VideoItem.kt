@@ -1,5 +1,17 @@
 package com.aurorashelf.app.model
 
+data class VideoDetailMetadata(
+    val actors: List<String> = emptyList(),
+    val directors: List<String> = emptyList(),
+    val year: String = "",
+    val area: String = "",
+    val tags: List<String> = emptyList(),
+    val synopsis: String = "",
+) {
+    val hasContent: Boolean
+        get() = actors.isNotEmpty() || directors.isNotEmpty() || year.isNotBlank() || area.isNotBlank() || tags.isNotEmpty() || synopsis.isNotBlank()
+}
+
 data class VideoItem(
     val id: String,
     val title: String,
@@ -8,6 +20,7 @@ data class VideoItem(
     val views: String,
     val pageUrl: String,
     val thumbnailUrl: String? = null,
+    val heroThumbnailUrl: String? = null,
 )
 
 enum class FeedCategory(val label: String, val path: String, val xvideosKioskId: String? = null) {

@@ -1,5 +1,7 @@
 # Active
 
+- [x] 修复漫画卡死与导航消失、全源连通性加固、iPad/Android 平板直播详情双栏适配、华视高清 Hero/封面及详情演员表/基本介绍匹配（`v2.16.30 / Build 256`）：完成双端漫画加载取消与状态恢复、iPad 非全屏状态栏避让与平板横屏直播双栏、华视 `.ft4` 片名评分过滤与 `<span class="slash">/</span>` 多演员解析修复及回归单测；末次修改后 Android（42 套件 257 项：0 失败 8 跳过，`lintDebug` 0 error，Release APK `206,876,555` bytes）与 iOS（177 项：0 失败 7 跳过，Simulator Release 通过）全绿，双端 Release 模拟器截屏核验与 `./scripts/publish_ota.sh Release` 完成（`bananarey.us` HTTP 200，远端磁盘可用 `11G`）— 2026-11-14。
+
 - [x] 新增无广告极速长视频源 134X（`https://134x.com`）全端原生接入、Release 模拟器验证与 `v2.16.29 (Build 255)` 交付：完成 TanStack Start `_serverFn` Seroval 协议逆向与双端适配器（`X134Repository.kt` / `X134SourceService.swift`）、6 并发详情水合与哈希自动刷新、Seroval 字符串反转义修复、20 源目录与搜索对齐、`probe_all_sources.mjs` / `diagnose_sources.swift` 同步扩展、Android R8 APK 与 iPhone 18 Pro / iPad Pro 13-inch Release 实测及 OTA 原子发布 — 2026-11-14。
 
 - [x] 全项目 Bug 审查、多端 UI 防错位与双端模拟器 Release 级实测交付（v2.16.28 / Build 254）：Android 修复 ANR、日间首屏与播放页状态栏高对比背板、平板响应式 Hero 高度、`SettingsSubpageScaffold` 固定设置子页返回栏（`AuroraFlowTest` 10/10）；iOS 消除 `HeroBanner`/`LiveScreen` 在 Duo 下的左右白边并上调操作栏底部间距；Web 游戏 `.age-badge` 移至左上角避让浮动胶囊；Android `lintDebug`（0 errors）、`testDebugUnitTest`（245 项 0 失败 7 跳过）、非在线 UI/无障碍设备测试（20/20）与 iOS XCTest（169 项 0 失败 6 跳过）全部通过，Release OTA（`Netgrey.apk` / `Netgrey.ipa`）同步发布至 `https://bananarey.us` — 2026-11-14。

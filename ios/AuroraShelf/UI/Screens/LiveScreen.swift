@@ -718,10 +718,19 @@ public struct LiveScreen: View {
             }
         }
         .navigationDestination(item: $activeStream) { stream in
-            LiveDetailView(stream: stream) {
-                activeStream = nil
-            }
+            LiveDetailView(
+                stream: stream,
+                relatedStreams: repo.liveStreams.filter { $0.id != stream.id },
+                onSelectStream: { next in
+                    activeStream = next
+                },
+                onDismiss: {
+                    activeStream = nil
+                }
+            )
+            .id(stream.id)
             .toolbar(.hidden, for: .tabBar)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
         }
         .onAppear {

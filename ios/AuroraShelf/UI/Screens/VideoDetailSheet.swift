@@ -13,6 +13,7 @@ public struct VideoDetailSheet: View {
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
 
     @State private var isDescriptionExpanded: Bool = false
+    @State private var detailMetadata: VideoDetailMetadata? = nil
     @State private var watchlistError: String?
     @State private var episodes: [PlaybackEpisode] = []
     @State private var selectedEpisode: PlaybackEpisode?
@@ -46,10 +47,20 @@ public struct VideoDetailSheet: View {
         var list: [CastMember] = []
         var seen = Set<String>()
 
-        // 1. 扫描 tags 中的演职员与导演信息
+        // 1. 优先展示真实抓取的导演与主演名单
+        if let meta = detailMetadata {
+            for director in meta.directors where !director.isEmpty && seen.insert(director).inserted {
+                list.append(CastMember(name: director, role: "导演", icon: "megaphone.fill", isSearchable: true))
+            }
+            for actor in meta.actors where !actor.isEmpty && seen.insert(actor).inserted {
+                list.append(CastMember(name: actor, role: "主演", icon: "person.crop.circle.fill", isSearchable: true))
+            }
+        }
+
+        // 2. 扫描 tags 中的补充演职员与标签信息
         for tag in video.tags {
             let trimmed = tag.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
+            guard !trimmed.isEmpty, trimmed != video.sourceName, trimmed != video.category else { continue }
 
             if trimmed.contains("导演") {
                 let clean = trimmed
@@ -60,7 +71,7 @@ public struct VideoDetailSheet: View {
                     let str = String(name).trimmingCharacters(in: .whitespaces)
                     if !str.isEmpty && !seen.contains(str) {
                         seen.insert(str)
-                        list.append(CastMember(name: str, role: "导演", icon: "person.crop.circle.badge.checkmark", isSearchable: true))
+                        list.append(CastMember(name: str, role: "导演", icon: "megaphone.fill", isSearchable: true))
                     }
                 }
             } else if trimmed.contains("主演") || trimmed.contains("演员") {
@@ -80,16 +91,10 @@ public struct VideoDetailSheet: View {
             } else if trimmed.count >= 2 && trimmed.count <= 6 && !trimmed.contains("4K") && !trimmed.contains("HDR") && !trimmed.contains("国语") && !trimmed.contains("中字") {
                 if !seen.contains(trimmed) {
                     seen.insert(trimmed)
-                    list.append(CastMember(name: trimmed, role: "演员 / 标签", icon: "person.fill", isSearchable: true))
+                    list.append(CastMember(name: trimmed, role: "关联标签", icon: "tag.fill", isSearchable: true))
                 }
             }
         }
-
-        // 2. 补足平台与出品音画母带保证 Apple TV 质感
-        list.append(CastMember(name: video.sourceName, role: "出品源 · 分发", icon: "tv", isSearchable: false))
-        list.append(CastMember(name: "超清母带组", role: "4K 影视工程", icon: "film", isSearchable: false))
-        list.append(CastMember(name: "官方原声", role: "杜比全景声", icon: "waveform", isSearchable: false))
-        list.append(CastMember(name: "官方译制", role: "双语字幕", icon: "captions.bubble", isSearchable: false))
 
         return list
     }
@@ -150,7 +155,7 @@ public struct VideoDetailSheet: View {
                     // 1. 顶部 16:9 全宽高清背景海报与渐变遮罩
                     ZStack(alignment: .bottomLeading) {
                         AuroraCoverImage(
-                            url: video.coverUrl,
+                            url: video.heroCoverUrl ?? video.coverUrl,
                             title: video.title,
                             sourceBaseURL: video.coverBaseURL,
                             aspectRatio: 16.0 / 9.0,
@@ -208,6 +213,24 @@ public struct VideoDetailSheet: View {
                                     Text(video.duration)
                                         .font(.caption)
                                         .foregroundStyle(.white.opacity(0.85))
+                                }
+
+                                if let year = detailMetadata?.year, !year.isEmpty {
+                                    Text(year)
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(.white.opacity(0.16), in: Capsule())
+                                }
+
+                                if let area = detailMetadata?.area, !area.isEmpty {
+                                    Text(area)
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(.white.opacity(0.16), in: Capsule())
                                 }
                             }
                         }
@@ -493,26 +516,48 @@ public struct VideoDetailSheet: View {
                         }
                     }
 
-                    // 4. 剧情与简介描述（支持折叠/展开）
+                    // 4. 剧情与基本介绍（支持折叠/展开）
                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                        Text("detail.synopsis".localized)
+                        Text("基本介绍")
                             .font(.headline)
                             .foregroundStyle(AuroraColor.textPrimary)
 
-                        let description = video.subtitle.isEmpty ? "本片由 \(video.sourceName) 官方源直连分发，支持硬件解码出画与多端投屏。" : video.subtitle
+                        if let metaTags = detailMetadata?.tags, !metaTags.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(metaTags.prefix(8), id: \.self) { tag in
+                                        Text(tag)
+                                            .font(.caption2.weight(.medium))
+                                            .foregroundStyle(AuroraColor.textSecondary)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(AuroraColor.surfaceCard, in: Capsule())
+                                            .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 0.75))
+                                    }
+                                }
+                            }
+                        }
+
+                        let metaDesc = detailMetadata?.synopsis.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        let description = !metaDesc.isEmpty
+                            ? metaDesc
+                            : (video.subtitle.isEmpty ? "本片由 \(video.sourceName) 源站直连分发。" : video.subtitle)
                         Text(description)
                             .font(.subheadline)
                             .foregroundStyle(AuroraColor.textSecondary)
-                            .lineLimit(isDescriptionExpanded ? nil : 3)
+                            .lineSpacing(3)
+                            .lineLimit(isDescriptionExpanded ? nil : 4)
 
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isDescriptionExpanded.toggle()
+                        if description.count > 75 {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    isDescriptionExpanded.toggle()
+                                }
+                            } label: {
+                                Text(isDescriptionExpanded ? "收起" : "展开全部")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(AuroraColor.brand)
                             }
-                        } label: {
-                            Text(isDescriptionExpanded ? "收起" : "展开全部")
-                                .font(.caption.bold())
-                                .foregroundStyle(AuroraColor.brand)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -533,46 +578,48 @@ public struct VideoDetailSheet: View {
                         .padding(.horizontal, AuroraMetrics.contentInset)
                     }
 
-                    // 5. Apple TV 标志性主创与演职员阵容（Cast & Crew - 支持点击演职员发起全域搜索）
-                    VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-                        HStack {
-                            Text("主创阵容")
-                                .font(.headline)
-                                .foregroundStyle(AuroraColor.textPrimary)
+                    // 5. 演职员阵容（Cast & Crew - 支持点击演职员发起全域搜索）
+                    if !parsedCastMembers.isEmpty {
+                        VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
+                            HStack {
+                                Text("演员表")
+                                    .font(.headline)
+                                    .foregroundStyle(AuroraColor.textPrimary)
 
-                            Spacer()
+                                Spacer()
 
-                            if onSearchKeyword != nil {
-                                Text("轻点演职员查看相关作品")
-                                    .font(.caption2)
-                                    .foregroundStyle(AuroraColor.textTertiary)
-                            }
-                        }
-                        .padding(.horizontal, AuroraMetrics.contentInset)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: AuroraMetrics.spacingL) {
-                                ForEach(parsedCastMembers) { member in
-                                    if member.isSearchable && onSearchKeyword != nil {
-                                        Button {
-                                            let impact = UIImpactFeedbackGenerator(style: .light)
-                                            impact.impactOccurred()
-                                            onDismiss()
-                                            dismiss()
-                                            onSearchKeyword?(member.name)
-                                        } label: {
-                                            castMemberView(name: member.name, role: member.role, icon: member.icon)
-                                        }
-                                        .buttonStyle(AppleSpringCardButtonStyle())
-                                    } else {
-                                        castMemberView(name: member.name, role: member.role, icon: member.icon)
-                                    }
+                                if onSearchKeyword != nil {
+                                    Text("轻点演职员查看相关作品")
+                                        .font(.caption2)
+                                        .foregroundStyle(AuroraColor.textTertiary)
                                 }
                             }
                             .padding(.horizontal, AuroraMetrics.contentInset)
+
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                LazyHStack(spacing: AuroraMetrics.spacingL) {
+                                    ForEach(parsedCastMembers) { member in
+                                        if member.isSearchable && onSearchKeyword != nil {
+                                            Button {
+                                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                                impact.impactOccurred()
+                                                onDismiss()
+                                                dismiss()
+                                                onSearchKeyword?(member.name)
+                                            } label: {
+                                                castMemberView(name: member.name, role: member.role, icon: member.icon)
+                                            }
+                                            .buttonStyle(AppleSpringCardButtonStyle())
+                                        } else {
+                                            castMemberView(name: member.name, role: member.role, icon: member.icon)
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, AuroraMetrics.contentInset)
+                            }
                         }
+                        .id("castCrewSection")
                     }
-                    .id("castCrewSection")
 
                     // 5. 同源推荐或相关推荐（Apple TV 经典货架）
                     let relatedVideos = videoRepo.feedVideos.filter { $0.id != video.id }.prefix(6)
@@ -672,11 +719,14 @@ public struct VideoDetailSheet: View {
     .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .task {
-            // 启动时静默预解析首个可用直链，实现点击立即起播
+            // 启动时静默预解析首个可用直链，并发加载剧集列表与演员简介
             VideoPreloadManager.shared.prewarm(video: video)
             isLoadingEpisodes = true
-            let eps = await videoRepo.resolveEpisodes(for: video)
+            async let epsTask = videoRepo.resolveEpisodes(for: video)
+            async let metaTask = videoRepo.fetchDetailMetadata(for: video)
+            let (eps, fetchedMeta) = await (epsTask, metaTask)
             episodes = eps
+            detailMetadata = fetchedMeta
             selectedEpisode = eps.first(where: { $0.pageUrl == video.playbackUrl }) ?? eps.first
             isLoadingEpisodes = false
             if let firstEp = eps.first {

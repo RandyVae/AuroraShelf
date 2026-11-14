@@ -41,8 +41,12 @@ public actor CoverImageLoader {
     }
 
     public func loadImage(from urlString: String, title: String? = nil, baseURL: URL? = nil, requestReferer: String? = nil) async -> UIImage? {
-        let normalized = Self.normalizeUrl(urlString, baseURL: baseURL)
-        guard let url = URL(string: normalized), !normalized.isEmpty else {
+        let rawNormalized = Self.normalizeUrl(urlString, baseURL: baseURL)
+        let normalized = DoubanPosterResolver.upgradePosterURL(rawNormalized) ?? rawNormalized
+        let isPlaceholderDouban = normalized.lowercased().contains("tv_default_small")
+            || normalized.lowercased().contains("movie_default_small")
+            || normalized.lowercased().contains("/cuphead/movie-static/pics/")
+        guard !isPlaceholderDouban, let url = URL(string: normalized), !normalized.isEmpty else {
             if let title, !title.isEmpty {
                 if let fallbackUrl = await DoubanPosterResolver.shared.resolvePosterURL(for: title) {
                     return await loadImage(from: fallbackUrl, title: nil, baseURL: nil, requestReferer: nil)
@@ -222,7 +226,7 @@ public actor CoverImageLoader {
         return "cover_\(digest.map { String(format: "%02x", $0) }.joined()).img"
     }
 
-    private static func decodeForDisplay(_ data: Data, maxPixelSize: Int = 1200) -> UIImage? {
+    private static func decodeForDisplay(_ data: Data, maxPixelSize: Int = 2200) -> UIImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
@@ -278,7 +282,14 @@ public actor CoverImageLoader {
             defaultReferer = "https://javnoni.com/"
         } else if ["sol140.com", "sol148.com", "23img.com", "cdn77.org"].contains(where: { host == $0 || host.hasSuffix(".\($0)") }) || host.contains("sol") {
             defaultReferer = "https://h1014.sol148.com/"
-        } else if host.contains("huarenlivewebsite") || host.contains("hitv.com") || host.contains("okokserver") || host.contains("weserv.nl") {
+        } else if host.contains("huarenlivewebsite")
+            || host.contains("hitv.com")
+            || host.contains("okokserver")
+            || host.contains("weserv.nl")
+            || host.contains("qpic.cn")
+            || host.contains("iqiyipic.com")
+            || host.contains("alicdn.com")
+            || host.contains("hhmage.com") {
             defaultReferer = "https://huavod.com/"
         } else if host == "t66y.com" || host.hasSuffix(".t66y.com") {
             defaultReferer = "https://t66y.com/"

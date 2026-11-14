@@ -4,6 +4,7 @@ import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.SourceCategory
 import com.aurorashelf.app.model.VideoItem
+import com.aurorashelf.app.ui.CoverImageLoader
 import java.io.IOException
 import java.net.URI
 import java.net.URLEncoder
@@ -66,21 +67,33 @@ class VideoRepository {
                 }
             }
             val requestUrl = pageUrl(baseUrl, category, page)
-            val document = try {
-                fetchDocument(requestUrl, baseUrl)
-            } catch (error: HttpStatusException) {
-                // Huangguo ranking pages or end-of-feed numbered URLs return 404,
-                // and deprecated routes such as /ai-huanlian/ return 410 Gone.
-                if (ContentSourceCatalog.isHuangguo(baseUrl) && (error.statusCode == 404 || error.statusCode == 410)) {
-                    if (page > 1 && error.statusCode == 404) return@withContext emptyList()
-                    val fallbackPath = if (page <= 1) "/original/" else "/original/$page/"
-                    val fallbackUrl = URI(baseUrl.trimEnd('/')).resolve(fallbackPath).toString()
-                    fetchDocument(fallbackUrl, baseUrl)
-                } else if (page > 1 && error.statusCode == 404 && ContentSourceCatalog.is91Dongman(baseUrl)) {
-                    return@withContext emptyList()
-                } else {
-                    throw error
+            val isHuavodFirstPage = ContentSourceCatalog.isHuavod(baseUrl) && page == 1
+            val (document, heroSlides) = if (isHuavodFirstPage) {
+                coroutineScope {
+                    val heroDeferred = async {
+                        runCatching { loadHuavodHeroSlidesCached(baseUrl) }.getOrDefault(emptyList())
+                    }
+                    val doc = fetchDocument(requestUrl, baseUrl)
+                    doc to heroDeferred.await()
                 }
+            } else {
+                val doc = try {
+                    fetchDocument(requestUrl, baseUrl)
+                } catch (error: HttpStatusException) {
+                    // Huangguo ranking pages or end-of-feed numbered URLs return 404,
+                    // and deprecated routes such as /ai-huanlian/ return 410 Gone.
+                    if (ContentSourceCatalog.isHuangguo(baseUrl) && (error.statusCode == 404 || error.statusCode == 410)) {
+                        if (page > 1 && error.statusCode == 404) return@withContext emptyList()
+                        val fallbackPath = if (page <= 1) "/original/" else "/original/$page/"
+                        val fallbackUrl = URI(baseUrl.trimEnd('/')).resolve(fallbackPath).toString()
+                        fetchDocument(fallbackUrl, baseUrl)
+                    } else if (page > 1 && error.statusCode == 404 && ContentSourceCatalog.is91Dongman(baseUrl)) {
+                        return@withContext emptyList()
+                    } else {
+                        throw error
+                    }
+                }
+                doc to emptyList()
             }
             val records = parseDocument(document, baseUrl)
             if (page == 1 && records.isEmpty()) {
@@ -90,6 +103,8 @@ class VideoRepository {
                 val diffRecords = differentiateHuangguoFeed(records, legacyCategory)
                 huangguoFeedCache["${category.cacheKey}:$page"] = Pair(System.currentTimeMillis(), diffRecords)
                 diffRecords
+            } else if (isHuavodFirstPage && heroSlides.isNotEmpty()) {
+                enrichHuavodWithHeroSlides(records, heroSlides, legacyCategory)
             } else {
                 records
             }
@@ -324,7 +339,10 @@ class VideoRepository {
 
     internal fun parseDocument(document: Document, baseUrl: String): List<VideoItem> {
         if (ContentSourceCatalog.is91Dongman(baseUrl)) {
-            val dmItems = document.select(".dm-card, .dm-comic-card, a.dm-card__media[href*=/anime/]")
+            val dmItems = document.select(
+                ".dm-card, .dm-comic-card, .dm-ranking-mobile-row, " +
+                    "a.dm-card__media[href*=/anime/], a.dm-ranking-mobile-row__main[href*=/anime/]",
+            )
                 .asSequence()
                 .mapNotNull { it.to91DongmanVideoItem(baseUrl) }
                 .distinctBy(VideoItem::pageUrl)
@@ -420,19 +438,25 @@ class VideoRepository {
         val anchor = if (tagName() == "a") this else selectFirst("a[href*=/anime/]") ?: return null
         val href = anchor.attr("href").trim()
         val pageUrl = SourceAddress.resolve(documentBase(baseUrl), href) ?: return null
-        val parent = if (tagName() == "a") parent() ?: this else this
-        val title = parent.selectFirst(".dm-card__title h3, h3, a[title]")?.text()?.trim()
-            ?: anchor.selectFirst("img")?.attr("alt")?.trim()
+        val container = if (tagName() == "a") parent() ?: this else this
+        val title = container.selectFirst(
+            ".dm-card__title h3, .dm-ranking-mobile-row__title, h3, a[title]",
+        )?.text()?.trim()?.takeIf(String::isNotBlank)
+            ?: anchor.attr("title").trim().takeIf(String::isNotBlank)
+            ?: anchor.selectFirst("img")?.attr("alt")?.trim()?.takeIf(String::isNotBlank)
             ?: return null
-        if (title.isBlank()) return null
-        val img = parent.selectFirst("img[data-src], img[src]")
+        val img = container.selectFirst("img[data-src], img[src]") ?: anchor.selectFirst("img[data-src], img[src]")
         val thumbnail = img?.let {
-            val reference = it.attr("data-src").ifBlank { it.attr("src") }
+            val rawDataSrc = it.attr("data-src").trim()
+            val rawSrc = it.attr("src").trim()
+            val reference = rawDataSrc.takeIf { s -> s.isNotBlank() && !s.contains("placeholder") }
+                ?: rawSrc.takeIf { s -> s.isNotBlank() && !s.startsWith("data:") && !s.contains("placeholder") }
+                ?: ""
             SourceAddress.resolve(documentBase(baseUrl), reference)
         }?.takeIf(String::isNotBlank)
-        val duration = parent.selectFirst(".dm-card__duration span")?.text()?.trim() ?: "--:--"
-        val views = parent.selectFirst(".dm-card__views span")?.text()?.trim() ?: "热播中"
-        val author = parent.selectFirst(".dm-card__badge, .dm-chip")?.text()?.trim() ?: "91动漫"
+        val duration = container.selectFirst(".dm-card__duration span, .dm-ranking-mobile-row__duration")?.text()?.trim() ?: "--:--"
+        val views = container.selectFirst(".dm-card__views span, .dm-ranking-mobile-row__meta")?.text()?.trim() ?: "热播中"
+        val author = container.selectFirst(".dm-card__badge, .dm-ranking-mobile-row__badge, .dm-chip")?.text()?.trim() ?: "91动漫"
         val id = Regex("/anime/[^/]+/(\\d+)").find(pageUrl)?.groupValues?.get(1) ?: pageUrl.hashCode().toString()
         return VideoItem(
             id = id,
@@ -457,12 +481,22 @@ class VideoRepository {
             .replace(Regex("\\s+"), " ")
         if (title.length < MIN_TITLE_LENGTH) return null
 
-        val thumbnail = image?.let {
-            val reference = it.attr("data-src").ifBlank { it.attr("src") }
-            SourceAddress.resolve(documentBase(baseUrl), reference)
+        val rawThumbnail = image?.let {
+            val reference = it.attr("data-src")
+                .ifBlank { it.attr("data-original") }
+                .ifBlank { it.attr("src") }
+            SourceAddress.resolve(documentBase(baseUrl), Parser.unescapeEntities(reference, false))
         }?.takeIf(String::isNotBlank)
 
-        val score = selectFirst(".ft4")?.text()?.trim()?.takeIf(String::isNotBlank)
+        val upgradedThumbnail = rawThumbnail
+            ?.takeUnless { CoverImageLoader.isDeadCoverHost(it) }
+            ?.let { CoverImageLoader.upgradeCoverUrl(it) }
+        val thumbnail = upgradedThumbnail ?: CoverImageLoader.quickDoubanLookup(title)
+
+        val score = (selectFirst(".public-list-prb .ft4") ?: selectFirst("i.ft4, span.ft4"))
+            ?.text()
+            ?.trim()
+            ?.takeIf { it.matches(Regex("""^\d+(?:\.\d+)?$""")) }
         val tag = selectFirst(".public-prt")?.text()?.trim()?.takeIf(String::isNotBlank)
         val views = score?.let { "评分 $it" } ?: (tag ?: "全网热播")
 
@@ -475,6 +509,134 @@ class VideoRepository {
             pageUrl = pageUrl,
             thumbnailUrl = thumbnail,
         )
+    }
+
+    internal data class HuavodHeroSlide(
+        val vodId: String,
+        val pageUrl: String,
+        val title: String,
+        val categoryLabel: String,
+        val bannerUrl: String,
+    )
+
+    private fun loadHuavodHeroSlidesCached(baseUrl: String): List<HuavodHeroSlide> {
+        val now = System.currentTimeMillis()
+        val cached = huavodHeroCache
+        if (cached != null && now - cached.first < HUAVOD_HERO_CACHE_TTL_MS && cached.second.isNotEmpty()) {
+            return cached.second
+        }
+        val homeUrl = SourceAddress.resolve("${baseUrl.trimEnd('/')}/", "/") ?: "https://huavod.com/"
+        val homeDoc = fetchDocument(homeUrl, baseUrl)
+        val slides = parseHuavodHeroSlides(homeDoc, baseUrl)
+        if (slides.isNotEmpty()) {
+            huavodHeroCache = now to slides
+        }
+        return slides
+    }
+
+    internal fun parseHuavodHeroSlides(document: Document, baseUrl: String): List<HuavodHeroSlide> {
+        val slides = mutableListOf<HuavodHeroSlide>()
+        val seenVodIds = mutableSetOf<String>()
+        for (slideEl in document.select(".swiper-slide")) {
+            if (slideEl.selectFirst(".slide-time-img3--ad") != null) continue
+            val link = slideEl.selectFirst("a[href*=/voddetail/]") ?: continue
+            val href = link.attr("href").trim()
+            if (href.contains("/advertiser", ignoreCase = true)) continue
+            val vodId = HUAVOD_VOD_ID_REGEX.find(href)?.groupValues?.getOrNull(1) ?: continue
+            val bannerEl = slideEl.selectFirst(".slide-time-img3:not(.slide-time-img3--ad)") ?: continue
+            val style = bannerEl.attr("style")
+            val rawBgUrl = CSS_BG_URL_REGEX.find(style)?.groupValues?.getOrNull(1)
+                ?.let { Parser.unescapeEntities(it, false) }
+                ?.trim('"', '\'', ' ')
+                ?.takeIf(String::isNotBlank)
+                ?: continue
+            val resolvedBanner = SourceAddress.resolve(slideEl.documentBase(baseUrl), rawBgUrl) ?: continue
+            if (resolvedBanner.contains("tv_default", ignoreCase = true) ||
+                resolvedBanner.contains("/advertiser", ignoreCase = true)
+            ) {
+                continue
+            }
+            val bannerUrl = CoverImageLoader.upgradeCoverUrl(resolvedBanner) ?: resolvedBanner
+            val slideTitle = slideEl.selectFirst(".slide-info-title")?.text()?.trim()
+                ?.ifBlank { link.attr("title").trim() }
+                ?.let { Parser.unescapeEntities(it, false) }
+                ?.takeIf(String::isNotBlank)
+                ?: "热门影视 $vodId"
+            val categoryLabel = slideEl.selectFirst(".slide-info-type span")?.text()?.trim().orEmpty()
+            if (seenVodIds.add(vodId)) {
+                val pageUrl = SourceAddress.resolve(slideEl.documentBase(baseUrl), href)
+                    ?: "https://huavod.com/voddetail/$vodId.html"
+                slides += HuavodHeroSlide(
+                    vodId = vodId,
+                    pageUrl = pageUrl,
+                    title = slideTitle,
+                    categoryLabel = categoryLabel,
+                    bannerUrl = bannerUrl,
+                )
+            }
+        }
+        return slides
+    }
+
+    internal fun enrichHuavodWithHeroSlides(
+        records: List<VideoItem>,
+        slides: List<HuavodHeroSlide>,
+        category: FeedCategory,
+    ): List<VideoItem> {
+        if (slides.isEmpty()) return records
+        val slideByVodId = slides.associateBy { it.vodId }
+        val cardByVodId = records.mapNotNull { item ->
+            val vodId = HUAVOD_VOD_ID_REGEX.find(item.pageUrl)?.groupValues?.getOrNull(1) ?: return@mapNotNull null
+            vodId to item
+        }.toMap()
+
+        val enrichedRecords = records.map { item ->
+            val vodId = HUAVOD_VOD_ID_REGEX.find(item.pageUrl)?.groupValues?.getOrNull(1)
+            val heroBanner = vodId?.let { slideByVodId[it]?.bannerUrl }
+            if (heroBanner != null) item.copy(heroThumbnailUrl = heroBanner) else item
+        }
+
+        val matchingSlides = slides.filter { slide ->
+            val label = slide.categoryLabel
+            when (category) {
+                FeedCategory.RECENT -> label.contains("电影") || label.isBlank()
+                FeedCategory.CURRENT_HOT -> label.contains("剧") && !label.contains("短剧")
+                FeedCategory.MONTHLY_HOT -> label.contains("综艺")
+                FeedCategory.FAVORITES -> label.contains("动漫")
+                FeedCategory.ALL -> label.contains("短剧")
+                else -> false
+            }
+        }.ifEmpty {
+            if (category == FeedCategory.RECENT) slides else emptyList()
+        }
+
+        if (matchingSlides.isEmpty()) return enrichedRecords
+
+        val promotedIds = mutableSetOf<String>()
+        val promotedItems = matchingSlides.take(5).mapNotNull { slide ->
+            if (!promotedIds.add(slide.vodId)) return@mapNotNull null
+            val matched = cardByVodId[slide.vodId]
+            if (matched != null) {
+                matched.copy(heroThumbnailUrl = slide.bannerUrl)
+            } else {
+                VideoItem(
+                    id = slide.pageUrl.sha256(),
+                    title = slide.title,
+                    author = "华视影院",
+                    duration = "--:--",
+                    views = slide.categoryLabel.ifBlank { "精选推荐" },
+                    pageUrl = slide.pageUrl,
+                    thumbnailUrl = CoverImageLoader.quickDoubanLookup(slide.title) ?: slide.bannerUrl,
+                    heroThumbnailUrl = slide.bannerUrl,
+                )
+            }
+        }
+        if (promotedItems.isEmpty()) return enrichedRecords
+        val remaining = enrichedRecords.filterNot { item ->
+            val vodId = HUAVOD_VOD_ID_REGEX.find(item.pageUrl)?.groupValues?.getOrNull(1)
+            vodId != null && promotedIds.contains(vodId)
+        }
+        return promotedItems + remaining
     }
 
     private fun Element.toRankVideoItem(baseUrl: String): VideoItem? {
@@ -691,6 +853,10 @@ class VideoRepository {
 
     companion object {
         private val huangguoFeedCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<VideoItem>>>()
+        @Volatile private var huavodHeroCache: Pair<Long, List<HuavodHeroSlide>>? = null
+        private const val HUAVOD_HERO_CACHE_TTL_MS = 10 * 60 * 1000L
+        private val HUAVOD_VOD_ID_REGEX = Regex("""/voddetail/(\d+)\.html""")
+        private val CSS_BG_URL_REGEX = Regex("""background-image\s*:\s*url\((?:['"]|&quot;|&#39;)?([^)'"]+)(?:['"]|&quot;|&#39;)?\)""", RegexOption.IGNORE_CASE)
         private const val REQUEST_TIMEOUT_MS = 15_000
         private const val MIN_TITLE_LENGTH = 2
         const val USER_AGENT =

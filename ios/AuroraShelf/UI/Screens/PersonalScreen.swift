@@ -281,6 +281,7 @@ public struct PersonalScreen: View {
                 showGame = false
             }
             .toolbar(.hidden, for: .tabBar)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
         }
         .navigationDestination(item: $activePlaybackVideo) { video in
@@ -288,6 +289,7 @@ public struct PersonalScreen: View {
                 activePlaybackVideo = nil
             }
             .toolbar(.hidden, for: .tabBar)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
         }
         .onAppear {

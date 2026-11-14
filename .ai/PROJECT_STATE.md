@@ -1,6 +1,24 @@
 # Project State
 
-## 最新工作状态（2026年11月14日 · 新增无广告极速长视频源 134X 双端原生接入与交付 · v2.16.29 Build 255）
+## 最新工作状态（2026年11月14日 · 漫画防卡死与导航恢复＋全源排查修复＋平板直播双栏＋华视高清封面与演员表/简介匹配 · v2.16.30 Build 256）
+
+- **漫画卡死、导航栏消失与后续漫画打不开根治（iOS + Android）**：
+  - 修复部分漫画详情/章节失败或慢响应时阻塞后续加载与隐藏底部导航的问题：Android [ComicScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ComicScreen.kt) / [ComicViewModel.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ComicViewModel.kt) / [ComicRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/comic/ComicRepository.kt) 与 iOS [ComicsScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/ComicsScreen.swift) / [ComicReaderView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Comic/ComicReaderView.swift) / [ComicRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Comic/ComicRepository.swift) 在加载中保留导航栏与可取消状态，失败或取消后干净恢复状态并可顺畅打开其他漫画。
+- **全源连通性排查修复与真实源探测**：
+  - 修复 `91动漫`、`GEDE Comix`、`ikmmh`、`Baozi`、`OHentai` 等源协议/解码与图床回退逻辑；
+  - 实测全源探针：iOS Live 审计 9/9 无鉴权漫画源（`baozi`、`jm`、`komiic`、`dongman91`、`8muses`、`gedecomix`、`copy`、`ikmmh`、`ehentai`）通过（`picacg` 需配置鉴权跳过）、7/7 论坛板块通过、2/2 可用直播源（`hornystudents` 300 房、`stripchat` 44 房）通过、19/20 视频源通过（`javsb` TLS 断连）与 `X134SourceServiceTests` 通过；Android 实时探针 `FullSystemSourceProbeTest` 19/20 视频源通过（`JAVSB` `SSLHandshakeException`）、`ComicSourceProbeTest` 9/9 无鉴权漫画源全通、`ForumSourcesTest` 10 项全通；CLI `probe_all_sources.mjs` 33/35 可达（`javsb` TLS、`jm` 缺密钥 `code=401`），`diagnose_sources.swift` 31/33 可达（`javsb` TLS、`spankbang` HTTP 403）。
+- **iPad / Android 平板直播详情页 YouTube 式双栏适配与 iPad 状态栏安全区避让**：
+  - [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt) 与 [LiveDetailView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LiveDetailView.swift) 为平板横屏适配左右双栏（左播放器/主播信息、右实时互动/更多直播），对齐视频详情页交互布局；
+  - 修复 [LivePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LivePlayerView.swift)、[LiveDetailView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LiveDetailView.swift) 与 [VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift) 中 iPad 非全屏态播放器顶入系统状态栏问题（`needsTopOffset = !isFullScreen && (!isLandscape || isPad)` 并补偿 `+ safeTop` 高度）。
+- **华视高清封面与详请页演员表/基本介绍精准匹配**：
+  - 双端修复 `.slide-time-img3` Hero 大图提取与 `DoubanPosterResolver` 高清封面替换；
+  - 过滤 `.ft4` 片名碰撞（仅接受 `<i/span>` 或 `.public-list-prb` 纯数字评分，杜绝列表副标题显示片名），并修复 `<span class="slash">/</span>` 导致的演员表首人截断（iOS 移除 `|span` 并扩展窗口至 `1500`，Android 移除 `.detail-info span` 并放宽行长度至 `500`），真实呈现导演、多名主演、年份、地区、分类与「基本介绍」。
+- **最终回归验证与交付（v2.16.30 Build 256）**：
+  - 最后一次代码修改后重跑：Android `./gradlew testDebugUnitTest lintDebug assembleRelease` 42 套件 257 项通过 249 / 跳过 8 / 失败 0、`lintDebug` exit 0（HTML 报告 `19 warnings` / 0 error）、`dist/Netgrey.apk` `206,876,555` bytes；iOS `AuroraShelfTests` 177 项通过 170 / 跳过 7 / 失败 0，Simulator `Release` 构建成功；
+  - 在 `iPhone 18 Pro`、`iPad Pro 13-inch (M5)` 模拟器与 `netgrey_phone`（R8 签名 `dist/Netgrey.apk`）完成多形态截屏验收，确认华视演员表多人展示、卡片无片名评分误显、iPad 直播状态栏避让、Android 平板 `1800x2560` 横屏直播双栏及漫画取消/返回/续看均正常；
+  - `./scripts/publish_ota.sh Release` 完成 `https://bananarey.us` 原子发布（`Netgrey.apk` `206,876,555` bytes / `Netgrey.ipa` `202,630,841` bytes，`manifest.plist` `2.16.30`，HTTPS `200 OK`，服务器磁盘可用 `11G`）。
+
+## 历史工作状态（2026年11月14日 · 新增无广告极速长视频源 134X 双端原生接入与交付 · v2.16.29 Build 255）
 
 - **Android 134X（`134x.com`）原生适配器与全链路接入**（[X134Repository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/X134Repository.kt)、[ContentSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/ContentSource.kt)、[VideoItem.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/VideoItem.kt)、[VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt)、[PlaybackResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PlaybackResolver.kt)、[OfflineCacheManager.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/OfflineCacheManager.kt)、[NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt)）：
   - 新增 `X134Repository` 封装 OkHttp 连接池、Seroval Wire 编解码器（`t=0,1,2,4,9,10,11` ＋ 线性字符串反转义）、`AppShell-*.js` 动态哈希自动刷新、cursor 翻页缓存、6 路并发 `za` 详情元信息水合与 15 分钟 LRU 缓存；

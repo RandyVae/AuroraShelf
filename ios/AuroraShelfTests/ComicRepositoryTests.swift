@@ -591,4 +591,13 @@ final class ComicDetailLoadingStateTests: XCTestCase {
         XCTAssertTrue(state.finishRequest(currentRequestID))
         XCTAssertFalse(state.isLoading)
     }
+
+    func testComicPageStableIdFallsBackToUUIDOnlyWhenBlank() {
+        let withURL = ComicPage(imageUrl: "https://cdn.example.com/01.jpg", referer: "https://example.com/")
+        XCTAssertEqual(withURL.id, "https://cdn.example.com/01.jpg")
+
+        let blank1 = ComicPage(imageUrl: "   ", referer: nil, resolutionUrl: "")
+        let blank2 = ComicPage(imageUrl: "   ", referer: nil, resolutionUrl: "")
+        XCTAssertNotEqual(blank1.id, blank2.id)
+    }
 }

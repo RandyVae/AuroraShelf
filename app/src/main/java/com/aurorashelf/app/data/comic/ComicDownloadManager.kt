@@ -269,10 +269,15 @@ class ComicDownloadManager private constructor(appContext: Context) {
         }
 
         conn.inputStream.use { input ->
+            val rawBytes = input.readBytes()
+            val plainBytes = com.aurorashelf.app.ui.CoverImageLoader.decryptPayloadIfNeeded(
+                rawBytes,
+                page.imageUrl,
+                page.referer,
+            )
             if (page.verticalSegments > 1) {
                 // 还原 JM 解密混淆切片
-                val rawBytes = input.readBytes()
-                val rawBitmap = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size)
+                val rawBitmap = BitmapFactory.decodeByteArray(plainBytes, 0, plainBytes.size)
                     ?: throw IllegalStateException("解码混淆图片失败")
                 val unscrambled = unscrambleBitmap(rawBitmap, page.verticalSegments)
                 FileOutputStream(targetFile).use { out ->
@@ -282,7 +287,7 @@ class ComicDownloadManager private constructor(appContext: Context) {
                 unscrambled.recycle()
             } else {
                 FileOutputStream(targetFile).use { out ->
-                    input.copyTo(out)
+                    out.write(plainBytes)
                 }
             }
         }

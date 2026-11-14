@@ -7,6 +7,7 @@ import com.aurorashelf.app.model.ComicSummary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withTimeout
 
 class ComicRepository internal constructor(
     private val sources: List<ComicSource>,
@@ -41,44 +42,71 @@ class ComicRepository internal constructor(
     suspend fun search(sourceId: String, query: String, page: Int): List<ComicSummary> =
         source(sourceId).search(query.trim(), page)
 
-    suspend fun details(comic: ComicSummary): ComicDetails = source(comic.sourceId).details(comic)
+    suspend fun details(comic: ComicSummary): ComicDetails =
+        withTimeout(DETAILS_TIMEOUT_MS) { source(comic.sourceId).details(comic) }
 
     fun getCachedChapter(comic: ComicSummary, chapterId: String): List<ComicPage>? {
         val key = "${comic.sourceId}:${comic.id}:$chapterId"
         return synchronized(chapterCache) { chapterCache[key] }
     }
 
-    suspend fun prewarmChapter(comic: ComicSummary, chapterId: String) = kotlinx.coroutines.coroutineScope {
+    suspend fun prewarmChapter(comic: ComicSummary, chapterId: String) = coroutineScope {
         val key = "${comic.sourceId}:${comic.id}:$chapterId"
         synchronized(chapterCache) {
-            if (chapterCache.containsKey(key)) return@coroutineScope
+            if (!chapterCache[key].isNullOrEmpty()) return@coroutineScope
         }
-        val deferred = async(kotlinx.coroutines.Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) {
+        lateinit var deferred: kotlinx.coroutines.Deferred<List<ComicPage>>
+        deferred = async(Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) {
             try {
-                val pages = source(comic.sourceId).chapter(comic, chapterId)
-                synchronized(chapterCache) {
-                    chapterCache[key] = pages
+                val pages = withTimeout(CHAPTER_TIMEOUT_MS) {
+                    source(comic.sourceId).chapter(comic, chapterId)
+                }
+                if (pages.isNotEmpty()) {
+                    synchronized(chapterCache) {
+                        chapterCache[key] = pages
+                    }
                 }
                 pages
             } finally {
-                inFlightChapters.remove(key)
+                inFlightChapters.remove(key, deferred)
             }
         }
         val winner = inFlightChapters.putIfAbsent(key, deferred)
-        (winner ?: deferred).start()
+        if (winner == null) {
+            deferred.start()
+        } else {
+            deferred.cancel()
+        }
     }
 
     suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage> {
         val key = "${comic.sourceId}:${comic.id}:$chapterId"
         synchronized(chapterCache) {
-            chapterCache[key]?.let { return it }
+            chapterCache[key]?.takeIf { it.isNotEmpty() }?.let { return it }
         }
-        inFlightChapters[key]?.let { return it.await() }
-        val pages = source(comic.sourceId).chapter(comic, chapterId)
-        synchronized(chapterCache) {
-            chapterCache[key] = pages
+        inFlightChapters[key]?.takeIf { it.isActive }?.let { ongoing ->
+            return try {
+                withTimeout(CHAPTER_TIMEOUT_MS) { ongoing.await() }
+            } catch (error: Throwable) {
+                inFlightChapters.remove(key, ongoing)
+                ongoing.cancel()
+                throw error
+            }
+        }
+        val pages = withTimeout(CHAPTER_TIMEOUT_MS) {
+            source(comic.sourceId).chapter(comic, chapterId)
+        }
+        if (pages.isNotEmpty()) {
+            synchronized(chapterCache) {
+                chapterCache[key] = pages
+            }
         }
         return pages
+    }
+
+    private companion object {
+        const val DETAILS_TIMEOUT_MS = 16_000L
+        const val CHAPTER_TIMEOUT_MS = 18_000L
     }
 
     fun isAuthenticationRequired(sourceId: String): Boolean = source(sourceId) is AuthenticatedComicSource

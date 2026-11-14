@@ -22,8 +22,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,6 +34,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -73,6 +76,8 @@ import androidx.compose.material.icons.filled.ConfirmationNumber
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Hd
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Pause
@@ -203,23 +208,31 @@ internal fun LiveScreen(
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onOpen: (LiveItem) -> Unit,
+    onSelectItem: (LiveItem) -> Unit = onOpen,
     onClose: () -> Unit,
     onSettings: () -> Unit = {},
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize()) {
             state.selectedItem?.let { item ->
+                val relatedItems = remember(state.items, item.id) {
+                    state.items.filter { it.id != item.id }
+                }
                 PredictiveBackContainer(
                     enabled = !isFullscreen,
                     onBack = onClose,
                 ) {
-                    LivePlayerScreen(
-                        item = item,
-                        isFullscreen = isFullscreen,
-                        onFullscreenChange = onFullscreenChange,
-                        onVideoOrientationChange = onVideoOrientationChange,
-                        onBack = onClose,
-                    )
+                    key(item.id) {
+                        LivePlayerScreen(
+                            item = item,
+                            relatedItems = relatedItems,
+                            isFullscreen = isFullscreen,
+                            onFullscreenChange = onFullscreenChange,
+                            onVideoOrientationChange = onVideoOrientationChange,
+                            onSelectRelated = onSelectItem,
+                            onBack = onClose,
+                        )
+                    }
                 }
             } ?: LiveFeed(
                 state = state,
@@ -1132,14 +1145,17 @@ private fun StreamerInfoBar(
 @Composable
 private fun LivePlayerScreen(
     item: LiveItem,
+    relatedItems: List<LiveItem> = emptyList(),
     isFullscreen: Boolean,
     onFullscreenChange: (Boolean) -> Unit,
     onVideoOrientationChange: (Boolean) -> Unit,
+    onSelectRelated: (LiveItem) -> Unit = {},
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     var comments by remember(item.id) { mutableStateOf<List<LiveComment>>(emptyList()) }
     var hasCheckedComments by remember(item.id) { mutableStateOf(false) }
+    var isCommentsExpanded by remember(item.id) { mutableStateOf(true) }
     var videoDimensions by remember(item.id) { mutableStateOf<Pair<Int, Int>?>(null) }
     val videoAspectRatio = remember(videoDimensions, item.playerUrl) {
         videoDimensions?.let { (w, h) ->
@@ -1168,136 +1184,194 @@ private fun LivePlayerScreen(
         value = resolver.resolve(item)
     }
 
-    Column(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(AuroraImmersiveBackground)
             .testTag("live-player"),
     ) {
-        val playerModifier = if (isFullscreen) {
-            Modifier.fillMaxSize()
-        } else {
-            val ratio = videoAspectRatio
-            if (ratio < 1.0f) {
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .aspectRatio(ratio)
-            } else {
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(ratio)
+        val isTwoPaneLandscape = !isFullscreen && maxWidth >= 840.dp && maxWidth > maxHeight
+        val leftPaneWidthFraction = if (isTwoPaneLandscape) 0.62f else 1f
+        val safeAspectRatio = videoAspectRatio.coerceAtLeast(0.5f)
+        val playerModifier = when {
+            isFullscreen -> Modifier.fillMaxSize()
+            isTwoPaneLandscape -> {
+                val leftPaneWidth = maxWidth * 0.62f
+                val targetHeight = (leftPaneWidth / safeAspectRatio).coerceIn(220.dp, maxHeight * 0.64f)
+                Modifier.fillMaxWidth().height(targetHeight)
             }
+            videoAspectRatio < 1.0f -> Modifier
+                .fillMaxWidth()
+                .heightIn(max = 420.dp)
+                .aspectRatio(videoAspectRatio)
+            else -> Modifier
+                .fillMaxWidth()
+                .heightIn(max = 420.dp)
+                .aspectRatio(videoAspectRatio)
         }
 
-        if (forceEmbedded) {
-            EmbeddedLivePlayer(
-                url = item.playerUrl,
-                isFullscreen = isFullscreen,
-                onFullscreenChange = onFullscreenChange,
-                onVideoOrientationChange = onVideoOrientationChange,
-                onVideoSizeChange = { w: Int, h: Int -> videoDimensions = Pair(w, h) },
-                onCommentsChange = { comments = it },
-                onCommentsLoadingChange = { hasCheckedComments = !it },
-                onOpenExternal = openInBrowser,
-                onBack = onBack,
-                modifier = playerModifier,
-                posterUrl = item.thumbnailUrl,
-                reused = cachedSession,
-                comments = comments,
-                item = item,
-            )
-        } else {
-            when (val res = resolveResult) {
-                is LiveStreamResolveResult.Success -> {
-                    NativeLivePlayer(
-                        hlsUrl = res.hlsUrl,
-                        referer = res.referer,
-                        item = item,
-                        isFullscreen = isFullscreen,
-                        onFullscreenChange = onFullscreenChange,
-                        onVideoOrientationChange = onVideoOrientationChange,
-                        onVideoSizeChange = { w: Int, h: Int -> videoDimensions = Pair(w, h) },
-                        onOpenExternal = openInBrowser,
-                        onBack = onBack,
-                        onFallbackToWeb = { forceEmbedded = true },
-                        modifier = playerModifier,
-                        posterUrl = item.thumbnailUrl,
-                        comments = comments,
-                    )
-                }
-                is LiveStreamResolveResult.StatusError -> {
-                    Box(playerModifier.background(AuroraImmersiveBackground)) {
-                        LiveRoomStatusOverlay(
-                            status = LiveRoomStatus.OFFLINE,
-                            errorMessage = res.message,
-                            onRetry = { resolveAttempt++ },
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth(leftPaneWidthFraction)
+                .fillMaxHeight(),
+        ) {
+            if (forceEmbedded) {
+                EmbeddedLivePlayer(
+                    url = item.playerUrl,
+                    isFullscreen = isFullscreen,
+                    onFullscreenChange = onFullscreenChange,
+                    onVideoOrientationChange = onVideoOrientationChange,
+                    onVideoSizeChange = { w: Int, h: Int -> videoDimensions = Pair(w, h) },
+                    onCommentsChange = { comments = it },
+                    onCommentsLoadingChange = { hasCheckedComments = !it },
+                    onOpenExternal = openInBrowser,
+                    onBack = onBack,
+                    modifier = playerModifier,
+                    posterUrl = item.thumbnailUrl,
+                    reused = cachedSession,
+                    comments = comments,
+                    item = item,
+                )
+            } else {
+                when (val res = resolveResult) {
+                    is LiveStreamResolveResult.Success -> {
+                        NativeLivePlayer(
+                            hlsUrl = res.hlsUrl,
+                            referer = res.referer,
+                            item = item,
+                            isFullscreen = isFullscreen,
+                            onFullscreenChange = onFullscreenChange,
+                            onVideoOrientationChange = onVideoOrientationChange,
+                            onVideoSizeChange = { w: Int, h: Int -> videoDimensions = Pair(w, h) },
                             onOpenExternal = openInBrowser,
                             onBack = onBack,
                             onFallbackToWeb = { forceEmbedded = true },
+                            modifier = playerModifier,
+                            posterUrl = item.thumbnailUrl,
+                            comments = comments,
                         )
                     }
-                }
-                is LiveStreamResolveResult.Failure -> {
-                    EmbeddedLivePlayer(
-                        url = item.playerUrl,
-                        isFullscreen = isFullscreen,
-                        onFullscreenChange = onFullscreenChange,
-                        onVideoOrientationChange = onVideoOrientationChange,
-                        onVideoSizeChange = { w: Int, h: Int -> videoDimensions = Pair(w, h) },
-                        onCommentsChange = { comments = it },
-                        onCommentsLoadingChange = { hasCheckedComments = !it },
-                        onOpenExternal = openInBrowser,
-                        onBack = onBack,
-                        modifier = playerModifier,
-                        posterUrl = item.thumbnailUrl,
-                        reused = cachedSession,
-                        comments = comments,
-                        item = item,
-                    )
-                }
-                null -> {
-                    Box(playerModifier.background(AuroraImmersiveBackground)) {
-                        item.thumbnailUrl.takeIf { it.isNotBlank() }?.let { poster ->
-                            AsyncImage(
-                                model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
-                                contentDescription = null,
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize(),
+                    is LiveStreamResolveResult.StatusError -> {
+                        Box(playerModifier.background(AuroraImmersiveBackground)) {
+                            LiveRoomStatusOverlay(
+                                status = LiveRoomStatus.OFFLINE,
+                                errorMessage = res.message,
+                                onRetry = { resolveAttempt++ },
+                                onOpenExternal = openInBrowser,
+                                onBack = onBack,
+                                onFallbackToWeb = { forceEmbedded = true },
                             )
-                            Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
                         }
-                        CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
-                        FilledTonalIconButton(
-                            onClick = onBack,
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color.Black.copy(alpha = 0.56f),
-                                contentColor = Color.White,
-                            ),
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
-                                .padding(12.dp)
-                                .size(44.dp),
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", modifier = Modifier.size(20.dp))
+                    }
+                    is LiveStreamResolveResult.Failure -> {
+                        EmbeddedLivePlayer(
+                            url = item.playerUrl,
+                            isFullscreen = isFullscreen,
+                            onFullscreenChange = onFullscreenChange,
+                            onVideoOrientationChange = onVideoOrientationChange,
+                            onVideoSizeChange = { w: Int, h: Int -> videoDimensions = Pair(w, h) },
+                            onCommentsChange = { comments = it },
+                            onCommentsLoadingChange = { hasCheckedComments = !it },
+                            onOpenExternal = openInBrowser,
+                            onBack = onBack,
+                            modifier = playerModifier,
+                            posterUrl = item.thumbnailUrl,
+                            reused = cachedSession,
+                            comments = comments,
+                            item = item,
+                        )
+                    }
+                    null -> {
+                        Box(playerModifier.background(AuroraImmersiveBackground)) {
+                            item.thumbnailUrl.takeIf { it.isNotBlank() }?.let { poster ->
+                                AsyncImage(
+                                    model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                                Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
+                            }
+                            CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
+                            FilledTonalIconButton(
+                                onClick = onBack,
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = Color.Black.copy(alpha = 0.56f),
+                                    contentColor = Color.White,
+                                ),
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
+                                    .padding(12.dp)
+                                    .size(44.dp),
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", modifier = Modifier.size(20.dp))
+                            }
                         }
+                    }
+                }
+            }
+
+            if (!isFullscreen) {
+                StreamerInfoBar(
+                    item = item,
+                    onOpenExternal = openInBrowser,
+                    onFullscreenToggle = { onFullscreenChange(true) },
+                )
+                if (isTwoPaneLandscape) {
+                    LiveLeftDetailPanel(
+                        item = item,
+                        onOpenExternal = openInBrowser,
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                    )
+                } else {
+                    LiveComments(
+                        comments = comments,
+                        isLoading = !hasCheckedComments && resolveResult == null,
+                        isExpanded = isCommentsExpanded,
+                        onToggleExpand = { isCommentsExpanded = !isCommentsExpanded },
+                        modifier = if (isCommentsExpanded || relatedItems.isEmpty()) {
+                            Modifier.fillMaxWidth().weight(1f)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        },
+                    )
+                    if (!isCommentsExpanded && relatedItems.isNotEmpty()) {
+                        LiveRelatedStreamsList(
+                            relatedItems = relatedItems,
+                            onSelectRelated = onSelectRelated,
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                        )
                     }
                 }
             }
         }
 
-        if (!isFullscreen) {
-            StreamerInfoBar(
-                item = item,
-                onOpenExternal = openInBrowser,
-                onFullscreenToggle = { onFullscreenChange(true) },
-            )
-            LiveComments(
-                comments = comments,
-                isLoading = !hasCheckedComments && resolveResult == null,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-            )
+        if (isTwoPaneLandscape) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .fillMaxWidth(0.38f)
+                    .fillMaxHeight()
+                    .statusBarsPadding(),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                )
+                LiveRightRail(
+                    comments = comments,
+                    isLoadingComments = !hasCheckedComments && resolveResult == null,
+                    isCommentsExpanded = isCommentsExpanded,
+                    onToggleComments = { isCommentsExpanded = !isCommentsExpanded },
+                    relatedItems = relatedItems,
+                    onSelectRelated = onSelectRelated,
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
+            }
         }
     }
 }
@@ -1723,6 +1797,8 @@ private fun NativeLivePlayer(
 private fun LiveComments(
     comments: List<LiveComment>,
     isLoading: Boolean,
+    isExpanded: Boolean = true,
+    onToggleExpand: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -1737,6 +1813,13 @@ private fun LiveComments(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
+                .then(
+                    if (onToggleExpand != null) {
+                        Modifier.clickable(role = Role.Button, onClick = onToggleExpand)
+                    } else {
+                        Modifier
+                    },
+                )
                 .padding(top = 10.dp, bottom = 8.dp),
         ) {
             Text(
@@ -1761,60 +1844,277 @@ private fun LiveComments(
             }
             Spacer(Modifier.weight(1f))
             Text("公开聊天室 · 只读", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
-        }
-        if (comments.isEmpty()) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Text(
-                    if (isLoading) "正在连接直播间实时评论…" else "当前暂无公开评论",
-                    color = Color.Gray,
-                    style = MaterialTheme.typography.bodyMedium,
+            if (onToggleExpand != null) {
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (isExpanded) "收起实时互动" else "展开实时互动",
+                    tint = Color.LightGray,
+                    modifier = Modifier.size(18.dp),
                 )
             }
-        } else {
-            LazyColumn(
-                state = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                items(comments, key = LiveComment::id) { comment ->
-                    Row(
-                        verticalAlignment = Alignment.Top,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF141414), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
-                    ) {
-                        Surface(
-                            shape = CircleShape,
-                            color = Color(0xFF242730),
-                            contentColor = Color.White,
-                            border = BorderStroke(1.dp, Color(0xFF383E4C)),
-                            modifier = Modifier.size(28.dp),
+        }
+        AnimatedVisibility(
+            visible = isExpanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            if (comments.isEmpty()) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Text(
+                        if (isLoading) "正在连接直播间实时评论…" else "当前暂无公开评论",
+                        color = Color.Gray,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    items(comments, key = LiveComment::id) { comment ->
+                        Row(
+                            verticalAlignment = Alignment.Top,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF141414), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
+                            Surface(
+                                shape = CircleShape,
+                                color = Color(0xFF242730),
+                                contentColor = Color.White,
+                                border = BorderStroke(1.dp, Color(0xFF383E4C)),
+                                modifier = Modifier.size(28.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        comment.username.take(1).uppercase(),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    comment.username.take(1).uppercase(),
+                                    text = comment.username,
+                                    color = AuroraCoral,
+                                    style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    text = comment.message,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
                                 )
                             }
                         }
-                        Spacer(Modifier.width(10.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = comment.username,
-                                color = AuroraCoral,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveLeftDetailPanel(
+    item: LiveItem,
+    onOpenExternal: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = modifier
+            .background(AuroraImmersiveBackground)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Surface(
+                color = Color(0xFF262626),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(
+                    text = if (item.isHd) "高清直播" else "标清直播",
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                )
+            }
+            if (item.countryCode.isNotBlank()) {
+                Surface(
+                    color = Color(0xFF262626),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(
+                        text = item.countryCode.uppercase(),
+                        color = Color.LightGray,
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
+            }
+            Surface(
+                color = AuroraCoral.copy(alpha = 0.16f),
+                shape = RoundedCornerShape(8.dp),
+            ) {
+                Text(
+                    text = "${item.viewersCount} 人在线",
+                    color = AuroraCoral,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                )
+            }
+        }
+        OutlinedButton(
+            onClick = onOpenExternal,
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+        ) {
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("在浏览器中打开直播间")
+        }
+    }
+}
+
+@Composable
+private fun LiveRightRail(
+    comments: List<LiveComment>,
+    isLoadingComments: Boolean,
+    isCommentsExpanded: Boolean,
+    onToggleComments: () -> Unit,
+    relatedItems: List<LiveItem>,
+    onSelectRelated: (LiveItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.background(AuroraImmersiveBackground)) {
+        LiveComments(
+            comments = comments,
+            isLoading = isLoadingComments,
+            isExpanded = isCommentsExpanded,
+            onToggleExpand = onToggleComments,
+            modifier = when {
+                isCommentsExpanded && relatedItems.isNotEmpty() -> Modifier.fillMaxWidth().weight(0.45f)
+                isCommentsExpanded -> Modifier.fillMaxWidth().weight(1f)
+                else -> Modifier.fillMaxWidth()
+            },
+        )
+        if (relatedItems.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
+            )
+            LiveRelatedStreamsList(
+                relatedItems = relatedItems,
+                onSelectRelated = onSelectRelated,
+                modifier = if (isCommentsExpanded) {
+                    Modifier.fillMaxWidth().weight(0.55f)
+                } else {
+                    Modifier.fillMaxWidth().weight(1f)
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun LiveRelatedStreamsList(
+    relatedItems: List<LiveItem>,
+    onSelectRelated: (LiveItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    Column(modifier = modifier.padding(horizontal = 16.dp)) {
+        Text(
+            text = "更多直播",
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .padding(top = 12.dp, bottom = 8.dp)
+                .semantics { heading() },
+        )
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(bottom = 24.dp),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            items(relatedItems.take(20), key = LiveItem::id) { related ->
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF191919))
+                        .clickable { onSelectRelated(related) }
+                        .padding(8.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(126.dp)
+                            .aspectRatio(16f / 9f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF242424)),
+                    ) {
+                        if (related.thumbnailUrl.isNotBlank()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(related.thumbnailUrl)
+                                    .memoryCacheKey(related.thumbnailUrl)
+                                    .build(),
+                                contentDescription = related.username,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
                             )
-                            Spacer(Modifier.height(2.dp))
+                        }
+                        Surface(
+                            color = Color(0xFFD92D20).copy(alpha = 0.9f),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.align(Alignment.TopStart).padding(5.dp),
+                        ) {
                             Text(
-                                text = comment.message,
+                                text = "LIVE",
                                 color = Color.White,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = related.username,
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "${related.viewersCount} 观看",
+                            color = Color.LightGray,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        if (related.countryCode.isNotBlank()) {
+                            Spacer(Modifier.height(3.dp))
+                            Text(
+                                text = related.countryCode.uppercase(),
+                                color = AuroraCoral,
+                                style = MaterialTheme.typography.labelSmall,
                             )
                         }
                     }

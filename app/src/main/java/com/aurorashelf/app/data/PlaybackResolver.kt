@@ -11,6 +11,8 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
 import android.util.Log
 import com.aurorashelf.app.model.ContentSourceCatalog
+import com.aurorashelf.app.model.VideoDetailMetadata
+import com.aurorashelf.app.model.VideoItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -24,7 +26,11 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.parser.Parser
 
-data class PlaybackSource(val url: String, val referer: String)
+data class PlaybackSource(
+    val url: String,
+    val referer: String,
+    val extraHeaders: Map<String, String> = emptyMap(),
+)
 data class PlaybackEpisode(val number: Int, val label: String, val pageUrl: String)
 data class HuavodTokenEntry(
     val token: String,
@@ -43,7 +49,11 @@ class PlaybackResolver {
             if (ContentSourceCatalog.isBeeg(detailUrl) || ContentSourceCatalog.is134x(detailUrl)) {
                 listOf(PlaybackEpisode(1, "正片", detailUrl))
             } else if (ContentSourceCatalog.isHuavod(detailUrl)) {
-                val parsedHuavod = parseHuavodEpisodes(fetch(detailUrl), detailUrl)
+                val huavodDoc = fetch(detailUrl)
+                parseHuavodDetailMetadata(huavodDoc)?.let { meta ->
+                    if (meta.hasContent) detailMetadataCache.put(detailUrl, meta)
+                }
+                val parsedHuavod = parseHuavodEpisodes(huavodDoc, detailUrl)
                 // 关键落地：华视详情页解析出剧集的第一时间，后台立即静默预热第 1 集的播放换链！
                 parsedHuavod.firstOrNull()?.pageUrl?.let { ep1Url ->
                     prewarmHuavod(ep1Url)
@@ -53,7 +63,13 @@ class PlaybackResolver {
             } else if (ContentSourceCatalog.isHuangguo(detailUrl)) {
                 resolveHuangguoEpisodes(detailUrl)
             } else {
-                val parsed = parseEpisodes(fetch(detailUrl), detailUrl)
+                val pageDoc = fetch(detailUrl)
+                if (ContentSourceCatalog.is91Dongman(detailUrl)) {
+                    parse91DongmanDetailMetadata(pageDoc)?.let { meta ->
+                        if (meta.hasContent) detailMetadataCache.put(detailUrl, meta)
+                    }
+                }
+                val parsed = parseEpisodes(pageDoc, detailUrl)
                 if (ContentSourceCatalog.is91Dongman(detailUrl)) {
                     parsed.firstOrNull()?.pageUrl?.let { ep1Url ->
                         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
@@ -198,9 +214,22 @@ class PlaybackResolver {
 
         val rawUrl = videoUrlAttr ?: throw IOException("页面未提供 91动漫 视频播放流")
         val cleanUrl = Parser.unescapeEntities(cleanHlsUrl(rawUrl), false)
+        val headers = linkedMapOf(
+            "Referer" to "https://91dongman.net/",
+            "Origin" to "https://91dongman.net",
+        )
+        val authKeyName = Regex("""data-cdn-auth-key=["']([^"']+)["']""").find(html)?.groupValues?.getOrNull(1)
+            ?.takeIf(String::isNotBlank) ?: "x-cdn-auth"
+        Regex("""data-cdn-auth-value=["']([^"']+)["']""").find(html)?.groupValues?.getOrNull(1)
+            ?.takeIf(String::isNotBlank)
+            ?.let { headers[authKeyName] = it }
+        Regex("""data-cdn-app=["']([^"']+)["']""").find(html)?.groupValues?.getOrNull(1)
+            ?.takeIf(String::isNotBlank)
+            ?.let { headers["x-cdn-app"] = it }
         val source = PlaybackSource(
             url = cleanUrl,
-            referer = pageUrl,
+            referer = "https://91dongman.net/",
+            extraHeaders = headers,
         )
         Log.i(TAG, "resolve 91dongman host=${runCatching { URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
         return source.rememberFor(pageUrl, startedAtMs)
@@ -222,6 +251,12 @@ class PlaybackResolver {
                     val source = PlaybackSource(url = cleanHlsUrl(firstStream), referer = "$origin/")
                     playbackCache.put(ep1Url, source)
                     playbackCache.put("$origin/video/$dramaId/", source)
+                }
+                HuangguoEdgeGateway.cachedDetailMetadata(dramaId)?.let { meta ->
+                    if (meta.hasContent) {
+                        detailMetadataCache.put(detailUrl, meta)
+                        detailMetadataCache.put("$origin/video/$dramaId/", meta)
+                    }
                 }
                 return edgeResult.first
             }
@@ -481,6 +516,213 @@ class PlaybackResolver {
             }
         }
         return result.sortedBy { it.number }
+    }
+
+    suspend fun resolveDetails(video: VideoItem): VideoDetailMetadata? = withContext(Dispatchers.IO) {
+        val pageUrl = video.pageUrl
+        detailMetadataCache.get(pageUrl)?.let { return@withContext it }
+        val canonicalUrl = canonicalDetailUrl(pageUrl)
+        if (canonicalUrl != null) {
+            detailMetadataCache.get(canonicalUrl)?.let {
+                detailMetadataCache.put(pageUrl, it)
+                return@withContext it
+            }
+        }
+
+        val resolved: VideoDetailMetadata? = runCatching {
+            when {
+                ContentSourceCatalog.isHuavod(pageUrl) -> {
+                    val target = canonicalUrl ?: pageUrl
+                    parseHuavodDetailMetadata(fetch(target))
+                }
+                ContentSourceCatalog.isHuangguo(pageUrl) -> {
+                    val dramaId = Regex("""/(?:video|detail|play)/(\d+)""").find(pageUrl)?.groupValues?.getOrNull(1)
+                    if (dramaId != null) {
+                        val origin = runCatching {
+                            val uri = URI(pageUrl)
+                            if (uri.scheme != null && uri.host != null) "${uri.scheme}://${uri.host}" else HuangguoEdgeGateway.DEFAULT_ORIGIN
+                        }.getOrDefault(HuangguoEdgeGateway.DEFAULT_ORIGIN)
+                        HuangguoEdgeGateway.fetchDetails(origin, dramaId)
+                    } else {
+                        null
+                    }
+                }
+                ContentSourceCatalog.is91Dongman(pageUrl) -> {
+                    parse91DongmanDetailMetadata(fetch(pageUrl))
+                }
+                ContentSourceCatalog.isPipePipe(pageUrl) -> {
+                    PipePipeBridge.getDetailMetadata(pageUrl)
+                }
+                else -> null
+            }
+        }.getOrNull()
+
+        if (resolved != null && resolved.hasContent) {
+            detailMetadataCache.put(pageUrl, resolved)
+            if (canonicalUrl != null) detailMetadataCache.put(canonicalUrl, resolved)
+        }
+        resolved
+    }
+
+    internal fun canonicalDetailUrl(pageUrl: String): String? {
+        if (ContentSourceCatalog.isHuavod(pageUrl)) {
+            val id = Regex("""/vod(?:play|detail)/(\d+)""").find(pageUrl)?.groupValues?.getOrNull(1)
+            if (id != null) return "https://huavod.com/voddetail/$id.html"
+        } else if (ContentSourceCatalog.isHuangguo(pageUrl)) {
+            val id = Regex("""/(?:video|detail|play)/(\d+)""").find(pageUrl)?.groupValues?.getOrNull(1)
+            if (id != null) return "https://huangguoai.com/video/$id/"
+        }
+        return null
+    }
+
+    internal fun parseHuavodDetailMetadata(page: Document): VideoDetailMetadata? {
+        val directors = mutableListOf<String>()
+        val actors = mutableListOf<String>()
+        val tags = mutableListOf<String>()
+        var year: String? = null
+        var area: String? = null
+
+        val infoRows = page.select(".detail-info li, .detail-info p, .detail-info div")
+        for (row in infoRows) {
+            val text = row.text().replace('\u00a0', ' ').trim()
+            if (text.isEmpty() || text.length > 500) continue
+            val colonIdx = text.indexOfAny(charArrayOf(':', '：'))
+            if (colonIdx <= 0) continue
+            val label = text.substring(0, colonIdx).trim()
+            if (label.length > 10) continue
+            val isDirector = label.contains("导演") || label.contains("监制")
+            val isActor = label.contains("演员") || label.contains("主演") || label.contains("声优") || label.contains("嘉宾")
+            if (!isDirector && !isActor) continue
+
+            val linkNames = row.select("a").map { it.text().trim() }.filter(::isValidPersonName)
+            val valueNames = if (linkNames.isNotEmpty()) {
+                linkNames
+            } else {
+                splitPeopleTokens(text.substring(colonIdx + 1))
+            }
+            if (isDirector) {
+                valueNames.forEach { if (it !in directors) directors += it }
+            }
+            if (isActor) {
+                valueNames.forEach { if (it !in actors) actors += it }
+            }
+        }
+
+        // Fallback via meta keywords ("片名,主演:林一 #卢昱晓 ... #导演:张博昱")
+        if (directors.isEmpty() || actors.isEmpty()) {
+            val keywords = page.selectFirst("meta[name=keywords]")?.attr("content").orEmpty()
+            if (keywords.isNotBlank()) {
+                var inActorSegment = false
+                for (rawPart in keywords.split('#')) {
+                    val part = rawPart.trim()
+                    val actorMatch = Regex("""^(?:主演|演员)\s*[:：]\s*(.+)$""").find(part)
+                    val directorMatch = Regex("""^导演\s*[:：]\s*(.+)$""").find(part)
+                    val firstColonActor = Regex("""(?:主演|演员)\s*[:：]\s*(.+)$""").find(part)
+                    when {
+                        actorMatch != null || (firstColonActor != null && part.contains(',')) -> {
+                            inActorSegment = true
+                            val rawVal = (actorMatch ?: firstColonActor)!!.groupValues[1]
+                            splitPeopleTokens(rawVal).forEach { if (it !in actors) actors += it }
+                        }
+                        directorMatch != null -> {
+                            inActorSegment = false
+                            splitPeopleTokens(directorMatch.groupValues[1]).forEach { if (it !in directors) directors += it }
+                        }
+                        inActorSegment -> {
+                            val token = part.substringBefore(',').trim()
+                            if (isValidPersonName(token) && token !in actors) actors += token
+                        }
+                    }
+                }
+            }
+        }
+
+        val areaSet = setOf(
+            "大陆", "中国大陆", "中国香港", "中国台湾", "香港", "台湾", "美国", "日本", "韩国",
+            "英国", "法国", "泰国", "印度", "德国", "俄罗斯", "意大利", "西班牙", "加拿大",
+            "澳大利亚", "欧美", "日韩", "国产", "内地", "港台", "其他",
+        )
+        val remarksText = page.select(".slide-info-remarks, .detail-info .gen")
+            .text()
+            .replace('\u00a0', ' ')
+            .trim()
+        if (remarksText.isNotBlank()) {
+            for (token in remarksText.split(Regex("""[\s/·|]+"""))) {
+                val clean = token.trim()
+                if (clean.isEmpty()) continue
+                when {
+                    clean.matches(Regex("""^(19\d{2}|20\d{2})$""")) -> {
+                        if (year == null) year = clean
+                    }
+                    areaSet.contains(clean) -> {
+                        if (area == null) area = clean
+                    }
+                    clean.uppercase(Locale.US) !in setOf("HD", "TC", "TS", "BD", "高清", "更新", "完结", "全集") -> {
+                        if (clean.length <= 16 && clean !in tags) tags += clean
+                    }
+                }
+            }
+        }
+
+        val rawSynopsis = page.selectFirst("#height_limit, .text.cor3, .vod_content")
+            ?.text()
+            ?.replace('\u00a0', ' ')
+            ?.trim()
+            .orEmpty()
+        val synopsis = cleanSynopsisText(rawSynopsis)
+
+        val meta = VideoDetailMetadata(
+            actors = actors.take(24),
+            directors = directors.take(8),
+            year = year.orEmpty(),
+            area = area.orEmpty(),
+            tags = tags.take(10),
+            synopsis = synopsis.orEmpty(),
+        )
+        return if (meta.hasContent) meta else null
+    }
+
+    internal fun parse91DongmanDetailMetadata(page: Document): VideoDetailMetadata? {
+        val tags = page.select(".dm-tag")
+            .map { it.text().trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(10)
+        val rawDesc = page.selectFirst(".dm-detail__desc")?.text()?.trim()
+            ?: page.selectFirst("meta[name=description]")?.attr("content")?.trim()
+            ?: ""
+        val synopsis = cleanSynopsisText(rawDesc).orEmpty()
+        val meta = VideoDetailMetadata(
+            actors = emptyList(),
+            directors = emptyList(),
+            tags = tags,
+            synopsis = synopsis,
+        )
+        return if (meta.hasContent) meta else null
+    }
+
+    private fun splitPeopleTokens(raw: String): List<String> = raw
+        .split(Regex("""[/,，、|;]"""))
+        .map { it.trim() }
+        .filter(::isValidPersonName)
+
+    private fun isValidPersonName(token: String): Boolean {
+        if (token.isBlank() || token.length > 32) return false
+        return token !in setOf("未知", "暂无", "内详", "其它", "其他", "N/A", "-", "--")
+    }
+
+    private fun cleanSynopsisText(raw: String): String? {
+        var text = raw
+            .replace(Regex("""^(?:简介|剧情简介|内容简介)\s*[:：]?\s*"""), "")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+        text = text
+            .replace(Regex("""请记住本站[^。！\n]*[。！]?"""), "")
+            .replace(Regex("""华视影院(?:官方网站|永久域名|备用域名)[^。！\n]*[。！]?"""), "")
+            .replace(Regex("""https?://\S+"""), "")
+            .trim()
+        if (text.isBlank() || text in setOf("暂无", "暂无简介", "未知")) return null
+        return text
     }
 
     internal suspend fun resolveXVideos(pageUrl: String, startedAtMs: Long): PlaybackSource = withContext(Dispatchers.IO) {
@@ -766,6 +1008,7 @@ class PlaybackResolver {
         private val playbackCache = CachedValue<PlaybackSource>(PLAYBACK_CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val huavodPlaybackCache = CachedValue<PlaybackSource>(HUAVOD_PLAYBACK_CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val episodeCache = CachedValue<List<PlaybackEpisode>>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
+        private val detailMetadataCache = CachedValue<VideoDetailMetadata>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val huavodTokenCache = CachedValue<HuavodTokenEntry>(CACHE_TTL_MS, CACHE_MAX_ENTRIES)
         private val huavodInFlight = ConcurrentHashMap<String, Deferred<PlaybackSource>>()
         private val huavodScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

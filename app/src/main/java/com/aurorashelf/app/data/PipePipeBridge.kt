@@ -3,11 +3,14 @@ package com.aurorashelf.app.data
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.SourceCategory
+import com.aurorashelf.app.model.VideoDetailMetadata
 import com.aurorashelf.app.model.VideoItem
 import com.aurorashelf.app.ui.CoverImageLoader
 import java.io.IOException
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import android.util.Log
+import org.jsoup.Jsoup
 import org.schabi.newpipe.extractor.InfoItem
 import org.schabi.newpipe.extractor.ListExtractor
 import org.schabi.newpipe.extractor.NewPipe
@@ -20,6 +23,7 @@ import org.schabi.newpipe.extractor.stream.VideoStream
 /** Adapter between AuroraShelf models and the vendored PipePipe extractors. */
 internal object PipePipeBridge {
     @Volatile private var isInitialized = false
+    private val detailMetadataCache = ConcurrentHashMap<String, VideoDetailMetadata>()
 
     fun loadFeed(baseUrl: String, category: FeedCategory, page: Int): List<VideoItem> {
         return loadFeed(baseUrl, ContentSourceCatalog.category(baseUrl, category), page)
@@ -65,6 +69,7 @@ internal object PipePipeBridge {
     fun resolve(pageUrl: String): PlaybackSource {
         initialize()
         val info = StreamInfo.getInfo(pageUrl)
+        extractAndCacheMetadata(pageUrl, info)
         val directHls = info.hlsUrl.orEmpty().takeIf(String::isNotBlank)
         if (directHls != null) return PlaybackSource(directHls, pageUrl)
         val stream = info.videoStreams
@@ -73,6 +78,45 @@ internal object PipePipeBridge {
             .maxByOrNull { it.qualityScore() }
             ?: throw IOException("该视频源没有提供可播放的视频流")
         return PlaybackSource(stream.content, pageUrl)
+    }
+
+    fun getDetailMetadata(pageUrl: String): VideoDetailMetadata? {
+        detailMetadataCache[pageUrl]?.let { return it }
+        return runCatching {
+            initialize()
+            val info = StreamInfo.getInfo(pageUrl)
+            extractAndCacheMetadata(pageUrl, info)
+        }.getOrNull()
+    }
+
+    private fun extractAndCacheMetadata(pageUrl: String, info: StreamInfo): VideoDetailMetadata? {
+        val directors = info.uploaderName?.trim()
+            ?.takeIf { it.isNotBlank() && it.length <= 40 }
+            ?.let(::listOf)
+            ?: emptyList()
+        val tags = info.tags.orEmpty()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(10)
+        val rawDesc = info.description?.content.orEmpty()
+        val synopsis = if (rawDesc.isNotBlank()) {
+            Jsoup.parse(rawDesc).text().replace(Regex("\\s+"), " ").trim()
+        } else {
+            ""
+        }
+        val meta = VideoDetailMetadata(
+            actors = emptyList(),
+            directors = directors,
+            tags = tags,
+            synopsis = synopsis,
+        )
+        return if (meta.hasContent) {
+            detailMetadataCache[pageUrl] = meta
+            meta
+        } else {
+            null
+        }
     }
 
     @Synchronized

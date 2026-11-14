@@ -142,4 +142,21 @@ final class SwipeBackTests: XCTestCase {
         XCTAssertEqual(controller.view.backgroundColor, .clear, "宿主控制器视图必须保持透明，绝不遮挡底层")
         XCTAssertFalse(controller.view.isUserInteractionEnabled, "宿主视图不得拦截普通用户交互")
     }
+
+    func testPopGestureEnablerPreservesNavigationBarVisibility() {
+        let root = UIViewController()
+        let child = UIViewController()
+        let enabler = PopGestureEnablerController()
+        child.addChild(enabler)
+        child.view.addSubview(enabler.view)
+        enabler.didMove(toParent: child)
+
+        let nav = UINavigationController(rootViewController: root)
+        nav.setNavigationBarHidden(false, animated: false)
+        nav.pushViewController(child, animated: false)
+        _ = enabler.view
+        enabler.viewDidAppear(false)
+
+        XCTAssertFalse(nav.isNavigationBarHidden, "启用侧滑手势不得强制隐藏 UINavigationBar，避免导航栏消失")
+    }
 }

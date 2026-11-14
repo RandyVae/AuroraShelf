@@ -54,11 +54,15 @@ internal class IkmmhComicSource : ComicSource {
 
     override suspend fun details(comic: ComicSummary): ComicDetails = withContext(Dispatchers.IO) {
         IkmmhHttp.warmup(BASE_URL)
-        val url = comic.id.takeIf { it.startsWith("http") } ?: "$BASE_URL/book/${comic.id}.html"
+        val url = when {
+            comic.id.startsWith("http") -> comic.id
+            comic.id.endsWith(".html") -> "$BASE_URL/book/${comic.id.trimStart('/')}"
+            else -> "$BASE_URL/book/${comic.id.trim('/')}/"
+        }
         val document = Jsoup.parse(IkmmhHttp.get(url), BASE_URL)
-        val bookId = url.trimEnd('/').substringAfterLast('/')
+        val bookId = url.trimEnd('/').substringAfterLast('/').substringBefore('.')
         val chapterJson = JSONObject(IkmmhHttp.get(
-            "$BASE_URL/api/comic/zyz/chapters?ph=1&tempid=3&zpid=$bookId&page=0&line=48&orderby=desc",
+            "$BASE_URL/api/comic/zyz/chapters?ph=1&tempid=3&zpid=$bookId&page=0&line=200&orderby=desc",
         ).replace("\\,", ","))
         val chapterArray = chapterJson.optJSONArray("length")
         val chapters = chapterArray?.let { array ->

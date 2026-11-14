@@ -72,6 +72,7 @@ public struct OfflineDownloadsScreen: View {
                     activeComicForReading = nil
                 }
                 .toolbar(.hidden, for: .tabBar)
+                .toolbar(.hidden, for: .navigationBar)
                 .navigationBarBackButtonHidden(true)
             }
             .toolbar {

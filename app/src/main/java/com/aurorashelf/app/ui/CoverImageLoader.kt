@@ -4,6 +4,7 @@ import android.content.Context
 import com.aurorashelf.app.data.VideoRepository
 import java.io.File
 import java.net.URI
+import java.net.URLEncoder
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -20,6 +21,51 @@ internal object CoverImageLoader {
     private val HUANGGUO_CDN_HOSTS = setOf("pic.cuinhri.cn", "pic.zdmhyg.cn", "pic.fisawck.cn")
     private val KNOWN_ENCRYPTED_HOSTS = setOf("pic.cuinhri.cn", "pic.zdmhyg.cn", "pic.fisawck.cn", "pic.drleao.cn")
     private val KNOWN_ENCRYPTED_SITE_HOSTS = setOf("huangguoai.com", "91dongman.net", "91dongman.com")
+    private val HUAVOD_REFERER_HOSTS = listOf(
+        "huavod.com",
+        "huarenlivewebsite.top",
+        "hitv.com",
+        "okokserver.com",
+        "weserv.nl",
+        "hhmage.com",
+        "qpic.cn",
+        "iqiyipic.com",
+        "alicdn.com",
+    )
+    private val DEAD_COVER_HOSTS = listOf("dbzy.tv", "dbzy5.com")
+    private val PLACEHOLDER_COVER_TOKENS = listOf(
+        "tv_default_small",
+        "tv_default_large",
+        "movie_default_small",
+        "movie_default_large",
+        "/cuphead/movie-static/pics/",
+    )
+    private val DOUBAN_SMALL_TOKENS = listOf(
+        "/view/photo/s_ratio_poster/",
+        "/view/photo/m_ratio_poster/",
+        "/view/photo/sqxs/",
+        "/view/photo/ipst/",
+        "/view/photo/thumb/",
+        "/view/photo/small/",
+    )
+    private val DOUBAN_STATIC_COVERS = mapOf(
+        "眩晕" to "https://img9.doubanio.com/view/photo/l_ratio_poster/public/p2932533736.jpg",
+        "给阿嬷的情书" to "https://img3.doubanio.com/view/photo/l_ratio_poster/public/p2931851430.jpg",
+        "地球超新鲜第二季" to "https://img3.doubanio.com/view/photo/l_ratio_poster/public/p2933553320.jpg",
+        "地球超新鲜 第二季" to "https://img3.doubanio.com/view/photo/l_ratio_poster/public/p2933553320.jpg",
+        "寻梦环游记" to "https://img1.doubanio.com/view/photo/l_ratio_poster/public/p2503997609.jpg",
+        "疯狂动物城2" to "https://img9.doubanio.com/view/photo/l_ratio_poster/public/p2928373804.jpg",
+        "霜花店" to "https://img9.doubanio.com/view/photo/l_ratio_poster/public/p453856276.jpg",
+    )
+    private const val DOUBAN_NEGATIVE_SENTINEL = "__NO_DOUBAN_POSTER__"
+    private val doubanUrlCache = ConcurrentHashMap<String, String>()
+    private val doubanClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(4, TimeUnit.SECONDS)
+            .readTimeout(4, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .build()
+    }
     private const val HUANGGUO_HOST = "huangguoai.com"
     private const val CRYPTO_WORKER_PATH = "/static/web/js/plugins/crypto-worker.js"
     private const val CONFIG_TTL_MS = 15 * 60 * 1000L
@@ -72,8 +118,109 @@ internal object CoverImageLoader {
         return clean
     }
 
-    fun load(address: String, referer: String): ByteArray? =
-        loader().load(normalizeThumbnailUrl(address), referer)
+    internal fun upgradeCoverUrl(url: String): String? {
+        val clean = normalizeThumbnailUrl(url)
+        if (clean.isEmpty()) return null
+        val lower = clean.lowercase(Locale.US)
+        if (PLACEHOLDER_COVER_TOKENS.any { lower.contains(it) }) return null
+        if (!lower.contains("doubanio.com") && !lower.contains("douban.com")) return clean
+        var upgraded = clean
+        for (token in DOUBAN_SMALL_TOKENS) {
+            if (upgraded.contains(token, ignoreCase = true)) {
+                upgraded = upgraded.replace(token, "/view/photo/l_ratio_poster/", ignoreCase = true)
+            }
+        }
+        return upgraded
+    }
+
+    internal fun isDeadCoverHost(url: String): Boolean {
+        val lower = url.lowercase(Locale.US)
+        return DEAD_COVER_HOSTS.any { lower.contains(it) }
+    }
+
+    internal fun quickDoubanLookup(title: String?): String? {
+        val clean = normalizeSearchTitle(title.orEmpty())
+        if (clean.isEmpty()) return null
+        DOUBAN_STATIC_COVERS[title.orEmpty().trim()]?.let { return it }
+        DOUBAN_STATIC_COVERS[clean]?.let { return it }
+        val cached = doubanUrlCache[clean]
+        return cached?.takeUnless { it == DOUBAN_NEGATIVE_SENTINEL }
+    }
+
+    private fun normalizeSearchTitle(raw: String): String =
+        raw.trim()
+            .replace(Regex("""\[[^\]]*\]|\([^)]*\)|【[^】]*】"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+
+    internal fun resolveDoubanPosterUrl(title: String): String? {
+        quickDoubanLookup(title)?.let { return it }
+        val clean = normalizeSearchTitle(title)
+        if (clean.length < 2) return null
+        val cached = doubanUrlCache[clean]
+        if (cached == DOUBAN_NEGATIVE_SENTINEL) return null
+        if (cached != null) return cached
+
+        val encoded = URLEncoder.encode(clean, "UTF-8")
+        val request = Request.Builder()
+            .url("https://movie.douban.com/j/subject_suggest?q=$encoded")
+            .header("User-Agent", VideoRepository.USER_AGENT)
+            .header("Referer", "https://movie.douban.com/")
+            .header("Accept", "application/json, text/plain, */*")
+            .build()
+        val resolved = runCatching {
+            doubanClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use null
+                val body = response.body?.string().orEmpty()
+                if (body.isBlank()) return@use null
+                val itemRegex = Regex("""\{[^{}]*"img"\s*:\s*"([^"]+)"[^{}]*\}""")
+                val typeRegex = Regex(""""type"\s*:\s*"([^"]+)"""")
+                var fallbackUrl: String? = null
+                for (match in itemRegex.findAll(body)) {
+                    val rawImg = match.groupValues[1].replace("\\/", "/")
+                    val candidate = upgradeCoverUrl(rawImg) ?: continue
+                    val type = typeRegex.find(match.value)?.groupValues?.getOrNull(1).orEmpty()
+                    if (type == "movie" || type == "tv") {
+                        return@use candidate
+                    }
+                    if (fallbackUrl == null) fallbackUrl = candidate
+                }
+                fallbackUrl
+            }
+        }.getOrNull()
+
+        doubanUrlCache[clean] = resolved ?: DOUBAN_NEGATIVE_SENTINEL
+        return resolved
+    }
+
+    @JvmOverloads
+    fun load(address: String, referer: String, title: String? = null): ByteArray? {
+        val normalized = normalizeThumbnailUrl(address)
+        val upgraded = upgradeCoverUrl(normalized)
+        val isDeadOrPlaceholder = upgraded == null || isDeadCoverHost(normalized)
+
+        if (isDeadOrPlaceholder && !title.isNullOrBlank()) {
+            resolveDoubanPosterUrl(title)?.let { doubanUrl ->
+                loader().load(doubanUrl, "https://movie.douban.com/")?.let { return it }
+            }
+        }
+
+        val primaryUrl = upgraded ?: normalized
+        if (primaryUrl.isNotBlank()) {
+            loader().load(primaryUrl, referer)?.let { return it }
+        }
+
+        if (!title.isNullOrBlank() &&
+            (referer.contains("huavod.com", ignoreCase = true) || isDeadOrPlaceholder)
+        ) {
+            resolveDoubanPosterUrl(title)?.let { doubanUrl ->
+                if (doubanUrl != primaryUrl) {
+                    loader().load(doubanUrl, "https://movie.douban.com/")?.let { return it }
+                }
+            }
+        }
+        return null
+    }
 
     private fun loader(): CoverLoader = sharedLoader ?: synchronized(loaderLock) {
         sharedLoader ?: CoverLoader(
@@ -104,6 +251,20 @@ internal object CoverImageLoader {
         val origin = "${uri.scheme}://${uri.host}${if (uri.port >= 0) ":${uri.port}" else ""}"
         referer to origin
     }.getOrNull()
+
+    internal fun decryptPayloadIfNeeded(
+        payload: ByteArray,
+        address: String,
+        referer: String? = null,
+    ): ByteArray {
+        if (looksLikeImage(payload)) return payload
+        if (!isEncryptedCover(address, referer) && payload.size < AES_BLOCK_SIZE) return payload
+        val huangguoCover = isHuangguoCover(address, referer)
+        val cryptoConfig = if (huangguoCover) currentConfig(referer.orEmpty()) else FALLBACK_CONFIG
+        return decryptIfNeeded(payload, cryptoConfig)
+            ?: decryptIfNeeded(payload, FALLBACK_CONFIG)
+            ?: payload
+    }
 
     private fun decryptIfNeeded(payload: ByteArray, config: CryptoConfig): ByteArray? {
         // The CDN can return an ordinary image for cached/legacy covers. Only run AES
@@ -181,6 +342,14 @@ internal object CoverImageLoader {
         val encryptedCover = isEncryptedCover(normalizedAddress, referer)
         val cryptoConfig = if (huangguoCover) currentConfig(referer) else FALLBACK_CONFIG
         val isMissAvCover = isMissAvCoverRequest(normalizedAddress, referer)
+        val lowerAddr = normalizedAddress.lowercase(Locale.US)
+        val lowerRef = referer.lowercase(Locale.US)
+        val isDoubanCover = lowerAddr.contains("doubanio.com") || lowerAddr.contains("douban.com")
+        val isHuavodCover = !isDoubanCover && (
+            HUAVOD_REFERER_HOSTS.any { lowerAddr.contains(it) } ||
+                lowerRef.contains("huavod.com")
+            )
+
         val request = Request.Builder()
             .url(normalizedAddress)
             .header("Accept", ACCEPT_HEADER)
@@ -193,6 +362,12 @@ internal object CoverImageLoader {
                 if (huangguoCover) {
                     header("Referer", "https://huangguoai.com/")
                     header("Origin", "https://huangguoai.com")
+                } else if (isDoubanCover) {
+                    header("Referer", "https://movie.douban.com/")
+                    removeHeader("Origin")
+                } else if (isHuavodCover) {
+                    header("Referer", "https://huavod.com/")
+                    header("Origin", "https://huavod.com")
                 } else if (referer.contains("91dongman") || normalizedAddress.contains("drleao.cn")) {
                     header("Referer", "https://91dongman.net/")
                     header("Origin", "https://91dongman.net")
@@ -205,16 +380,33 @@ internal object CoverImageLoader {
                 }
             }
             .build()
-        return httpClient.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return@use null
-            val bytes = response.body?.bytes() ?: return@use null
-            if (looksLikeImage(bytes)) return@use bytes
-            if (encryptedCover || bytes.size >= AES_BLOCK_SIZE) {
-                decryptIfNeeded(bytes, cryptoConfig)
-                    ?: decryptIfNeeded(bytes, FALLBACK_CONFIG)
-            } else {
-                null
-            }
+        val primaryBytes = executeCoverRequest(request, cryptoConfig, encryptedCover)
+        if (primaryBytes != null) return primaryBytes
+
+        if (isHuavodCover) {
+            val bareRequest = Request.Builder()
+                .url(normalizedAddress)
+                .header("Accept", ACCEPT_HEADER)
+                .header("User-Agent", VideoRepository.USER_AGENT)
+                .build()
+            return executeCoverRequest(bareRequest, cryptoConfig, encryptedCover)
+        }
+        return null
+    }
+
+    private fun executeCoverRequest(
+        request: Request,
+        cryptoConfig: CryptoConfig,
+        encryptedCover: Boolean,
+    ): ByteArray? = httpClient.newCall(request).execute().use { response ->
+        if (!response.isSuccessful) return@use null
+        val bytes = response.body?.bytes() ?: return@use null
+        if (looksLikeImage(bytes)) return@use bytes
+        if (encryptedCover || bytes.size >= AES_BLOCK_SIZE) {
+            decryptIfNeeded(bytes, cryptoConfig)
+                ?: decryptIfNeeded(bytes, FALLBACK_CONFIG)
+        } else {
+            null
         }
     }
 

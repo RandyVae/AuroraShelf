@@ -403,4 +403,51 @@ class PlaybackResolverTest {
         )
         assertNull(resolver.parse(previewOnlyPage))
     }
+
+    @Test fun huavodParseDetailMetadataExtractsCastIntroYearAreaAndTags() {
+        val resolver = PlaybackResolver()
+        val doc = Jsoup.parse(
+            """
+            <html>
+              <head>
+                <meta name="keywords" content="折月亮,主演:林一 #卢昱晓 #李歌洋 #导演:张博昱" />
+              </head>
+              <body>
+                <div class="slide-info-remarks"><span>2026</span>&nbsp;<span>大陆</span>&nbsp;剧情 爱情</div>
+                <div class="detail-info">
+                  <li>导演：<a href="/d/1">张博昱</a></li>
+                  <li>演员：<a href="/a/1">林一</a> / <a href="/a/2">卢昱晓</a></li>
+                </div>
+                <div id="height_limit" class="text cor3">社恐少女与天才少年双向奔赴的浪漫故事。请记住本站永久域名 https://huavod.com。</div>
+              </body>
+            </html>
+            """.trimIndent(),
+            "https://huavod.com/voddetail/204741.html",
+        )
+        val meta = resolver.parseHuavodDetailMetadata(doc)
+        assertNotNull(meta)
+        assertEquals(listOf("张博昱"), meta!!.directors)
+        assertEquals(listOf("林一", "卢昱晓"), meta.actors)
+        assertEquals("2026", meta.year)
+        assertEquals("大陆", meta.area)
+        assertEquals(listOf("剧情", "爱情"), meta.tags)
+        assertEquals("社恐少女与天才少年双向奔赴的浪漫故事。", meta.synopsis)
+    }
+
+    @Test fun huavodParseDetailMetadataHandlesSlashSpansAndMultipleActors() {
+        val resolver = PlaybackResolver()
+        val doc = Jsoup.parse(
+            """
+            <div class="detail-info">
+              <div class="slide-info hide"><strong class="r6">导演 :</strong><a href="/d/1">杨龙</a></div>
+              <div class="slide-info hide"><strong class="r6">演员 :</strong><a href="/a/1">田曦薇</a><span class="slash">/</span><a href="/a/2">闫桉</a><span class="slash">/</span><a href="/a/3">王一楠</a><span class="slash">/</span><a href="/a/4">林一</a></div>
+            </div>
+            """.trimIndent(),
+            "https://huavod.com/voddetail/204173.html",
+        )
+        val meta = resolver.parseHuavodDetailMetadata(doc)
+        assertNotNull(meta)
+        assertEquals(listOf("杨龙"), meta!!.directors)
+        assertEquals(listOf("田曦薇", "闫桉", "王一楠", "林一"), meta.actors)
+    }
 }

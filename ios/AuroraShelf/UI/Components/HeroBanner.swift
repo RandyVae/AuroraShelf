@@ -108,11 +108,11 @@ public struct HeroBanner: View {
     @ViewBuilder
     private func heroSlide(for videoItem: VideoItem, pull: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
-            // 背景封面海报：沉浸式充满视口，支持 Apple TV 原生下拉橡皮筋视差缩放（Stretch Parallax）
+            // 背景封面海报：沉浸式充满视口，优先使用华视高清横幅大图，支持 Apple TV 原生下拉橡皮筋视差缩放（Stretch Parallax）
             Color.clear
                 .overlay(
                     AuroraCoverImage(
-                        url: videoItem.coverUrl,
+                        url: videoItem.heroCoverUrl ?? videoItem.coverUrl,
                         title: videoItem.title,
                         sourceBaseURL: videoItem.coverBaseURL,
                         aspectRatio: nil,

@@ -216,6 +216,24 @@ class CoverImageLoaderTest {
         assertTrue(CoverImageLoader.isEncryptedCover("https://91dongman.net/static/cover.jpg"))
     }
 
+    @Test
+    fun upgradesDoubanPosterUrlsAndFiltersPlaceholders() {
+        assertEquals(
+            "https://img9.doubanio.com/view/photo/l_ratio_poster/public/p2932533736.jpg",
+            CoverImageLoader.upgradeCoverUrl("https://img9.doubanio.com/view/photo/s_ratio_poster/public/p2932533736.jpg"),
+        )
+        assertEquals(
+            "https://img3.doubanio.com/view/photo/l_ratio_poster/public/p2931851430.jpg",
+            CoverImageLoader.upgradeCoverUrl("https://img3.doubanio.com/view/photo/m_ratio_poster/public/p2931851430.jpg"),
+        )
+        assertEquals(
+            null,
+            CoverImageLoader.upgradeCoverUrl("https://img1.doubanio.com/cuphead/movie-static/pics/tv_default_small.png"),
+        )
+        assertTrue(CoverImageLoader.isDeadCoverHost("https://dbzy.tv/upload/vod/1.jpg"))
+        assertTrue(CoverImageLoader.isDeadCoverHost("https://dbzy5.com/upload/vod/2.jpg"))
+    }
+
     private fun newLoader(cache: CoverCache, fetcher: CoverFetcher): CoverLoader = CoverLoader(
         cache = cache,
         fetcher = fetcher,

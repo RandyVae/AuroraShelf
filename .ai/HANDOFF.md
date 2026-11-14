@@ -1,4 +1,23 @@
-## 最新交接：2026-11-14 — 新增无广告极速长视频源 134X（134x.com）双端原生接入与 Release 验证交付 · v2.16.29 (Build 255)
+## 最新交接：2026-11-14 — 漫画卡死与导航恢复、全源修复、平板直播双栏、华视高清封面与演员表/简介匹配 · v2.16.30 (Build 256)
+
+- **范围**：
+  - 响应 Randy 需求：「iPad 直播详情页没做视频详情页那种 YouTube 布局适配；华视的大封面要求高清，然后视频详情页要匹配演员表和基本的介绍；部分源存在无法加载的情况；漫画 bug 严重，部分漫画点进去没能加载的话，页面会卡死，导航栏消失，其他漫画也无法打开」。
+  1. **漫画防卡死、取消与导航保留（双端）**：
+     - Android（[ComicScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ComicScreen.kt)、[ComicViewModel.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ComicViewModel.kt)、[ComicRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/comic/ComicRepository.kt)）与 iOS（[ComicsScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/ComicsScreen.swift)、[ComicReaderView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Comic/ComicReaderView.swift)、[ComicRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Comic/ComicRepository.swift)）消除章节/详情加载阻塞锁死与底栏消失缺陷，支持加载中随时取消/返回并顺利切入其他漫画。
+  2. **平板直播双栏适配与 iPad 状态栏安全区避让**：
+     - Android [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt) 与 iOS [LiveDetailView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LiveDetailView.swift) 对齐 YouTube 式平板横屏双栏（左播放器/主播栏，右实时互动与更多直播推荐）；
+     - 修复 iPad 非全屏态 [LivePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LivePlayerView.swift)、[LiveDetailView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LiveDetailView.swift) 与 [VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift) 顶部状态栏重叠（`needsTopOffset = !isFullScreen && (!isLandscape || isPad)` ＋ `+ safeTop`）。
+  3. **华视高清封面、去伪标签与演员表/基本介绍精准解析**：
+     - 修复 `.slide-time-img3` 单引号正则匹配与 Douban 高清封面兜底；
+     - 过滤 `<a class="time-title hide ft4">` 片名误作评分显示的问题（仅采信 `<i/span>` 或 `.public-list-prb` 纯数字评分）；
+     - 修复 `<span class="slash">/</span>` 导致的华视详情页演员表只显示第一人的截断问题，并补充回归单测（`CoverImageLoaderTests.swift`、`VideoRepositoryTest.kt`、`PlaybackResolverTest.kt`）。
+  4. **实测、测试与发布状态（v2.16.30 Build 256）**：
+     - 末次编辑后构建与单测：Android `./gradlew testDebugUnitTest lintDebug assembleRelease` 通过（42 套件 257 项：0 失败 0 错误 8 跳过；`lintDebug` 0 error，HTML 报告 19 warnings；`dist/Netgrey.apk` `206,876,555` bytes）；iOS `AuroraShelfTests` 通过（177 项：0 失败 7 跳过）＋ Simulator `Release` 编译通过；
+     - Release 级模拟器实测截图确认：iPhone 华视多人演员表与高清推荐封面、iPad 直播状态栏零重叠、iPhone 91 动漫阅读器、Android R8 APK 华视详情（演员表/基本介绍/标签）与 `1800x2560` 平板横屏双栏直播、Android 漫画取消/返回/换看全通；
+     - 全源实测基线（本轮专项探针）：iOS 9/9 无鉴权漫画、7/7 论坛、2/2 可用直播、19/20 视频与 `134x` 通过；Android 19/20 视频、9/9 无鉴权漫画（3 分类）、10 项论坛通过；外部受限：`JAVSB`（TLS 断连）、`SpankBang`（HTTP 403）、`哔咔`（需鉴权配置）、`Chaturbate`（上游空流）、Node `jm` 脚本缺密钥（401）；
+     - OTA 与版本同步：版本号全面升级至 `2.16.30 / Build 256`，`./scripts/publish_ota.sh Release` 完成 `https://bananarey.us` 原子覆盖（`Netgrey.apk` `206,876,555` bytes / `Netgrey.ipa` `202,630,841` bytes，HTTPS `200 OK`，远端磁盘可用 `11G`）。
+
+## 历史交接：2026-11-14 — 新增无广告极速长视频源 134X（134x.com）双端原生接入与 Release 验证交付 · v2.16.29 (Build 255)
 
 - **范围**：
   - 响应 Randy 需求：「新增一个视频源 `134x.com`，这个网站没有广告加载也快」，完成 `134x.com` 协议分析、Android/iOS/iPadOS 原生适配器接入、多端 Release 级模拟器实测与 `v2.16.29 (Build 255)` 发布。

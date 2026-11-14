@@ -64,28 +64,28 @@ public struct ComicVisualSpec: Sendable {
                 gradientColors: [Color(rgb: 0x01579B), Color(rgb: 0x0288D1)],
                 accentColor: Color(rgb: 0x81D4FA)
             )
-        case "copycomic":
+        case "copy", "copycomic":
             // 拷贝漫画：暗曜紫罗兰
             return ComicVisualSpec(
                 iconName: "books.vertical.fill",
                 gradientColors: [Color(rgb: 0x311B92), Color(rgb: 0x5E35B1)],
                 accentColor: Color(rgb: 0xB39DDB)
             )
-        case "91dongman":
+        case "dongman91", "91dongman":
             // 91动漫：二次元电光紫品红
             return ComicVisualSpec(
                 iconName: "sparkles.tv.fill",
                 gradientColors: [Color(rgb: 0x4A148C), Color(rgb: 0x8E24AA)],
                 accentColor: Color(rgb: 0xCE93D8)
             )
-        case "eightMuses":
+        case "8muses", "eightMuses":
             // 8Muses：暗夜翡翠森林绿
             return ComicVisualSpec(
                 iconName: "photo.on.rectangle.angled",
                 gradientColors: [Color(rgb: 0x1B5E20), Color(rgb: 0x388E3C)],
                 accentColor: Color(rgb: 0xA5D6A7)
             )
-        case "gedeComix":
+        case "gedecomix", "gedeComix":
             // GedeComix：黑曜石现代极简灰
             return ComicVisualSpec(
                 iconName: "square.grid.2x2.fill",
@@ -568,6 +568,7 @@ public struct ComicsScreen: View {
                     ComicPlatformsShelf(
                         currentSource: repo.currentSource,
                         onSelect: { source in
+                            cancelComicDetailsLoad()
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 repo.switchSource(to: source)
                             }
@@ -653,6 +654,7 @@ public struct ComicsScreen: View {
                 activeComicForReading = nil
             }
             .toolbar(.hidden, for: .tabBar)
+            .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
         }
         .alert("无法打开漫画", isPresented: Binding(
@@ -670,10 +672,41 @@ public struct ComicsScreen: View {
         }
         .overlay {
             if detailLoadingState.isLoading {
-                ProgressView("正在加载章节…")
+                ZStack {
+                    Color.black.opacity(0.32)
+                        .ignoresSafeArea()
+                        .contentShape(Rectangle())
+                        .onTapGesture { }
+
+                    VStack(spacing: AuroraMetrics.spacingM) {
+                        ProgressView("正在加载章节…")
+                        if let title = selectedComicForRetry?.title, !title.isEmpty {
+                            Text(title)
+                                .font(.caption)
+                                .foregroundStyle(AuroraColor.textSecondary)
+                                .lineLimit(2)
+                                .multilineTextAlignment(.center)
+                        }
+                        Button("取消", role: .cancel) {
+                            cancelComicDetailsLoad()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: 260)
                     .padding(AuroraMetrics.spacingXL)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius))
+                }
             }
+        }
+        .onChange(of: repo.currentSource.id) { _, _ in
+            cancelComicDetailsLoad()
+            detailError = nil
+            selectedComicForRetry = nil
+        }
+        .onChange(of: repo.selectedCategory) { _, _ in
+            cancelComicDetailsLoad()
+            detailError = nil
+            selectedComicForRetry = nil
         }
         .sheet(isPresented: $showPicacgLogin) {
             picacgLoginSheet

@@ -233,11 +233,12 @@ internal fun NativeSitePlayer(
             val http = DefaultHttpDataSource.Factory().setUserAgent(VideoRepository.USER_AGENT)
                 .setConnectTimeoutMs(15_000).setReadTimeoutMs(20_000)
                 .setDefaultRequestProperties(
-                    mapOf(
-                        "Referer" to source.referer,
-                        "Origin" to originOf(source.referer),
-                        "Accept" to "*/*",
-                    ),
+                    buildMap {
+                        put("Referer", source.referer)
+                        put("Origin", originOf(source.referer))
+                        put("Accept", "*/*")
+                        putAll(source.extraHeaders)
+                    },
                 )
             val cachedDataSource = cacheManager.playbackDataSourceFactory(http)
             val item = MediaItem.Builder()

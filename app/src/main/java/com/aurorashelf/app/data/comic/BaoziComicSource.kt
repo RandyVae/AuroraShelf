@@ -90,12 +90,34 @@ internal class BaoziComicSource : ComicSource {
             chapterId.startsWith("/") -> ComicHttp.resolve(BASE_URL, chapterId) ?: "$BASE_URL$chapterId"
             else -> "$BASE_URL/comic/chapter/${comic.id}/0_$chapterId.html"
         }
-        val response = ComicHttp.getResponse(targetUrl)
-        val finalUrl = response.finalUrl.ifBlank { targetUrl }
-        val document = Jsoup.parse(response.body, finalUrl)
+        val headers = mapOf("Referer" to "$BASE_URL/comic/${comic.id}")
+        var response = ComicHttp.getResponse(targetUrl, headers)
+        var effectiveUrl = response.finalUrl.ifBlank { targetUrl }
+        if (response.status == 404) {
+            val fallbackUri = runCatching {
+                val parsed = java.net.URI(targetUrl)
+                java.net.URI(
+                    "https",
+                    parsed.rawUserInfo,
+                    FALLBACK_HOST,
+                    parsed.port,
+                    parsed.rawPath,
+                    parsed.rawQuery,
+                    parsed.rawFragment,
+                ).toString()
+            }.getOrNull()
+            if (!fallbackUri.isNullOrBlank() && fallbackUri != targetUrl) {
+                response = ComicHttp.getResponse(fallbackUri, mapOf("Referer" to "https://$FALLBACK_HOST/"))
+                effectiveUrl = response.finalUrl.ifBlank { fallbackUri }
+            }
+        }
+        if (response.status !in 200..299) {
+            throw java.io.IOException("包子漫画章节返回 HTTP ${response.status}")
+        }
+        val document = Jsoup.parse(response.body, effectiveUrl)
         document.select("ul.comic-contain amp-img, ul.comic-contain img").mapNotNull { element ->
             val src = element.attr("src").ifBlank { element.attr("data-src") }
-            ComicHttp.resolve(finalUrl, src)?.let { ComicPage(it, finalUrl) }
+            ComicHttp.resolve(effectiveUrl, src)?.let { ComicPage(it, effectiveUrl) }
         }
     }
 
@@ -114,5 +136,6 @@ internal class BaoziComicSource : ComicSource {
 
     private companion object {
         const val BASE_URL = "https://cn.webmota.com"
+        const val FALLBACK_HOST = "cn.twbzmg.com"
     }
 }

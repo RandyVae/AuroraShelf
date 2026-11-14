@@ -333,6 +333,11 @@ private extension UIView {
 public final class PopGestureEnablerController: UIViewController {
     weak var coordinator: NavigationPopCoordinator?
     var isEnabled: Bool = true
+    private weak var attachedNavigationController: UINavigationController?
+    private weak var previousPopDelegate: UIGestureRecognizerDelegate?
+    private var previousPopEnabled: Bool?
+    private weak var previousContentPopDelegate: UIGestureRecognizerDelegate?
+    private var previousContentPopEnabled: Bool?
 
     public override func viewDidLoad() {
         super.viewDidLoad()
@@ -342,33 +347,26 @@ public final class PopGestureEnablerController: UIViewController {
 
     public override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        if let nav = findNavigationController() {
-            nav.setNavigationBarHidden(true, animated: animated)
-        }
         attachPopGesture()
     }
 
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        if let nav = findNavigationController() {
-            nav.setNavigationBarHidden(true, animated: false)
-        }
         attachPopGesture()
     }
 
     public override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        if let nav = findNavigationController(), nav.viewControllers.count <= 2 {
-            nav.setNavigationBarHidden(false, animated: animated)
-        }
+        restorePopGesture()
     }
 
     public override func didMove(toParent parent: UIViewController?) {
         super.didMove(toParent: parent)
-        if let nav = findNavigationController() {
-            nav.setNavigationBarHidden(true, animated: false)
+        if parent == nil {
+            restorePopGesture()
+        } else {
+            attachPopGesture()
         }
-        attachPopGesture()
     }
 
     func updatePopState(isEnabled: Bool) {
@@ -378,16 +376,48 @@ public final class PopGestureEnablerController: UIViewController {
     }
 
     private func attachPopGesture() {
-        guard let nav = findNavigationController() else { return }
+        guard let nav = findNavigationController(), nav.viewControllers.count > 1 else {
+            restorePopGesture()
+            return
+        }
+        if attachedNavigationController !== nav {
+            restorePopGesture()
+            attachedNavigationController = nav
+            previousPopDelegate = nav.interactivePopGestureRecognizer?.delegate
+            previousPopEnabled = nav.interactivePopGestureRecognizer?.isEnabled
+            if #available(iOS 26.0, *) {
+                previousContentPopDelegate = nav.interactiveContentPopGestureRecognizer?.delegate
+                previousContentPopEnabled = nav.interactiveContentPopGestureRecognizer?.isEnabled
+            }
+        }
+        // 不覆盖 nav.delegate：保留 SwiftUI NavigationStack 内部协调器以同步 .navigationDestination(item:) 绑定，
+        // 也不在此强制调用 setNavigationBarHidden，避免切换页面或返回后导航栏异常消失。
         coordinator?.navigationController = nav
-        nav.delegate = coordinator
-        nav.setNavigationBarHidden(true, animated: false)
         nav.interactivePopGestureRecognizer?.isEnabled = isEnabled
-        nav.interactivePopGestureRecognizer?.delegate = isEnabled ? coordinator : nil
+        nav.interactivePopGestureRecognizer?.delegate = isEnabled ? coordinator : previousPopDelegate
         if #available(iOS 26.0, *) {
             nav.interactiveContentPopGestureRecognizer?.isEnabled = isEnabled
-            nav.interactiveContentPopGestureRecognizer?.delegate = isEnabled ? coordinator : nil
+            nav.interactiveContentPopGestureRecognizer?.delegate = isEnabled ? coordinator : previousContentPopDelegate
         }
+    }
+
+    private func restorePopGesture() {
+        guard let nav = attachedNavigationController else { return }
+        if let previousPopEnabled {
+            nav.interactivePopGestureRecognizer?.isEnabled = previousPopEnabled
+        }
+        nav.interactivePopGestureRecognizer?.delegate = previousPopDelegate
+        if #available(iOS 26.0, *) {
+            if let previousContentPopEnabled {
+                nav.interactiveContentPopGestureRecognizer?.isEnabled = previousContentPopEnabled
+            }
+            nav.interactiveContentPopGestureRecognizer?.delegate = previousContentPopDelegate
+        }
+        attachedNavigationController = nil
+        previousPopDelegate = nil
+        previousPopEnabled = nil
+        previousContentPopDelegate = nil
+        previousContentPopEnabled = nil
     }
 
     private func findNavigationController() -> UINavigationController? {
@@ -480,7 +510,6 @@ public final class NavigationPopCoordinator: NSObject, UIGestureRecognizerDelega
         animated: Bool
     ) {
         if navigationController.viewControllers.count > 1 {
-            navigationController.setNavigationBarHidden(true, animated: false)
             navigationController.interactivePopGestureRecognizer?.isEnabled = isEnabled
             navigationController.interactivePopGestureRecognizer?.delegate = isEnabled ? self : nil
             if #available(iOS 26.0, *) {

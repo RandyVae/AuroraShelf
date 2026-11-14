@@ -11,8 +11,8 @@ actor ComicPageImageLoader {
 
     private init() {
         let configuration = URLSessionConfiguration.default
-        configuration.timeoutIntervalForRequest = 20
-        configuration.timeoutIntervalForResource = 45
+        configuration.timeoutIntervalForRequest = 15
+        configuration.timeoutIntervalForResource = 25
         session = URLSession.permissive(configuration: configuration)
         cache.countLimit = 32
         cache.totalCostLimit = 80 * 1024 * 1024 // 80 MB 内存上限
@@ -32,27 +32,44 @@ actor ComicPageImageLoader {
     }
 
     func load(_ page: ComicPage) async throws -> UIImage {
+        try Task.checkCancellation()
         if let image = cache.object(forKey: page.id as NSString) { return image }
-        if let ongoing = inFlightTasks[page.id] {
-            return try await ongoing.task.value
+        let taskToken: UUID
+        let task: Task<UIImage, Error>
+        if let ongoing = inFlightTasks[page.id], !ongoing.task.isCancelled {
+            taskToken = ongoing.id
+            task = ongoing.task
+        } else {
+            let newToken = UUID()
+            let created = Task<UIImage, Error> {
+                try await self.performLoad(page)
+            }
+            inFlightTasks[page.id] = (id: newToken, task: created)
+            taskToken = newToken
+            task = created
         }
 
-        let taskToken = UUID()
-        let task = Task<UIImage, Error> {
-            try await self.performLoad(page)
-        }
-
-        inFlightTasks[page.id] = (id: taskToken, task: task)
         defer {
             if inFlightTasks[page.id]?.id == taskToken {
                 inFlightTasks[page.id] = nil
             }
         }
 
-        let result = try await task.value
-        let cost = result.cgImage.map { $0.bytesPerRow * $0.height } ?? 1024
-        cache.setObject(result, forKey: page.id as NSString, cost: cost)
-        return result
+        do {
+            let result = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            let cost = result.cgImage.map { $0.bytesPerRow * $0.height } ?? 1024
+            cache.setObject(result, forKey: page.id as NSString, cost: cost)
+            return result
+        } catch {
+            if inFlightTasks[page.id]?.id == taskToken {
+                inFlightTasks[page.id] = nil
+            }
+            throw error
+        }
     }
 
     private func performLoad(_ page: ComicPage) async throws -> UIImage {

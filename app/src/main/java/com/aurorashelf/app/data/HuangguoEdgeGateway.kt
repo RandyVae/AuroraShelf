@@ -2,6 +2,7 @@ package com.aurorashelf.app.data
 
 import android.util.Log
 import com.aurorashelf.app.model.FeedCategory
+import com.aurorashelf.app.model.VideoDetailMetadata
 import com.aurorashelf.app.model.VideoItem
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -9,6 +10,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.net.URLEncoder
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 /**
@@ -24,6 +26,101 @@ object HuangguoEdgeGateway {
     const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+    private val detailMetadataCache = ConcurrentHashMap<String, VideoDetailMetadata>()
+
+    fun cachedDetailMetadata(dramaId: String): VideoDetailMetadata? = detailMetadataCache[dramaId]
+
+    fun fetchDetails(
+        origin: String = DEFAULT_ORIGIN,
+        dramaId: String,
+    ): VideoDetailMetadata? {
+        detailMetadataCache[dramaId]?.let { return it }
+        val normalizedOrigin = origin.trimEnd('/')
+        val jsonStr = executeEdgeRequest(
+            origin = normalizedOrigin,
+            method = "GET",
+            path = "/api/videos/$dramaId",
+        ) ?: return null
+        return runCatching {
+            val data = JSONObject(jsonStr).optJSONObject("data") ?: return@runCatching null
+            parseDetailMetadata(data, dramaId)
+        }.getOrNull()
+    }
+
+    private fun parseDetailMetadata(data: JSONObject, dramaId: String): VideoDetailMetadata? {
+        val actors = mutableListOf<String>()
+        val actorsArr = data.optJSONArray("actors")
+        if (actorsArr != null) {
+            for (i in 0 until actorsArr.length()) {
+                val item = actorsArr.opt(i)
+                val name = when (item) {
+                    is JSONObject -> item.optString("name").trim()
+                    is String -> item.trim()
+                    else -> ""
+                }
+                if (name.isNotBlank() && name.length <= 32 && name !in actors) actors += name
+            }
+        } else {
+            val actorsStr = data.optString("actors").trim()
+            if (actorsStr.isNotBlank()) {
+                actorsStr.split(Regex("[/,，、|;]"))
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() && it !in listOf("未知", "暂无") && it.length <= 32 }
+                    .forEach { if (it !in actors) actors += it }
+            }
+        }
+
+        val directors = mutableListOf<String>()
+        data.optJSONObject("author")?.optString("name")?.trim()?.takeIf { it.isNotBlank() }?.let {
+            directors += it
+        }
+        data.optString("director").trim().takeIf { it.isNotBlank() }?.let { dirStr ->
+            dirStr.split(Regex("[/,，、|;]"))
+                .map { it.trim() }
+                .filter { it.isNotBlank() && it !in directors }
+                .forEach { directors += it }
+        }
+
+        val tags = mutableListOf<String>()
+        data.optJSONArray("tags")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val item = arr.opt(i)
+                val tag = when (item) {
+                    is JSONObject -> item.optString("name").trim()
+                    is String -> item.trim()
+                    else -> ""
+                }
+                if (tag.isNotBlank() && tag !in tags) tags += tag
+            }
+        }
+
+        val year = data.optString("year").trim().takeIf { it.matches(Regex("\\d{4}")) }
+            ?: data.optString("created_at").trim().takeIf { it.length >= 4 && it.take(4).all(Char::isDigit) }?.take(4)
+            ?: ""
+        val area = data.optString("area").ifBlank { data.optString("region") }.trim()
+        val synopsis = data.optString("description")
+            .ifBlank { data.optString("intro") }
+            .ifBlank { data.optString("synopsis") }
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .takeIf { it.isNotBlank() && it != "暂无" }
+            ?: ""
+
+        val meta = VideoDetailMetadata(
+            actors = actors.take(24),
+            directors = directors.take(8),
+            year = year,
+            area = area,
+            tags = tags.take(10),
+            synopsis = synopsis,
+        )
+        return if (meta.hasContent) {
+            detailMetadataCache[dramaId] = meta
+            meta
+        } else {
+            null
+        }
+    }
 
     internal var client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
@@ -89,6 +186,7 @@ object HuangguoEdgeGateway {
         return runCatching {
             val root = JSONObject(jsonStr)
             val data = root.optJSONObject("data") ?: return null
+            parseDetailMetadata(data, dramaId)
             val episodesArray = data.optJSONArray("episodes")
             val episodesList = mutableListOf<PlaybackEpisode>()
 
