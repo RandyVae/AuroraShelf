@@ -19,7 +19,10 @@ object SourceAddress {
 
     fun resolve(base: String, reference: String): String? = runCatching {
         if (reference.isBlank()) return null
-        val uri = URI(base).resolve(reference.trim())
+        val sanitized = reference.trim()
+            .replace("\u3000", "%E3%80%80")
+            .replace(" ", "%20")
+        val uri = URI(base).resolve(sanitized)
         uri.toString().takeIf { uri.scheme in setOf("https", "http") && !uri.host.isNullOrBlank() && uri.rawUserInfo == null }
     }.getOrNull()
 }

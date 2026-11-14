@@ -30,8 +30,8 @@ public struct ForumBoardVisualSpec: Sendable {
                 gradientColors: [Color(rgb: 0x1B5E20), Color(rgb: 0x2E7D32)],
                 accentColor: Color(rgb: 0x81C784)
             )
-        case 16, 33:
-            // 达盖尔的旗帜 / 唯美摄影：深海孔雀绿
+        case 16:
+            // 唯美摄影：深海孔雀绿
             return ForumBoardVisualSpec(
                 iconName: "photo.artframe",
                 gradientColors: [Color(rgb: 0x004D40), Color(rgb: 0x00695C)],

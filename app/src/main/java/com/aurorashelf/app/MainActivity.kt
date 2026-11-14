@@ -13,7 +13,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,11 +48,10 @@ class MainActivity : ComponentActivity() {
                 mutableStateOf(!BuildConfig.DEBUG && preferences.introAnimationEnabled)
             }
             var introSoundEnabled by remember { mutableStateOf(preferences.introSoundEnabled) }
-            // The intro owns the first frames; the app is composed once the lockup is reached so its
-            // heavy first composition cannot stall the opening (or when the user skips).
-            // Compose the real surface immediately. The intro remains a covering layer, so feed
-            // layout and first-frame work can progress while the film is playing.
-            var appVisible by rememberSaveable { mutableStateOf(true) }
+            // The intro owns the first frames so its H.264 decoder and RenderThread never
+            // contend with Home's initial composition or ViewModel initialization; PostIntroVeil
+            // bridges the brief frame gap when the app reveals after the intro or a tap-skip.
+            var appVisible by rememberSaveable { mutableStateOf(!introVisible) }
             // The veil covers the app's first composition; it only exists after the intro.
             var veilVisible by rememberSaveable { mutableStateOf(false) }
             var appDrawn by remember { mutableStateOf(!introVisible) }
@@ -63,28 +61,32 @@ class MainActivity : ComponentActivity() {
                     veilVisible = false
                 }
             }
-            SideEffect {
+            var introShownAtLaunch by rememberSaveable { mutableStateOf(introVisible) }
+            LaunchedEffect(introVisible) {
                 WindowCompat.getInsetsController(window, window.decorView).apply {
-                    // Full-bleed cinema: hide system bars during the film and restore afterwards.
+                    // Full-bleed cinema: hide system bars during the film and restore visibility
+                    // once it finishes; AuroraShelfApp owns per-destination light/dark bar styling.
                     if (introVisible) {
+                        introShownAtLaunch = true
                         isAppearanceLightStatusBars = false
                         isAppearanceLightNavigationBars = false
                         hide(WindowInsetsCompat.Type.systemBars())
                         systemBarsBehavior =
                             androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                    } else {
-                        isAppearanceLightStatusBars = false
-                        isAppearanceLightNavigationBars = false
+                    } else if (introShownAtLaunch) {
+                        introShownAtLaunch = false
                         show(WindowInsetsCompat.Type.systemBars())
                     }
                 }
             }
             AuroraTheme(darkTheme = darkTheme) {
                 Box(Modifier.fillMaxSize()) {
-                    // The app composes underneath the intro so the brand moment never delays
-                    // first paint or network/cache work.
+                    // Reveal and compose the main app once the intro finishes or is skipped.
                     if (appVisible) {
-                        AuroraShelfApp(viewModel = warmUpViewModel)
+                        AuroraShelfApp(
+                            viewModel = warmUpViewModel,
+                            introActive = introVisible,
+                        )
                         OnFirstFrame { appDrawn = true }
                     }
                     if (introVisible) {

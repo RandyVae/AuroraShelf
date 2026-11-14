@@ -3,9 +3,9 @@ package com.aurorashelf.app.data.comic
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Rect
 import android.util.Log
+import com.aurorashelf.app.ui.JmUnscrambleTransformation
+import coil3.size.Size
 import com.aurorashelf.app.model.ComicChapter
 import com.aurorashelf.app.model.ComicDetails
 import com.aurorashelf.app.model.ComicPage
@@ -55,9 +55,9 @@ data class DownloadedComicChapter(
     val errorMessage: String? = null,
 )
 
-class ComicDownloadManager private constructor(private val context: Context) {
+class ComicDownloadManager private constructor(appContext: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val baseDir = File(context.filesDir, "OfflineComics").apply { if (!exists()) mkdirs() }
+    private val baseDir = File(appContext.filesDir, "OfflineComics").apply { if (!exists()) mkdirs() }
     private val metaFile = File(baseDir, "comic_metadata.json")
     private val activeJobs = ConcurrentHashMap<String, Job>()
 
@@ -258,7 +258,7 @@ class ComicDownloadManager private constructor(private val context: Context) {
         }
     }
 
-    private fun downloadAndSavePage(page: ComicPage, targetFile: File) {
+    private suspend fun downloadAndSavePage(page: ComicPage, targetFile: File) {
         val url = URL(page.imageUrl)
         val conn = (url.openConnection() as HttpURLConnection).apply {
             connectTimeout = 15000
@@ -288,31 +288,8 @@ class ComicDownloadManager private constructor(private val context: Context) {
         }
     }
 
-    private fun unscrambleBitmap(source: Bitmap, segments: Int): Bitmap {
-        val width = source.width
-        val height = source.height
-        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(output)
-        val segmentHeight = height / segments
-        val remainder = height % segments
-
-        for (i in 0 until segments) {
-            val srcY = (segments - 1 - i) * segmentHeight
-            val dstY = i * segmentHeight
-            val srcRect = Rect(0, srcY, width, srcY + segmentHeight)
-            val dstRect = Rect(0, dstY, width, dstY + segmentHeight)
-            canvas.drawBitmap(source, srcRect, dstRect, null)
-        }
-
-        if (remainder > 0) {
-            val srcY = segments * segmentHeight
-            val srcRect = Rect(0, srcY, width, height)
-            val dstRect = Rect(0, srcY, width, height)
-            canvas.drawBitmap(source, srcRect, dstRect, null)
-        }
-
-        return output
-    }
+    private suspend fun unscrambleBitmap(source: Bitmap, segments: Int): Bitmap =
+        JmUnscrambleTransformation(segments).transform(source, Size.ORIGINAL)
 
     private fun findChapter(id: String) = _chapters.value.find { it.id == id }
 

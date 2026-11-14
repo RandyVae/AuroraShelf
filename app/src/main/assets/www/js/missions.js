@@ -127,15 +127,19 @@
       for (const [k, v] of Object.entries(item.rewards)) {
         if (k === 'gold') {
           state.gold = (state.gold || 0) + v;
+          if (state.wallet) state.wallet.gold = state.gold;
           granted.push(v + ' 金币');
         } else if (k === 'keys') {
           state.keys = (state.keys || 0) + v;
+          if (state.wallet) state.wallet.keys = state.keys;
           granted.push(v + ' 契约钥匙');
         } else if (k === 'energy') {
           state.energy = Math.min(100, (state.energy || 0) + v);
+          if (state.wallet) state.wallet.energy = state.energy;
           granted.push(v + ' 点行动力');
         } else if (k === 'shards') {
           state.shards = (state.shards || 0) + v;
+          if (state.wallet) state.wallet.shards = state.shards;
           granted.push(v + ' 突破碎片');
         }
         if (typeof window !== 'undefined' && window.LGSave && window.LGSave.recordTransaction) {

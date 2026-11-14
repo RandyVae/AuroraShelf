@@ -1,4 +1,22 @@
-## 最新交接：2026-11-14 — 播放器组件与 UI 全方位审查及对标 Apple TV 重构 · v2.16.27 (Build 253)
+## 最新交接：2026-11-14 — 全项目 Bug 审查、多形态模拟器实测加固与双端交付 · v2.16.28 (Build 254)
+
+- **范围**：
+  - 响应 Randy 需求：「全面审查项目 Bug 并要在模拟器实测（全量覆盖 Android、iOS/iPadOS 与共享 Web 游戏）」，完成全项目缺陷排查与 Release 级实测交付。
+  1. **Android 端修复与加固**：
+     - 修复 `MainActivity.kt`、`AuroraShelfApp.kt`、`ForumViewModel.kt` ANR 风险；优化 `HomeScreen.kt` 日间模式顶栏状态栏高对比背衬与 `1920x1200` 平板响应式 Hero 高度；
+     - `PlayerScreen.kt` 为竖屏与双栏播放器状态栏区域添加黑色背板，杜绝日间主题下白色状态栏图标叠白底看不清的问题；
+     - `PersonalScreen.kt` 抽出 `SettingsSubpageScaffold` 将 `SettingsPageHeader` 固定在可滚动列表上方，解决输入网址时键盘聚焦及 `BringIntoView` 将返回按钮滚出视口的问题；
+     - 完成数据源/缓存/投屏/漫画/论坛/R8/Lint 相关批次修复（具体改动见 Git 提交与各模块变更）。
+  2. **iOS / iPadOS 与 Web 游戏修复**：
+     - `HeroBanner.swift` 与 `LiveScreen.swift` 通过 `Color.clear.overlay(AuroraCoverImage(..., aspectRatio: nil, contentMode: .fill, cornerRadius: 0))` 彻底消除 `iPhone Duo`（`466x678pt`）左右白边，同时上调多视频 Hero 底部按钮边距（`spacingM + 18` = 30pt）避免遮挡轮播圆点；
+     - `app/src/main/assets/www/css/app.css` 将 `.age-badge`（`18+`）移至左上角（`inset-inline-start`），解除与 Android `GameActivity` 右上角浮动控制胶囊 `[ ••• | ✕ ]` 重叠（iOS `Resources/www` 软链同步）。
+  3. **实测与发布（v2.16.28 Build 254）**：
+     - **Android**：`lintDebug` 0 errors；`testDebugUnitTest` 41 文件 245 项通过 238 / 失败 0 / 错误 0 / 跳过 7 项在线探测；`connectedDebugAndroidTest` 非在线 UI/无障碍 6 类 20/20 全过（`AuroraFlowTest` 10、`HigAccessibilityTest` 6、论坛/反混淆 4；9 项默认需 `live=true` / `sourceAudit=true` 的用例按预期抛出 `AssumptionViolatedException`，`LiveComicTest` 经 `notClass` 过滤未跑）；安装签名 Release APK（`206,843,787` bytes）于 `emulator-5554` 实测首屏、播放页日间状态栏、设置子页及游戏画面，日志零 ANR/Crash。
+     - **iOS / iPadOS**：Simulator Release 编译通过，XCTest 169 项 0 失败（6 项跳过），并在 `iPhone 18`（日间/夜间）、`iPhone Duo` 外屏与 `iPad`（日间/夜间）完成截图走查（Duo 从折叠态启动时 `--display=3` 副屏保持黑屏）。
+     - **Web 与源探测**：`verify-game-logic.js`、`verify-fixes.js` 与 `verify_auth_api.sh` 全通；`probe_all_sources.mjs` 34 源 32 可达（`javsb` TLS 断连、`jm` 脚本 `API code=401`）。
+     - **OTA 发布**：`./scripts/publish_ota.sh Release` 已将双端最新正式包（`Netgrey.apk` 197 MiB、`Netgrey.ipa` 193 MiB）原子覆盖发布至 `https://bananarey.us`（HTTPS 实测 `200 OK` 与 `manifest.plist` `2.16.28` 一致），远端仅存唯一最新版，磁盘剩余 `11G`（29%）。
+
+## 历史交接：2026-11-14 — 播放器组件与 UI 全方位审查及对标 Apple TV 重构 · v2.16.27 (Build 253)
 
 - **范围**：
   - 响应 Randy 需求：「对播放器组件以及 UI 进行一次全方位的审查，向 Apple TV 看齐」，完成双端 12 项审查发现的全量改造与发布。

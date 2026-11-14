@@ -1,6 +1,7 @@
 package com.aurorashelf.app.data
 
 import android.content.Context
+import androidx.core.content.edit
 import com.aurorashelf.app.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -94,7 +95,10 @@ class AccountRepository private constructor(context: Context) {
     }
 
     fun signOut() {
-        preferences.edit().remove(KEY_TOKEN).remove(KEY_PROFILE).apply()
+        preferences.edit {
+            remove(KEY_TOKEN)
+            remove(KEY_PROFILE)
+        }
         _state.value = AccountState.SignedOut
     }
 
@@ -108,11 +112,11 @@ class AccountRepository private constructor(context: Context) {
 
     private fun persistProfile(profile: AccountProfile, token: String) {
         if (token.isBlank()) throw IOException("认证服务未返回会话")
-        preferences.edit()
-            .putString(KEY_TOKEN, token)
-            .putString(KEY_EMAIL, profile.email)
-            .putString(KEY_PROFILE, profile.toJson().toString())
-            .apply()
+        preferences.edit {
+            putString(KEY_TOKEN, token)
+            putString(KEY_EMAIL, profile.email)
+            putString(KEY_PROFILE, profile.toJson().toString())
+        }
         _state.value = AccountState.SignedIn(profile)
     }
 

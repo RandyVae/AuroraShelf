@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -79,7 +80,10 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -96,39 +100,19 @@ import androidx.compose.ui.unit.sp
 import com.aurorashelf.app.model.SourceCategory
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.VideoItem
-import com.aurorashelf.app.ui.theme.AuroraBrandAccentDeep
 import com.aurorashelf.app.ui.theme.AuroraCoral
 import com.aurorashelf.app.ui.theme.AuroraDimens
 import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
-import com.aurorashelf.app.ui.theme.AuroraMediaInk
 import com.aurorashelf.app.ui.theme.AuroraMediaLabel
-import com.aurorashelf.app.ui.theme.AuroraMediaMeta
-import com.aurorashelf.app.ui.theme.AuroraMediaMuted
-import com.aurorashelf.app.ui.theme.AuroraMediaOnImage
-import com.aurorashelf.app.ui.theme.AuroraMediaOutline
 import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
-import com.aurorashelf.app.ui.theme.AuroraMediaRankFill
-import com.aurorashelf.app.ui.theme.AuroraMediaRankOutline
-import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
-import com.aurorashelf.app.ui.theme.AuroraProfileAccent
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 
 private val HomeBackground = AuroraImmersiveBackground
 private val HomeAccent = AuroraCoral
-private val HomeAccentDeep = AuroraBrandAccentDeep
-private val HomeMediaInk = AuroraMediaInk
 private val HomeMediaLabel = AuroraMediaLabel
-private val HomeMediaMeta = AuroraMediaMeta
-private val HomeMuted = AuroraMediaMuted
-private val HomeMediaOnImage = AuroraMediaOnImage
-private val HomeMediaOutline = AuroraMediaOutline
 private val HomeMediaPlaceholder = AuroraMediaPlaceholder
-private val HomeMediaRankFill = AuroraMediaRankFill
-private val HomeMediaRankOutline = AuroraMediaRankOutline
-private val HomeMediaSurfaceVariant = AuroraMediaSurfaceVariant
-private val HomeProfileAccent = AuroraProfileAccent
 
 @Composable
 internal fun HomeScreen(
@@ -144,9 +128,10 @@ internal fun HomeScreen(
     onLoadMore: () -> Unit,
 ) {
     val fontScale = LocalDensity.current.fontScale
-    val gridColumns = if (fontScale >= SINGLE_COLUMN_FONT_SCALE) 1 else 2
-    val gridRows = remember(state.videos, gridColumns) {
-        homeGridRows(state.videos, gridColumns)
+    val density = LocalDensity.current
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val emptyHeaderSpacer = remember(headerHeightPx, density) {
+        if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() + 12.dp } else 130.dp
     }
     val listState = rememberLazyListState()
     val isScrolled by remember {
@@ -167,11 +152,42 @@ internal fun HomeScreen(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(MaterialTheme.colorScheme.background),
     ) {
+        val gridColumns = when {
+            fontScale >= SINGLE_COLUMN_FONT_SCALE -> 1
+            maxWidth >= 840.dp -> 4
+            maxWidth >= 600.dp -> 3
+            else -> 2
+        }
+        val spotlightCount = if (state.videos.size >= 16) 4 else 1
+        val spotlightVideos = remember(state.videos, spotlightCount) {
+            state.videos.take(spotlightCount)
+        }
+        val afterSpotlight = remember(state.videos, spotlightCount) {
+            state.videos.drop(spotlightCount)
+        }
+        val top10Videos = remember(afterSpotlight) { afterSpotlight.take(10) }
+        val afterTop10 = remember(afterSpotlight, top10Videos) { afterSpotlight.drop(top10Videos.size) }
+        val recommendedVideos = remember(afterTop10) {
+            if (afterTop10.size > 10) afterTop10.take(10) else emptyList()
+        }
+        val afterRecommended = remember(afterTop10, recommendedVideos) {
+            afterTop10.drop(recommendedVideos.size)
+        }
+        val trendingVideos = remember(afterRecommended) {
+            if (afterRecommended.size > 14) afterRecommended.take(10) else emptyList()
+        }
+        val gridVideos = remember(afterRecommended, trendingVideos) {
+            afterRecommended.drop(trendingVideos.size)
+        }
+        val gridRows = remember(gridVideos, gridColumns) {
+            gridVideos.chunked(gridColumns)
+        }
+
             LazyColumn(
                 state = listState,
                 flingBehavior = ScrollableDefaults.flingBehavior(),
@@ -182,7 +198,7 @@ internal fun HomeScreen(
             ) {
                 if (state.videos.isEmpty()) {
                     item(key = "empty-header-space") {
-                        Spacer(Modifier.height(130.dp))
+                        Spacer(Modifier.height(emptyHeaderSpacer))
                     }
                     state.message?.let { message ->
                         item(key = "empty-message") {
@@ -206,7 +222,6 @@ internal fun HomeScreen(
                     }
                 } else {
                     item(key = "hero-billboard") {
-                        val spotlightVideos = remember(state.videos) { state.videos.take(4) }
                         NetflixHeroBillboard(
                             videos = spotlightVideos,
                             favoriteIds = state.favoriteIds,
@@ -226,7 +241,7 @@ internal fun HomeScreen(
                         }
                     }
 
-                    if (state.videos.size > 1) {
+                    if (top10Videos.isNotEmpty()) {
                         item(key = "top-10-heading") {
                             NetflixSectionHeader(
                                 title = "今日热播 Top 10",
@@ -240,7 +255,7 @@ internal fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 itemsIndexed(
-                                    items = state.videos.drop(1).take(10),
+                                    items = top10Videos,
                                     key = { _, v -> "top10-${v.id}" },
                                 ) { index, video ->
                                     NetflixTop10Card(
@@ -253,7 +268,7 @@ internal fun HomeScreen(
                         }
                     }
 
-                    if (state.videos.size > 11) {
+                    if (recommendedVideos.isNotEmpty()) {
                         item(key = "recommended-heading") {
                             NetflixSectionHeader(
                                 title = "为你推荐",
@@ -267,7 +282,7 @@ internal fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 items(
-                                    items = state.videos.drop(11).take(10),
+                                    items = recommendedVideos,
                                     key = { "rec-${it.id}" },
                                 ) { video ->
                                     NetflixPosterShelfCard(
@@ -279,7 +294,7 @@ internal fun HomeScreen(
                         }
                     }
 
-                    if (state.videos.size > 21) {
+                    if (trendingVideos.isNotEmpty()) {
                         item(key = "trending-heading") {
                             NetflixSectionHeader(
                                 title = "热播精选",
@@ -293,7 +308,7 @@ internal fun HomeScreen(
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 items(
-                                    items = state.videos.drop(21).take(10),
+                                    items = trendingVideos,
                                     key = { "trend-${it.id}" },
                                 ) { video ->
                                     NetflixPosterShelfCard(
@@ -305,33 +320,39 @@ internal fun HomeScreen(
                         }
                     }
 
-                    item(key = "explore-heading") {
-                        NetflixSectionHeader(
-                            title = "更多精彩视频",
-                            subtitle = "海量全库深度探索",
-                        )
-                    }
+                    if (gridRows.isNotEmpty()) {
+                        item(key = "explore-heading") {
+                            NetflixSectionHeader(
+                                title = "更多精彩视频",
+                                subtitle = "海量全库深度探索",
+                            )
+                        }
 
-                    items(
-                        items = gridRows,
-                        key = { row -> row.joinToString(separator = "|") { it.id } },
-                    ) { row ->
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 6.dp),
-                        ) {
-                            row.forEach { video ->
-                                VideoGridCard(
-                                    video = video,
-                                    isFavorite = video.id in state.favoriteIds,
-                                    onClick = { onVideo(video) },
-                                    onFavorite = { onFavorite(video) },
-                                    modifier = if (gridColumns == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
-                                )
+                        items(
+                            items = gridRows,
+                            key = { row -> row.joinToString(separator = "|") { it.id } },
+                        ) { row ->
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                            ) {
+                                row.forEach { video ->
+                                    VideoGridCard(
+                                        video = video,
+                                        isFavorite = video.id in state.favoriteIds,
+                                        onClick = { onVideo(video) },
+                                        onFavorite = { onFavorite(video) },
+                                        modifier = if (gridColumns == 1) Modifier.fillMaxWidth() else Modifier.weight(1f),
+                                    )
+                                }
+                                if (gridColumns > 1 && row.size < gridColumns) {
+                                    repeat(gridColumns - row.size) {
+                                        Spacer(Modifier.weight(1f))
+                                    }
+                                }
                             }
-                            if (gridColumns > 1 && row.size == 1) Spacer(Modifier.weight(1f))
                         }
                     }
 
@@ -353,7 +374,7 @@ internal fun HomeScreen(
                         item(key = "end-of-feed") {
                             Text(
                                 text = "已加载全部内容",
-                                color = HomeMuted,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -365,11 +386,12 @@ internal fun HomeScreen(
                 }
             }
 
+            val overlayDarkHeader = !isScrolled && state.videos.isNotEmpty()
             val headerModifier = if (isScrolled) {
                 Modifier
-                    .background(Color(0xFF000000).copy(alpha = 0.96f))
-                    .border(BorderStroke(0.5.dp, Color(0xFF222222)), RectangleShape)
-            } else {
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
+                    .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
+            } else if (overlayDarkHeader) {
                 Modifier.background(
                     Brush.verticalGradient(
                         listOf(
@@ -379,6 +401,8 @@ internal fun HomeScreen(
                         ),
                     ),
                 )
+            } else {
+                Modifier.background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
             }
 
             Column(
@@ -386,17 +410,22 @@ internal fun HomeScreen(
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .then(headerModifier)
-                    .windowInsetsPadding(WindowInsets.statusBars),
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .onSizeChanged { size ->
+                        if (size.height > 0) headerHeightPx = size.height
+                    },
             ) {
                 HomeHeader(
                     onSearch = onSearch,
                     onSettings = onSettings,
+                    forceDark = overlayDarkHeader,
                 )
                 CategoryBar(
                     selected = state.category,
                     sourceUrl = state.sourceUrl,
                     onCategory = onCategory,
                     isScrolled = isScrolled,
+                    forceDark = overlayDarkHeader,
                 )
                 if (state.isLoading) {
                     LinearProgressIndicator(
@@ -414,7 +443,7 @@ internal fun HomeScreen(
 @Composable
 private fun AccountOnboardingCard(onOpenAccount: () -> Unit) {
     Surface(
-        color = HomeMediaSurfaceVariant,
+        color = MaterialTheme.colorScheme.surfaceVariant,
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, HomeAccent.copy(alpha = 0.35f)),
         modifier = Modifier
@@ -429,8 +458,8 @@ private fun AccountOnboardingCard(onOpenAccount: () -> Unit) {
         ) {
             Icon(Icons.Default.Person, contentDescription = null, tint = HomeAccent, modifier = Modifier.size(28.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("注册免费账号", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("同步片单与历史，后续会员权益也会保留在账号中", style = MaterialTheme.typography.bodySmall, color = HomeMuted)
+                Text("注册免费账号", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text("同步片单与历史，后续会员权益也会保留在账号中", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Button(onClick = onOpenAccount, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
                 Text("注册 / 登录")
@@ -446,14 +475,17 @@ internal fun homeGridRows(videos: List<VideoItem>, columns: Int = 2): List<List<
 private fun HomeHeader(
     onSearch: () -> Unit,
     onSettings: () -> Unit = {},
+    forceDark: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     NetflixTopBar(
         modifier = modifier,
+        forceDark = forceDark,
     ) {
         NetflixSearchCapsule(
             label = "搜索视频",
             onClick = onSearch,
+            forceDark = forceDark,
         )
     }
 }
@@ -465,12 +497,14 @@ private fun CategoryBar(
     onCategory: (SourceCategory) -> Unit,
     modifier: Modifier = Modifier,
     isScrolled: Boolean = false,
+    forceDark: Boolean = false,
 ) {
     CategoryStrip(
         modifier = modifier,
         testTag = "home-category-bar",
         isScrolled = isScrolled,
         applyBackground = false,
+        forceDark = forceDark,
     ) {
         ContentSourceCatalog.sourceCategories(sourceUrl).forEach { category ->
             NetflixCategoryChip(
@@ -478,6 +512,7 @@ private fun CategoryBar(
                 onClick = { onCategory(category) },
                 label = category.label,
                 hasDropdown = category.isAll,
+                forceDark = forceDark,
             )
         }
     }
@@ -508,10 +543,12 @@ private fun NetflixHeroBillboard(
         }
     }
 
+    val screenHeightDp = LocalConfiguration.current.screenHeightDp
+    val heroHeight = (screenHeightDp * 0.72f).coerceIn(300f, 460f).dp
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(460.dp)
+            .height(heroHeight)
             .clickable(role = Role.Button, onClick = { onDetails(video) }),
     ) {
         MediaImage(
@@ -528,8 +565,8 @@ private fun NetflixHeroBillboard(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            HomeBackground.copy(alpha = 0.88f),
-                            HomeBackground.copy(alpha = 0.45f),
+                            Color.Black.copy(alpha = 0.88f),
+                            Color.Black.copy(alpha = 0.45f),
                             Color.Transparent,
                         ),
                     ),
@@ -547,9 +584,9 @@ private fun NetflixHeroBillboard(
                         colorStops = arrayOf(
                             0.0f to Color.Transparent,
                             0.38f to Color.Transparent,
-                            0.62f to HomeBackground.copy(alpha = 0.65f),
-                            0.82f to HomeBackground.copy(alpha = 0.94f),
-                            1.0f to HomeBackground,
+                            0.62f to Color.Black.copy(alpha = 0.65f),
+                            0.82f to Color.Black.copy(alpha = 0.90f),
+                            1.0f to Color.Black.copy(alpha = 0.96f),
                         ),
                     ),
                 ),
@@ -597,7 +634,7 @@ private fun NetflixHeroBillboard(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "高清 1080P",
+                    text = "多线路直连",
                     color = HomeMediaLabel,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -826,15 +863,19 @@ private fun NetflixTop10Card(
                     fontWeight = FontWeight.SemiBold,
                     lineHeight = 16.sp,
                 ),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(2.dp))
             Text(
-                text = video.views.ifBlank { video.author },
+                text = listOf(video.views, video.author)
+                    .map { it.trim() }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                color = AuroraMediaMeta,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -866,7 +907,7 @@ private fun VideoGridCard(
                 .fillMaxWidth()
                 .aspectRatio(16 / 10f)
                 .clip(RoundedCornerShape(8.dp))
-                .background(HomeMediaPlaceholder),
+                .background(MaterialTheme.colorScheme.surfaceVariant),
         ) {
             MediaImage(video = video, modifier = Modifier.fillMaxSize())
             if (video.duration.isNotBlank()) {
@@ -897,15 +938,19 @@ private fun VideoGridCard(
                     text = video.title,
                     style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp),
                     fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                     maxLines = 2,
                     minLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "${video.author} · ${video.views}",
+                    text = listOf(video.author, video.views)
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() }
+                        .distinct()
+                        .joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = HomeMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -922,7 +967,7 @@ private fun VideoGridCard(
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
-                    tint = if (isFavorite) AuroraCoral else Color(0xFF888888),
+                    tint = if (isFavorite) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                 )
             }

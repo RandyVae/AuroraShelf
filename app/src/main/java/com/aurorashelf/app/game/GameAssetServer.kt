@@ -36,21 +36,10 @@ class GameAssetServer(context: Context) : Runnable {
     fun start(): Int {
         if (serverSocket != null) return port
         val loopback = InetAddress.getByName("127.0.0.1")
-        for (attempt in 0 until 25) {
-            if (serverSocket != null) break
-            try {
-                serverSocket = ServerSocket(8765, 60, loopback)
-            } catch (busy: IOException) {
-                try {
-                    Thread.sleep(150L)
-                } catch (ignored: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                }
-            }
-        }
-        if (serverSocket == null) {
-            serverSocket = ServerSocket(0, 60, loopback)
-        }
+        // Try fixed port 8765 once so IndexedDB/localStorage origin stays stable across launches,
+        // and immediately fall back to an ephemeral port if another process holds 8765 (#18).
+        serverSocket = runCatching { ServerSocket(8765, 60, loopback) }.getOrNull()
+            ?: ServerSocket(0, 60, loopback)
         val socket = serverSocket ?: error("Unable to start local game asset server")
         port = socket.localPort
         clientPool = Executors.newCachedThreadPool { r ->

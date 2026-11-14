@@ -76,7 +76,7 @@ public struct EpisodePickerSheet: View {
                                             .foregroundStyle(isSelected ? .white : AuroraColor.textPrimary)
                                             .lineLimit(1)
 
-                                        Text(isSelected ? "正在播放" : "4K HDR")
+                                        Text(isSelected ? "正在播放" : "选集")
                                             .font(.caption2)
                                             .foregroundStyle(isSelected ? .white.opacity(0.85) : AuroraColor.textTertiary)
                                     }

@@ -209,22 +209,6 @@ public struct VideoDetailSheet: View {
                                         .font(.caption)
                                         .foregroundStyle(.white.opacity(0.85))
                                 }
-
-                                // Apple TV 标志性微型音视频规格标牌
-                                HStack(spacing: 4) {
-                                    ForEach(["4K", "HDR", "ATMOS"], id: \.self) { badge in
-                                        Text(badge)
-                                            .font(.system(size: 8.5, weight: .heavy))
-                                            .foregroundStyle(.white.opacity(0.9))
-                                            .padding(.horizontal, 4)
-                                            .padding(.vertical, 2)
-                                            .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 3, style: .continuous))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 3, style: .continuous)
-                                                    .stroke(Color.white.opacity(0.25), lineWidth: 0.5)
-                                            )
-                                    }
-                                }
                             }
                         }
                         .padding(.horizontal, AuroraMetrics.contentInset)
@@ -489,13 +473,6 @@ public struct VideoDetailSheet: View {
                                                             .lineLimit(1)
 
                                                         HStack(spacing: 4) {
-                                                            Text("4K HDR")
-                                                                .font(.system(size: 8.5, weight: .heavy))
-                                                                .padding(.horizontal, 4)
-                                                                .padding(.vertical, 1)
-                                                                .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
-                                                                .foregroundStyle(AuroraColor.textSecondary)
-
                                                             Text(video.sourceName)
                                                                 .font(.caption2)
                                                                 .foregroundStyle(AuroraColor.textTertiary)
@@ -522,7 +499,7 @@ public struct VideoDetailSheet: View {
                             .font(.headline)
                             .foregroundStyle(AuroraColor.textPrimary)
 
-                        let description = video.subtitle.isEmpty ? "本片由 \(video.sourceName) 官方源直连分发，支持 4K 超清硬解出画与多端投屏。" : video.subtitle
+                        let description = video.subtitle.isEmpty ? "本片由 \(video.sourceName) 官方源直连分发，支持硬件解码出画与多端投屏。" : video.subtitle
                         Text(description)
                             .font(.subheadline)
                             .foregroundStyle(AuroraColor.textSecondary)
@@ -549,9 +526,8 @@ public struct VideoDetailSheet: View {
                             .padding(.horizontal, AuroraMetrics.contentInset)
 
                         HStack(spacing: AuroraMetrics.spacingM) {
-                            specItem(title: "画质标准", value: "4K HDR")
-                            specItem(title: "视频编码", value: video.playbackUrl.contains(".m3u8") ? "HLS 变码率" : "H.264 MP4")
-                            specItem(title: "音频标准", value: "Dolby 5.1")
+                            specItem(title: "视频编码", value: video.playbackUrl.contains(".m3u8") ? "HLS" : "MP4")
+                            specItem(title: "来源站点", value: video.sourceName)
                             specItem(title: "投屏支持", value: "AirPlay / DLNA")
                         }
                         .padding(.horizontal, AuroraMetrics.contentInset)

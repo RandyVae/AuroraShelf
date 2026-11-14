@@ -310,7 +310,14 @@ class PlaybackResolver {
         val parsed = runCatching { URI(url) }.getOrNull()
         val host = parsed?.host?.lowercase(Locale.US).orEmpty()
         val path = parsed?.path?.lowercase(Locale.US) ?: url.lowercase(Locale.US)
-        if (path.contains("/preview.mp4") || path.endsWith("/preview") || path.contains("/vast") || path.contains("/preroll")) {
+        if (path.contains("/preview") ||
+            path.contains("/vast") ||
+            path.contains("/preroll") ||
+            path.contains("/ads/") ||
+            path.contains("/ad_vast") ||
+            path.contains("_ad.") ||
+            path.contains("-ad.")
+        ) {
             return true
         }
         return BLOCKED_AD_HOSTS.any { adHost -> host == adHost || host.endsWith(".$adHost") }
@@ -762,9 +769,11 @@ class PlaybackResolver {
         private val JSON_EPISODES = Regex("""\"epPlaySrcs\"\s*:\s*\{(.*?)\}""", setOf(RegexOption.DOT_MATCHES_ALL))
         private val MEDIA_EXTENSIONS = setOf(".m3u8", ".mp4", ".m4v", ".webm", ".mov", ".mkv", ".ts")
         private val BLOCKED_AD_HOSTS = setOf(
-            "tsyndicate.com", "exoclick.com", "realsrv.com", "trafficjunky.net",
-            "juicyads.com", "popads.net", "doubleclick.net", "googlesyndication.com",
-            "biomanos.org", "benchform.org",
+            "tsyndicate.com", "exoclick.com", "realsrv.com", "magsrv.com",
+            "trafficjunky.net", "trafficjunky.com", "juicyads.com", "popads.net",
+            "doubleclick.net", "googlesyndication.com", "biomanos.org", "benchform.org",
+            "myavlive.com", "chaturbate.com", "stripchat.com", "livejasmin.com",
+            "bongacams.com", "adserver.com", "adsco.re",
         )
         private val DIRECT_HLS = Regex("""https?://[^\"'\s<>]+?\.m3u8[^\"'\s<>]*""", RegexOption.IGNORE_CASE)
         private val ENCODED_HLS = Regex("""https?%3A(?:%2F){2}[^\"'\s<>]+?\.m3u8[^\"'\s<>]*""", RegexOption.IGNORE_CASE)

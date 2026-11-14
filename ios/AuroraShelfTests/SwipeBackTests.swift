@@ -99,12 +99,12 @@ final class SwipeBackTests: XCTestCase {
 
     func testNavigationPopCoordinatorLifecycleAndRules() {
         let coordinator = NavigationPopCoordinator(isEnabled: true)
-        let nav = UINavigationController()
+        let rootVC = UIViewController()
+        let nav = UINavigationController(rootViewController: rootVC)
+        nav.loadViewIfNeeded()
         coordinator.navigationController = nav
 
         // 仅有 1 个根控制器时，禁止触发返回
-        let rootVC = UIViewController()
-        nav.viewControllers = [rootVC]
         let dummyGesture = UIGestureRecognizer()
         XCTAssertFalse(coordinator.gestureRecognizerShouldBegin(dummyGesture), "根页面禁止触发手势返回")
 

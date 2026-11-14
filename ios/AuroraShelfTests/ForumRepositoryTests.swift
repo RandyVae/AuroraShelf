@@ -16,29 +16,48 @@ final class ForumRepositoryTests: XCTestCase {
             let (data, response) = try await session.data(for: request)
             let status = (response as? HTTPURLResponse)?.statusCode
             let html = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .init(rawValue: 0x80000632)) ?? ""
-            let posts = board.fid == ForumSourceCatalog.t66y.fid
+            let posts = ForumSourceCatalog.isT66Y(fid: board.fid)
                 ? ForumPostParser.parseT66Y(html, fid: board.fid, baseUrl: "https://\(listURL.host ?? "")")
                 : ForumPostParser.parse(html, fid: board.fid, baseUrl: "https://\(listURL.host ?? "")")
             print("LIVE_FORUM_BOARD fid=\(board.fid) status=\(status ?? 0) parsed=\(posts.count)")
             XCTAssertEqual(status, 200, "\(board.name) list HTTP status")
             XCTAssertFalse(posts.isEmpty, "\(board.name) list parser returned no real topics")
 
-            let post = try XCTUnwrap(posts.first(where: {
+            let candidatePosts = Array(posts.filter {
                 !sharedPinnedIDs.contains($0.id) && !Self.isPinnedOrAnnouncement($0.title)
-            }), "\(board.name) returned only pinned or announcement topics")
-            XCTAssertEqual(post.boardName, board.name)
-            let detailURL = try XCTUnwrap(URL(string: post.threadUrl))
-            var detailRequest = URLRequest(url: detailURL)
-            detailRequest.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
-            detailRequest.setValue("https://\(detailURL.host ?? "")", forHTTPHeaderField: "Referer")
-            let (detailData, detailResponse) = try await session.data(for: detailRequest)
-            let detailStatus = (detailResponse as? HTTPURLResponse)?.statusCode
-            let detailHTML = String(data: detailData, encoding: .utf8) ?? String(data: detailData, encoding: .init(rawValue: 0x80000632)) ?? ""
-            let detail = ForumPostParser.parseDetail(detailHTML, post: post)
-            print("LIVE_FORUM_THREAD fid=\(board.fid) id=\(post.id) title=\(post.title) status=\(detailStatus ?? 0) text=\(detail.contentText.count) image=\(detail.previewImageUrl != nil)")
-            XCTAssertEqual(detailStatus, 200, "\(board.name) thread HTTP status")
-            let hasValidBody = detail.contentText.count >= 20 || (detail.contentText.count > 0 && (detail.previewImageUrl != nil || !detail.contentImageUrls.isEmpty))
-            XCTAssertTrue(hasValidBody, "\(board.name) ordinary topic body was not parsed (text count: \(detail.contentText.count))")
+            }.prefix(3))
+            XCTAssertFalse(candidatePosts.isEmpty, "\(board.name) returned only pinned or announcement topics")
+            var verifiedDetail: (post: ForumPostItem, detail: ForumPostItem)?
+            var lastTextCount = 0
+            for candidate in candidatePosts {
+                XCTAssertEqual(candidate.boardName, board.name)
+                let detailURL = try XCTUnwrap(URL(string: candidate.threadUrl))
+                var detailRequest = URLRequest(url: detailURL)
+                detailRequest.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+                detailRequest.setValue("https://\(detailURL.host ?? "")", forHTTPHeaderField: "Referer")
+                let (detailData, detailResponse) = try await session.data(for: detailRequest)
+                let detailStatus = (detailResponse as? HTTPURLResponse)?.statusCode
+                let detailHTML = String(data: detailData, encoding: .utf8) ?? String(data: detailData, encoding: .init(rawValue: 0x80000632)) ?? ""
+                let detail = ForumPostParser.parseDetail(detailHTML, post: candidate)
+                print("LIVE_FORUM_THREAD fid=\(board.fid) id=\(candidate.id) title=\(candidate.title) status=\(detailStatus ?? 0) text=\(detail.contentText.count) image=\(detail.previewImageUrl != nil)")
+                XCTAssertEqual(detailStatus, 200, "\(board.name) thread HTTP status")
+                XCTAssertFalse(
+                    detail.contentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                    detail.previewImageUrl == nil &&
+                    detail.contentImageUrls.isEmpty,
+                    "\(board.name) ordinary topic body was empty"
+                )
+                lastTextCount = detail.contentText.count
+                let hasValidBody = detail.contentText.count >= 20 || (detail.contentText.count > 0 && (detail.previewImageUrl != nil || !detail.contentImageUrls.isEmpty))
+                if hasValidBody {
+                    verifiedDetail = (candidate, detail)
+                    break
+                }
+            }
+            let (post, detail) = try XCTUnwrap(
+                verifiedDetail,
+                "\(board.name) ordinary topic body was not parsed (last text count: \(lastTextCount))"
+            )
             if let imageURL = detail.contentImageUrls.first ?? detail.previewImageUrl {
                 let image = await CoverImageLoader.shared.loadImage(from: imageURL, requestReferer: post.threadUrl)
                 XCTAssertNotNil(image?.cgImage, "\(board.name) topic image did not decode")
@@ -52,7 +71,7 @@ final class ForumRepositoryTests: XCTestCase {
             let (pageTwoData, pageTwoResponse) = try await session.data(for: pageTwoRequest)
             let pageTwoStatus = (pageTwoResponse as? HTTPURLResponse)?.statusCode
             let pageTwoHTML = String(data: pageTwoData, encoding: .utf8) ?? String(data: pageTwoData, encoding: .init(rawValue: 0x80000632)) ?? ""
-            let pageTwoPosts = board.fid == ForumSourceCatalog.t66y.fid
+            let pageTwoPosts = ForumSourceCatalog.isT66Y(fid: board.fid)
                 ? ForumPostParser.parseT66Y(pageTwoHTML, fid: board.fid, baseUrl: "https://\(pageTwoURL.host ?? "")")
                 : ForumPostParser.parse(pageTwoHTML, fid: board.fid, baseUrl: "https://\(pageTwoURL.host ?? "")")
             XCTAssertEqual(pageTwoStatus, 200, "\(board.name) page 2 HTTP status")

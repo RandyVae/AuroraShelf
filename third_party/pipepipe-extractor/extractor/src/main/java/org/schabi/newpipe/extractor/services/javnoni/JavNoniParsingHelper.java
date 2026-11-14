@@ -1,5 +1,8 @@
 package org.schabi.newpipe.extractor.services.javnoni;
 
+import com.grack.nanojson.JsonArray;
+import com.grack.nanojson.JsonObject;
+import com.grack.nanojson.JsonParser;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -757,6 +760,33 @@ public final class JavNoniParsingHelper {
 
     private static List<String> extractEmbedUrls(final Document document) {
         final LinkedHashSet<String> urls = new LinkedHashSet<>();
+        for (final Element script : document.select("script.javhd-player-data")) {
+            final String jsonText = script.html().trim();
+            if (jsonText.isEmpty()) {
+                continue;
+            }
+            try {
+                final JsonArray providers = JsonParser.array().from(jsonText);
+                for (int i = 0; i < providers.size(); i++) {
+                    final JsonObject provider = providers.getObject(i);
+                    if (provider == null) {
+                        continue;
+                    }
+                    final JsonArray episodes = provider.getArray("episodes");
+                    if (episodes == null) {
+                        continue;
+                    }
+                    for (int j = 0; j < episodes.size(); j++) {
+                        final JsonObject episode = episodes.getObject(j);
+                        if (episode != null) {
+                            addEmbedUrl(urls, unescapeUrl(episode.getString("url", "")));
+                        }
+                    }
+                }
+            } catch (final Exception ignored) {
+                // Ignore malformed player JSON blocks and continue with remaining extractors.
+            }
+        }
         addEmbedUrl(urls, attr(document.selectFirst("meta[property=og:video]"), "content"));
         addEmbedUrl(urls, attr(document.selectFirst("meta[property=og:video:url]"), "content"));
         addEmbedUrl(urls, attr(document.selectFirst("meta[property='og:video:secure_url']"), "content"));
@@ -771,7 +801,8 @@ public final class JavNoniParsingHelper {
         }
         for (final Element element : document.select(
                 "iframe[src], iframe[data-src], a#tracking-url[href], "
-                        + "a[href*=luluvdo.com/e/], a[href*=luluvido.com/e/], a[href*=lulustream.com/e/], "
+                        + "a[href*=luluvid.com/e/], a[href*=luluvdo.com/e/], a[href*=luluvido.com/e/], a[href*=lulustream.com/e/], "
+                        + "a[href*=nuvorel.top/embed-], a[href*=streamruby.com/e/], "
                         + "a[href*=playmogo.com/e/]")) {
             addEmbedUrl(urls, firstNonEmpty(attr(element, "src"), attr(element, "data-src"),
                     attr(element, "href")));
@@ -787,9 +818,12 @@ public final class JavNoniParsingHelper {
         try {
             final URI uri = new URI(url);
             final String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-            if ((host.equals("luluvdo.com") || host.endsWith(".luluvdo.com")
+            if ((host.equals("luluvid.com") || host.endsWith(".luluvid.com")
+                    || host.equals("luluvdo.com") || host.endsWith(".luluvdo.com")
                     || host.equals("luluvido.com") || host.endsWith(".luluvido.com")
                     || host.equals("lulustream.com") || host.endsWith(".lulustream.com")
+                    || host.equals("nuvorel.top") || host.endsWith(".nuvorel.top")
+                    || host.equals("streamruby.com") || host.endsWith(".streamruby.com")
                     || host.equals("playmogo.com") || host.endsWith(".playmogo.com"))
                     && uri.getPath() != null && uri.getPath().startsWith("/e/")) {
                 urls.add(url);

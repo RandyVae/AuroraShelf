@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `dc76d44`（2026-11-14），未提交 17 个文件
+- Git：`main` @ `f42f057`（2026-11-14），未提交 87 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-14（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-14（今天）
@@ -36,19 +36,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-14 14:15 by `sync.py`
+- 最后同步：2026-11-14 17:32 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
-- 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-14 · Build 253 / v2.16.27）：已完成播放器组件与 UI 对标 Apple TV 的全方位审查与双端重构升级。(1) iOS/iPadOS 合流 `VideoDetailPlaybackScreen` 与 `NativePlayerView`，激活 `AVAudioSession .playback` 破除静音键无声限制，打通 `PlaybackProgressStore` 断点续播与每 3 秒自动存盘，顶栏补齐字幕/多音轨菜单（`PlayerMediaTrackMenu`）、画中画（PiP）与 Apple TV `InSight` 规格面板，消除双 HUD 重叠与进度条拖拽跳针，补齐三区双击、iPad 键盘快捷键与选集卡片实时进度条；(2) Android 停用 Media3 旧版默认控制器（`useController = false`），重构为 Compose 原生 Apple TV OSD 控制层（`AppleTvScrubberBar` 悬浮时间气泡、点击切换 `-MM:SS` 剩余时间、`0.5x~2.0x` 倍速、Fit/Zoom 画幅、三区双击与左右滑调光/调音 HUD），并与顶部按钮同步 3.5 秒自动渐隐实现全屏 100% 零遮挡；(3) 双端编译测试、全源探测与 Release OTA 发布全部通过。
+- 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
+- 当前阶段（2026-11-14 · Build 254 / v2.16.28）：已完成 Android / iOS / iPadOS / 共享 Web 游戏全项目缺陷排查、多端修复、模拟器 Release 实测与 OTA 发布。(1) Android：修复冷启动/论坛 ANR、日间首屏状态栏高对比与平板 `1920x1200` 响应式 Hero 高度、`PlayerScreen` 竖屏/双栏状态栏黑色背板防白底白字、`PersonalScreen` 抽取 `SettingsSubpageScaffold` 固定子页标题栏防键盘弹起移出返回按钮；(2) iOS/iPadOS：`HeroBanner` 与 `LiveScreen` 改用 `Color.clear.overlay` 消除 `iPhone Duo` 左右白边，上调 Hero 底部按钮间距防与指示点重叠，多形态（iPhone / Duo / iPad 日夜间）真机级 Simulator Release 验收通过；(3) Web 游戏：`.age-badge`（`18+`）移至左上角避免与 Android `GameActivity` 右上角胶囊重叠；(4) 验证：`lintDebug` 0 error、`testDebugUnitTest` 245 项 0 失败（7 项默认跳过）、非在线 UI/无障碍设备测试 20/20 通过、`xcodebuild test` 169 项 0 失败（6 项跳过）、Release APK 实机无 ANR/Crash、`./scripts/publish_ota.sh Release` 已双端原子发布（`Netgrey.apk` 197 MiB、`Netgrey.ipa` 193 MiB）。
 - 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，同时监控双端生产环境反馈与性能表现。
 - 下一步：接入用户资料/收藏历史云同步与后续订阅权益接口。
-- 阻塞：当前机器未安装 iOS Simulator runtime（已通过 `xcodebuild build-for-testing` 与签名真机 Release IPA 归档验证）；JAVSB 与禁漫天堂在当前网络节点下偶发连接超时（34 源中 32 源可达）。
+- 阻塞：`node scripts/probe_all_sources.mjs` 34 源中 32 源可达，`javsb` 因本机网络 TLS 断连、`jm` 因脚本 `API code=401` 失败（另 `85po`/`SpankBang` 遇 anti-bot 403、`哔咔`需鉴权）；`iPhone Duo` 从折叠态启动时模拟器 `--display=3` 副屏保持黑屏属模拟器特性。
 - 最近一次更新：2026-11-14 by Antigravity (Claude Opus)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-14（Antigravity）：全项目 Bug 审计、多端 UI 防错位与 Release 模拟器全量核验（v2.16.28 Build 254）。(1) iOS/iPadOS 英雄横幅贴边修补：`HeroBanner.swift` 与 `LiveScreen.swift` 将背景图包裹于 `Color.clear.overlay(AuroraCoverImage(..., aspectRatio: nil, contentMode: .fill, cornerRadius: 0))` 并设定明确宽/高约束，消除 `iPhone Duo` 窄宽比下 `.fit` 回退导致的左右白边，同时将多视频轮播时操作栏底部边距由 `spacingS` 抬升至 `spacingM + 18`（30pt）避免遮挡轮播圆点；(2) Web 游戏角标避让：`app/src/main/assets/www/css/app.css` 将 `.age-badge` 改为左上角定位（`inset-inline-start`），避开 `GameActivity` 右上角原生 `[ ••• | ✕ ]` 浮动胶囊（通过符号链接同步生效于 iOS `Resources/www`）；(3) Android 播放页与设置页架构加固：`PlayerScreen.kt` 为竖屏与双栏状态栏区域补充黑色背景防止浅色主题白底白字，`PersonalScreen.kt` 抽出 `SettingsSubpageScaffold` 将 `SettingsPageHeader` 固定在 `LazyColumn` 上方，解决底部输入框聚焦触发 `BringIntoView` 时将返回按钮顶出视口的隐患（`AuroraFlowTest` 10/10 全绿）。
 
 - 2026-11-14（Antigravity）：播放器组件与 UI 对标 Apple TV 全方位审查与双端重构（v2.16.27 Build 253）。(1) iOS 消除双播放器分裂：将 `NativePlayerView` 统一委托至 `VideoDetailPlaybackScreen`，在 `VideoDetailPlaybackScreen` 激活 `AVAudioSession .playback`、打通 `PlaybackProgressStore` 断点续播与自动存盘、接入 PiP / `PlayerMediaTrackMenu` / `InSightSheetView` / 键盘快捷键，移除根视图重复 HUD 并通过 `onEditingChanged` + `isSeeking` 修复拖拽进度条跳针；(2) Android 原生 Apple TV OSD 重构：关闭 `PlayerView.useController`，实现 Compose 原生顶栏/中区/底栏 `AppleTvScrubberBar`、剩余时间切换、倍速、画幅裁切、三区双击与左右滑亮度/音量 HUD，并同步控制顶栏按钮显隐以保证观影画面零遮挡，同时修复选集卡片 `0.5f` 假进度条与直播内嵌控制栏常驻问题。
 

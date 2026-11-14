@@ -597,14 +597,14 @@ public final class MissAvParsingHelper {
     public static String extractHlsUrl(final Document doc) throws ParsingException {
         final String html = doc.html();
         final Matcher urlMatcher = M3U8_URL_PATTERN.matcher(html);
-        if (urlMatcher.find()) {
+        while (urlMatcher.find()) {
             final String candidate = unescapeUrl(urlMatcher.group());
             if (isValidHlsUrl(candidate)) {
                 return candidate;
             }
         }
         final Matcher escapedUrlMatcher = ESCAPED_M3U8_URL_PATTERN.matcher(html);
-        if (escapedUrlMatcher.find()) {
+        while (escapedUrlMatcher.find()) {
             final String candidate = decodeUrl(unescapeUrl(escapedUrlMatcher.group()));
             if (isValidHlsUrl(candidate)) {
                 return candidate;
@@ -678,12 +678,39 @@ public final class MissAvParsingHelper {
 
     private static boolean isValidHlsUrl(final String url) {
         final String cleanUrl = url == null ? "" : url.split("[?#]", 2)[0];
-        return url != null
-                && (url.startsWith("https://") || url.startsWith("http://"))
-                && url.contains(".")
-                && cleanUrl.endsWith(".m3u8")
-                && !url.contains("://.")
-                && !url.contains(" ");
+        if (url == null
+                || !(url.startsWith("https://") || url.startsWith("http://"))
+                || !url.contains(".")
+                || !cleanUrl.endsWith(".m3u8")
+                || url.contains("://.")
+                || url.contains(" ")) {
+            return false;
+        }
+        return !isAdOrPreviewUrl(url);
+    }
+
+    private static boolean isAdOrPreviewUrl(final String url) {
+        final String lower = url.toLowerCase(Locale.ROOT);
+        if (lower.contains("/preview")
+                || lower.contains("/preroll")
+                || lower.contains("/vast")
+                || lower.contains("/ads/")
+                || lower.contains("_ad.")
+                || lower.contains("-ad.")) {
+            return true;
+        }
+        final String[] blockedAdHosts = {
+                "tsyndicate.com", "exoclick.com", "trafficjunky.net", "trafficjunky.com",
+                "juicyads.com", "doubleclick.net", "googlesyndication.com",
+                "myavlive.com", "magsrv.com", "realsrv.com", "adserver", "chaturbate.com",
+                "stripchat.com", "livejasmin.com", "bongacams.com",
+        };
+        for (final String adHost : blockedAdHosts) {
+            if (lower.contains(adHost)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static JsonObject getResultValues(final JsonObject object) {

@@ -125,7 +125,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.platform.testTag
@@ -160,10 +162,6 @@ import com.aurorashelf.app.data.OfflineVideo
 import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
 import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
 import com.aurorashelf.app.ui.theme.AuroraCoral
-import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
-import com.aurorashelf.app.ui.theme.AuroraMediaLabel
-import com.aurorashelf.app.ui.theme.AuroraMediaMuted
-import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
@@ -199,19 +197,34 @@ internal fun SearchScreen(
             videos
         } else {
             videos.filter {
-                it.title.contains(query, ignoreCase = true) || it.author.contains(query, ignoreCase = true)
+                it.title.contains(query, ignoreCase = true) ||
+                    it.author.contains(query, ignoreCase = true) ||
+                    ContentSourceCatalog.inferSourceName(it.pageUrl).contains(query, ignoreCase = true)
             }
         }
     }
     var selectedSourceFilter by rememberSaveable { mutableStateOf("全部") }
     val availableSources = remember(matches) {
         if (matches.isEmpty()) listOf("全部")
-        else listOf("全部") + matches.map { it.author.ifBlank { "华视影院" } }.distinct().sorted()
+        else listOf("全部") + matches.map { ContentSourceCatalog.inferSourceName(it.pageUrl) }.distinct().sorted()
+    }
+    LaunchedEffect(availableSources) {
+        if (selectedSourceFilter !in availableSources) {
+            selectedSourceFilter = "全部"
+        }
     }
     val filteredMatches = remember(matches, selectedSourceFilter) {
         if (selectedSourceFilter == "全部") matches
-        else matches.filter { (it.author.ifBlank { "华视影院" }) == selectedSourceFilter }
+        else matches.filter { ContentSourceCatalog.inferSourceName(it.pageUrl) == selectedSourceFilter }
     }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val handleClose: () -> Unit = {
+        keyboardController?.hide()
+        focusManager.clearFocus()
+        onClose()
+    }
+    BackHandler(onBack = handleClose)
     val prefetchContext = LocalContext.current
     // task-17: warm the first screen of results (bytes + decode) after the list settles.
     LaunchedEffect(matches) {
@@ -219,7 +232,7 @@ internal fun SearchScreen(
             CoverPrefetcher.prefetchVideos(prefetchContext, matches, limit = SEARCH_COVER_PREFETCH_LIMIT)
         }
     }
-    Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 36.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -238,7 +251,7 @@ internal fun SearchScreen(
                         onQueryChange = onQuery,
                         placeholder = "全局搜索所有视频源",
                         onSearch = onSearch,
-                        onBack = onClose,
+                        onBack = handleClose,
                         onClear = { onQuery("") },
                         isSearching = isSearching,
                         testTag = "search-input-field",
@@ -258,10 +271,10 @@ internal fun SearchScreen(
                             Text(
                                 text = "热门探索",
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White,
+                                color = MaterialTheme.colorScheme.onBackground,
                             )
                             val trending = listOf(
-                                "4K 超清", "最新电影", "热门连续剧", "经典港片",
+                                "热门精选", "最新电影", "热门连续剧", "经典港片",
                                 "热血动漫", "高分综艺", "悬疑惊悚", "科幻大片"
                             )
                             Row(
@@ -273,8 +286,8 @@ internal fun SearchScreen(
                                 trending.forEach { keyword ->
                                     Surface(
                                         shape = RoundedCornerShape(20.dp),
-                                        color = AuroraMediaSurfaceVariant,
-                                        border = BorderStroke(1.dp, Color(0xFF333333)),
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                         modifier = Modifier.applePressEffect {
                                             onQuery(keyword)
                                             onSearch()
@@ -283,7 +296,7 @@ internal fun SearchScreen(
                                         Text(
                                             text = keyword,
                                             style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp),
-                                            color = AuroraMediaLabel,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                                         )
                                     }
@@ -322,21 +335,29 @@ internal fun SearchScreen(
                                 val isSelected = selectedSourceFilter == src
                                 Surface(
                                     shape = RoundedCornerShape(16.dp),
-                                    color = if (isSelected) AuroraCoral else AuroraMediaSurfaceVariant,
-                                    border = BorderStroke(1.dp, if (isSelected) AuroraCoral else Color(0xFF333333)),
+                                    color = if (isSelected) AuroraCoral else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) AuroraCoral else MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.applePressEffect {
                                         selectedSourceFilter = src
                                     },
                                 ) {
-                                    val count = if (src == "全部") matches.size else matches.count { (it.author.ifBlank { "华视影院" }) == src }
+                                    val count = if (src == "全部") {
+                                        matches.size
+                                    } else {
+                                        matches.count { ContentSourceCatalog.inferSourceName(it.pageUrl) == src }
+                                    }
                                     Text(
                                         text = "$src ($count)",
                                         style = MaterialTheme.typography.bodyMedium.copy(
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         ),
-                                        color = if (isSelected) Color.White else AuroraMediaLabel,
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier
+                                            .widthIn(max = 160.dp)
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
                                     )
                                 }
                             }
@@ -360,7 +381,7 @@ internal fun SearchScreen(
                                 Text(
                                     text = "热门匹配",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onBackground,
                                 )
                                 Text(
                                     text = "精选 ${topMatches.size} 部",
@@ -390,7 +411,7 @@ internal fun SearchScreen(
                     Text(
                         text = "全部检索结果 (${filteredMatches.size})",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }

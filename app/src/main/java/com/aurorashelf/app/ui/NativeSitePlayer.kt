@@ -3,6 +3,7 @@ package com.aurorashelf.app.ui
 import android.app.Activity
 import android.content.Context
 import android.media.AudioManager
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -15,9 +16,12 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -59,6 +64,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
@@ -109,12 +115,16 @@ internal fun NativeSitePlayer(
     onDurationChange: (Long) -> Unit = {},
     onControllerVisibilityChange: (Boolean) -> Unit = {},
     onPlaybackEnded: (() -> Unit)? = null,
+    keepTopBarVisible: Boolean = false,
+    topBarStart: (@Composable () -> Unit)? = null,
+    topBarEnd: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
     val offlineEntries by cacheManager.entries.collectAsStateWithLifecycle()
     val offlineVideo = offlineEntries.firstOrNull { it.pageUrl == pageUrl && it.isPlayableOffline }
+    val latestOfflineVideo by rememberUpdatedState(offlineVideo)
     val player = remember(pageUrl) {
         // Start faster: playback may begin after 800 ms of buffered media (default 2.5 s) and
         // resumes after a rebuffer once 1.5 s is buffered (default 5 s), while the forward buffer
@@ -125,6 +135,13 @@ internal fun NativeSitePlayer(
             .build()
         ExoPlayer.Builder(context.applicationContext)
             .setLoadControl(loadControl)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                true,
+            )
             .build().apply {
                 // G5: when the (external) media declares text tracks, prefer Chinese then English
                 // subtitles and let ExoPlayer auto-select one. Media without subtitle tracks is
@@ -199,7 +216,7 @@ internal fun NativeSitePlayer(
         }
     }
 
-    LaunchedEffect(pageUrl, attempt, offlineVideo?.mediaUrl) {
+    LaunchedEffect(pageUrl, attempt) {
         loadStartedAtMs.longValue = android.os.SystemClock.elapsedRealtime()
         timingReadyLogged.value = false
         timingFirstFrameLogged.value = false
@@ -207,7 +224,8 @@ internal fun NativeSitePlayer(
         isLoading = true
         error = null
         try {
-            val source = offlineVideo?.mediaUrl?.let { cachedUrl ->
+            val activeOffline = latestOfflineVideo
+            val source = activeOffline?.mediaUrl?.let { cachedUrl ->
                 com.aurorashelf.app.data.PlaybackSource(cachedUrl, pageUrl)
             } ?: PlaybackResolver().resolve(pageUrl)
             Log.i(TAG, "source resolved type=${mediaType(source.url)} host=${runCatching { java.net.URI(source.url).host }.getOrNull()} refererHost=${runCatching { java.net.URI(source.referer).host }.getOrNull()}")
@@ -225,8 +243,8 @@ internal fun NativeSitePlayer(
             val item = MediaItem.Builder()
                 .setUri(source.url)
                 .apply {
-                    if (offlineVideo != null && mediaType(source.url) != "hls") {
-                        setCustomCacheKey(offlineVideo.id)
+                    if (activeOffline != null && mediaType(source.url) != "hls") {
+                        setCustomCacheKey(activeOffline.id)
                     }
                 }
                 .build()
@@ -325,7 +343,7 @@ internal fun NativeSitePlayer(
             override fun onPlayerError(failure: PlaybackException) {
                 Log.e(TAG, "player error code=${failure.errorCode} name=${failure.errorCodeName} cause=${failure.cause?.javaClass?.simpleName}: ${failure.cause?.message}", failure)
                 isLoading = false
-                error = if (offlineVideo != null) {
+                error = if (latestOfflineVideo != null) {
                     "离线缓存读取失败，请在设置中删除后重新缓存"
                 } else {
                     "播放失败（${failure.errorCode}），请重新解析后重试"
@@ -375,6 +393,21 @@ internal fun NativeSitePlayer(
             .build()
     }
 
+    val activityWindow = (context as? Activity)?.window
+    DisposableEffect(activityWindow, pageUrl) {
+        val initialBrightness = activityWindow?.attributes?.screenBrightness
+            ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        onDispose {
+            activityWindow?.let { win ->
+                val lp = win.attributes
+                if (lp.screenBrightness != initialBrightness) {
+                    lp.screenBrightness = initialBrightness
+                    win.attributes = lp
+                }
+            }
+        }
+    }
+
     val audioManager = remember(context) {
         context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
     }
@@ -405,26 +438,44 @@ internal fun NativeSitePlayer(
         modifier = modifier
             .background(Color.Black)
             .pointerInput(pageUrl, isFullscreen) {
-                detectTapGestures(
-                    onDoubleTap = { offset ->
+                val doubleTapTimeout = viewConfiguration.doubleTapTimeoutMillis
+                var lastTapMs = 0L
+                var lastTapOffset = Offset.Zero
+                var visibilityBeforeFirstTap = isControllerVisible
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = true)
+                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+                    if (up.isConsumed) return@awaitEachGesture
+                    if ((up.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                        return@awaitEachGesture
+                    }
+                    up.consume()
+                    val now = android.os.SystemClock.uptimeMillis()
+                    val isDoubleTap = (now - lastTapMs) <= doubleTapTimeout &&
+                        (up.position - lastTapOffset).getDistance() <= viewConfiguration.touchSlop * 4f
+                    if (isDoubleTap) {
+                        lastTapMs = 0L
+                        isControllerVisible = visibilityBeforeFirstTap
                         val w = size.width.toFloat().coerceAtLeast(1f)
                         when {
-                            offset.x < w * 0.35f -> {
+                            up.position.x < w * 0.35f -> {
                                 seekRelative(-10_000L)
                                 showHud(Icons.Default.Replay10, "快退 10 秒")
                             }
-                            offset.x > w * 0.65f -> {
+                            up.position.x > w * 0.65f -> {
                                 seekRelative(10_000L)
                                 showHud(Icons.Default.Forward10, "快进 10 秒")
                             }
                             else -> toggleFillMode()
                         }
-                    },
-                    onTap = {
+                    } else {
+                        visibilityBeforeFirstTap = isControllerVisible
                         isControllerVisible = !isControllerVisible
                         controlInteractionTick++
-                    },
-                )
+                        lastTapMs = now
+                        lastTapOffset = up.position
+                    }
+                }
             }
             .pointerInput(pageUrl, isFullscreen) {
                 if (!isFullscreen) return@pointerInput
@@ -533,39 +584,28 @@ internal fun NativeSitePlayer(
             }
         }
 
-        // Apple TV 原生风格控制覆层（顶栏辅助键 + 中央快进退/主播放键 + 底部弹性拖拽时间轴）
+        // 顶部控制栏（与调用方返回/投屏/全屏共享单行排布，零重叠）
         AnimatedVisibility(
-            visible = isControllerVisible && error == null,
+            visible = isControllerVisible || keepTopBarVisible || error != null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.fillMaxSize(),
         ) {
             Box(Modifier.fillMaxSize()) {
-                // 顶部与底部可读性暗角渐变（中间完全通透）
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (isFullscreen) 96.dp else 72.dp)
-                        .align(Alignment.TopCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Black.copy(alpha = 0.76f), Color.Transparent)
-                            )
-                        ),
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(if (isFullscreen) 110.dp else 80.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f))
-                            )
-                        ),
-                )
+                if (isControllerVisible && error == null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(if (isFullscreen) 96.dp else 72.dp)
+                            .align(Alignment.TopCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Black.copy(alpha = 0.76f), Color.Transparent)
+                                )
+                            ),
+                    )
+                }
 
-                // 顶部控制栏（全屏时包含退出全屏与 4K HDR 徽标；内嵌时右侧工具与 PlayerScreen 顶栏对齐）
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -573,9 +613,8 @@ internal fun NativeSitePlayer(
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
                         .padding(
-                            start = if (isFullscreen) 16.dp else 62.dp,
-                            end = if (isFullscreen) 16.dp else 108.dp,
-                            top = 10.dp,
+                            horizontal = if (isFullscreen) 16.dp else 10.dp,
+                            vertical = 10.dp,
                         ),
                 ) {
                     if (isFullscreen) {
@@ -592,143 +631,184 @@ internal fun NativeSitePlayer(
                                 contentDescription = "退出全屏",
                             )
                         }
-                        Surface(
-                            color = Color.White.copy(alpha = 0.18f),
-                            shape = RoundedCornerShape(6.dp),
-                        ) {
-                            Text(
-                                text = "4K HDR",
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                            )
-                        }
+                    } else {
+                        topBarStart?.invoke()
                     }
 
                     Spacer(Modifier.weight(1f))
 
-                    // 倍速选择胶囊（Apple TV 0.5x ~ 2.0x）
-                    Box {
-                        Surface(
-                            onClick = {
-                                speedMenuExpanded = true
-                                controlInteractionTick++
-                            },
-                            shape = RoundedCornerShape(999.dp),
-                            color = Color.Black.copy(alpha = 0.54f),
-                            contentColor = Color.White,
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-                            modifier = Modifier.height(36.dp),
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
-                                modifier = Modifier.padding(horizontal = 12.dp),
-                            ) {
-                                Text(
-                                    text = if (playbackSpeed == 1.0f) "1.0x" else "${playbackSpeed}x",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                )
-                            }
-                        }
-                        DropdownMenu(
-                            expanded = speedMenuExpanded,
-                            onDismissRequest = { speedMenuExpanded = false },
-                        ) {
-                            listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
-                                DropdownMenuItem(
-                                    text = { Text(if (speed == 1.0f) "正常 (1.0x)" else "${speed}x") },
-                                    trailingIcon = {
-                                        if (playbackSpeed == speed) {
-                                            Icon(Icons.Default.Check, contentDescription = null)
-                                        }
-                                    },
-                                    onClick = {
-                                        speedMenuExpanded = false
-                                        playbackSpeed = speed
-                                        player.setPlaybackSpeed(speed)
-                                        showHud(Icons.Default.Speed, "${speed}x 倍速")
-                                        controlInteractionTick++
-                                    },
-                                )
-                            }
-                        }
-                    }
-
-                    // 字幕菜单（当视频包含字幕轨时展示）
-                    if (subtitleOptions.isNotEmpty()) {
+                    if (isControllerVisible && error == null) {
+                        // 倍速选择胶囊（Apple TV 0.5x ~ 2.0x）
                         Box {
-                            FilledTonalIconButton(
+                            Surface(
                                 onClick = {
-                                    subtitleMenuExpanded = true
+                                    speedMenuExpanded = true
                                     controlInteractionTick++
                                 },
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = Color.Black.copy(alpha = 0.54f),
-                                    contentColor = Color.White,
-                                ),
-                                modifier = Modifier.size(40.dp),
+                                shape = RoundedCornerShape(999.dp),
+                                color = Color.Black.copy(alpha = 0.54f),
+                                contentColor = Color.White,
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+                                modifier = Modifier.height(40.dp),
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Subtitles,
-                                    contentDescription = "字幕",
-                                    modifier = Modifier.size(18.dp),
-                                )
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                ) {
+                                    Text(
+                                        text = if (playbackSpeed == 1.0f) "1.0x" else "${playbackSpeed}x",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                    )
+                                }
                             }
                             DropdownMenu(
-                                expanded = subtitleMenuExpanded,
-                                onDismissRequest = { subtitleMenuExpanded = false },
+                                expanded = speedMenuExpanded,
+                                onDismissRequest = { speedMenuExpanded = false },
+                                containerColor = Color(0xFF1C1F28),
                             ) {
-                                DropdownMenuItem(
-                                    text = { Text("关闭字幕") },
-                                    trailingIcon = {
-                                        if (subtitleOptions.none { it.selected }) {
-                                            Icon(Icons.Default.Check, contentDescription = null)
-                                        }
-                                    },
-                                    onClick = {
-                                        subtitleMenuExpanded = false
-                                        setSubtitlesEnabled(false)
-                                    },
-                                )
-                                subtitleOptions.forEach { option ->
+                                listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
                                     DropdownMenuItem(
-                                        text = { Text(option.label) },
+                                        text = {
+                                            Text(
+                                                if (speed == 1.0f) "正常 (1.0x)" else "${speed}x",
+                                                color = Color.White,
+                                            )
+                                        },
                                         trailingIcon = {
-                                            if (option.selected) {
-                                                Icon(Icons.Default.Check, contentDescription = null)
+                                            if (playbackSpeed == speed) {
+                                                Icon(
+                                                    Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = AuroraCoral,
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            speedMenuExpanded = false
+                                            playbackSpeed = speed
+                                            player.setPlaybackSpeed(speed)
+                                            showHud(Icons.Default.Speed, "${speed}x 倍速")
+                                            controlInteractionTick++
+                                        },
+                                    )
+                                }
+                            }
+                        }
+
+                        // 字幕菜单（当视频包含字幕轨时展示）
+                        if (subtitleOptions.isNotEmpty()) {
+                            Box {
+                                Surface(
+                                    onClick = {
+                                        subtitleMenuExpanded = true
+                                        controlInteractionTick++
+                                    },
+                                    shape = CircleShape,
+                                    color = Color.Black.copy(alpha = 0.54f),
+                                    contentColor = Color.White,
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+                                    modifier = Modifier.size(44.dp),
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Subtitles,
+                                            contentDescription = "字幕",
+                                            modifier = Modifier.size(20.dp),
+                                        )
+                                    }
+                                }
+                                DropdownMenu(
+                                    expanded = subtitleMenuExpanded,
+                                    onDismissRequest = { subtitleMenuExpanded = false },
+                                    containerColor = Color(0xFF1C1F28),
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("关闭字幕", color = Color.White) },
+                                        trailingIcon = {
+                                            if (subtitleOptions.none { it.selected }) {
+                                                Icon(
+                                                    Icons.Default.Check,
+                                                    contentDescription = null,
+                                                    tint = AuroraCoral,
+                                                )
                                             }
                                         },
                                         onClick = {
                                             subtitleMenuExpanded = false
-                                            selectSubtitle(option)
+                                            setSubtitlesEnabled(false)
                                         },
+                                    )
+                                    subtitleOptions.forEach { option ->
+                                        DropdownMenuItem(
+                                            text = { Text(option.label, color = Color.White) },
+                                            trailingIcon = {
+                                                if (option.selected) {
+                                                    Icon(
+                                                        Icons.Default.Check,
+                                                        contentDescription = null,
+                                                        tint = AuroraCoral,
+                                                    )
+                                                }
+                                            },
+                                            onClick = {
+                                                subtitleMenuExpanded = false
+                                                selectSubtitle(option)
+                                            },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 画幅裁切切换（Fit / Fill）
+                        if (isFullscreen) {
+                            Surface(
+                                onClick = { toggleFillMode() },
+                                shape = CircleShape,
+                                color = Color.Black.copy(alpha = 0.54f),
+                                contentColor = Color.White,
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+                                modifier = Modifier.size(44.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.AspectRatio,
+                                        contentDescription = if (isFillMode) "适合屏幕" else "填满屏幕",
+                                        modifier = Modifier.size(20.dp),
                                     )
                                 }
                             }
                         }
                     }
 
-                    // 画幅裁切切换（Fit / Fill）
-                    if (isFullscreen) {
-                        FilledTonalIconButton(
-                            onClick = { toggleFillMode() },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color.Black.copy(alpha = 0.54f),
-                                contentColor = Color.White,
-                            ),
-                            modifier = Modifier.size(44.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AspectRatio,
-                                contentDescription = if (isFillMode) "适合屏幕" else "填满屏幕",
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
+                    if (!isFullscreen) {
+                        topBarEnd?.invoke()
                     }
                 }
+            }
+        }
+
+        // Apple TV 原生风格主播放控制与底部弹性时间轴
+        AnimatedVisibility(
+            visible = isControllerVisible && error == null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isFullscreen) 110.dp else 80.dp)
+                        .align(Alignment.BottomCenter)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f))
+                            )
+                        ),
+                )
 
                 // 中央播放控制组（快退 10s + 主播放/暂停 + 快进 10s）
                 if (!isLoading) {
@@ -874,40 +954,42 @@ internal fun NativeSitePlayer(
             }
         }
 
-        // Apple TV 中央动态 HUD 胶囊（音量、亮度、快进退、画幅、倍速）
+        // 顶部偏上紧凑动态 HUD 胶囊（音量、亮度、快进退、画幅、倍速 — 不遮挡中央播放键）
         AnimatedVisibility(
             visible = hudState != null,
-            enter = fadeIn() + scaleIn(initialScale = 0.9f),
-            exit = fadeOut() + scaleOut(targetScale = 0.9f),
-            modifier = Modifier.align(Alignment.Center),
+            enter = fadeIn() + scaleIn(initialScale = 0.92f),
+            exit = fadeOut() + scaleOut(targetScale = 0.92f),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = if (isFullscreen) 68.dp else 56.dp),
         ) {
             hudState?.let { hud ->
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(999.dp),
                     color = Color(0xCC16181F),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                     ) {
                         Icon(
                             imageVector = hud.icon,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(26.dp),
+                            modifier = Modifier.size(18.dp),
                         )
                         Text(
                             text = hud.text,
                             color = Color.White,
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                         )
                         if (hud.progress != null) {
                             Box(
                                 modifier = Modifier
-                                    .width(104.dp)
+                                    .width(68.dp)
                                     .height(4.dp)
                                     .clip(RoundedCornerShape(999.dp))
                                     .background(Color.White.copy(alpha = 0.24f)),

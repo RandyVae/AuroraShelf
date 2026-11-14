@@ -10,7 +10,7 @@ import org.junit.Test
 class LiveComicTest {
     @Test
     fun komiicBrowseDetailsAndChapterAreReadable() {
-        if (InstrumentationRegistry.getArguments().getString("live") != "true") return
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.live=true to run live tests", InstrumentationRegistry.getArguments().getString("live") == "true")
         runBlocking {
             val repository = ComicRepository()
             val comics = repository.browse(sourceId = "komiic", categoryId = "0", page = 1)
@@ -34,7 +34,7 @@ class LiveComicTest {
 
     @Test
     fun ehentaiBrowseDetailsAndPageResolutionAreReadable() {
-        if (InstrumentationRegistry.getArguments().getString("live") != "true") return
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.live=true to run live tests", InstrumentationRegistry.getArguments().getString("live") == "true")
         runBlocking {
             val repository = ComicRepository()
             val comics = repository.browse(sourceId = "ehentai", categoryId = "0", page = 1)
@@ -53,7 +53,7 @@ class LiveComicTest {
 
     @Test
     fun jmBrowseDetailsAndChapterAreReadable() {
-        if (InstrumentationRegistry.getArguments().getString("live") != "true") return
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.live=true to run live tests", InstrumentationRegistry.getArguments().getString("live") == "true")
         runBlocking {
             val repository = ComicRepository()
             val comics = repository.browse(sourceId = "jm", categoryId = "0", page = 1)

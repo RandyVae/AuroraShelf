@@ -47,7 +47,9 @@ public final class AccountService: ObservableObject {
         )
         if profile != nil {
             await signIn(email: email, password: password)
-            message = "注册成功，请检查邮箱完成验证"
+            if token != nil {
+                message = "注册成功，请检查邮箱完成验证"
+            }
         }
     }
 
@@ -120,8 +122,6 @@ public final class AccountService: ObservableObject {
                 throw AccountError.server(json["message"] as? String ?? "账号请求失败（HTTP \(http.statusCode)）")
             }
             if let record = json["record"] as? [String: Any] {
-                let recordData = try JSONSerialization.data(withJSONObject: record)
-                let decoder = JSONDecoder()
                 profile = AccountProfile(
                     id: record["id"] as? String ?? "",
                     email: record["email"] as? String ?? "",
@@ -129,7 +129,6 @@ public final class AccountService: ObservableObject {
                     isVerified: record["verified"] as? Bool ?? false,
                     subscriptionStatus: (record["subscriptionStatus"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "free",
                 )
-                _ = try? decoder.decode([String: String].self, from: recordData)
                 if let profile, let saved = try? JSONEncoder().encode(profile) {
                     UserDefaults.standard.set(saved, forKey: Self.profileKey)
                 }
@@ -167,7 +166,8 @@ private enum KeychainTokenStore {
     private static let service = "com.aurorashelf.app.account"
     private static let account = "refresh-token"
 
-    static func save(_ token: String) {
+    @discardableResult
+    static func save(_ token: String) -> Bool {
         let data = Data(token.utf8)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -175,7 +175,12 @@ private enum KeychainTokenStore {
             kSecAttrAccount as String: account,
         ]
         SecItemDelete(query as CFDictionary)
-        SecItemAdd((query.merging([kSecValueData as String: data]) { _, new in new }) as CFDictionary, nil)
+        let insertQuery = query.merging([
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+        ]) { _, new in new }
+        let status = SecItemAdd(insertQuery as CFDictionary, nil)
+        return status == errSecSuccess
     }
 
     static func load() -> String? {

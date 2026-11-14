@@ -14,7 +14,7 @@ import org.junit.Test
 /** Opt-in source inventory audit; logs only stage results, never remote content or URLs. */
 class PreReleaseSourceAuditTest {
     @Test fun ikmmhReadsThroughFirstChapter(): Unit = runBlocking {
-        if (!isSourceAuditEnabled()) return@runBlocking
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.sourceAudit=true to run source audit tests", isSourceAuditEnabled())
         val repository = ComicRepository()
         val first = repository.browse("ikmmh", "全部", 1)
         check(first.isNotEmpty())
@@ -26,7 +26,7 @@ class PreReleaseSourceAuditTest {
     }
 
     @Test fun copyComicReadsThroughFirstChapter(): Unit = runBlocking {
-        if (!isSourceAuditEnabled()) return@runBlocking
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.sourceAudit=true to run source audit tests", isSourceAuditEnabled())
         val repository = ComicRepository()
         val first = repository.browse("copy", "", 1)
         check(first.isNotEmpty())
@@ -40,7 +40,7 @@ class PreReleaseSourceAuditTest {
     }
 
     @Test fun repairedPaginationReturnsNewRecords() = runBlocking {
-        if (!isSourceAuditEnabled()) return@runBlocking
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.sourceAudit=true to run source audit tests", isSourceAuditEnabled())
         val expected = setOf("KissJAV", "Pornhub", "SpankBang", "EPORNER", "MRDOUGA", "XNXX", "TOKYO Motion", "85po", "JAV-NONI", "XVideos", "xHamster")
         val repository = VideoRepository()
         for (source in ContentSourceCatalog.sources.filter { it.name in expected }) {
@@ -53,7 +53,7 @@ class PreReleaseSourceAuditTest {
     }
 
     @Test fun auditForumLists() = runBlocking {
-        if (!isSourceAuditEnabled()) return@runBlocking
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.sourceAudit=true to run source audit tests", isSourceAuditEnabled())
         for (page in 1..2) {
             val result = ForumRepository().load(page)
             for (sourceId in listOf("t66y", "t906")) {
@@ -66,7 +66,7 @@ class PreReleaseSourceAuditTest {
     }
 
     @Test fun auditAllConfiguredSources() = runBlocking {
-        if (!isSourceAuditEnabled()) return@runBlocking
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.sourceAudit=true to run source audit tests", isSourceAuditEnabled())
         val videos = VideoRepository()
         for (source in ContentSourceCatalog.sources) {
             val records = stage(source.name, "list") {

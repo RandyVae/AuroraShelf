@@ -52,7 +52,7 @@ public final class ComicRepository: ObservableObject {
     private var loadTask: Task<Void, Never>?
     private var activeRequestID = UUID()
     private var chapterCache: [String: [ComicPage]] = [:]
-    private var inFlightChapterTasks: [String: Task<[ComicPage], Error>] = [:]
+    private var inFlightChapterTasks: [String: (id: UUID, task: Task<[ComicPage], Error>)] = [:]
 
     public func cachedChapter(sourceId: String, comicId: String, chapterId: String) -> [ComicPage]? {
         let key = "\(sourceId):\(comicId):\(chapterId)"
@@ -828,8 +828,9 @@ public final class ComicRepository: ObservableObject {
             return cached
         }
         if let ongoing = inFlightChapterTasks[key] {
-            return try await ongoing.value
+            return try await ongoing.task.value
         }
+        let taskToken = UUID()
         let task = Task<[ComicPage], Error> {
             let pages: [ComicPage]
             switch sourceId {
@@ -862,8 +863,12 @@ public final class ComicRepository: ObservableObject {
             }
             return pages
         }
-        inFlightChapterTasks[key] = task
-        defer { inFlightChapterTasks[key] = nil }
+        inFlightChapterTasks[key] = (id: taskToken, task: task)
+        defer {
+            if inFlightChapterTasks[key]?.id == taskToken {
+                inFlightChapterTasks[key] = nil
+            }
+        }
 
         let pages = try await task.value
         chapterCache[key] = pages

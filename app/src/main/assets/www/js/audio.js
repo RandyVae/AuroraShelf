@@ -31,6 +31,7 @@
     this.current = null;
     this.sfxVolume = 0.8;
     this.bgmVolume = 0.55;
+    this.isMuted = false;
     this.unlocked = false;
     this.pool = new Map();
   }
@@ -50,14 +51,24 @@
   AudioManager.prototype.setVolumes = function (bgm, sfx) {
     this.bgmVolume = Math.max(0, Math.min(1, bgm));
     this.sfxVolume = Math.max(0, Math.min(1, sfx));
+    this.isMuted = (this.bgmVolume === 0 && this.sfxVolume === 0);
     if (this.bgmEl) this.bgmEl.volume = this.bgmVolume;
+  };
+
+  AudioManager.prototype.stopBgm = function () {
+    this.isMuted = true;
+    if (this.bgmEl) {
+      try { this.bgmEl.pause(); } catch (e) {}
+    }
   };
 
   AudioManager.prototype.playBgm = function (name, force) {
     const src = BGM[name];
     if (!src) return;
     this.current = name;
-    if (!this.bgmEl || this.bgmEl.dataset.src === src) return;
+    this.isMuted = false;
+    if (!this.bgmEl) return;
+    if (!force && this.bgmEl.dataset.src === src && !this.bgmEl.paused) return;
     this.bgmEl.dataset.src = src;
     this.bgmEl.src = src;
     this.bgmEl.volume = this.bgmVolume;
@@ -68,7 +79,7 @@
   AudioManager.prototype.playSfx = function (name) {
     const list = SFX[name];
     if (!list || !list.length) return;
-    if (!this.sfxVolume) return;
+    if (!this.sfxVolume || this.isMuted) return;
     const src = list[Math.floor(Math.random() * list.length)];
     try {
       const el = new Audio(src);
@@ -78,10 +89,13 @@
   };
 
   AudioManager.prototype.playVoice = function (path) {
-    if (!path) return;
+    if (!path || !this.sfxVolume || this.isMuted) return;
+    const src = (path.startsWith(A) || path.startsWith('/') || /^https?:/i.test(path))
+      ? path
+      : (A + path);
     try {
-      const el = new Audio(path);
-      el.volume = Math.max(0.5, this.sfxVolume);
+      const el = new Audio(src);
+      el.volume = this.sfxVolume;
       el.play().catch(() => {});
     } catch (e) { /* ignore */ }
   };

@@ -13,12 +13,14 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import javax.net.ssl.SSLHandshakeException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class ForumUiState(
     val posts: List<ForumPost> = emptyList(),
@@ -51,15 +53,17 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun ensureLoaded() {
         val state = mutableUiState.value
-        if (state.page != 0 || state.isLoading) return
-        val cached = preferences.cachedForumFirstPage()
-        if (cached != null && cached.posts.isNotEmpty() && state.posts.isEmpty()) {
-            mutableUiState.update {
-                it.copy(posts = cached.posts, canLoadMore = false, error = null, loadMoreError = null)
+        if (state.page != 0 || state.isLoading || loadJob?.isActive == true) return
+        loadJob = viewModelScope.launch {
+            val cached = withContext(Dispatchers.IO) { preferences.cachedForumFirstPage() }
+            if (cached != null && cached.posts.isNotEmpty() && mutableUiState.value.posts.isEmpty()) {
+                mutableUiState.update {
+                    it.copy(posts = cached.posts, canLoadMore = false, error = null, loadMoreError = null)
+                }
+                logSafely { Log.i(TAG, "first-screen cache posts=${cached.posts.size}") }
             }
-            logSafely { Log.i(TAG, "first-screen cache posts=${cached.posts.size}") }
+            performRefresh()
         }
-        refresh()
     }
 
     fun refresh() {
@@ -67,47 +71,53 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
         prefetchJob?.cancel()
         clearPrefetched()
         loadJob = viewModelScope.launch {
-            val startedAt = System.currentTimeMillis()
-            var loggedFirstResult = false
-            mutableUiState.update {
-                it.copy(isLoading = true, isLoadingMore = false, error = null, loadMoreError = null, unavailableSources = emptyList())
-            }
-            runCatching {
-                repository.loadProgressively(1) { posts, unavailable, canLoadMore ->
-                    if (posts.isEmpty()) return@loadProgressively
-                    if (!loggedFirstResult) {
-                        loggedFirstResult = true
-                        logSafely {
-                            Log.i(TAG, "first-screen network ms=${System.currentTimeMillis() - startedAt} posts=${posts.size}")
-                        }
-                    }
-                    mutableUiState.update {
-                        it.copy(
-                            posts = posts,
-                            page = 1,
-                            canLoadMore = canLoadMore,
-                            error = null,
-                            loadMoreError = null,
-                            unavailableSources = unavailable,
-                        )
+            performRefresh()
+        }
+    }
+
+    private suspend fun performRefresh() {
+        val startedAt = System.currentTimeMillis()
+        var loggedFirstResult = false
+        mutableUiState.update {
+            it.copy(isLoading = true, isLoadingMore = false, error = null, loadMoreError = null, unavailableSources = emptyList())
+        }
+        runCatching {
+            repository.loadProgressively(1) { posts, unavailable, canLoadMore ->
+                if (posts.isEmpty()) return@loadProgressively
+                if (!loggedFirstResult) {
+                    loggedFirstResult = true
+                    logSafely {
+                        Log.i(TAG, "first-screen network ms=${System.currentTimeMillis() - startedAt} posts=${posts.size}")
                     }
                 }
-            }.onSuccess { page ->
                 mutableUiState.update {
                     it.copy(
-                        posts = page.posts,
+                        posts = posts,
                         page = 1,
-                        canLoadMore = page.canLoadMore,
-                        isLoading = false,
+                        canLoadMore = canLoadMore,
                         error = null,
                         loadMoreError = null,
-                        unavailableSources = page.unavailableSources,
+                        unavailableSources = unavailable,
                     )
                 }
-                if (page.posts.isNotEmpty()) preferences.saveForumFirstPage(page.posts)
-                if (page.canLoadMore && page.posts.isNotEmpty()) prefetchPage(2)
-            }.onFailure(::handleFailure)
-        }
+            }
+        }.onSuccess { page ->
+            mutableUiState.update {
+                it.copy(
+                    posts = page.posts,
+                    page = 1,
+                    canLoadMore = page.canLoadMore,
+                    isLoading = false,
+                    error = null,
+                    loadMoreError = null,
+                    unavailableSources = page.unavailableSources,
+                )
+            }
+            if (page.posts.isNotEmpty()) {
+                withContext(Dispatchers.IO) { preferences.saveForumFirstPage(page.posts) }
+            }
+            if (page.canLoadMore && page.posts.isNotEmpty()) prefetchPage(2)
+        }.onFailure(::handleFailure)
     }
 
     fun loadMore() {
@@ -199,7 +209,7 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
         is UnknownHostException -> "当前网络无法连接论坛，请检查网络或 DNS 后重试"
         is SocketTimeoutException -> "论坛响应超时，请稍后重试"
         is SSLHandshakeException -> "论坛安全连接失败，请确认系统时间和网络环境"
-        is IOException -> message ?: "论坛连接失败，请稍后重试"
+        is IOException -> com.aurorashelf.app.data.VideoRepository.friendlyLoadErrorMessage(this, "论坛连接失败，请稍后重试")
         else -> "论坛暂时无法加载，请稍后重试"
     }
 

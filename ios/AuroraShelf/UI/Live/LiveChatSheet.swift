@@ -129,7 +129,7 @@ private struct LiveRoomWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate {
         var reloadID = UUID()
         private let onStatus: (String) -> Void
-        private var pollTimer: Timer?
+        nonisolated(unsafe) private var pollTimer: Timer?
 
         init(onStatus: @escaping (String) -> Void) {
             self.onStatus = onStatus
@@ -141,35 +141,39 @@ private struct LiveRoomWebView: UIViewRepresentable {
         }
 
         deinit {
-            cleanup()
+            pollTimer?.invalidate()
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             onStatus("已连接 · 正在监听消息")
             pollTimer?.invalidate()
             pollTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self, weak webView] _ in
-                guard let self, let webView else { return }
-                let script = """
-                (() => {
-                  const overlay = document.getElementById('entrance_terms_overlay') || document.getElementById('entrance_terms');
-                  if (overlay) { try { overlay.remove(); } catch(e) {} }
-                  const accept = document.querySelector('.btn-visitors-agreement-accept, [class*=visitors-agreement-accept]');
-                  if (accept) { try { accept.click(); } catch(e) {} }
+                Task { @MainActor [weak self, weak webView] in
+                    guard let self, let webView else { return }
+                    let script = """
+                    (() => {
+                      const overlay = document.getElementById('entrance_terms_overlay') || document.getElementById('entrance_terms');
+                      if (overlay) { try { overlay.remove(); } catch(e) {} }
+                      const accept = document.querySelector('.btn-visitors-agreement-accept, [class*=visitors-agreement-accept]');
+                      if (accept) { try { accept.click(); } catch(e) {} }
 
-                  const selectors = '[class*=message],[class*=chat],[data-testid*=message],[data-testid*=chat]';
-                  const nodes = document.querySelectorAll(selectors).length;
-                  const text = (document.body?.innerText || '').length;
-                  return JSON.stringify({nodes, text});
-                })()
-                """
-                webView.evaluateJavaScript(script) { [weak self] result, _ in
-                    guard let self,
-                          let json = result as? String,
-                          let data = json.data(using: .utf8),
-                          let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                          let nodes = payload["nodes"] as? Int,
-                          let text = payload["text"] as? Int else { return }
-                    self.onStatus("已连接 · 实时消息节点 \(nodes) · 文本 \(text) 字")
+                      const selectors = '[class*=message],[class*=chat],[data-testid*=message],[data-testid*=chat]';
+                      const nodes = document.querySelectorAll(selectors).length;
+                      const text = (document.body?.innerText || '').length;
+                      return JSON.stringify({nodes, text});
+                    })()
+                    """
+                    webView.evaluateJavaScript(script) { [weak self] result, _ in
+                        Task { @MainActor [weak self] in
+                            guard let self,
+                                  let json = result as? String,
+                                  let data = json.data(using: .utf8),
+                                  let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                                  let nodes = payload["nodes"] as? Int,
+                                  let text = payload["text"] as? Int else { return }
+                            self.onStatus("已连接 · 实时消息节点 \(nodes) · 文本 \(text) 字")
+                        }
+                    }
                 }
             }
         }

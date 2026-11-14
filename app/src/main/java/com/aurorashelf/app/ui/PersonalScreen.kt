@@ -51,6 +51,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -126,6 +127,7 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -171,12 +173,8 @@ import com.aurorashelf.app.data.OfflineVideo
 import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
 import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
 import com.aurorashelf.app.ui.theme.AuroraCoral
-import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
 import com.aurorashelf.app.ui.theme.AuroraMediaLabel
-import com.aurorashelf.app.ui.theme.AuroraMediaMuted
 import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
-import com.aurorashelf.app.ui.theme.AuroraMediaSurface
-import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
 import com.aurorashelf.app.ui.theme.AuroraProfileAccent
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
@@ -217,7 +215,7 @@ internal fun PersonalScreen(
     onAccount: () -> Unit = {},
 ) {
     BackHandler(enabled = route != PersonalRoute.OVERVIEW) { onRoute(PersonalRoute.OVERVIEW) }
-    Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         AnimatedContent(
             targetState = route,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
@@ -326,12 +324,12 @@ private fun PersonalOverview(
                             fontSize = 24.sp,
                             fontWeight = FontWeight.ExtraBold,
                         ),
-                        color = Color.White,
+                        color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
                         "片单、历史与应用设置",
-                        color = AuroraMediaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -397,9 +395,9 @@ private fun PersonalOverview(
                     onClick = onFavorites,
                     modifier = Modifier.testTag("personal-favorites-entry"),
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = Color(0xFF262626))
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsNavigationRow(
-                    icon = { Icon(Icons.Default.History, contentDescription = null, tint = Color.White) },
+                    icon = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface) },
                     title = "历史",
                     supporting = "查看最近播放过的视频",
                     value = "$historyCount 条",
@@ -432,9 +430,9 @@ private fun PersonalOverview(
                     onClick = onAccount,
                     modifier = Modifier.testTag("personal-account-entry"),
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = Color(0xFF262626))
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsNavigationRow(
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White) },
+                    icon = { Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface) },
                     title = "设置",
                     supporting = "视频源、漫画源与离线缓存",
                     value = currentSource,
@@ -549,7 +547,7 @@ private fun SettingsScreen(
         )
     }
     Surface(
-        color = AuroraImmersiveBackground,
+        color = MaterialTheme.colorScheme.background,
         modifier = Modifier.fillMaxSize(),
     ) {
         AnimatedContent(
@@ -823,9 +821,10 @@ private fun IntroPreferenceRow(
 @Composable
 private fun SettingsCard(content: @Composable () -> Unit) {
     Surface(
-        color = AuroraMediaSurface,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, Color(0xFF262626)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         modifier = Modifier.fillMaxWidth(),
         content = content,
     )
@@ -871,17 +870,17 @@ private fun SettingsNavigationRow(
     ) {
         Surface(
             shape = RoundedCornerShape(10.dp),
-            color = Color(0xFF262626),
-            contentColor = Color.White,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(44.dp),
         ) {
             Box(contentAlignment = Alignment.Center, content = { icon() })
         }
         Column(verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             Text(
                 supporting,
-                color = AuroraMediaMuted,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -898,7 +897,7 @@ private fun SettingsNavigationRow(
         Icon(
             Icons.AutoMirrored.Filled.ArrowForward,
             contentDescription = null,
-            tint = AuroraMediaMuted,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -915,17 +914,46 @@ private fun SettingsPageHeader(
         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = backDescription, tint = Color.White)
+            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = backDescription, tint = MaterialTheme.colorScheme.onBackground)
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 title,
                 style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.semantics { heading() },
             )
-            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = AuroraMediaMuted)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+/** Pins [SettingsPageHeader] above a scrollable settings subpage so back navigation stays accessible during scroll or IME focus. */
+@Composable
+private fun SettingsSubpageScaffold(
+    title: String,
+    subtitle: String,
+    onBack: () -> Unit,
+    listTag: String,
+    content: LazyListScope.() -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
+        Box(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp)) {
+            SettingsPageHeader(title = title, subtitle = subtitle, onBack = onBack)
+        }
+        LazyColumn(
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = LocalDockHeight.current + 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .testTag(listTag),
+            content = content,
+        )
     }
 }
 
@@ -947,12 +975,12 @@ private fun VideoSourcesPage(
     }
     val directSources = remember(filteredSources) { filteredSources.filter { it.isDirectDomestic } }
     val overseasSources = remember(filteredSources) { filteredSources.filter { !it.isDirectDomestic } }
-    LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = LocalDockHeight.current + 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).testTag("video-sources-page"),
+    SettingsSubpageScaffold(
+        title = "视频源",
+        subtitle = "选择后立即刷新首页内容",
+        onBack = onBack,
+        listTag = "video-sources-page",
     ) {
-        item { SettingsPageHeader("视频源", "选择后立即刷新首页内容", onBack) }
         item {
             CenteredSearchBar(
                 query = filter,
@@ -999,16 +1027,16 @@ private fun VideoSourcesPage(
         item { SettingsSectionLabel("自定义站点") }
         item {
             Surface(
-                color = AuroraMediaSurface,
-                contentColor = Color.White,
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, Color(0xFF262626)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(18.dp)) {
                     Text(
                         "仅适用于与默认站点结构兼容的地址。不会在地址中保存账号信息。",
-                        color = AuroraMediaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     OutlinedTextField(
@@ -1052,20 +1080,12 @@ private fun ComicSourcesPage(
                 source.description.contains(filter, ignoreCase = true)
         }
     }
-    LazyColumn(
-        contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
-            top = 14.dp,
-            bottom = LocalDockHeight.current + 24.dp,
-        ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .testTag("comic-sources-page"),
+    SettingsSubpageScaffold(
+        title = "漫画源",
+        subtitle = "选择后立即刷新漫画内容",
+        onBack = onBack,
+        listTag = "comic-sources-page",
     ) {
-        item { SettingsPageHeader("漫画源", "选择后立即刷新漫画内容", onBack) }
         item {
             CenteredSearchBar(
                 query = filter,
@@ -1107,23 +1127,17 @@ private fun OfflineCachePage(
     onRetry: (OfflineVideo) -> Unit,
     onRemove: (String) -> Unit,
 ) {
-    LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 14.dp, bottom = LocalDockHeight.current + 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).testTag("offline-cache-page"),
+    SettingsSubpageScaffold(
+        title = "离线缓存",
+        subtitle = "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
+        onBack = onBack,
+        listTag = "offline-cache-page",
     ) {
         item {
-            SettingsPageHeader(
-                title = "离线缓存",
-                subtitle = "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
-                onBack = onBack,
-            )
-        }
-        item {
             Surface(
-                color = AuroraMediaSurfaceVariant,
+                color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, Color(0xFF2B2B2B)),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
@@ -1134,7 +1148,7 @@ private fun OfflineCachePage(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("本地存储空间", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                        Text("本地存储空间", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
                         Text("已占用 ${formatBytes(downloadedBytes)}", style = MaterialTheme.typography.labelSmall, color = AuroraCoral)
                     }
                     Box(
@@ -1142,7 +1156,7 @@ private fun OfflineCachePage(
                             .fillMaxWidth()
                             .height(8.dp)
                             .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF333333)),
+                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)),
                     ) {
                         Row(Modifier.fillMaxSize()) {
                             Box(
@@ -1166,11 +1180,11 @@ private fun OfflineCachePage(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF0A84FF)))
-                            Text("已缓存视频", style = MaterialTheme.typography.labelSmall, color = AuroraMediaMuted)
+                            Text("已缓存视频", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFFF9F0A)))
-                            Text("海报与元数据", style = MaterialTheme.typography.labelSmall, color = AuroraMediaMuted)
+                            Text("海报与元数据", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -1179,10 +1193,10 @@ private fun OfflineCachePage(
         if (cachedVideos.isEmpty()) {
             item {
                 Surface(
-                    color = AuroraMediaSurface,
-                    contentColor = Color.White,
+                    color = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                     shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, Color(0xFF262626)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(
@@ -1196,10 +1210,10 @@ private fun OfflineCachePage(
                             tint = AuroraCoral,
                             modifier = Modifier.size(36.dp),
                         )
-                        Text("暂无离线内容", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                        Text("暂无离线内容", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
                         Text(
                             "播放视频时点击缓存按钮，任务和已下载内容会显示在这里。",
-                            color = AuroraMediaMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Button(
@@ -1253,9 +1267,9 @@ private fun OfflineCacheRow(
     Surface(
         onClick = onOpen,
         enabled = cached.isPlayableOffline,
-        color = AuroraMediaSurface,
-        contentColor = Color.White,
-        border = BorderStroke(1.dp, Color(0xFF262626)),
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         shape = RoundedCornerShape(20.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -1272,7 +1286,7 @@ private fun OfflineCacheRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 val detail = buildList {
                     cached.episodeLabel?.let(::add)
@@ -1287,7 +1301,7 @@ private fun OfflineCacheRow(
                         },
                     )
                 }.joinToString(" · ")
-                Text(detail, color = AuroraMediaMuted, style = MaterialTheme.typography.bodySmall)
+                Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 if (cached.state == OfflineCacheState.DOWNLOADING) {
                     LinearProgressIndicator(
                         progress = { (cached.percentDownloaded / 100f).coerceIn(0f, 1f) },
@@ -1310,17 +1324,19 @@ private fun OfflineCacheRow(
 @Composable
 private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -> Unit) {
     val haptic = LocalHapticFeedback.current
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val selectedBg = if (isLight) Color(0xFFEAF2FF) else Color(0xFF1E2838)
     Surface(
         onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             if (!selected) onClick()
         },
-        color = if (selected) Color(0xFF1E2838) else AuroraMediaSurface,
-        contentColor = if (selected) AuroraProfileAccent else Color.White,
+        color = if (selected) selectedBg else MaterialTheme.colorScheme.surface,
+        contentColor = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(
             1.dp,
-            if (selected) AuroraProfileAccent.copy(alpha = 0.55f) else Color(0xFF262626),
+            if (selected) AuroraProfileAccent.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant,
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1332,17 +1348,32 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.Default.PlayArrow,
                 contentDescription = null,
-                tint = if (selected) AuroraProfileAccent else Color.White,
+                tint = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Column(Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
-                    val badgeBg = if (source.isDirectDomestic) Color(0x1F34C759) else Color(0x1F0A84FF)
-                    val badgeBorder = if (source.isDirectDomestic) Color(0x4034C759) else Color(0x400A84FF)
-                    val badgeText = if (source.isDirectDomestic) Color(0xFF34C759) else Color(0xFF64D2FF)
+                    Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                    val badgeBg = when {
+                        isLight && source.isDirectDomestic -> Color(0x1A1B873F)
+                        isLight -> Color(0x1A0066CC)
+                        source.isDirectDomestic -> Color(0x1F34C759)
+                        else -> Color(0x1F0A84FF)
+                    }
+                    val badgeBorder = when {
+                        isLight && source.isDirectDomestic -> Color(0x4D1B873F)
+                        isLight -> Color(0x4D0066CC)
+                        source.isDirectDomestic -> Color(0x4034C759)
+                        else -> Color(0x400A84FF)
+                    }
+                    val badgeText = when {
+                        isLight && source.isDirectDomestic -> Color(0xFF137333)
+                        isLight -> Color(0xFF0055B3)
+                        source.isDirectDomestic -> Color(0xFF34C759)
+                        else -> Color(0xFF64D2FF)
+                    }
                     val badgeLabel = if (source.isDirectDomestic) "直连" else "海外"
                     Surface(
                         color = badgeBg,
@@ -1361,7 +1392,7 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
                     }
                 }
                 Spacer(Modifier.height(2.dp))
-                Text(source.description, style = MaterialTheme.typography.bodySmall, color = AuroraMediaMuted)
+                Text(source.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (selected) {
                 Text("使用中", style = MaterialTheme.typography.labelMedium, color = AuroraProfileAccent)
@@ -1373,17 +1404,19 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
 @Composable
 private fun ComicSourceOption(source: ComicSourceInfo, selected: Boolean, onClick: () -> Unit) {
     val haptic = LocalHapticFeedback.current
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val selectedBg = if (isLight) Color(0xFFEAF2FF) else Color(0xFF1E2838)
     Surface(
         onClick = {
             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             if (!selected) onClick()
         },
-        color = if (selected) Color(0xFF1E2838) else AuroraMediaSurface,
-        contentColor = if (selected) AuroraProfileAccent else Color.White,
+        color = if (selected) selectedBg else MaterialTheme.colorScheme.surface,
+        contentColor = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(
             1.dp,
-            if (selected) AuroraProfileAccent.copy(alpha = 0.55f) else Color(0xFF262626),
+            if (selected) AuroraProfileAccent.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant,
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1395,14 +1428,14 @@ private fun ComicSourceOption(source: ComicSourceInfo, selected: Boolean, onClic
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.AutoMirrored.Filled.MenuBook,
                 contentDescription = null,
-                tint = if (selected) AuroraProfileAccent else Color.White,
+                tint = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Column(Modifier.weight(1f)) {
-                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     source.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = AuroraMediaMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Text(
@@ -1432,20 +1465,12 @@ private fun LiveSourcesPage(
                 source.description.contains(filter, ignoreCase = true)
         }
     }
-    LazyColumn(
-        contentPadding = PaddingValues(
-            start = 20.dp,
-            end = 20.dp,
-            top = 14.dp,
-            bottom = LocalDockHeight.current + 24.dp,
-        ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .testTag("live-sources-page"),
+    SettingsSubpageScaffold(
+        title = "直播源",
+        subtitle = "选择后立即刷新直播内容",
+        onBack = onBack,
+        listTag = "live-sources-page",
     ) {
-        item { SettingsPageHeader("直播源", "选择后立即刷新直播内容", onBack) }
         item {
             CenteredSearchBar(
                 query = filter,
@@ -1481,14 +1506,16 @@ private fun LiveSourceOption(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val selectedBg = if (isLight) Color(0xFFEAF2FF) else MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
     Surface(
         onClick = onClick,
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
+        color = if (selected) selectedBg else MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(18.dp),
         border = BorderStroke(
             1.dp,
             if (selected) AuroraProfileAccent.copy(alpha = 0.85f)
-            else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
+            else MaterialTheme.colorScheme.outlineVariant,
         ),
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1500,14 +1527,14 @@ private fun LiveSourceOption(
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.Default.LiveTv,
                 contentDescription = null,
-                tint = if (selected) AuroraProfileAccent else Color.White,
+                tint = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Column(Modifier.weight(1f)) {
-                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color.White)
+                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     source.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = AuroraMediaMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (selected) {

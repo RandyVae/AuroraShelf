@@ -192,10 +192,17 @@ public struct ComicReaderView: View {
                                 }) {
                                     Text("上一话")
                                         .font(.headline)
-                                        .foregroundStyle(currentChapterIndex > 0 ? .white : .secondary)
+                                        .foregroundStyle(
+                                            currentChapterIndex > 0
+                                                ? (readerTheme.isDark ? Color.white : Color.black.opacity(0.88))
+                                                : Color.secondary
+                                        )
                                         .padding(.horizontal, AuroraMetrics.spacingXL)
                                         .frame(height: AuroraMetrics.minTouchTarget)
-                                        .background(AuroraColor.surfaceCard, in: .capsule)
+                                        .background(
+                                            readerTheme.isDark ? AuroraColor.surfaceCard : Color.black.opacity(0.08),
+                                            in: .capsule
+                                        )
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(currentChapterIndex <= 0)
@@ -218,7 +225,7 @@ public struct ComicReaderView: View {
                             
                             Text("已阅至本话末尾")
                                 .font(.footnote)
-                                .foregroundStyle(AuroraColor.textTertiary)
+                                .foregroundStyle(readerTheme.isDark ? Color.white.opacity(0.6) : Color.black.opacity(0.55))
                         }
                         .padding(.vertical, AuroraMetrics.spacingXXL)
                     }
@@ -231,14 +238,14 @@ public struct ComicReaderView: View {
             }
             
             VStack {
-                PlayerOverlayBar(
-                    title: comic.title,
-                    subtitle: currentChapter.map { "\($0.title) · 连载瀑布流" } ?? "章节不可用",
-                    onDismiss: {
-                        onDismiss()
-                        dismiss()
-                    }
-                ) {
+                if showControls {
+                    PlayerOverlayBar(
+                        title: comic.title,
+                        subtitle: currentChapter.map { "\($0.title) · 连载瀑布流" } ?? "章节不可用",
+                        onDismiss: {
+                            onDismiss()
+                        }
+                    ) {
                     HStack(spacing: 8) {
                         // 离线下载当前话与整本漫画
                         if let chapter = currentChapter {
@@ -326,6 +333,8 @@ public struct ComicReaderView: View {
                         .accessibilityLabel("阅读背景底色，当前：\(readerTheme.rawValue)")
                     }
                 }
+                .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 Spacer()
 
@@ -339,13 +348,14 @@ public struct ComicReaderView: View {
                             .frame(height: AuroraMetrics.minTouchTarget)
                             .glassEffect(.regular.interactive(), in: .capsule)
                     }
+                    .environment(\.colorScheme, .dark)
                     .padding(.bottom, max(DeviceLayout.safeAreaBottom, AuroraMetrics.spacingXL))
                 }
             }
             .zIndex(10)
         }
         .ignoresSafeArea()
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(readerTheme.isDark ? .dark : .light)
         .onAppear {
             loadPages()
         }
@@ -355,7 +365,6 @@ public struct ComicReaderView: View {
         .enableSwipeBack {
             pageLoadTask?.cancel()
             onDismiss()
-            dismiss()
         }
     }
     

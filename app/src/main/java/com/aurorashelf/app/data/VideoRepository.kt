@@ -66,9 +66,18 @@ class VideoRepository {
             val document = try {
                 fetchDocument(requestUrl, baseUrl)
             } catch (error: HttpStatusException) {
-                // Huangguo ranking pages or end-of-feed numbered URLs return 404.
-                if (page > 1 && error.statusCode == 404 && (ContentSourceCatalog.isHuangguo(baseUrl) || ContentSourceCatalog.is91Dongman(baseUrl))) return@withContext emptyList()
-                throw error
+                // Huangguo ranking pages or end-of-feed numbered URLs return 404,
+                // and deprecated routes such as /ai-huanlian/ return 410 Gone.
+                if (ContentSourceCatalog.isHuangguo(baseUrl) && (error.statusCode == 404 || error.statusCode == 410)) {
+                    if (page > 1 && error.statusCode == 404) return@withContext emptyList()
+                    val fallbackPath = if (page <= 1) "/original/" else "/original/$page/"
+                    val fallbackUrl = URI(baseUrl.trimEnd('/')).resolve(fallbackPath).toString()
+                    fetchDocument(fallbackUrl, baseUrl)
+                } else if (page > 1 && error.statusCode == 404 && ContentSourceCatalog.is91Dongman(baseUrl)) {
+                    return@withContext emptyList()
+                } else {
+                    throw error
+                }
             }
             val records = parseDocument(document, baseUrl)
             if (page == 1 && records.isEmpty()) {
@@ -693,6 +702,34 @@ class VideoRepository {
             .digest(toByteArray())
             .take(12)
             .joinToString("") { "%02x".format(it) }
+
+        internal fun friendlyLoadErrorMessage(error: Throwable, fallback: String = "内容加载失败，请稍后重试。"): String {
+            val raw = error.message?.trim().orEmpty()
+            val lower = raw.lowercase()
+            return when {
+                error is java.net.UnknownHostException ||
+                    lower.contains("unable to resolve host") ||
+                    lower.contains("unknownhost") ||
+                    lower.contains("nxdomain") ->
+                    "当前节点无法解析该源域名，请检查网络或代理设置后切换可用数据源"
+                lower.contains("connection closed") ||
+                    lower.contains("unexpected end of stream") ||
+                    lower.contains("eofexception") ||
+                    lower.contains("connection reset") ||
+                    lower.contains("broken pipe") ->
+                    "源站连接被意外中断（可能域名暂不可用或被防火墙拦截），请稍后重试或切换其他数据源"
+                error is java.net.SocketTimeoutException || lower.contains("timeout") ->
+                    "请求源站超时，请检查当前网络线路后重试"
+                error is javax.net.ssl.SSLException || lower.contains("ssl") || lower.contains("handshake") ->
+                    "与源站建立安全连接失败（TLS 握手异常），请确认网络代理或系统时间"
+                lower.contains("http error fetching url") && lower.contains("status=404") ->
+                    "目标页面或栏目已失效（HTTP 404），请尝试切换分类或更换数据源"
+                lower.contains("http error fetching url") && lower.contains("status=403") ->
+                    "源站拒绝访问（HTTP 403 / 触发防护验证），请稍后重试或切换其他源"
+                raw.isBlank() -> fallback
+                else -> raw
+            }
+        }
     }
 
     private fun Element.documentBase(fallback: String): String = baseUri().ifBlank { "$fallback/" }

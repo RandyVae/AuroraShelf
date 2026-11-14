@@ -93,15 +93,31 @@ function probe(source) {
       });
       res.on('end', () => {
         const durationMs = Date.now() - startTime;
+        const preview = Buffer.concat(chunks).toString('utf8').trim();
+        let jsonAppFailure = null;
+        if (preview.startsWith('{') || preview.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(preview);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && parsed.code !== undefined) {
+              const codeNum = Number(parsed.code);
+              if (Number.isFinite(codeNum) && codeNum !== 200 && codeNum !== 0) {
+                jsonAppFailure = `API code=${codeNum}${parsed.errorMsg || parsed.msg ? `: ${parsed.errorMsg || parsed.msg}` : ''}`;
+              }
+            }
+          } catch (_) {
+            // Partial chunk JSON preview; ignore parse error unless truncated
+          }
+        }
+        const okHttp = res.statusCode >= 200 && res.statusCode < 400;
         resolve({
           ...source,
           status: res.statusCode,
           durationMs,
           bytes,
-          success: (res.statusCode >= 200 && res.statusCode < 400) ||
+          success: (okHttp && !jsonAppFailure) ||
             (source.expectedAntiBot && res.statusCode === 403 && bytes > 0) ||
             (source.requiresAuthentication && [400, 401, 403].includes(res.statusCode)),
-          error: null,
+          error: jsonAppFailure,
         });
       });
     });

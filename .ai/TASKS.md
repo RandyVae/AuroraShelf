@@ -1,5 +1,7 @@
 # Active
 
+- [x] 全项目 Bug 审查、多端 UI 防错位与双端模拟器 Release 级实测交付（v2.16.28 / Build 254）：Android 修复 ANR、日间首屏与播放页状态栏高对比背板、平板响应式 Hero 高度、`SettingsSubpageScaffold` 固定设置子页返回栏（`AuroraFlowTest` 10/10）；iOS 消除 `HeroBanner`/`LiveScreen` 在 Duo 下的左右白边并上调操作栏底部间距；Web 游戏 `.age-badge` 移至左上角避让浮动胶囊；Android `lintDebug`（0 errors）、`testDebugUnitTest`（245 项 0 失败 7 跳过）、非在线 UI/无障碍设备测试（20/20）与 iOS XCTest（169 项 0 失败 6 跳过）全部通过，Release OTA（`Netgrey.apk` / `Netgrey.ipa`）同步发布至 `https://bananarey.us` — 2026-11-14。
+
 - [x] 播放器组件与 UI 对标 Apple TV 全方位审查与双端重构（v2.16.27 / Build 253）：iOS 合流双播放器、激活 `.playback` 音频会话、打通 Up Next 断点续播与自动存盘、补齐 PiP / 字幕音轨菜单 / InSight 规格抽屉 / 键盘快捷键、消除双 HUD 重叠与拖拽跳针；Android 重构为 Compose 原生 Apple TV OSD 控制层（`AppleTvScrubberBar` 悬浮时间气泡、剩余时间切换、倍速、画幅 Fit/Zoom、三区双击与左右滑调光调音 HUD、控制栏同步渐隐零遮挡） — 2026-11-14。
 
 - [x] 逐源分类统一与 iPad 横屏 YouTube 双栏布局：Android 完整 kiosk 分类适配、iOS 41 个 XVideos 分类与国际源原站分类收敛、iPad 横屏播放器/推荐双栏、Android 243 项 JVM 单测与 iOS build-for-testing 通过 — 2026-11-14；JAVSB 外部 TLS 阻塞、iOS Simulator runtime 缺失和既有 Android lint 错误已记录。

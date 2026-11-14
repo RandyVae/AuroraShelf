@@ -267,6 +267,7 @@
     this.ended = false;
     this.running = true;
     this.units.filter((u) => u.side === 'ally').forEach((u) => {
+      u.alive = true;
       u.dead = false;
       u.hp = u.maxHp;
       u.shield = Math.round(u.maxHp * 0.6);

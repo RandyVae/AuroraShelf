@@ -37,6 +37,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -100,9 +101,7 @@ class GameActivity : ComponentActivity() {
         wv.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false)
         wv.isVerticalScrollBarEnabled = false
         wv.isHorizontalScrollBarEnabled = false
-        if (Build.VERSION.SDK_INT >= 26) {
-            wv.defaultFocusHighlightEnabled = false
-        }
+        wv.defaultFocusHighlightEnabled = false
         wv.overScrollMode = View.OVER_SCROLL_NEVER
 
         wv.addJavascriptInterface(GameSaveBridge(applicationContext), "AndroidSave")
@@ -153,8 +152,23 @@ class GameActivity : ComponentActivity() {
             marginEnd = dpToPx(16)
         }
         rootLayout.addView(capsule, capsuleLp)
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { _, windowInsets ->
+            val topInset = windowInsets.getInsets(
+                WindowInsetsCompat.Type.statusBars() or WindowInsetsCompat.Type.displayCutout(),
+            ).top
+            val lp = capsule.layoutParams as? FrameLayout.LayoutParams
+            if (lp != null) {
+                val targetTop = max(dpToPx(12), topInset + dpToPx(8))
+                if (lp.topMargin != targetTop) {
+                    lp.topMargin = targetTop
+                    capsule.layoutParams = lp
+                }
+            }
+            windowInsets
+        }
 
         setContentView(rootLayout)
+        ViewCompat.requestApplyInsets(rootLayout)
         hideSystemBars()
         scheduleAutoFade()
 
@@ -303,8 +317,6 @@ class GameActivity : ComponentActivity() {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         webView?.evaluateJavascript("window.APP && APP.destroyGame && APP.destroyGame()", null)
-        assetServer?.stop()
-        assetServer = null
         webView?.let { wv ->
             wv.stopLoading()
             (wv.parent as? ViewGroup)?.removeView(wv)
@@ -312,6 +324,8 @@ class GameActivity : ComponentActivity() {
             wv.destroy()
         }
         webView = null
+        assetServer?.stop()
+        assetServer = null
         exitCapsule = null
         super.onDestroy()
     }

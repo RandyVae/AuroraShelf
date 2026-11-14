@@ -212,9 +212,8 @@ internal object CoverImageLoader {
             if (encryptedCover || bytes.size >= AES_BLOCK_SIZE) {
                 decryptIfNeeded(bytes, cryptoConfig)
                     ?: decryptIfNeeded(bytes, FALLBACK_CONFIG)
-                    ?: bytes
             } else {
-                bytes
+                null
             }
         }
     }
@@ -231,10 +230,15 @@ internal object CoverImageLoader {
     internal fun missAvFallbackUrl(address: String): String? = runCatching {
         val uri = URI(address)
         val host = uri.host?.lowercase(Locale.US) ?: return@runCatching null
-        if (host == "fourhoi.com" || host.endsWith(".fourhoi.com")) {
-            URI(uri.scheme, uri.userInfo, "fourhoi.mrstcdn.store", uri.port, uri.rawPath, uri.rawQuery, uri.rawFragment).toString()
-        } else {
-            null
+        val path = uri.rawPath.orEmpty()
+        when {
+            host == "fourhoi.com" || host.endsWith(".fourhoi.com") ->
+                URI(uri.scheme, uri.userInfo, "fourhoi.mrstcdn.store", uri.port, uri.rawPath, uri.rawQuery, uri.rawFragment).toString()
+            path.endsWith("/cover-n.jpg", ignoreCase = true) ->
+                URI(uri.scheme, uri.userInfo, host, uri.port, path.dropLast("cover-n.jpg".length) + "cover-t.jpg", uri.rawQuery, uri.rawFragment).toString()
+            path.endsWith("/cover-t.jpg", ignoreCase = true) ->
+                URI(uri.scheme, uri.userInfo, host, uri.port, path.dropLast("cover-t.jpg".length) + "cover-n.jpg", uri.rawQuery, uri.rawFragment).toString()
+            else -> null
         }
     }.getOrNull()
 

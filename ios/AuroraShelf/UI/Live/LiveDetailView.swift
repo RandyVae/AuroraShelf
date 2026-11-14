@@ -26,13 +26,17 @@ public struct LiveDetailView: View {
 
     public var body: some View {
         GeometryReader { screenGeo in
+            let isPad = UIDevice.current.userInterfaceIdiom == .pad
             let isPhysicallyLandscape = screenGeo.size.width > screenGeo.size.height
-            let isRotated = isFullScreen && isLandscape && !isPhysicallyLandscape
+            let isRotated = !isPad && isFullScreen && isLandscape && !isPhysicallyLandscape
             let targetWidth = isRotated ? screenGeo.size.height : screenGeo.size.width
             let safeTop = DeviceLayout.safeAreaTop(in: screenGeo.size)
             let targetHeight: CGFloat = {
                 if isFullScreen {
                     return isRotated ? screenGeo.size.width : screenGeo.size.height
+                }
+                if isPad {
+                    return min((screenGeo.size.width * 9.0 / 16.0) + safeTop, screenGeo.size.height * 0.50)
                 }
                 return (screenGeo.size.width * 9.0 / 16.0) + safeTop
             }()
@@ -93,7 +97,6 @@ public struct LiveDetailView: View {
             }
         }
         .ignoresSafeArea()
-        .preferredColorScheme(.dark)
         .statusBarHidden(isFullScreen)
         .persistentSystemOverlays(isFullScreen ? .hidden : .automatic)
         .onAppear {
@@ -114,7 +117,6 @@ public struct LiveDetailView: View {
         }
         .enableSwipeBack(isEnabled: !isFullScreen) {
             onDismiss()
-            dismiss()
         }
     }
 
@@ -135,7 +137,6 @@ public struct LiveDetailView: View {
             topSafeArea: DeviceLayout.safeAreaTop(in: screenGeo.size),
             onDismiss: {
                 onDismiss()
-                dismiss()
             },
             onToggleHUD: { message in
                 showHUD(message)

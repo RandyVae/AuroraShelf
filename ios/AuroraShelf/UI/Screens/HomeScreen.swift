@@ -7,6 +7,7 @@ public struct HomeScreen: View {
     public let onOpenAccount: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     @State private var showSourcePicker: Bool = false
     @State private var selectedCategory: String = "全部"
@@ -174,14 +175,21 @@ public struct HomeScreen: View {
                                         }
                                         .padding(.horizontal, AuroraMetrics.contentInset)
 
-                                        LazyVGrid(
-                                            columns: [
+                                        let gridColumns = horizontalSizeClass == .regular
+                                            ? [GridItem(.adaptive(minimum: 240, maximum: 340), spacing: AuroraMetrics.spacingM)]
+                                            : [
                                                 GridItem(.flexible(), spacing: AuroraMetrics.spacingM),
                                                 GridItem(.flexible(), spacing: AuroraMetrics.spacingM)
-                                            ],
+                                            ]
+                                        let dropOffset = repo.top10Videos.isEmpty ? 1 : 11
+                                        let remainingVideos = Array(repo.feedVideos.dropFirst(dropOffset))
+                                        let gridVideos = remainingVideos.isEmpty ? repo.feedVideos : remainingVideos
+
+                                        LazyVGrid(
+                                            columns: gridColumns,
                                             spacing: AuroraMetrics.spacingL
                                         ) {
-                                            ForEach(repo.feedVideos.dropFirst(repo.top10Videos.isEmpty ? 1 : 11)) { video in
+                                            ForEach(gridVideos) { video in
                                                 PosterCard(
                                                     video: video,
                                                     onSelect: { playVideo(video) },
@@ -370,6 +378,11 @@ public struct HomeScreen: View {
         .onChange(of: playerCoordinator.activeVideo) { _, newVideo in
             if let v = newVideo, activePlaybackVideo != v {
                 activePlaybackVideo = v
+            }
+        }
+        .onChange(of: activePlaybackVideo) { _, newValue in
+            if newValue == nil && playerCoordinator.activeVideo != nil {
+                playerCoordinator.dismiss()
             }
         }
     }

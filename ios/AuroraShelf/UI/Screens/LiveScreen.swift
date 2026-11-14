@@ -330,15 +330,19 @@ public struct LiveHeroBanner: View {
 
     public var body: some View {
         ZStack(alignment: .bottom) {
-            AuroraCoverImage(
-                url: stream.snapshotUrl,
-                title: stream.username,
-                aspectRatio: isWideAspect ? 16 / 9 : 4 / 3,
-                contentMode: .fill,
-                cornerRadius: 0
-            )
-            .frame(maxWidth: .infinity, maxHeight: heroHeight)
-            .clipped()
+            Color.clear
+                .overlay(
+                    AuroraCoverImage(
+                        url: stream.snapshotUrl,
+                        title: stream.username,
+                        aspectRatio: nil,
+                        contentMode: .fill,
+                        cornerRadius: 0
+                    )
+                )
+                .frame(height: heroHeight)
+                .frame(maxWidth: .infinity)
+                .clipped()
 
             VStack(spacing: 0) {
                 LinearGradient(

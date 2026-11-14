@@ -22,8 +22,8 @@ android {
         applicationId = "com.aurorashelf.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 253
-        versionName = "2.16.27"
+        versionCode = 254
+        versionName = "2.16.28"
         buildConfigField("String", "AUTH_API_BASE_URL", "\"https://bananarey.us/auth-api\"")
 
         buildConfigField("String", "PICACG_API_KEY", sourceSecret("PICACG_API_KEY").asBuildConfigString())
@@ -40,6 +40,28 @@ android {
         vectorDrawables.useSupportLibrary = true
     }
 
+    signingConfigs {
+        create("releaseOptional") {
+            val storePath = providers.environmentVariable("AURORA_KEYSTORE_PATH").orNull
+                ?: sourceSecrets.getProperty("AURORA_KEYSTORE_PATH")
+            if (!storePath.isNullOrBlank() && file(storePath).isFile) {
+                storeFile = file(storePath)
+                storePassword = providers.environmentVariable("AURORA_KEYSTORE_PASSWORD").orNull
+                    ?: sourceSecrets.getProperty("AURORA_KEYSTORE_PASSWORD")
+                keyAlias = providers.environmentVariable("AURORA_KEY_ALIAS").orNull
+                    ?: sourceSecrets.getProperty("AURORA_KEY_ALIAS")
+                keyPassword = providers.environmentVariable("AURORA_KEY_PASSWORD").orNull
+                    ?: sourceSecrets.getProperty("AURORA_KEY_PASSWORD")
+            } else {
+                val debugCfg = getByName("debug")
+                storeFile = debugCfg.storeFile
+                storePassword = debugCfg.storePassword
+                keyAlias = debugCfg.keyAlias
+                keyPassword = debugCfg.keyPassword
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -48,8 +70,9 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // Internal installable candidate only; replace with the publisher key for distribution.
-            signingConfig = signingConfigs.getByName("debug")
+            // Uses releaseOptional keystore when AURORA_KEYSTORE_* is configured; otherwise retains the debug
+            // signature so existing OTA testers can upgrade in-place.
+            signingConfig = signingConfigs.getByName("releaseOptional")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

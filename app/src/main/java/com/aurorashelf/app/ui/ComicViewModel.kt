@@ -426,8 +426,8 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                 "漫画源证书验证失败，请切换来源或稍后重试"
             causes.any { it is UnknownHostException } ->
                 "无法连接漫画源，请检查网络或切换来源"
-            this is IOException -> message ?: "漫画源网络连接失败"
-            else -> message?.takeIf(String::isNotBlank) ?: "漫画源解析失败"
+            this is IOException -> com.aurorashelf.app.data.VideoRepository.friendlyLoadErrorMessage(this, "漫画源网络连接失败")
+            else -> com.aurorashelf.app.data.VideoRepository.friendlyLoadErrorMessage(this, "漫画源解析失败")
         }
     }
 }

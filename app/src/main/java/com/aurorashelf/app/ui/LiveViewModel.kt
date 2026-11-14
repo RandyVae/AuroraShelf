@@ -165,13 +165,7 @@ class LiveViewModel(
                         items = fallbackItems,
                         isLoading = false,
                         isLoadingMore = false,
-                        error = if (fallbackItems.isNotEmpty()) null else when (failure) {
-                            is UnknownHostException -> "无法连接直播服务器，请检查网络连接"
-                            is SocketTimeoutException -> "连接直播服务器超时，请稍后重试"
-                            is SSLHandshakeException -> "直播连接加密失败，请稍后重试"
-                            is IOException -> failure.message ?: "网络连接异常"
-                            else -> "加载直播失败：${failure.message ?: "未知异常"}"
-                        },
+                        error = if (fallbackItems.isNotEmpty()) null else failure.userMessage(),
                     )
                 }
             }
@@ -179,10 +173,10 @@ class LiveViewModel(
     }
 
     private fun Throwable.userMessage(): String = when (this) {
-        is UnknownHostException -> "当前网络无法连接 Stripchat，请检查网络或 DNS"
-        is SocketTimeoutException -> "Stripchat 响应超时，请稍后重试"
-        is SSLHandshakeException -> "Stripchat 安全连接失败，请确认系统时间和网络"
-        is IOException -> message ?: "Stripchat 连接失败，请稍后重试"
+        is UnknownHostException -> "当前网络无法连接直播服务器，请检查网络或 DNS"
+        is SocketTimeoutException -> "直播服务器响应超时，请稍后重试"
+        is SSLHandshakeException -> "直播安全连接失败，请确认系统时间和网络"
+        is IOException -> com.aurorashelf.app.data.VideoRepository.friendlyLoadErrorMessage(this, "直播连接失败，请稍后重试")
         else -> "直播暂时无法加载，请稍后重试"
     }
 

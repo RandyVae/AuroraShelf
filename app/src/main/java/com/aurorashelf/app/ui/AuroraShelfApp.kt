@@ -117,6 +117,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -196,6 +197,7 @@ fun AuroraShelfApp(
     comicViewModel: ComicViewModel = viewModel(),
     forumViewModel: ForumViewModel = viewModel(),
     liveViewModel: LiveViewModel = viewModel(),
+    introActive: Boolean = false,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val comicState by comicViewModel.uiState.collectAsStateWithLifecycle()
@@ -248,22 +250,36 @@ fun AuroraShelfApp(
 
     LaunchedEffect(
         activity,
+        introActive,
         isPlayerFullscreen,
         isLiveFullscreen,
         isCurrentVideoPortrait,
         isCurrentLivePortrait,
         state.selectedVideo,
         state.destination,
+        state.isSearchOpen,
+        comicState.details,
+        comicState.reader,
         liveState.selectedItem,
         systemInDarkTheme,
     ) {
         activity ?: return@LaunchedEffect
         val insetsController = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
-        // All top-level screens (Home, Comics, Live, Forum, Me) and playback canvases are immersive
-        // dark surfaces. Keep status bar and navigation bar icons consistently light (white) so they
-        // remain crisp, legible, and never collide into the dark backgrounds in light mode.
-        insetsController.isAppearanceLightStatusBars = false
-        insetsController.isAppearanceLightNavigationBars = false
+        if (!introActive) {
+            val hasDarkStatusBarSurface = systemInDarkTheme ||
+                state.selectedVideo != null ||
+                liveState.selectedItem != null ||
+                (!state.isSearchOpen && (
+                    state.destination == AppDestination.HOME ||
+                        state.destination == AppDestination.LIVE ||
+                        (state.destination == AppDestination.COMICS && comicState.details == null)
+                ))
+            val hasDarkNavigationBarSurface = systemInDarkTheme ||
+                isAnyFullscreen ||
+                (state.destination == AppDestination.COMICS && comicState.reader != null && !state.isSearchOpen)
+            insetsController.isAppearanceLightStatusBars = !hasDarkStatusBarSurface
+            insetsController.isAppearanceLightNavigationBars = !hasDarkNavigationBarSurface
+        }
         if (isPlayerFullscreen && state.selectedVideo != null) {
             activity.requestedOrientation = when (isCurrentVideoPortrait) {
                 true -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
@@ -320,8 +336,8 @@ fun AuroraShelfApp(
     }
 
     Surface(
-        color = AuroraImmersiveBackground,
-        contentColor = AuroraInkContent,
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.fillMaxSize(),
     ) {
       BoxWithConstraints(
@@ -349,7 +365,6 @@ fun AuroraShelfApp(
         AnimatedContent(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .widthIn(max = if (isAnyFullscreen) maxWidth else if (windowLayout.compactDock) 760.dp else 680.dp)
                 .fillMaxSize()
                 .layerBackdrop(liquidBackdrop)
                 .hazeSource(state = hazeState)
@@ -490,10 +505,17 @@ fun AuroraShelfApp(
             }
         }
 
+        val showNavigation = state.selectedVideo == null &&
+            !state.isSearchOpen &&
+            comicState.reader == null &&
+            forumState.selectedPost == null &&
+            liveState.selectedItem == null &&
+            !isLiveFullscreen &&
+            !(state.destination == AppDestination.ME && personalRoute == PersonalRoute.ACCOUNT)
+
         if (windowLayout.compactDock) {
             AnimatedVisibility(
-                visible = state.selectedVideo == null && !state.isSearchOpen && comicState.reader == null &&
-                    forumState.selectedPost == null && liveState.selectedItem == null && !isLiveFullscreen,
+                visible = showNavigation,
                 enter = fadeIn() + scaleIn(initialScale = 0.94f),
                 exit = fadeOut() + scaleOut(targetScale = 0.94f),
                 modifier = Modifier
@@ -511,8 +533,7 @@ fun AuroraShelfApp(
             }
         } else {
             AnimatedVisibility(
-                visible = state.selectedVideo == null && !state.isSearchOpen && comicState.reader == null &&
-                    forumState.selectedPost == null && liveState.selectedItem == null && !isLiveFullscreen,
+                visible = showNavigation,
                 enter = fadeIn() + scaleIn(initialScale = 0.96f),
                 exit = fadeOut() + scaleOut(targetScale = 0.96f),
                 modifier = Modifier
@@ -620,7 +641,7 @@ private fun ExpressiveBottomBar(
         AppDestination.FORUM,
         AppDestination.ME,
     )
-    var lastNavigationIndex by remember { mutableStateOf(0) }
+    var lastNavigationIndex by remember { mutableIntStateOf(0) }
     LaunchedEffect(selected) {
         val selectedIndex = navigationDestinations.indexOf(selected)
         if (selectedIndex >= 0) lastNavigationIndex = selectedIndex

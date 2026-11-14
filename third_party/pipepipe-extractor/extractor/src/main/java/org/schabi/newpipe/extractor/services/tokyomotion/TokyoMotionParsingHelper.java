@@ -64,7 +64,10 @@ public final class TokyoMotionParsingHelper {
         if (url == null || url.trim().isEmpty()) {
             return "";
         }
-        String normalized = url.trim().replace("&amp;", "&");
+        String normalized = url.trim()
+                .replace("&amp;", "&")
+                .replace("\u3000", "%E3%80%80")
+                .replace(" ", "%20");
         if (normalized.startsWith("//")) {
             normalized = "https:" + normalized;
         }

@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import AVFoundation
+import Network
 
 public enum OfflineDownloadStatus: Codable, Sendable, Equatable {
     case queued
@@ -86,13 +87,16 @@ public final class OfflineDownloadManager: ObservableObject {
     private let fileManager = FileManager.default
     private let baseDirectory: URL
     private let metaFileURL: URL
+    private let localServer: OfflineLocalHTTPServer
     private var activeTasks: [String: Task<Void, Never>] = [:]
     
     private init() {
         let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         self.baseDirectory = docs.appendingPathComponent("OfflineVideos", isDirectory: true)
         self.metaFileURL = docs.appendingPathComponent("offline_downloads.json")
+        self.localServer = OfflineLocalHTTPServer(baseDirectory: self.baseDirectory)
         try? fileManager.createDirectory(at: baseDirectory, withIntermediateDirectories: true)
+        self.localServer.start()
         loadFromDisk()
     }
     
@@ -128,22 +132,47 @@ public final class OfflineDownloadManager: ObservableObject {
         }
     }
     
-    public func localPlaybackURL(for video: VideoItem, episode: PlaybackEpisode? = nil) -> URL? {
+    private func completedItem(for video: VideoItem, episode: PlaybackEpisode? = nil) -> OfflineDownloadItem? {
         let itemId = generateID(video: video, episode: episode)
-        guard let item = items.first(where: { $0.id == itemId }), item.status.isCompleted else {
-            return nil
+        if let direct = items.first(where: { $0.id == itemId && $0.status.isCompleted }) {
+            return direct
         }
-        let fullPath = baseDirectory.appendingPathComponent(item.localRelativePath)
-        if fileManager.fileExists(atPath: fullPath.path) {
-            return fullPath
+        if episode == nil {
+            return items.first(where: { $0.status.isCompleted && $0.pageUrl == video.playbackUrl })
         }
         return nil
+    }
+
+    public func playableLocalURL(for video: VideoItem, episode: PlaybackEpisode? = nil) async -> URL? {
+        guard let item = completedItem(for: video, episode: episode) else { return nil }
+        return await playableLocalURL(for: item)
+    }
+
+    public func playableLocalURL(for item: OfflineDownloadItem) async -> URL? {
+        guard item.status.isCompleted else { return nil }
+        let fullPath = baseDirectory.appendingPathComponent(item.localRelativePath)
+        guard fileManager.fileExists(atPath: fullPath.path) else { return nil }
+        if item.localRelativePath.lowercased().hasSuffix(".m3u8") {
+            return await localServer.playbackURL(forRelativePath: item.localRelativePath) ?? fullPath
+        }
+        return fullPath
+    }
+
+    public func localPlaybackURL(for video: VideoItem, episode: PlaybackEpisode? = nil) -> URL? {
+        guard let item = completedItem(for: video, episode: episode) else {
+            return nil
+        }
+        return localPlaybackURL(for: item)
     }
     
     public func localPlaybackURL(for item: OfflineDownloadItem) -> URL? {
         guard item.status.isCompleted else { return nil }
         let fullPath = baseDirectory.appendingPathComponent(item.localRelativePath)
         if fileManager.fileExists(atPath: fullPath.path) {
+            if item.localRelativePath.lowercased().hasSuffix(".m3u8"),
+               let loopbackURL = localServer.urlIfReady(forRelativePath: item.localRelativePath) {
+                return loopbackURL
+            }
             return fullPath
         }
         return nil
@@ -192,6 +221,24 @@ public final class OfflineDownloadManager: ObservableObject {
         activeTasks[itemId] = task
     }
     
+    public func retryDownload(id: String) {
+        guard let existing = items.first(where: { $0.id == id }),
+              !existing.status.isCompleted,
+              !existing.status.isDownloading else { return }
+        activeTasks[id]?.cancel()
+        activeTasks.removeValue(forKey: id)
+        updateItem(id: id) { item in
+            item.status = .resolving
+        }
+        saveToDisk()
+        let stubVideo = existing.toVideoItem()
+        let task = Task { [weak self] in
+            guard let self = self else { return }
+            await self.executeDownload(itemId: id, video: stubVideo, pageUrl: existing.pageUrl)
+        }
+        activeTasks[id] = task
+    }
+
     public func removeDownload(id: String) {
         activeTasks[id]?.cancel()
         activeTasks.removeValue(forKey: id)
@@ -253,10 +300,13 @@ public final class OfflineDownloadManager: ObservableObject {
             }
             
             activeTasks.removeValue(forKey: itemId)
+        } catch is CancellationError {
+            activeTasks.removeValue(forKey: itemId)
         } catch {
             updateItem(id: itemId) { item in
                 item.status = .failed(message: error.localizedDescription)
             }
+            saveToDisk()
             activeTasks.removeValue(forKey: itemId)
         }
     }
@@ -329,7 +379,7 @@ public final class OfflineDownloadManager: ObservableObject {
         let targetSegments = segmentOriginalURLs
         
         for (i, segURL) in targetSegments.enumerated() {
-            if Task.isCancelled { break }
+            try Task.checkCancellation()
             
             var segReq = URLRequest(url: segURL)
             if let ref = referer { segReq.setValue(ref, forHTTPHeaderField: "Referer") }
@@ -338,6 +388,7 @@ public final class OfflineDownloadManager: ObservableObject {
             let localSegURL = targetDir.appendingPathComponent("segment_\(i).ts")
             if !fileManager.fileExists(atPath: localSegURL.path) {
                 let (data, response) = try await URLSession.permissiveShared.data(for: segReq)
+                try Task.checkCancellation()
                 try Self.requireSuccessfulMediaResponse(response)
                 guard !data.isEmpty else {
                     throw NSError(domain: "OfflineDownload", code: -3, userInfo: [NSLocalizedDescriptionKey: "切片为空"])
@@ -357,6 +408,7 @@ public final class OfflineDownloadManager: ObservableObject {
             }
         }
         
+        try Task.checkCancellation()
         // 写出本地播放列表 local_index.m3u8
         let localPlaylistURL = targetDir.appendingPathComponent("local_index.m3u8")
         let localPlaylistText = rewrittenLines.joined(separator: "\n")
@@ -377,6 +429,7 @@ public final class OfflineDownloadManager: ObservableObject {
         
         let localFileURL = targetDir.appendingPathComponent("video.mp4")
         let (tempURL, response) = try await URLSession.permissiveShared.download(for: req)
+        try Task.checkCancellation()
         try Self.requireSuccessfulMediaResponse(response)
         
         if fileManager.fileExists(atPath: localFileURL.path) {
@@ -411,7 +464,8 @@ public final class OfflineDownloadManager: ObservableObject {
     }
     
     private func generateID(video: VideoItem, episode: PlaybackEpisode?) -> String {
-        let base = video.id.replacingOccurrences(of: "hua-", with: "vod-")
+        let stripped = video.id.replacingOccurrences(of: #"-ep-\d+$"#, with: "", options: .regularExpression)
+        let base = stripped.replacingOccurrences(of: "hua-", with: "vod-")
         if let ep = episode {
             return "\(base)_ep\(ep.number)"
         }
@@ -424,11 +478,275 @@ public final class OfflineDownloadManager: ObservableObject {
               let decoded = try? JSONDecoder().decode([OfflineDownloadItem].self, from: data) else {
             return
         }
-        self.items = decoded
+        var didRecoverInterrupted = false
+        self.items = decoded.map { item in
+            var copy = item
+            if copy.status.isDownloading {
+                copy.status = .failed(message: "下载已中断，点击重试")
+                didRecoverInterrupted = true
+            }
+            return copy
+        }
+        if didRecoverInterrupted {
+            saveToDisk()
+        }
     }
     
     private func saveToDisk() {
         guard let data = try? JSONEncoder().encode(items) else { return }
         try? data.write(to: metaFileURL)
+    }
+}
+
+/// Loopback HTTP server for local HLS playlists (`local_index.m3u8` + `.ts`), since AVURLAsset rejects `file://` M3U8.
+private final class OfflineLocalHTTPServer: @unchecked Sendable {
+    private let baseDirectory: URL
+    private let queue = DispatchQueue(label: "com.aurorashelf.offline-http-server")
+    private let lock = NSLock()
+    private var listener: NWListener?
+    private var port: UInt16?
+    private var waiters: [CheckedContinuation<UInt16?, Never>] = []
+
+    init(baseDirectory: URL) {
+        self.baseDirectory = baseDirectory
+    }
+
+    func start() {
+        queue.async { [weak self] in
+            self?.ensureListenerLocked()
+        }
+    }
+
+    func urlIfReady(forRelativePath relativePath: String) -> URL? {
+        lock.lock()
+        let activePort = port
+        lock.unlock()
+        guard let activePort else { return nil }
+        return buildURL(port: activePort, relativePath: relativePath)
+    }
+
+    func playbackURL(forRelativePath relativePath: String) async -> URL? {
+        if let ready = urlIfReady(forRelativePath: relativePath) {
+            return ready
+        }
+        start()
+        let boundPort = await withCheckedContinuation { (cont: CheckedContinuation<UInt16?, Never>) in
+            lock.lock()
+            if let activePort = port {
+                lock.unlock()
+                cont.resume(returning: activePort)
+                return
+            }
+            waiters.append(cont)
+            lock.unlock()
+
+            queue.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                guard let self else { return }
+                self.lock.lock()
+                if self.port == nil, !self.waiters.isEmpty {
+                    let pending = self.waiters
+                    self.waiters.removeAll()
+                    self.lock.unlock()
+                    pending.forEach { $0.resume(returning: nil) }
+                } else {
+                    self.lock.unlock()
+                }
+            }
+        }
+        guard let boundPort else { return nil }
+        return buildURL(port: boundPort, relativePath: relativePath)
+    }
+
+    private func buildURL(port: UInt16, relativePath: String) -> URL? {
+        let clean = relativePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let encoded = clean.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? clean
+        return URL(string: "http://127.0.0.1:\(port)/offline/\(encoded)")
+    }
+
+    private func ensureListenerLocked() {
+        guard listener == nil else { return }
+        do {
+            let params = NWParameters.tcp
+            params.allowLocalEndpointReuse = true
+            params.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(.loopback), port: .any)
+            let newListener = try NWListener(using: params)
+            newListener.stateUpdateHandler = { [weak self] state in
+                guard let self else { return }
+                switch state {
+                case .ready:
+                    if let assignedPort = newListener.port?.rawValue {
+                        self.lock.lock()
+                        self.port = assignedPort
+                        let pending = self.waiters
+                        self.waiters.removeAll()
+                        self.lock.unlock()
+                        pending.forEach { $0.resume(returning: assignedPort) }
+                    }
+                case .failed, .cancelled:
+                    self.lock.lock()
+                    self.listener = nil
+                    self.port = nil
+                    let pending = self.waiters
+                    self.waiters.removeAll()
+                    self.lock.unlock()
+                    pending.forEach { $0.resume(returning: nil) }
+                default:
+                    break
+                }
+            }
+            newListener.newConnectionHandler = { [weak self] connection in
+                self?.handleConnection(connection)
+            }
+            self.listener = newListener
+            newListener.start(queue: queue)
+        } catch {
+            lock.lock()
+            let pending = waiters
+            waiters.removeAll()
+            lock.unlock()
+            pending.forEach { $0.resume(returning: nil) }
+        }
+    }
+
+    private func handleConnection(_ connection: NWConnection) {
+        connection.start(queue: queue)
+        receiveRequest(on: connection, buffer: Data())
+    }
+
+    private func receiveRequest(on connection: NWConnection, buffer: Data) {
+        connection.receive(minimumIncompleteLength: 1, maximumLength: 16_384) { [weak self] data, _, isComplete, error in
+            guard let self else {
+                connection.cancel()
+                return
+            }
+            var nextBuffer = buffer
+            if let data { nextBuffer.append(data) }
+
+            if let headerRange = nextBuffer.range(of: Data("\r\n\r\n".utf8)) {
+                let headerData = nextBuffer[..<headerRange.lowerBound]
+                let headerString = String(data: headerData, encoding: .utf8) ?? ""
+                self.respond(to: headerString, on: connection)
+                return
+            }
+
+            if isComplete || error != nil || nextBuffer.count > 65_536 {
+                connection.cancel()
+                return
+            }
+            self.receiveRequest(on: connection, buffer: nextBuffer)
+        }
+    }
+
+    private func respond(to rawRequest: String, on connection: NWConnection) {
+        let lines = rawRequest.components(separatedBy: "\r\n")
+        guard let requestLine = lines.first else {
+            sendSimple(status: "400 Bad Request", on: connection)
+            return
+        }
+        let parts = requestLine.split(separator: " ")
+        guard parts.count >= 2 else {
+            sendSimple(status: "400 Bad Request", on: connection)
+            return
+        }
+        let method = String(parts[0]).uppercased()
+        guard method == "GET" || method == "HEAD" else {
+            sendSimple(status: "405 Method Not Allowed", on: connection)
+            return
+        }
+
+        let rawTarget = String(parts[1]).split(separator: "?").first.map(String.init) ?? ""
+        let decodedPath = rawTarget.removingPercentEncoding ?? rawTarget
+        guard decodedPath.hasPrefix("/offline/") else {
+            sendSimple(status: "404 Not Found", on: connection)
+            return
+        }
+
+        let relative = String(decodedPath.dropFirst("/offline/".count))
+        let segments = relative.split(separator: "/").map(String.init)
+        guard !segments.isEmpty, !segments.contains(".."), !segments.contains(".") else {
+            sendSimple(status: "403 Forbidden", on: connection)
+            return
+        }
+
+        var fileURL = baseDirectory
+        for seg in segments {
+            fileURL.appendPathComponent(seg)
+        }
+
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+              let totalLength = (attrs[.size] as? NSNumber)?.int64Value,
+              totalLength >= 0 else {
+            sendSimple(status: "404 Not Found", on: connection)
+            return
+        }
+
+        var byteRange: ClosedRange<Int64>? = nil
+        for line in lines.dropFirst() {
+            let lower = line.lowercased()
+            if lower.hasPrefix("range: bytes=") {
+                let spec = lower.dropFirst("range: bytes=".count)
+                    .trimmingCharacters(in: .whitespaces)
+                    .split(separator: ",").first.map(String.init) ?? ""
+                let bounds = spec.split(separator: "-", omittingEmptySubsequences: false).map(String.init)
+                if bounds.count == 2 {
+                    if let start = Int64(bounds[0]) {
+                        let end = Int64(bounds[1]) ?? (totalLength - 1)
+                        let clampedEnd = min(max(start, end), max(0, totalLength - 1))
+                        if start >= 0 && start < totalLength && start <= clampedEnd {
+                            byteRange = start...clampedEnd
+                        }
+                    }
+                }
+            }
+        }
+
+        let contentType: String = {
+            switch fileURL.pathExtension.lowercased() {
+            case "m3u8": return "application/vnd.apple.mpegurl"
+            case "ts": return "video/mp2t"
+            case "mp4": return "video/mp4"
+            default: return "application/octet-stream"
+            }
+        }()
+
+        let startOffset = byteRange?.lowerBound ?? 0
+        let endOffset = byteRange?.upperBound ?? max(0, totalLength - 1)
+        let responseLength = totalLength == 0 ? 0 : (endOffset - startOffset + 1)
+
+        var header = byteRange != nil
+            ? "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes \(startOffset)-\(endOffset)/\(totalLength)\r\n"
+            : "HTTP/1.1 200 OK\r\n"
+        header += "Content-Type: \(contentType)\r\n"
+        header += "Content-Length: \(responseLength)\r\n"
+        header += "Accept-Ranges: bytes\r\n"
+        header += "Connection: close\r\n\r\n"
+
+        var payload = Data(header.utf8)
+        if method == "GET" && responseLength > 0 {
+            guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
+                sendSimple(status: "500 Internal Server Error", on: connection)
+                return
+            }
+            defer { try? handle.close() }
+            try? handle.seek(toOffset: UInt64(startOffset))
+            var remaining = Int(responseLength)
+            while remaining > 0 {
+                let chunkSize = min(remaining, 262_144)
+                guard let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty else { break }
+                payload.append(chunk)
+                remaining -= chunk.count
+            }
+        }
+
+        connection.send(content: payload, completion: .contentProcessed { _ in
+            connection.cancel()
+        })
+    }
+
+    private func sendSimple(status: String, on connection: NWConnection) {
+        let raw = "HTTP/1.1 \(status)\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        connection.send(content: Data(raw.utf8), completion: .contentProcessed { _ in
+            connection.cancel()
+        })
     }
 }

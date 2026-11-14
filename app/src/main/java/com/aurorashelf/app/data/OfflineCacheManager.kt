@@ -1,6 +1,8 @@
 package com.aurorashelf.app.data
 
 import android.content.Context
+import android.os.storage.StorageManager
+import androidx.core.net.toUri
 import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.MimeTypes
@@ -8,6 +10,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.NoOpCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
@@ -77,6 +80,7 @@ internal data class OfflineMetadata(
     val episodeLabel: String?,
     val pageUrl: String,
     val thumbnailUrl: String?,
+    val referer: String? = null,
 )
 
 /**
@@ -92,6 +96,7 @@ internal object OfflineMetadataCodec {
         put("episodeLabel", metadata.episodeLabel.orEmpty())
         put("pageUrl", metadata.pageUrl)
         put("thumbnailUrl", metadata.thumbnailUrl.orEmpty())
+        put("referer", metadata.referer.orEmpty())
     }.toString().toByteArray(Charsets.UTF_8)
 
     fun decode(bytes: ByteArray): OfflineMetadata? = runCatching {
@@ -102,6 +107,7 @@ internal object OfflineMetadataCodec {
             episodeLabel = json.optString("episodeLabel").takeIf(String::isNotBlank),
             pageUrl = json.optString("pageUrl"),
             thumbnailUrl = json.optString("thumbnailUrl").takeIf(String::isNotBlank),
+            referer = json.optString("referer").takeIf(String::isNotBlank),
         )
     }.getOrNull()
 }
@@ -116,11 +122,50 @@ class OfflineCacheManager private constructor(context: Context) {
         NoOpCacheEvictor(),
         databaseProvider,
     )
+    private val refererByUri = ConcurrentHashMap<String, String>()
+    private val refererByHost = ConcurrentHashMap<String, String>()
+
+    private fun registerReferer(mediaUrl: String?, referer: String?) {
+        val ref = referer?.takeIf { it.isNotBlank() } ?: return
+        val url = mediaUrl?.takeIf { it.isNotBlank() } ?: return
+        refererByUri[url] = ref
+        runCatching { url.toUri().host?.lowercase() }
+            .getOrNull()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { host -> refererByHost[host] = ref }
+    }
+
     private val upstreamFactory = DefaultHttpDataSource.Factory()
         .setUserAgent(VideoRepository.USER_AGENT)
         .setConnectTimeoutMs(15_000)
         .setReadTimeoutMs(30_000)
         .setAllowCrossProtocolRedirects(true)
+
+    private val downloadDataSourceFactory = ResolvingDataSource.Factory(upstreamFactory) { dataSpec ->
+        val uriStr = dataSpec.uri.toString()
+        val host = dataSpec.uri.host?.lowercase()
+        val ref = refererByUri[uriStr] ?: host?.let { refererByHost[it] }
+        if (ref.isNullOrBlank()) {
+            dataSpec
+        } else {
+            val origin = runCatching {
+                val parsed = ref.toUri()
+                if (!parsed.scheme.isNullOrBlank() && !parsed.host.isNullOrBlank()) {
+                    "${parsed.scheme}://${parsed.host}"
+                } else {
+                    null
+                }
+            }.getOrNull()
+            val merged = buildMap {
+                putAll(dataSpec.httpRequestHeaders)
+                putIfAbsent("Referer", ref)
+                if (origin != null) {
+                    putIfAbsent("Origin", origin)
+                }
+            }
+            dataSpec.withAdditionalHeaders(merged)
+        }
+    }
     private val downloadExecutor = Executors.newFixedThreadPool(2)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val transientEntries = ConcurrentHashMap<String, OfflineVideo>()
@@ -131,7 +176,7 @@ class OfflineCacheManager private constructor(context: Context) {
         applicationContext,
         databaseProvider,
         cache,
-        upstreamFactory,
+        downloadDataSourceFactory,
         downloadExecutor,
     ).apply {
         maxParallelDownloads = 2
@@ -170,7 +215,16 @@ class OfflineCacheManager private constructor(context: Context) {
     }
 
     fun hasSufficientDiskSpace(): Boolean {
-        val usable = runCatching { applicationContext.filesDir.usableSpace }.getOrDefault(Long.MAX_VALUE)
+        val usable = runCatching {
+            val storageManager = applicationContext.getSystemService(StorageManager::class.java)
+            if (storageManager != null) {
+                storageManager.getAllocatableBytes(
+                    storageManager.getUuidForPath(applicationContext.filesDir),
+                )
+            } else {
+                Long.MAX_VALUE
+            }
+        }.getOrDefault(Long.MAX_VALUE)
         return usable >= MIN_USABLE_DISK_SPACE_BYTES
     }
 
@@ -216,8 +270,10 @@ class OfflineCacheManager private constructor(context: Context) {
                             episodeLabel = episodeLabel,
                             pageUrl = pageUrl,
                             thumbnailUrl = video.thumbnailUrl,
+                            referer = source.referer,
                         )
-                        val request = DownloadRequest.Builder(id, Uri.parse(source.url))
+                        registerReferer(source.url, metadata.referer)
+                        val request = DownloadRequest.Builder(id, source.url.toUri())
                             .setMimeType(mimeType(source.url))
                             .setData(OfflineMetadataCodec.encode(metadata))
                             .apply {
@@ -322,6 +378,10 @@ class OfflineCacheManager private constructor(context: Context) {
     private fun Download.toOfflineVideo(): OfflineVideo {
         // Corrupt metadata must only lose the descriptive fields, never the whole entry.
         val metadata = OfflineMetadataCodec.decode(request.data)
+        registerReferer(
+            mediaUrl = request.uri.toString(),
+            referer = metadata?.referer ?: metadata?.pageUrl,
+        )
         return OfflineVideo(
             id = request.id,
             videoId = metadata?.videoId?.takeIf(String::isNotBlank) ?: request.id,

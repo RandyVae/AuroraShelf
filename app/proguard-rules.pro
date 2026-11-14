@@ -11,6 +11,11 @@
 
 -keep class com.aurorashelf.app.model.** { *; }
 -keep class com.aurorashelf.app.data.** { *; }
+-keep class com.aurorashelf.app.game.** { *; }
+-keep class com.aurorashelf.app.cast.** { *; }
+-keep class com.aurorashelf.app.ui.LiveOrientationBridge { *; }
+-keep class com.google.protobuf.** { *; }
+-dontwarn com.google.protobuf.**
 
 # Keep ViewModel constructors for ViewModelProvider reflection
 -keepclassmembers class * extends androidx.lifecycle.ViewModel {

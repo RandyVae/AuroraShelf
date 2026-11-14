@@ -7,7 +7,7 @@ actor ComicPageImageLoader {
 
     private let session: URLSession
     private let cache = NSCache<NSString, UIImage>()
-    private var inFlightTasks: [String: Task<UIImage, Error>] = [:]
+    private var inFlightTasks: [String: (id: UUID, task: Task<UIImage, Error>)] = [:]
 
     private init() {
         let configuration = URLSessionConfiguration.default
@@ -34,15 +34,20 @@ actor ComicPageImageLoader {
     func load(_ page: ComicPage) async throws -> UIImage {
         if let image = cache.object(forKey: page.id as NSString) { return image }
         if let ongoing = inFlightTasks[page.id] {
-            return try await ongoing.value
+            return try await ongoing.task.value
         }
 
+        let taskToken = UUID()
         let task = Task<UIImage, Error> {
             try await self.performLoad(page)
         }
 
-        inFlightTasks[page.id] = task
-        defer { inFlightTasks[page.id] = nil }
+        inFlightTasks[page.id] = (id: taskToken, task: task)
+        defer {
+            if inFlightTasks[page.id]?.id == taskToken {
+                inFlightTasks[page.id] = nil
+            }
+        }
 
         let result = try await task.value
         let cost = result.cgImage.map { $0.bytesPerRow * $0.height } ?? 1024

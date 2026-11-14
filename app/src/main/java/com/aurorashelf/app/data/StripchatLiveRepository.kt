@@ -100,17 +100,7 @@ class StripchatLiveRepository {
         private val USERNAME_PATTERN = Regex("[A-Za-z0-9_-]{1,80}")
 
         internal val okHttpClient: OkHttpClient by lazy {
-            val trustAllCerts = arrayOf<javax.net.ssl.TrustManager>(object : javax.net.ssl.X509TrustManager {
-                override fun checkClientTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
-                override fun checkServerTrusted(chain: Array<java.security.cert.X509Certificate>?, authType: String?) {}
-                override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
-            })
-            val sslContext = javax.net.ssl.SSLContext.getInstance("TLS").apply {
-                init(null, trustAllCerts, java.security.SecureRandom())
-            }
             OkHttpClient.Builder()
-                .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as javax.net.ssl.X509TrustManager)
-                .hostnameVerifier { _, _ -> true }
                 .connectTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .readTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)
                 .callTimeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS)

@@ -225,7 +225,7 @@ public struct LivePlayerView: View {
             .frame(height: gradientHeight)
             .allowsHitTesting(false)
 
-            HStack(spacing: AuroraMetrics.spacingM) {
+            HStack(spacing: AuroraMetrics.spacingS) {
                 // 左侧：返回 / 退出全屏按钮（iOS 27 原生 Liquid Glass 按键样式）
                 Button(action: {
                     let impact = UIImpactFeedbackGenerator(style: .medium)
@@ -235,7 +235,6 @@ public struct LivePlayerView: View {
                     } else {
                         cleanupLivePlayer()
                         onDismiss()
-                        dismiss()
                     }
                 }) {
                     Image(systemName: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "chevron.left")
@@ -283,14 +282,13 @@ public struct LivePlayerView: View {
                             .lineLimit(1)
                     }
                 }
-                .frame(maxWidth: 220, alignment: .leading)
-                .layoutPriority(1)
+                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
 
-                Spacer()
+                Spacer(minLength: 4)
 
                 // 右侧功能键区（iOS 27 GlassEffectContainer 融合按键群组）
-                GlassEffectContainer(spacing: 6) {
-                    HStack(spacing: 6) {
+                GlassEffectContainer(spacing: 4) {
+                    HStack(spacing: 4) {
                         // 1. 聊天室按钮
                         controlCircleButton(systemImage: "bubble.left.and.bubble.right", label: "打开聊天室") {
                             showRoomChat = true
@@ -616,6 +614,8 @@ public struct LivePlayerView: View {
 
     private func startNativePlayback(hlsUrl: URL, referer: String = "https://chaturbate.com/", requestID: UUID) {
         guard activeStreamRequestID == requestID else { return }
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+        try? AVAudioSession.sharedInstance().setActive(true)
         let headers: [String: String] = [
             "Referer": referer,
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"

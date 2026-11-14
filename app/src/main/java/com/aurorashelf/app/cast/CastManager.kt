@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.OptIn
+import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
@@ -191,6 +192,7 @@ class CastManager private constructor(context: Context) {
                 cacheManager.cache.getContentMetadata(cacheKey),
             )
             val httpFactory = DefaultHttpDataSource.Factory()
+            .setAllowCrossProtocolRedirects(true)
                 .setUserAgent(VideoRepository.USER_AGENT)
                 .setConnectTimeoutMs(15_000)
                 .setReadTimeoutMs(20_000)
@@ -206,7 +208,7 @@ class CastManager private constructor(context: Context) {
                 else -> C.LENGTH_UNSET.toLong()
             }
             val spec = DataSpec.Builder()
-                .setUri(Uri.parse(sourceUrl))
+                .setUri(sourceUrl.toUri())
                 .setKey(cacheKey)
                 .setPosition(start)
                 .setLength(requestedLength)

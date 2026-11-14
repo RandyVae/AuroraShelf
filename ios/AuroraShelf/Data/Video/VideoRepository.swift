@@ -6,10 +6,12 @@ public struct PlaybackSourceResult: Sendable {
     public let referer: String?
     public let title: String
 
+    public static let defaultUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+
     public init(url: URL, headers: [String: String] = [:], referer: String? = nil, title: String) {
         self.url = url
         var h = headers
-        h["User-Agent"] = h["User-Agent"] ?? "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1"
+        h["User-Agent"] = h["User-Agent"] ?? Self.defaultUserAgent
         if let referer = referer {
             h["Referer"] = referer
             if let components = URLComponents(string: referer),
@@ -606,7 +608,14 @@ public final class VideoRepository: ObservableObject {
                 }
             }
             if let variant = chosenVariant, !variant.isEmpty {
-                let variantURLStr = variant.starts(with: "http") ? variant : ("https://video.beeg.com" + (variant.starts(with: "/") ? variant : "/\(variant)"))
+                let variantURLStr: String
+                if variant.starts(with: "http") {
+                    variantURLStr = variant
+                } else if variant.starts(with: "//") {
+                    variantURLStr = "https:\(variant)"
+                } else {
+                    variantURLStr = "https://video.beeg.com" + (variant.starts(with: "/") ? variant : "/\(variant)")
+                }
                 if let variantURL = URL(string: variantURLStr) {
                     await cache.set(key: cacheKey, url: variantURL)
                     return variantURL
@@ -722,19 +731,28 @@ public final class VideoRepository: ObservableObject {
         default: path = "/recommend"
         }
 
-        let fullPath: String
-        if p == 1 {
-            fullPath = path
-        } else {
-            fullPath = path.hasSuffix("/") ? "\(path)\(p)/" : "\(path)/\(p)/"
+        let buildPageURL: (String) -> URL? = { route in
+            let fullPath = p == 1 ? route : (route.hasSuffix("/") ? "\(route)\(p)/" : "\(route)/\(p)/")
+            return URL(string: "https://huangguoai.com\(fullPath)")
         }
-        guard let url = URL(string: "https://huangguoai.com\(fullPath)") else {
+        guard let url = buildPageURL(path) else {
             throw VideoFeedError.invalidURL(source: "黄果短剧")
         }
-        var request = URLRequest(url: url)
-        request.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
-        request.setValue("https://huangguoai.com/", forHTTPHeaderField: "Referer")
-        let data = try await requestFeedData(for: request, source: "黄果短剧")
+        func makeRequest(for targetURL: URL) -> URLRequest {
+            var req = URLRequest(url: targetURL)
+            req.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
+            req.setValue("https://huangguoai.com/", forHTTPHeaderField: "Referer")
+            return req
+        }
+        let data: Data
+        do {
+            data = try await requestFeedData(for: makeRequest(for: url), source: "黄果短剧")
+        } catch {
+            guard category == "AI换脸", let fallbackURL = buildPageURL("/original/") else {
+                throw error
+            }
+            data = try await requestFeedData(for: makeRequest(for: fallbackURL), source: "黄果短剧")
+        }
         guard let html = String(data: data, encoding: .utf8) else {
             throw VideoFeedError.malformedResponse(source: "黄果短剧")
         }

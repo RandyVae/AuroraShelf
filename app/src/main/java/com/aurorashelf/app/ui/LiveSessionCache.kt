@@ -31,6 +31,7 @@ internal object LiveSessionCache {
         (webView.parent as? ViewGroup)?.removeView(webView)
         runCatching {
             webView.evaluateJavascript(PAUSE_AND_MUTE, null)
+            webView.onPause()
         }
         retained = webView
         retainedUrl = url
@@ -44,6 +45,7 @@ internal object LiveSessionCache {
         retained = null
         retainedUrl = null
         (view.parent as? ViewGroup)?.removeView(view)
+        runCatching { view.onResume() }
         return CachedLiveSession(view, retainedReady)
     }
 

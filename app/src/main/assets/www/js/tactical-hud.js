@@ -203,7 +203,13 @@
           const ally = this.selectedUnit || this.battle.units.find(u => u.side === 'ally' && u.alive);
           if (ally && enemy) {
             this.battle.damage(ally, enemy, ally.atk * 1.5);
-            if (window.LGVFX) window.LGVFX.slash({ x: enemy.x, y: enemy.footY });
+            if (window.LGVFX && this.battle.spine) {
+              const tp = this.battle.spine.project(enemy.x, enemy.footY);
+              window.LGVFX.slash({
+                x: (tp.x / this.battle.W) * 100,
+                y: (1 - tp.y / this.battle.H) * 100,
+              });
+            }
           }
           this.advanceStep();
         }

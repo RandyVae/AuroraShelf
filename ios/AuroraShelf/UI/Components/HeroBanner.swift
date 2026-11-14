@@ -109,18 +109,22 @@ public struct HeroBanner: View {
     private func heroSlide(for videoItem: VideoItem, pull: CGFloat) -> some View {
         ZStack(alignment: .bottom) {
             // 背景封面海报：沉浸式充满视口，支持 Apple TV 原生下拉橡皮筋视差缩放（Stretch Parallax）
-            AuroraCoverImage(
-                url: videoItem.coverUrl,
-                title: videoItem.title,
-                sourceBaseURL: videoItem.coverBaseURL,
-                aspectRatio: isWideAspect ? 16 / 9 : 4 / 5,
-                contentMode: .fill,
-                cornerRadius: 0
-            )
-            .frame(maxWidth: .infinity, maxHeight: heroHeight + pull)
-            .scaleEffect(max(1.0, 1.0 + (pull / max(heroHeight, 1)) * 0.5), anchor: .top)
-            .offset(y: -pull)
-            .clipped()
+            Color.clear
+                .overlay(
+                    AuroraCoverImage(
+                        url: videoItem.coverUrl,
+                        title: videoItem.title,
+                        sourceBaseURL: videoItem.coverBaseURL,
+                        aspectRatio: nil,
+                        contentMode: .fill,
+                        cornerRadius: 0
+                    )
+                )
+                .frame(height: heroHeight + pull)
+                .frame(maxWidth: .infinity)
+                .scaleEffect(max(1.0, 1.0 + (pull / max(heroHeight, 1)) * 0.5), anchor: .top)
+                .offset(y: -pull)
+                .clipped()
 
             // 多层渐变可读性遮罩（Apple TV 自然五阶衰减，无痕融合画布底色）
             VStack(spacing: 0) {
@@ -175,7 +179,7 @@ public struct HeroBanner: View {
                 }
                 .frame(maxWidth: DeviceLayout.heroActionsMaxWidth(for: formFactor) ?? .infinity)
                 .padding(.horizontal, AuroraMetrics.contentInset)
-                .padding(.bottom, videos.count > 1 ? AuroraMetrics.spacingS : AuroraMetrics.spacingL)
+                .padding(.bottom, videos.count > 1 ? (AuroraMetrics.spacingM + 18) : AuroraMetrics.spacingL)
             }
         }
     }
@@ -183,12 +187,14 @@ public struct HeroBanner: View {
     @ViewBuilder
     private func metadataView(for targetVideo: VideoItem) -> some View {
         HStack(spacing: AuroraMetrics.spacingS) {
-            Text("超清 4K HDR")
-                .font(.caption2.bold())
-                .foregroundStyle(.white)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(.white.opacity(0.2), in: Capsule())
+            if !targetVideo.duration.isEmpty {
+                Text(targetVideo.duration)
+                    .font(.caption2.bold())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(.white.opacity(0.2), in: Capsule())
+            }
 
             if !targetVideo.rating.isEmpty {
                 HStack(spacing: 3) {

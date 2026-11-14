@@ -118,6 +118,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -134,6 +135,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -187,11 +189,6 @@ import com.aurorashelf.app.cast.CastState
 import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
 import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
 import com.aurorashelf.app.ui.theme.AuroraCoral
-import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
-import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
-import com.aurorashelf.app.ui.theme.AuroraMediaLabel
-import com.aurorashelf.app.ui.theme.AuroraMediaMuted
-import com.aurorashelf.app.ui.theme.AuroraMediaMeta
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -233,8 +230,8 @@ internal fun PlayerScreen(
 
     var playbackUrl by remember(video.id) { mutableStateOf(video.pageUrl) }
     var videoAspectRatio by remember(playbackUrl) { mutableStateOf<Float?>(null) }
-    var currentPositionMs by rememberSaveable(playbackUrl) { mutableStateOf(0L) }
-    var currentDurationMs by rememberSaveable(playbackUrl) { mutableStateOf(0L) }
+    var currentPositionMs by rememberSaveable(playbackUrl) { mutableLongStateOf(0L) }
+    var currentDurationMs by rememberSaveable(playbackUrl) { mutableLongStateOf(0L) }
     var isPlayerControllerVisible by remember(playbackUrl) { mutableStateOf(true) }
     var isEpisodePickerVisible by remember(video.id) { mutableStateOf(false) }
     // Flow marker for logcat: the gap from this line to "timing ready" is the tap -> READY time.
@@ -321,8 +318,8 @@ internal fun PlayerScreen(
     }
 
     Surface(
-        color = if (isFullscreen) Color.Black else AuroraImmersiveBackground,
-        contentColor = Color.White,
+        color = if (isFullscreen) Color.Black else MaterialTheme.colorScheme.background,
+        contentColor = if (isFullscreen) Color.White else MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.fillMaxSize(),
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -446,146 +443,41 @@ internal fun PlayerScreen(
                 collapseOffsetDp = currentCollapseDp,
             )
 
-            if (!isFullscreen) {
-                LazyColumn(
-                    state = listState,
-                    contentPadding = PaddingValues(bottom = 32.dp),
-                    verticalArrangement = Arrangement.spacedBy(0.dp),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .statusBarsPadding()
-                        .nestedScroll(nestedScrollConnection)
-                        .testTag("player-details"),
-                ) {
-                    item(key = "player-space") {
-                        Spacer(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(effectivePlayerHeight)
-                        )
-                    }
-                    item(key = "player-info") {
-                        PlayerDetails(
-                            video = video,
-                            isFavorite = isFavorite,
-                            cachedVideo = cachedVideo,
-                            episodes = episodes,
-                            selectedEpisode = selectedEpisode,
-                            currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
-                            isEpisodePickerVisible = isEpisodePickerVisible,
-                            isCasting = isCasting,
-                            onFavorite = onFavorite,
-                            onCache = onCache,
-                            onCast = { isCastSheetVisible = true },
-                            onToggleEpisodes = { isEpisodePickerVisible = !isEpisodePickerVisible },
-                            onEpisode = { episode ->
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                playbackUrl = episode.pageUrl
-                                currentPositionMs = 0L
-                                currentDurationMs = 0L
-                                isEpisodePickerVisible = false
-                                val activeDevice = (castState as? CastState.Connected)?.device
-                                if (activeDevice != null) {
-                                    launchCastForUrl(activeDevice, episode.pageUrl, episode.label, 0L)
-                                }
-                            },
-                        )
-                    }
-                    if (relatedVideos.isNotEmpty()) {
-                        item(key = "recommendation-title") {
-                            Text(
-                                text = "接着观看",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color.White,
-                                modifier = Modifier
-                                    .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 10.dp)
-                                    .semantics { heading() },
-                            )
-                        }
-                        items(relatedVideos, key = { "related-${it.id}" }) { related ->
-                            PlayerRecommendationRow(
-                                video = related,
-                                isFavorite = related.id in favoriteIds,
-                                onClick = { onVideo(related) },
-                                onFavorite = { onRelatedFavorite(related) },
-                            )
-                        }
-                    }
+            val isTwoPaneLandscape = !isFullscreen && screenWidth >= 840.dp && screenWidth > screenHeight
+            val handleEpisodeSelect: (PlaybackEpisode) -> Unit = { episode ->
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                playbackUrl = episode.pageUrl
+                currentPositionMs = 0L
+                currentDurationMs = 0L
+                isEpisodePickerVisible = false
+                val activeDevice = (castState as? CastState.Connected)?.device
+                if (activeDevice != null) {
+                    launchCastForUrl(activeDevice, episode.pageUrl, episode.label, 0L)
                 }
             }
-
-            NativeSitePlayer(
-                pageUrl = playbackUrl,
-                isFullscreen = isFullscreen,
-                onFullscreenChange = onFullscreenChange,
-                onVideoOrientationChange = onVideoOrientationChange,
-                onVideoAspectRatioChange = { videoAspectRatio = it },
-                onPositionChange = { currentPositionMs = it },
-                onDurationChange = { currentDurationMs = it },
-                onControllerVisibilityChange = { isPlayerControllerVisible = it },
-                onPlaybackEnded = {
-                    val curNum = selectedEpisode
-                    val nextEp = episodes.firstOrNull { it.number == curNum + 1 }
-                    if (nextEp != null) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        playbackUrl = nextEp.pageUrl
-                        currentPositionMs = 0L
-                        currentDurationMs = 0L
-                        val activeDevice = (castState as? CastState.Connected)?.device
-                        if (activeDevice != null) {
-                            launchCastForUrl(activeDevice, nextEp.pageUrl, nextEp.label, 0L)
-                        }
-                    }
-                },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .then(
-                        if (isFullscreen) {
-                            Modifier.fillMaxSize()
-                        } else {
-                            Modifier
-                                .statusBarsPadding()
-                                .fillMaxWidth()
-                                .height(effectivePlayerHeight)
-                        },
-                    )
-                    .testTag("native-player-container"),
-            )
-
-            AnimatedVisibility(
-                visible = !isFullscreen && (isPlayerControllerVisible || isCasting),
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(10.dp),
-            ) {
-                FilledTonalIconButton(
+            val handlePlaybackEnded: () -> Unit = {
+                val curNum = selectedEpisode
+                val nextEp = episodes.firstOrNull { it.number == curNum + 1 }
+                if (nextEp != null) {
+                    handleEpisodeSelect(nextEp)
+                }
+            }
+            val topBarBackButton: @Composable () -> Unit = {
+                Surface(
                     onClick = onBack,
-                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = Color.Black.copy(alpha = 0.52f),
-                        contentColor = Color.White,
-                    ),
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.54f),
+                    contentColor = Color.White,
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
                     modifier = Modifier.size(44.dp),
                 ) {
-                    Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
+                    }
                 }
             }
-
-            AnimatedVisibility(
-                visible = !isFullscreen && (isPlayerControllerVisible || isCasting),
-                enter = fadeIn(),
-                exit = fadeOut(),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(10.dp),
-            ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+            val topBarRightControls: @Composable () -> Unit = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isCasting) {
                         FilledIconButton(
                             onClick = {
@@ -604,110 +496,265 @@ internal fun PlayerScreen(
                             )
                         }
                     } else {
-                        FilledTonalIconButton(
+                        Surface(
                             onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 isCastSheetVisible = true
                             },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color.Black.copy(alpha = 0.52f),
-                                contentColor = Color.White,
-                            ),
+                            shape = CircleShape,
+                            color = Color.Black.copy(alpha = 0.54f),
+                            contentColor = Color.White,
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
                             modifier = Modifier.size(44.dp),
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Cast,
-                                contentDescription = "投屏",
-                            )
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Cast,
+                                    contentDescription = "投屏",
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            }
                         }
                     }
-                    FilledTonalIconButton(
+                    Surface(
                         onClick = {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             onFullscreenChange(true)
                         },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = Color.Black.copy(alpha = 0.52f),
-                            contentColor = Color.White,
-                        ),
+                        shape = CircleShape,
+                        color = Color.Black.copy(alpha = 0.54f),
+                        contentColor = Color.White,
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
                         modifier = Modifier.size(44.dp),
                     ) {
-                        Icon(Icons.Default.Fullscreen, contentDescription = "全屏播放")
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Fullscreen,
+                                contentDescription = "全屏播放",
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
                     }
                 }
             }
 
-            // Apple HIG / Netflix Floating Cast Banner when casting
-            AnimatedVisibility(
-                visible = isCasting,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically(),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 10.dp, start = 60.dp, end = 60.dp),
-            ) {
-                val connected = castState as? CastState.Connected
-                if (connected != null) {
-                    Surface(
-                        color = Color(0xDD14171F),
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.5f)),
+            if (isTwoPaneLandscape) {
+                val twoPanePlayerHeight = (screenWidth * 0.62f * (9f / 16f))
+                    .coerceIn(220.dp, screenHeight * 0.62f)
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .statusBarsPadding(),
+                ) {
+                    Column(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable { isCastSheetVisible = true },
+                            .weight(0.62f)
+                            .fillMaxHeight(),
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(twoPanePlayerHeight),
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.CastConnected,
-                                contentDescription = null,
-                                tint = AuroraCoral,
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = "正在投屏至 ${connected.device.name}",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color.White,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false),
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            IconButton(
-                                onClick = {
-                                    if (connected.isPlaying) castManager.pause() else castManager.play()
-                                },
+                            NativeSitePlayer(
+                                pageUrl = playbackUrl,
+                                isFullscreen = false,
+                                onFullscreenChange = onFullscreenChange,
+                                onVideoOrientationChange = onVideoOrientationChange,
+                                onVideoAspectRatioChange = { videoAspectRatio = it },
+                                onPositionChange = { currentPositionMs = it },
+                                onDurationChange = { currentDurationMs = it },
+                                onControllerVisibilityChange = { isPlayerControllerVisible = it },
+                                onPlaybackEnded = handlePlaybackEnded,
+                                keepTopBarVisible = isCasting,
+                                topBarStart = topBarBackButton,
+                                topBarEnd = topBarRightControls,
                                 modifier = Modifier
-                                    .minimumInteractiveComponentSize()
-                                    .size(36.dp),
-                            ) {
-                                Icon(
-                                    imageVector = if (connected.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (connected.isPlaying) "暫停電視" else "播放",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(18.dp),
+                                    .fillMaxSize()
+                                    .testTag("native-player-container"),
+                            )
+                            FloatingCastStatusBanner(
+                                visible = isCasting,
+                                connected = castState as? CastState.Connected,
+                                castManager = castManager,
+                                onOpenSheet = { isCastSheetVisible = true },
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 60.dp, start = 16.dp, end = 16.dp),
+                            )
+                        }
+                        LazyColumn(
+                            state = listState,
+                            contentPadding = PaddingValues(bottom = 24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .testTag("player-details"),
+                        ) {
+                            item(key = "player-info") {
+                                PlayerDetails(
+                                    video = video,
+                                    isFavorite = isFavorite,
+                                    cachedVideo = cachedVideo,
+                                    episodes = episodes,
+                                    selectedEpisode = selectedEpisode,
+                                    currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
+                                    isEpisodePickerVisible = isEpisodePickerVisible,
+                                    isCasting = isCasting,
+                                    onFavorite = onFavorite,
+                                    onCache = onCache,
+                                    onCast = { isCastSheetVisible = true },
+                                    onToggleEpisodes = { isEpisodePickerVisible = !isEpisodePickerVisible },
+                                    onEpisode = handleEpisodeSelect,
                                 )
                             }
-                            IconButton(
-                                onClick = { castManager.disconnect() },
-                                modifier = Modifier
-                                    .minimumInteractiveComponentSize()
-                                    .size(36.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "斷開投屏",
-                                    tint = Color.White.copy(alpha = 0.7f),
-                                    modifier = Modifier.size(16.dp),
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+                    LazyColumn(
+                        contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
+                        modifier = Modifier
+                            .weight(0.38f)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.background),
+                    ) {
+                        if (relatedVideos.isNotEmpty()) {
+                            item(key = "recommendation-title") {
+                                Text(
+                                    text = "接着观看",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier
+                                        .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 10.dp)
+                                        .semantics { heading() },
+                                )
+                            }
+                            items(relatedVideos, key = { "related-${it.id}" }) { related ->
+                                PlayerRecommendationRow(
+                                    video = related,
+                                    isFavorite = related.id in favoriteIds,
+                                    onClick = { onVideo(related) },
+                                    onFavorite = { onRelatedFavorite(related) },
                                 )
                             }
                         }
                     }
                 }
+            } else {
+                if (!isFullscreen) {
+                    LazyColumn(
+                        state = listState,
+                        contentPadding = PaddingValues(bottom = 32.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .nestedScroll(nestedScrollConnection)
+                            .testTag("player-details"),
+                    ) {
+                        item(key = "player-space") {
+                            Spacer(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(effectivePlayerHeight)
+                            )
+                        }
+                        item(key = "player-info") {
+                            PlayerDetails(
+                                video = video,
+                                isFavorite = isFavorite,
+                                cachedVideo = cachedVideo,
+                                episodes = episodes,
+                                selectedEpisode = selectedEpisode,
+                                currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
+                                isEpisodePickerVisible = isEpisodePickerVisible,
+                                isCasting = isCasting,
+                                onFavorite = onFavorite,
+                                onCache = onCache,
+                                onCast = { isCastSheetVisible = true },
+                                onToggleEpisodes = { isEpisodePickerVisible = !isEpisodePickerVisible },
+                                onEpisode = handleEpisodeSelect,
+                            )
+                        }
+                        if (relatedVideos.isNotEmpty()) {
+                            item(key = "recommendation-title") {
+                                Text(
+                                    text = "接着观看",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier
+                                        .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 10.dp)
+                                        .semantics { heading() },
+                                )
+                            }
+                            items(relatedVideos, key = { "related-${it.id}" }) { related ->
+                                PlayerRecommendationRow(
+                                    video = related,
+                                    isFavorite = related.id in favoriteIds,
+                                    onClick = { onVideo(related) },
+                                    onFavorite = { onRelatedFavorite(related) },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (!isFullscreen) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .background(Color.Black)
+                            .statusBarsPadding(),
+                    )
+                }
+
+                NativeSitePlayer(
+                    pageUrl = playbackUrl,
+                    isFullscreen = isFullscreen,
+                    onFullscreenChange = onFullscreenChange,
+                    onVideoOrientationChange = onVideoOrientationChange,
+                    onVideoAspectRatioChange = { videoAspectRatio = it },
+                    onPositionChange = { currentPositionMs = it },
+                    onDurationChange = { currentDurationMs = it },
+                    onControllerVisibilityChange = { isPlayerControllerVisible = it },
+                    onPlaybackEnded = handlePlaybackEnded,
+                    keepTopBarVisible = !isFullscreen && isCasting,
+                    topBarStart = topBarBackButton,
+                    topBarEnd = topBarRightControls,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .then(
+                            if (isFullscreen) {
+                                Modifier.fillMaxSize()
+                            } else {
+                                Modifier
+                                    .statusBarsPadding()
+                                    .fillMaxWidth()
+                                    .height(effectivePlayerHeight)
+                            },
+                        )
+                        .testTag("native-player-container"),
+                )
+
+                FloatingCastStatusBanner(
+                    visible = isCasting,
+                    connected = castState as? CastState.Connected,
+                    castManager = castManager,
+                    onOpenSheet = { isCastSheetVisible = true },
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 60.dp, start = 20.dp, end = 20.dp),
+                )
             }
 
             if (isCastSheetVisible) {
@@ -719,6 +766,83 @@ internal fun PlayerScreen(
                         launchCastForUrl(device, playbackUrl, selectedEpisodeLabel, currentPositionMs)
                     },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingCastStatusBanner(
+    visible: Boolean,
+    connected: CastState.Connected?,
+    castManager: CastManager,
+    onOpenSheet: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + slideInVertically(),
+        exit = fadeOut() + slideOutVertically(),
+        modifier = modifier,
+    ) {
+        if (connected != null) {
+            Surface(
+                color = Color(0xDD14171F),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable(onClick = onOpenSheet),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.CastConnected,
+                        contentDescription = null,
+                        tint = AuroraCoral,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "正在投屏至 ${connected.device.name}",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    IconButton(
+                        onClick = {
+                            if (connected.isPlaying) castManager.pause() else castManager.play()
+                        },
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .size(36.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (connected.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (connected.isPlaying) "暂停电视" else "播放",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                    IconButton(
+                        onClick = { castManager.disconnect() },
+                        modifier = Modifier
+                            .minimumInteractiveComponentSize()
+                            .size(36.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "断开投屏",
+                            tint = Color.White.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
             }
         }
     }
@@ -762,7 +886,7 @@ private fun PlayerDetails(
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .background(AuroraImmersiveBackground)
+            .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 18.dp, vertical = 18.dp)
             .animateContentSize(),
     ) {
@@ -770,15 +894,19 @@ private fun PlayerDetails(
             text = video.title,
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.semantics { heading() },
         )
         Text(
-            text = listOf(video.author, video.views).filter { it.isNotBlank() }.joinToString(" · "),
+            text = listOf(video.author, video.views)
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .joinToString(" · "),
             style = MaterialTheme.typography.bodyMedium,
-            color = AuroraMediaMuted,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -865,7 +993,7 @@ private fun PlayerDetails(
                     ) {
                         Surface(
                             shape = RoundedCornerShape(10.dp),
-                            color = AuroraMediaSurfaceVariant,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             border = if (selected) BorderStroke(2.dp, AuroraCoral) else null,
                             modifier = Modifier
                                 .width(180.dp)
@@ -931,15 +1059,15 @@ private fun PlayerDetails(
                                 fontSize = 13.sp,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                             ),
-                            color = if (selected) AuroraCoral else Color.White,
+                            color = if (selected) AuroraCoral else MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            text = if (selected) "正在播放 · 4K 超清" else "4K HDR · 极速播放",
+                            text = if (selected) "正在播放" else "极速直连",
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = AuroraMediaMeta,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -947,7 +1075,7 @@ private fun PlayerDetails(
                 }
             }
         }
-        HorizontalDivider(color = Color(0xFF262626))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -960,13 +1088,19 @@ private fun PlayerActionButton(
     stateDescriptionText: String? = null,
     icon: @Composable () -> Unit,
 ) {
+    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
     Surface(
         onClick = onClick,
         enabled = enabled,
         shape = MaterialTheme.shapes.large,
-        color = Color.White.copy(alpha = 0.08f),
-        contentColor = if (enabled) Color.White.copy(alpha = 0.94f) else Color.White.copy(alpha = 0.38f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
+        color = if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color.White.copy(alpha = 0.08f),
+        contentColor = MaterialTheme.colorScheme.onSurface.let { base ->
+            if (enabled) base else base.copy(alpha = 0.38f)
+        },
+        border = BorderStroke(
+            1.dp,
+            if (isLight) MaterialTheme.colorScheme.outlineVariant else Color.White.copy(alpha = 0.10f),
+        ),
         modifier = modifier
             .height(68.dp)
             .then(
@@ -1052,28 +1186,41 @@ private fun PlayerRecommendationRow(
             verticalArrangement = Arrangement.spacedBy(4.dp),
             modifier = Modifier.weight(1f),
         ) {
+            val cleanAuthor = video.author.trim()
+            val cleanViews = video.views.trim().let { viewLabel ->
+                val bareSource = viewLabel.removePrefix("来源:").removePrefix("来源：").trim()
+                if (cleanAuthor.isNotBlank() && (viewLabel == cleanAuthor || bareSource == cleanAuthor)) {
+                    ""
+                } else {
+                    viewLabel
+                }
+            }
             Text(
                 text = video.title,
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Medium,
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = video.author,
-                style = MaterialTheme.typography.labelMedium,
-                color = AuroraMediaMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = video.views,
-                style = MaterialTheme.typography.labelMedium,
-                color = AuroraMediaMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (cleanAuthor.isNotBlank()) {
+                Text(
+                    text = cleanAuthor,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (cleanViews.isNotBlank()) {
+                Text(
+                    text = cleanViews,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         IconButton(
             onClick = {
@@ -1085,7 +1232,7 @@ private fun PlayerRecommendationRow(
             Icon(
                 imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                 contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
-                tint = if (isFavorite) AuroraCoral else AuroraMediaMuted,
+                tint = if (isFavorite) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

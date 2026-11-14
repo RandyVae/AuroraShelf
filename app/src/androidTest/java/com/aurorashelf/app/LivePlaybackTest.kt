@@ -26,7 +26,7 @@ import org.junit.Test
 @androidx.annotation.OptIn(UnstableApi::class)
 class LivePlaybackTest {
     @Test fun huangguoDetailExposesEpisodeSelection() {
-        if (InstrumentationRegistry.getArguments().getString("live") != "true") return
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.live=true to run live tests", InstrumentationRegistry.getArguments().getString("live") == "true")
         runBlocking {
             val episodes = PlaybackResolver().resolveEpisodes("https://huangguoai.com/detail/117/")
             assertTrue("Expected Huangguo detail page to expose multiple episodes", episodes.size > 1)
@@ -36,7 +36,7 @@ class LivePlaybackTest {
     }
 
     @Test fun huangguoPlaybackReachesReady() {
-        if (InstrumentationRegistry.getArguments().getString("live") != "true") return
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.live=true to run live tests", InstrumentationRegistry.getArguments().getString("live") == "true")
         runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext.applicationContext
@@ -84,7 +84,7 @@ class LivePlaybackTest {
     }
 
     @Test fun firstLiveRecordReachesPlayback() {
-        if (InstrumentationRegistry.getArguments().getString("live") != "true") return
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.live=true to run live tests", InstrumentationRegistry.getArguments().getString("live") == "true")
         runBlocking {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext.applicationContext

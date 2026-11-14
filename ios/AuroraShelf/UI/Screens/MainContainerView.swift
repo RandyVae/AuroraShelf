@@ -132,6 +132,13 @@ public struct MainContainerView: View {
             )
         }
         .onAppear {
+            PictureInPictureManager.shared.onRestoreUserInterface = { completion in
+                if let pipVideo = PictureInPictureManager.shared.activePiPVideo {
+                    selectedTab = .home
+                    coordinator.play(pipVideo)
+                }
+                completion(true)
+            }
             let args = CommandLine.arguments
             if args.contains("--tab-comics") {
                 selectedTab = .comics

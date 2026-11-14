@@ -610,7 +610,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
             }
         }
 
-        public func webView(
+        nonisolated public func webView(
             _ webView: WKWebView,
             didReceive challenge: URLAuthenticationChallenge,
             completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void

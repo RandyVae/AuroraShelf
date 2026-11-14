@@ -90,10 +90,9 @@ public struct InSightSheetView: View {
                             .padding(.horizontal, AuroraMetrics.contentInset)
 
                         HStack(spacing: AuroraMetrics.spacingM) {
-                            specBadge(title: "清晰度", value: "4K HDR")
+                            specBadge(title: "画面比例", value: isFillMode ? "铺满屏幕" : "原始比例")
                             specBadge(title: "协议流", value: video.playbackUrl.contains(".m3u8") ? "HLS" : "MP4")
-                            specBadge(title: "色彩模式", value: "DCI-P3")
-                            specBadge(title: "声道", value: "空间立体声")
+                            specBadge(title: "视频源", value: video.sourceName)
                         }
                         .padding(.horizontal, AuroraMetrics.contentInset)
                     }

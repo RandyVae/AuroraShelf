@@ -104,6 +104,18 @@ object ContentSourceCatalog {
 
     fun displayName(baseUrl: String): String = find(baseUrl)?.name ?: "自定义视频源"
 
+    fun inferSourceName(pageUrl: String): String = when {
+        find(pageUrl) != null -> find(pageUrl)!!.name
+        is91(pageUrl) -> "91视频"
+        isHuangguo(pageUrl) -> "黄果短剧"
+        isHuavod(pageUrl) -> "华视影院"
+        is91Dongman(pageUrl) -> "91动漫"
+        isBeeg(pageUrl) -> "Beeg"
+        isXVideos(pageUrl) -> "XVideos"
+        isMissAv(pageUrl) -> "MissAV"
+        else -> host(pageUrl) ?: "其他视频源"
+    }
+
     fun is91(baseUrl: String): Boolean = host(baseUrl) in setOf("h1014.sol148.com", "91porn.com", "sol148.com")
 
     fun isXVideos(baseUrl: String): Boolean = host(baseUrl) in setOf("xvideos.com", "xvideos-cdn.com")

@@ -131,7 +131,7 @@ final class LiveVideoSourceAuditTests: XCTestCase {
     private static func probeMediaResponse(_ playback: PlaybackSourceResult) async throws {
         var request = URLRequest(url: playback.url)
         request.setValue("bytes=0-255", forHTTPHeaderField: "Range")
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        request.setValue(PlaybackSourceResult.defaultUserAgent, forHTTPHeaderField: "User-Agent")
         if let referer = playback.referer {
             request.setValue(referer, forHTTPHeaderField: "Referer")
         }

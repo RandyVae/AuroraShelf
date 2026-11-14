@@ -1,6 +1,20 @@
 # Project State
 
-## 最新工作状态（2026年11月14日 · 播放器组件与 UI 全方位审查及对标 Apple TV 重构 · v2.16.27 Build 253）
+## 最新工作状态（2026年11月14日 · 全项目 Bug 审查与双端模拟器实测加固 · v2.16.28 Build 254）
+
+- **Android 全链路加固与 UI 修复**（[PlayerScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PlayerScreen.kt)、[PersonalScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PersonalScreen.kt)、[HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt)、[MainActivity.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/MainActivity.kt)）：
+  - 排查并修复冷启动/论坛 ANR 隐患，优化日间主题首屏状态栏高对比度与 `1920x1200` 平板 Hero 响应式高度；
+  - 为 `PlayerScreen` 竖屏与双栏状态栏区域增加黑色背板，防止浅色模式下白色状态栏图标落于白底；
+  - 抽取 `SettingsSubpageScaffold` 将 `SettingsPageHeader` 固定在 `LazyColumn` 顶部，修复自定义站点输入框聚焦触发滚屏时返回按钮移出视口的回归问题（`AuroraFlowTest` 10/10 全过）。
+- **iOS / iPadOS 与 Web 游戏 UI 适配**（[HeroBanner.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/HeroBanner.swift)、[LiveScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/LiveScreen.swift)、[app.css](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/assets/www/css/app.css)）：
+  - `HeroBanner` 与 `LiveScreen` Hero 背景改用 `Color.clear.overlay(AuroraCoverImage(..., aspectRatio: nil, contentMode: .fill, cornerRadius: 0))` 填充全宽与固定高度，彻底消除 `iPhone Duo`（`466x678pt`）左右留白，并将多视频轮播操作栏下边距调整至 `spacingM + 18`（30pt）以避开指示点；
+  - Web 游戏 `.age-badge`（`18+`）移至左上角，解除与 Android `GameActivity` 右上角原生浮动胶囊的重叠，并通过软链同步 iOS `Resources/www`。
+- **全量验证与交付（v2.16.28 Build 254）**：
+  - Android：`lintDebug` 0 errors；`testDebugUnitTest` 41 文件 245 项（0 失败 / 0 错误 / 7 跳过在线探测）；`connectedDebugAndroidTest` 6 类 20 项非在线 UI/无障碍全部通过（9 项未开启参数按预期抛出 `AssumptionViolatedException`，`LiveComicTest` 过滤排除）；签名 Release APK（`206,843,787` bytes）在 `emulator-5554` 实装验证零 ANR/Crash；
+  - iOS/iPadOS：Simulator Release 编译与 169 项 XCTest（0 失败，6 跳过）通过，多设备多外观截图实测完成；签名发布 `Netgrey.ipa`（`202,489,697` bytes）；
+  - OTA 线上验证：`./scripts/publish_ota.sh Release` 成功发布至 `https://bananarey.us`（HTTPS `200 OK`，`manifest.plist` `2.16.28`），远端仅存最新双端包，磁盘剩余 `11G`。
+
+## 历史工作状态（2026年11月14日 · 播放器组件与 UI 全方位审查及对标 Apple TV 重构 · v2.16.27 Build 253）
 
 - **iOS / iPadOS 播放器内核合流与 Apple TV 全功能补齐**（[VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift)、[NativePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/NativePlayerView.swift)、[PlayerScrubberBar.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/PlayerScrubberBar.swift)）：
   - 消除 `VideoDetailPlaybackScreen` 与 `NativePlayerView` 的双播放器实现分叉，将 `NativePlayerView` 统一委托至 `VideoDetailPlaybackScreen` 并抽出公用 `PlayerMediaTrackMenu`；

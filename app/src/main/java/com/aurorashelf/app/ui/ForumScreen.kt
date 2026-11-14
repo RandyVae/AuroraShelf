@@ -71,6 +71,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -82,7 +83,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -157,7 +160,13 @@ internal fun ForumScreen(
         }.distinctUntilChanged().filter { it }.collect { onLoadMore() }
     }
 
-    Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
+    var headerHeightPx by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val headerSpacerHeight = remember(headerHeightPx, density) {
+        if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() + 8.dp } else 115.dp
+    }
+
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize()) {
             LazyColumn(
                 state = listState,
@@ -167,15 +176,15 @@ internal fun ForumScreen(
                 modifier = Modifier.fillMaxSize().testTag("forum-feed"),
             ) {
                 item(key = "forum-header-spacer") {
-                    Spacer(Modifier.height(115.dp))
+                    Spacer(Modifier.height(headerSpacerHeight))
                 }
 
         if (state.unavailableSources.isNotEmpty()) {
             item {
                 Surface(
-                    color = Color(0xFF1E222B),
-                    contentColor = Color(0xFFD6DCE5),
-                    border = BorderStroke(1.dp, Color(0xFF333A48)),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -191,9 +200,9 @@ internal fun ForumScreen(
         if (state.error != null && state.posts.isNotEmpty()) {
             item {
                 Surface(
-                    color = Color(0xFF2B1417),
-                    contentColor = Color(0xFFFFB4AB),
-                    border = BorderStroke(1.dp, Color(0xFF5C2026)),
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().testTag("forum-refresh-error-banner"),
                 ) {
@@ -247,7 +256,7 @@ internal fun ForumScreen(
                     Text(
                         text = "该板块暂未抓取到更多帖子，请下拉刷新或浏览【全部】",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = AuroraMediaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -284,14 +293,14 @@ internal fun ForumScreen(
 
     val headerModifier = if (isScrolled) {
         Modifier
-            .background(Color(0xFF000000).copy(alpha = 0.96f))
-            .border(BorderStroke(0.5.dp, Color(0xFF222222)), RectangleShape)
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
+            .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
     } else {
         Modifier.background(
             Brush.verticalGradient(
                 listOf(
-                    Color.Black.copy(alpha = 0.85f),
-                    Color.Black.copy(alpha = 0.40f),
+                    MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                    MaterialTheme.colorScheme.background.copy(alpha = 0.60f),
                     Color.Transparent,
                 ),
             ),
@@ -303,6 +312,9 @@ internal fun ForumScreen(
             .align(Alignment.TopCenter)
             .fillMaxWidth()
             .then(headerModifier)
+            .onSizeChanged { size ->
+                if (size.height > 0) headerHeightPx = size.height
+            }
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
         NetflixTopBar {
@@ -355,9 +367,10 @@ internal fun ForumScreen(
 private fun ForumPostCard(post: ForumPost, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        color = AuroraMediaSurface,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, Color(0xFF262626)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
         modifier = Modifier
             .fillMaxWidth()
             .testTag("forum-post"),
@@ -370,7 +383,7 @@ private fun ForumPostCard(post: ForumPost, onClick: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                     lineHeight = 20.sp,
                 ),
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -399,22 +412,22 @@ private fun ForumPostCard(post: ForumPost, onClick: () -> Unit) {
                 Text(
                     text = post.author,
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                    color = AuroraMediaMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = AuroraMediaMuted, modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                 Text(
                     text = post.replyCount.toString(),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
-                    color = AuroraMediaLabel,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 if (post.updatedLabel.isNotBlank()) {
                     Text(
                         text = post.updatedLabel,
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = AuroraMediaMuted,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -452,7 +465,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     var isLoading by remember(post.url) { mutableStateOf(true) }
     var error by remember(post.url) { mutableStateOf<String?>(null) }
     var canGoBack by remember(post.url) { mutableStateOf(false) }
-    var loadGeneration by remember(post.url) { mutableStateOf(0) }
+    var loadGeneration by remember(post.url) { mutableIntStateOf(0) }
     var pendingImageRequest by remember(post.url) { mutableStateOf<ForumImageRequest?>(null) }
     var permissionImageRequest by remember(post.url) { mutableStateOf<ForumImageRequest?>(null) }
     var isSavingImage by remember(post.url) { mutableStateOf(false) }
@@ -611,23 +624,23 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
         enabled = !(canGoBack && webView.canGoBack()),
         onBack = onClose,
     ) {
-        Column(Modifier.fillMaxSize().background(Color(0xFF141218)).statusBarsPadding().testTag("forum-reader")) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().testTag("forum-reader")) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp),
         ) {
             IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回论坛", tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回论坛", tint = MaterialTheme.colorScheme.onBackground)
             }
             Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                Text(post.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = Color.White)
-                Text(post.sourceName, style = MaterialTheme.typography.labelMedium, color = AuroraMediaMuted)
+                Text(post.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onBackground)
+                Text(post.sourceName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             IconButton(onClick = { webView.reload() }) {
-                Icon(Icons.Default.Refresh, contentDescription = "刷新帖子", tint = Color.White)
+                Icon(Icons.Default.Refresh, contentDescription = "刷新帖子", tint = MaterialTheme.colorScheme.onBackground)
             }
         }
-        HorizontalDivider(color = Color(0xFF262626))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Box(Modifier.fillMaxSize()) {
             val contentAlpha by animateFloatAsState(
                 targetValue = if (!isLoading && error == null) 1f else 0f,
@@ -641,10 +654,10 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
             if (isLoading) {
                 LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = AuroraCoral)
                 Surface(
-                    color = Color(0xFF211F26),
-                    contentColor = Color.White,
+                    color = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
                     shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, Color(0xFF33303A)),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     modifier = Modifier.align(Alignment.Center).testTag("forum-reader-loading"),
                 ) {
                     Column(
@@ -653,11 +666,11 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                         modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
                     ) {
                         CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp, color = AuroraCoral)
-                        Text("正在整理帖子排版", style = MaterialTheme.typography.titleSmall, color = Color.White)
+                        Text("正在整理帖子排版", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                         Text(
                             "内容准备好后会一次显示",
                             style = MaterialTheme.typography.bodySmall,
-                            color = AuroraMediaMuted,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 }
@@ -666,9 +679,9 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.align(Alignment.Center).background(Color(0xFF141218)).padding(24.dp),
+                    modifier = Modifier.align(Alignment.Center).background(MaterialTheme.colorScheme.background).padding(24.dp),
                 ) {
-                    Text(message, color = Color.White)
+                    Text(message, color = MaterialTheme.colorScheme.onBackground)
                     TextButton(onClick = { webView.reload() }) { Text("重新加载", color = AuroraCoral) }
                 }
             }

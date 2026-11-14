@@ -35,8 +35,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aurorashelf.app.data.AccountRepository
 import com.aurorashelf.app.data.AccountResult
 import com.aurorashelf.app.data.AccountState
-import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
-import com.aurorashelf.app.ui.theme.AuroraMediaMuted
 
 @Composable
 internal fun AccountScreen(onBack: () -> Unit) {
@@ -51,7 +49,7 @@ internal fun AccountScreen(onBack: () -> Unit) {
     var isSubmitting by remember { mutableStateOf(false) }
     var isResetting by rememberSaveable { mutableStateOf(false) }
 
-    Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -67,9 +65,9 @@ internal fun AccountScreen(onBack: () -> Unit) {
                 is AccountState.SignedIn -> item {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(state.profile.displayName, style = MaterialTheme.typography.titleLarge)
-                        Text(state.profile.email, color = AuroraMediaMuted)
-                        Text(if (state.profile.isVerified) "邮箱已验证" else "邮箱待验证", color = AuroraMediaMuted)
-                        Text("当前计划：免费", color = AuroraMediaMuted)
+                        Text(state.profile.email, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (state.profile.isVerified) "邮箱已验证" else "邮箱待验证", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("当前计划：免费", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Button(onClick = { repository.signOut(); message = "已退出登录" }, modifier = Modifier.fillMaxWidth()) {
                             Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                             Text("退出登录", modifier = Modifier.padding(start = 8.dp))

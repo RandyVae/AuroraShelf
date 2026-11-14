@@ -211,43 +211,55 @@ enum HTMLVideoSourceAdapter {
             else { continue }
 
             let cardHTML = cardContext(in: nsHTML, around: anchor.range)
-            let imageHTML = cardHTML.isEmpty ? body : cardHTML
-            let bodyRange = NSRange(location: 0, length: (imageHTML as NSString).length)
-            let imageMatches = imageRegex.matches(in: imageHTML, range: bodyRange)
-            var imageValues: [String: String] = [:]
-            var rawCover = ""
-            for imageMatch in imageMatches {
+            // Always scan the anchor's own inner HTML first so nested <div></div> wrappers
+            // inside <a> (such as badge overlays before <img>) are never truncated by cardContext.
+            let bodyImageMatches = imageRegex.matches(in: body, range: NSRange(location: 0, length: (body as NSString).length))
+            let imageHTML: String
+            let imageMatches: [NSTextCheckingResult]
+            if !bodyImageMatches.isEmpty || cardHTML.isEmpty {
+                imageHTML = body
+                imageMatches = bodyImageMatches
+            } else {
+                imageHTML = cardHTML
+                imageMatches = imageRegex.matches(in: cardHTML, range: NSRange(location: 0, length: (cardHTML as NSString).length))
+            }
+            let coverKeys = ["data-poster", "data-original", "data-src", "data-thumb", "data-lazy-src", "data-sfwthumb", "data-mediumthumb", "poster"]
+            let validCoverURL: (String?) -> Bool = { value in
+                guard let value else { return false }
+                let lower = value.lowercased()
+                return !value.isEmpty
+                    && !lower.hasPrefix("data:image")
+                    && !lower.hasPrefix("javascript:")
+                    && !lower.contains("/img/flags/")
+                    && !lower.contains("preview.mp4")
+            }
+            let imageCandidateDicts = imageMatches.map { imageMatch in
                 let candidateAttributes = (imageHTML as NSString).substring(with: imageMatch.range(at: 1))
-                let candidateValues = attributeValues(candidateAttributes, regex: attributeRegex)
-                let candidateCover = ["data-poster", "data-original", "data-src", "data-thumb", "data-lazy-src", "data-sfwthumb", "data-mediumthumb", "poster", "src"]
-                    .compactMap { candidateValues[$0] }
-                    .first { value in
-                        let lower = value.lowercased()
-                        return !value.isEmpty
-                            && !lower.hasPrefix("data:image")
-                            && !lower.hasPrefix("javascript:")
-                            && !lower.contains("/img/flags/")
-                            && !lower.contains("preview.mp4")
-                    }
-                if let candidateCover {
+                return attributeValues(candidateAttributes, regex: attributeRegex)
+            }
+            var imageValues = imageCandidateDicts.first ?? [:]
+            var rawCover = ""
+            for candidateValues in imageCandidateDicts {
+                if let candidateCover = coverKeys.compactMap({ candidateValues[$0] }).first(where: validCoverURL) {
                     imageValues = candidateValues
                     rawCover = candidateCover
                     break
-                } else if imageValues.isEmpty {
-                    imageValues = candidateValues
                 }
             }
             if rawCover.isEmpty {
-                rawCover = ["data-poster", "data-original", "data-src", "data-thumb", "data-lazy-src", "data-sfwthumb", "data-mediumthumb", "poster", "src"]
-                    .compactMap { values[$0] }
-                    .first { value in
-                        let lower = value.lowercased()
-                        return !value.isEmpty
-                            && !lower.hasPrefix("data:image")
-                            && !lower.hasPrefix("javascript:")
-                            && !lower.contains("/img/flags/")
-                            && !lower.contains("preview.mp4")
-                    } ?? ""
+                rawCover = coverKeys.compactMap { values[$0] }.first(where: validCoverURL) ?? ""
+            }
+            if rawCover.isEmpty {
+                for candidateValues in imageCandidateDicts {
+                    if let candidateSrc = candidateValues["src"], validCoverURL(candidateSrc) {
+                        imageValues = candidateValues
+                        rawCover = candidateSrc
+                        break
+                    }
+                }
+            }
+            if rawCover.isEmpty, let anchorSrc = values["src"], validCoverURL(anchorSrc) {
+                rawCover = anchorSrc
             }
             let cleanRawCover = decodeHTML(rawCover).trimmingCharacters(in: .whitespacesAndNewlines)
             let encodedRawCover = cleanRawCover.contains(" ") ? cleanRawCover.replacingOccurrences(of: " ", with: "%20") : cleanRawCover
@@ -293,7 +305,7 @@ enum HTMLVideoSourceAdapter {
                 sourceName: source.name
             ))
         }
-        if source.id == "missav", items.contains(where: { !$0.coverUrl.isEmpty }) {
+        if (source.id == "missav" || source.id == "ohentai"), items.contains(where: { !$0.coverUrl.isEmpty }) {
             return items.filter { !$0.coverUrl.isEmpty }
         }
         return items
@@ -370,13 +382,16 @@ enum HTMLVideoSourceAdapter {
         if path.contains("/preview.mp4") || url.lastPathComponent.lowercased().hasPrefix("preview.") {
             return true
         }
-        if path.contains("/vast") || path.contains("/preroll") || path.contains("/ad_vast") {
+        if path.contains("/vast") || path.contains("/preroll") || path.contains("/ad_vast")
+            || path.contains("/ads/") || path.contains("_ad.") || path.contains("-ad.") {
             return true
         }
         let blockedAdHosts = [
-            "tsyndicate.com", "exoclick.com", "realsrv.com", "trafficjunky.net",
-            "juicyads.com", "popads.net", "doubleclick.net", "googlesyndication.com",
-            "biomanos.org", "benchform.org"
+            "tsyndicate.com", "exoclick.com", "realsrv.com", "magsrv.com",
+            "trafficjunky.net", "trafficjunky.com", "juicyads.com", "popads.net",
+            "doubleclick.net", "googlesyndication.com", "biomanos.org", "benchform.org",
+            "myavlive.com", "chaturbate.com", "stripchat.com", "livejasmin.com",
+            "bongacams.com", "adserver.com", "adsco.re"
         ]
         return blockedAdHosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") })
     }
@@ -440,7 +455,7 @@ enum HTMLVideoSourceAdapter {
             }
             let isSameSource = sourceHost.map { frameHost == $0 || frameHost.hasSuffix(".\($0)") } ?? false
             let isKnownJavnoniPlayer = source.id == "javnoni"
-                && ["luluvido.com", "doodstream.com", "playmogo.com"].contains(where: { frameHost == $0 || frameHost.hasSuffix(".\($0)") })
+                && javnoniPlayerHosts.contains(where: { frameHost == $0 || frameHost.hasSuffix(".\($0)") })
             guard isSameSource || isKnownJavnoniPlayer else { return nil }
             return frameURL
         }
@@ -455,16 +470,26 @@ enum HTMLVideoSourceAdapter {
         guard let providers = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]] else {
             return frames
         }
-        let allowedHosts = ["luluvido.com", "doodstream.com", "playmogo.com"]
         let externalFrames = providers.flatMap { $0["episodes"] as? [[String: Any]] ?? [] }
             .compactMap { $0["url"] as? String }
             .compactMap { URL(string: decodeHTML($0), relativeTo: pageURL)?.absoluteURL }
             .filter { url in
                 guard let host = url.host?.lowercased() else { return false }
-                return allowedHosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") })
+                return javnoniPlayerHosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") })
             }
         return frames + externalFrames
     }
+
+    private static let javnoniPlayerHosts: [String] = [
+        "luluvid.com",
+        "luluvdo.com",
+        "luluvido.com",
+        "lulustream.com",
+        "nuvorel.top",
+        "streamruby.com",
+        "doodstream.com",
+        "playmogo.com",
+    ]
 
     private static func isVideoPage(_ url: URL, source: VideoSourceDefinition) -> Bool {
         let path = url.path.lowercased()

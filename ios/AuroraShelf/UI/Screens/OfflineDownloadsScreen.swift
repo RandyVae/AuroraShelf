@@ -24,8 +24,7 @@ public struct OfflineDownloadsScreen: View {
     }
     
     public var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 // 分段选择器（视频 / 漫画）
                 Picker("下载类型", selection: $selectedTab) {
                     Text("视频 (\(downloadManager.items.count))").tag(OfflineTab.video)
@@ -60,6 +59,10 @@ public struct OfflineDownloadsScreen: View {
                         }
                     }
                 }
+            }
+            .onChange(of: selectedTab) { _, _ in
+                editMode = .inactive
+                selectedItemIDs.removeAll()
             }
             .navigationTitle("离线缓存")
             .navigationBarTitleDisplayMode(.inline)
@@ -135,7 +138,6 @@ public struct OfflineDownloadsScreen: View {
             } message: {
                 Text(selectedTab == .video ? "此操作将删除所有已下载的视频文件，释放本地存储空间。" : "此操作将删除所有已下载的离线漫画页面，释放本地存储空间。")
             }
-        }
     }
     
     private func emptyStateView(icon: String, title: String, description: String) -> some View {
@@ -175,8 +177,11 @@ public struct OfflineDownloadsScreen: View {
                     downloadVideoRow(item: item)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if editMode == .inactive && item.status.isCompleted {
+                            guard editMode == .inactive else { return }
+                            if item.status.isCompleted {
                                 onPlayVideo(item.toVideoItem())
+                            } else if case .failed = item.status {
+                                downloadManager.retryDownload(id: item.id)
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {

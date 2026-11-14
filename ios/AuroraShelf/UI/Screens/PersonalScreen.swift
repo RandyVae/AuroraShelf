@@ -80,7 +80,6 @@ public struct PersonalScreen: View {
                     // 资料库核心：接着播放与最近历史（对齐 Apple TV 资料库）
                     UpNextShelf(onPlayVideo: { video in
                         activePlaybackVideo = video
-                        onPlayVideo(video)
                     })
 
                     // 2. 娱乐板块（战术 RPG 离线单机游戏接入）
@@ -108,7 +107,7 @@ public struct PersonalScreen: View {
                                         Text("settings.game_title".localized)
                                             .font(.headline)
                                             .foregroundStyle(AuroraColor.textPrimary)
-                                        Text("v2.16.27")
+                                        Text(shortAppVersion)
                                             .font(.caption2)
                                             .fontWeight(.bold)
                                             .foregroundStyle(AuroraColor.brand)
@@ -185,7 +184,6 @@ public struct PersonalScreen: View {
                         NavigationLink {
                             WatchlistScreen(onPlayVideo: { video in
                                 activePlaybackVideo = video
-                                onPlayVideo(video)
                             })
                         } label: {
                             settingRow(
@@ -231,7 +229,6 @@ public struct PersonalScreen: View {
                         NavigationLink {
                             OfflineDownloadsScreen(onPlayVideo: { video in
                                 activePlaybackVideo = video
-                                onPlayVideo(video)
                             })
                         } label: {
                             settingRow(
@@ -267,7 +264,7 @@ public struct PersonalScreen: View {
                             .foregroundStyle(Color(red: 1.0, green: 0.31, blue: 0.48))
                             .tracking(-0.5)
 
-                        Text("Netgrey · iOS 27")
+                        Text(platformFootnote)
                             .font(.caption2)
                             .foregroundStyle(AuroraColor.textSecondary)
                     }
@@ -344,6 +341,17 @@ public struct PersonalScreen: View {
             }
             Button("取消", role: .cancel) {}
         }
+    }
+
+    private var shortAppVersion: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
+        return "v\(version)"
+    }
+
+    private var platformFootnote: String {
+        let platformName = UIDevice.current.userInterfaceIdiom == .pad ? "iPadOS" : "iOS"
+        let major = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+        return "Netgrey · \(platformName) \(major)"
     }
 
     private var appVersion: String {

@@ -150,11 +150,39 @@
         energyAt: (state.stats && state.stats.energyAt) || Date.now(),
       };
     }
-    // Bidirectional sync
-    state.gold = state.wallet.gold = Math.max(0, Math.min(99999999, Math.round(state.wallet.gold || state.gold || 0)));
-    state.keys = state.wallet.keys = Math.max(0, Math.min(99999, Math.round(state.wallet.keys || state.keys || 0)));
-    state.energy = state.wallet.energy = Math.max(0, Math.min(99999, Math.round(state.wallet.energy !== undefined ? state.wallet.energy : (state.energy || 0))));
-    state.shards = state.wallet.shards = Math.max(0, Math.min(99999, Math.round(state.wallet.shards || state.shards || 0)));
+    // Bidirectional sync: prefer whichever mirror changed since last sync (top-level wins ties).
+    const prevSnapshot = state._mirrorSnapshot || {};
+    [
+      ['gold', 99999999, 0],
+      ['keys', 99999, 0],
+      ['energy', 99999, 100],
+      ['shards', 99999, 0],
+    ].forEach(([field, maxVal, fallback]) => {
+      const topVal = state[field];
+      const walletVal = state.wallet[field];
+      const hasPrev = Object.prototype.hasOwnProperty.call(prevSnapshot, field);
+      let nextVal;
+      if (hasPrev && topVal !== prevSnapshot[field] && walletVal === prevSnapshot[field]) {
+        nextVal = topVal;
+      } else if (hasPrev && walletVal !== prevSnapshot[field] && topVal === prevSnapshot[field]) {
+        nextVal = walletVal;
+      } else if (topVal !== undefined) {
+        nextVal = topVal;
+      } else if (walletVal !== undefined) {
+        nextVal = walletVal;
+      } else {
+        nextVal = fallback;
+      }
+      const clamped = Math.max(0, Math.min(maxVal, Math.round(nextVal || 0)));
+      state[field] = state.wallet[field] = clamped;
+      prevSnapshot[field] = clamped;
+    });
+    Object.defineProperty(state, '_mirrorSnapshot', {
+      value: prevSnapshot,
+      writable: true,
+      enumerable: false,
+      configurable: true,
+    });
 
     if (!state.progress) state.progress = {};
     state.stars = state.progress.stars = state.progress.stars || state.stars || {};

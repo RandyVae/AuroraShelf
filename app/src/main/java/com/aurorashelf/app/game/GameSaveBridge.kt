@@ -3,6 +3,7 @@ package com.aurorashelf.app.game
 import android.content.Context
 import android.content.SharedPreferences
 import android.webkit.JavascriptInterface
+import androidx.core.content.edit
 
 /**
  * Durable save bridge so progress survives process death regardless of WebView storage.
@@ -17,12 +18,12 @@ class GameSaveBridge(context: Context) {
 
     @JavascriptInterface
     fun set(value: String?) {
-        prefs.edit().putString(KEY, value ?: "").apply()
+        prefs.edit { putString(KEY, value ?: "") }
     }
 
     @JavascriptInterface
     fun clear() {
-        prefs.edit().remove(KEY).apply()
+        prefs.edit { remove(KEY) }
     }
 
     companion object {

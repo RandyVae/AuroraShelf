@@ -158,7 +158,6 @@ public struct VideoDetailPlaybackScreen: View {
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarHidden(true)
         .navigationBarBackButtonHidden(true)
-        .preferredColorScheme(.dark)
         .statusBarHidden(isFullScreen ? (!showControls || isLandscape) : false)
         .persistentSystemOverlays(isFullScreen && !showControls ? .hidden : .automatic)
         .task(id: currentVideo.playbackUrl) {
@@ -268,14 +267,12 @@ public struct VideoDetailPlaybackScreen: View {
             } else {
                 cleanupPlayer()
                 onDismiss()
-                dismiss()
             }
             return .handled
         }
         .enableSwipeBack(isEnabled: !isFullScreen) {
             cleanupPlayer()
             onDismiss()
-            dismiss()
         }
     }
 
@@ -470,7 +467,7 @@ public struct VideoDetailPlaybackScreen: View {
             
             // 播放器控制覆盖层（Apple HIG 悬浮胶囊与进度条）
             if showControls && resolveError == nil {
-                playerControlsOverlay(in: screenGeo, isRotated: isRotated)
+                playerControlsOverlay(in: screenGeo, playerWidth: targetWidth, isRotated: isRotated)
                     .transition(.opacity)
             }
             
@@ -526,7 +523,7 @@ public struct VideoDetailPlaybackScreen: View {
     // MARK: - 播放器控制栏（内嵌 / 全屏自适应）
     
     @ViewBuilder
-    private func playerControlsOverlay(in screenGeo: GeometryProxy, isRotated: Bool) -> some View {
+    private func playerControlsOverlay(in screenGeo: GeometryProxy, playerWidth: CGFloat, isRotated: Bool) -> some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
         let safeTop = DeviceLayout.safeAreaTop(in: screenGeo.size)
         // 顶栏无论内嵌还是全屏，均必须刚性避让 safeTop（灵动岛/状态栏 59pt），杜绝按钮飞出屏幕或陷入灵动岛
@@ -539,8 +536,7 @@ public struct VideoDetailPlaybackScreen: View {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { location in
-                    let viewportWidth = isRotated ? screenGeo.size.height : screenGeo.size.width
-                    handleDoubleTap(at: location.x, in: viewportWidth)
+                    handleDoubleTap(at: location.x, in: playerWidth)
                 }
                 .onTapGesture(count: 1) {
                     withAnimation(.easeInOut(duration: 0.25)) {
@@ -553,14 +549,13 @@ public struct VideoDetailPlaybackScreen: View {
                     DragGesture(minimumDistance: 15)
                         .onChanged { value in
                             guard isFullScreen else { return }
-                            let screenWidth = screenGeo.size.width
                             let startX = value.startLocation.x
                             if activeGestureMode == nil {
-                                if startX < screenWidth * 0.40 {
+                                if startX < playerWidth * 0.40 {
                                     activeGestureMode = .brightness
                                     let activeScreen = (UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)?.screen
                                     gestureInitialValue = activeScreen?.brightness ?? 0.5
-                                } else if startX > screenWidth * 0.60 {
+                                } else if startX > playerWidth * 0.60 {
                                     activeGestureMode = .volume
                                     gestureInitialValue = CGFloat(player?.volume ?? 1.0)
                                 }
@@ -694,13 +689,6 @@ public struct VideoDetailPlaybackScreen: View {
                             Text(currentVideo.sourceName)
                                 .font(.caption2.bold())
                                 .foregroundStyle(AuroraColor.brandLabel)
-                            
-                            Text("4K HDR")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.85))
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 1)
-                                .background(Color.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 3))
                         }
                     }
                     .padding(.leading, 4)
@@ -711,7 +699,6 @@ public struct VideoDetailPlaybackScreen: View {
                         impact.impactOccurred()
                         cleanupPlayer()
                         onDismiss()
-                        dismiss()
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "chevron.backward")
@@ -1094,19 +1081,14 @@ public struct VideoDetailPlaybackScreen: View {
                     .padding(.vertical, 3)
                     .background(AuroraColor.brand.opacity(0.16), in: Capsule())
                 
-                Text("4K HDR")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 4))
-                
-                Text("杜比视界")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.8))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 4))
+                if !currentVideo.duration.isEmpty {
+                    Text(currentVideo.duration)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(AuroraColor.textSecondary)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 4))
+                }
                 
                 if !currentVideo.rating.isEmpty {
                     HStack(spacing: 3) {
@@ -1562,7 +1544,7 @@ public struct VideoDetailPlaybackScreen: View {
                 .font(.headline)
                 .foregroundStyle(AuroraColor.textPrimary)
             
-            let description = currentVideo.subtitle.isEmpty ? "本片由 \(currentVideo.sourceName) 官方源直连分发，支持 4K 超清硬解出画与离线缓存下载。" : currentVideo.subtitle
+            let description = currentVideo.subtitle.isEmpty ? "本片由 \(currentVideo.sourceName) 官方源直连分发，支持硬件解码出画与离线缓存下载。" : currentVideo.subtitle
             Text(description)
                 .font(.subheadline)
                 .foregroundStyle(AuroraColor.textSecondary)
@@ -1618,15 +1600,25 @@ public struct VideoDetailPlaybackScreen: View {
     // MARK: - 核心播放调度引擎（单一实例，零重新缓冲）
     
     private func startPlayback(for video: VideoItem) async {
-        cleanupPlayer()
+        cleanupPlayer(forceStopPlayer: false)
         let resolveID = UUID()
         activeResolveID = resolveID
         isResolving = true
         resolveError = nil
         resolveStatus = "正在极速秒开…"
+
+        // 若正从当前视频的画中画恢复，直接复用仍在播放中的 AVPlayer，零中断
+        if let retainedPlayer = PictureInPictureManager.shared.consumeRetainedPlayer(for: video) {
+            attachObservers(to: retainedPlayer)
+            self.player = retainedPlayer
+            self.isPlaying = retainedPlayer.timeControlStatus != .paused
+            self.isResolving = false
+            return
+        }
         
-        // 优先检查本地离线缓存
-        if let localURL = downloadManager.localPlaybackURL(for: video, episode: currentEpisode) {
+        // 优先检查本地离线缓存（.m3u8 通过本地回环 HTTP 代理提供）
+        if let localURL = await downloadManager.playableLocalURL(for: video, episode: currentEpisode) {
+            guard activeResolveID == resolveID else { return }
             resolveStatus = "从离线缓存中加载…"
             initPlayer(url: localURL, referer: nil)
             isResolving = false
@@ -1671,7 +1663,20 @@ public struct VideoDetailPlaybackScreen: View {
         let p = AVPlayer(playerItem: playerItem)
         self.player = p
         self.lastSavedSecond = -1
-        
+        attachObservers(to: p, applyResumeSeek: true)
+    }
+
+    private func attachObservers(to p: AVPlayer, applyResumeSeek: Bool = false) {
+        guard let playerItem = p.currentItem else { return }
+        self.player = p
+        self.lastSavedSecond = -1
+        let itemDur = CMTimeGetSeconds(playerItem.duration)
+        if itemDur.isFinite && itemDur > 0 {
+            self.duration = itemDur
+        }
+        self.currentTime = max(0, CMTimeGetSeconds(p.currentTime()))
+        self.loadMediaSelectionGroups(for: playerItem)
+
         // 观察时长
         itemDurationObserver = playerItem.observe(\.duration, options: [.new, .initial]) { [self] item, _ in
             let seconds = CMTimeGetSeconds(item.duration)
@@ -1692,7 +1697,8 @@ public struct VideoDetailPlaybackScreen: View {
                     self.isPlaying = true
                     self.loadMediaSelectionGroups(for: item)
                     // Apple TV Up Next 断点续播：若存在未完成的播放记录，自动跳转至上次观看进度
-                    if let record = self.progressStore.record(for: self.currentVideo),
+                    if applyResumeSeek,
+                       let record = self.progressStore.record(for: self.currentVideo),
                        !record.isManuallyCompleted,
                        record.positionMs > 3_000,
                        record.progressRatio < 0.95 {
@@ -1879,21 +1885,23 @@ public struct VideoDetailPlaybackScreen: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.5, execute: task)
     }
     
-    private func cleanupPlayer() {
+    private func cleanupPlayer(forceStopPlayer: Bool = false) {
         UIApplication.shared.isIdleTimerDisabled = false
-        if duration > 5.0 && currentTime > 2.0 && currentTime < duration - 1.0 {
+        if player != nil, duration > 5.0, currentTime > 2.0, currentTime < duration - 1.0 {
             progressStore.updateProgress(
                 video: currentVideo,
                 positionMs: Int64(currentTime * 1000),
                 durationMs: Int64(duration * 1000)
             )
+            progressStore.flushPendingPersist()
         }
-        progressStore.flushPendingPersist()
         hideControlsTask?.cancel()
         subtitleSelectionGroup = nil
         audioSelectionGroup = nil
         itemStatusObserver?.invalidate()
+        itemStatusObserver = nil
         itemDurationObserver?.invalidate()
+        itemDurationObserver = nil
         if let token = didPlayToEndObserverToken {
             NotificationCenter.default.removeObserver(token)
             didPlayToEndObserverToken = nil
@@ -1902,8 +1910,19 @@ public struct VideoDetailPlaybackScreen: View {
             p.removeTimeObserver(token)
             timeObserverToken = nil
         }
-        player?.pause()
+        if !forceStopPlayer, PictureInPictureManager.shared.isActive, let activePlayer = player {
+            PictureInPictureManager.shared.retainPlayerForPiP(player: activePlayer, video: currentVideo)
+        } else {
+            if forceStopPlayer {
+                PictureInPictureManager.shared.stopAndReleasePiPIfNeeded()
+            }
+            player?.pause()
+        }
         player = nil
+        currentTime = 0
+        duration = 0
+        lastSavedSecond = -1
+        isPlaying = false
     }
     
     private func handleEpisodePlaybackEnded() {
@@ -1933,10 +1952,15 @@ public struct VideoDetailPlaybackScreen: View {
     }
     
     private func switchEpisode(_ ep: PlaybackEpisode) {
+        cleanupPlayer(forceStopPlayer: true)
         currentEpisode = ep
+        let baseId = currentVideo.id.replacingOccurrences(of: #"-ep-\d+$"#, with: "", options: .regularExpression)
+        let baseTitle = initialVideo.id.replacingOccurrences(of: #"-ep-\d+$"#, with: "", options: .regularExpression) == baseId
+            ? initialVideo.title
+            : currentVideo.title
         let epVideo = VideoItem(
-            id: "\(currentVideo.id)-ep-\(ep.number)",
-            title: "\(currentVideo.title) \(ep.label)",
+            id: "\(baseId)-ep-\(ep.number)",
+            title: "\(baseTitle) \(ep.label)",
             subtitle: currentVideo.subtitle,
             coverUrl: currentVideo.coverUrl,
             playbackUrl: ep.pageUrl,
@@ -1961,6 +1985,8 @@ public struct VideoDetailPlaybackScreen: View {
     private func switchToVideo(_ newVideo: VideoItem) {
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
+        cleanupPlayer(forceStopPlayer: true)
+        resolveError = nil
         currentVideo = newVideo
         currentEpisode = nil
         episodes = []

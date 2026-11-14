@@ -613,20 +613,32 @@ internal fun CategoryStrip(
     testTag: String? = null,
     isScrolled: Boolean = false,
     applyBackground: Boolean = true,
+    forceDark: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
     val backgroundModifier = if (!applyBackground) {
         Modifier
     } else if (isScrolled) {
         Modifier
-            .background(Color(0xFF000000).copy(alpha = 0.94f))
-            .border(BorderStroke(0.5.dp, Color(0xFF222222)), RectangleShape)
+            .background(
+                if (isDark) Color(0xFF000000).copy(alpha = 0.94f)
+                else MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
+            )
+            .border(
+                BorderStroke(
+                    0.5.dp,
+                    if (isDark) Color(0xFF222222) else MaterialTheme.colorScheme.outlineVariant,
+                ),
+                RectangleShape,
+            )
     } else {
+        val edgeColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
         Modifier.background(
             Brush.verticalGradient(
                 listOf(
-                    Color.Black.copy(alpha = 0.80f),
-                    Color.Black.copy(alpha = 0.35f),
+                    edgeColor.copy(alpha = 0.85f),
+                    edgeColor.copy(alpha = 0.40f),
                     Color.Transparent,
                 ),
             ),
@@ -658,20 +670,36 @@ internal fun NetflixCategoryChip(
     label: String,
     modifier: Modifier = Modifier,
     hasDropdown: Boolean = false,
+    forceDark: Boolean = false,
 ) {
     val haptic = LocalHapticFeedback.current
+    val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
     val containerColor by animateColorAsState(
-        targetValue = if (selected) Color.White else Color(0x66000000),
+        targetValue = if (selected) {
+            if (isDark) Color.White else MaterialTheme.colorScheme.primary
+        } else {
+            if (isDark) Color(0x66000000) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
+        },
         animationSpec = spring(stiffness = 500f, dampingRatio = 0.8f),
         label = "chip-bg",
     )
     val contentColor by animateColorAsState(
-        targetValue = if (selected) Color.Black else Color.White,
+        targetValue = if (selected) {
+            if (isDark) Color.Black else MaterialTheme.colorScheme.onPrimary
+        } else {
+            if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+        },
         animationSpec = spring(stiffness = 500f, dampingRatio = 0.8f),
         label = "chip-fg",
     )
     val borderColor by animateColorAsState(
-        targetValue = if (selected) Color.Transparent else Color(0x66FFFFFF),
+        targetValue = if (selected) {
+            Color.Transparent
+        } else if (isDark) {
+            Color(0x66FFFFFF)
+        } else {
+            MaterialTheme.colorScheme.outlineVariant
+        },
         animationSpec = spring(stiffness = 500f, dampingRatio = 0.8f),
         label = "chip-border",
     )
@@ -813,7 +841,7 @@ internal fun NetflixRankNumber(
     modifier: Modifier = Modifier,
     fontSize: TextUnit = 34.sp,
     outlineColor: Color = Color.Transparent,
-    fillColor: Color = Color.White.copy(alpha = 0.55f),
+    fillColor: Color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
 ) {
     val rankText = "$rank"
     Text(
@@ -867,14 +895,14 @@ internal fun NetflixSectionHeader(
                         fontSize = 17.sp,
                         letterSpacing = (-0.3).sp,
                     ),
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onBackground,
                 )
             }
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                    color = AuroraMediaMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
@@ -927,7 +955,7 @@ internal fun NetflixPosterShelfCard(
     ) {
         Surface(
             shape = RoundedCornerShape(10.dp),
-            color = AuroraMediaPlaceholder,
+            color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier
                 .width(140.dp)
                 .height(210.dp),
@@ -961,7 +989,7 @@ internal fun NetflixPosterShelfCard(
                 fontWeight = FontWeight.SemiBold,
                 lineHeight = 16.sp,
             ),
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -969,7 +997,7 @@ internal fun NetflixPosterShelfCard(
         Text(
             text = video.views.ifBlank { video.author },
             style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-            color = AuroraMediaMeta,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -982,10 +1010,12 @@ internal fun NetflixTopBar(
     titleTestTag: String? = null,
     onCast: (() -> Unit)? = null,
     isCasting: Boolean = LocalCastController.current.isCasting,
+    forceDark: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val castController = LocalCastController.current
     val actualOnCast = onCast ?: { castController.onOpenCastSheet() }
+    val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1015,7 +1045,7 @@ internal fun NetflixTopBar(
             Icon(
                 imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
                 contentDescription = if (isCasting) "正在投屏至電視" else "投屏",
-                tint = if (isCasting) AuroraCoral else Color.White,
+                tint = if (isCasting) AuroraCoral else if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(22.dp),
             )
         }
@@ -1029,9 +1059,12 @@ internal fun NetflixSearchCapsule(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    forceDark: Boolean = false,
 ) {
     val haptic = LocalHapticFeedback.current
     val fontScale = LocalDensity.current.fontScale
+    val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
+    val fgColor = if (isDark) AuroraMediaLabel else MaterialTheme.colorScheme.onSurfaceVariant
     if (fontScale >= 1.3f) {
         IconButton(
             onClick = {
@@ -1043,15 +1076,18 @@ internal fun NetflixSearchCapsule(
             Icon(
                 imageVector = Icons.Outlined.Search,
                 contentDescription = label,
-                tint = Color.White,
+                tint = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(24.dp),
             )
         }
     } else {
         Surface(
             shape = RoundedCornerShape(18.dp),
-            color = Color(0xFF262626).copy(alpha = 0.85f),
-            border = BorderStroke(0.8.dp, Color(0xFF454545)),
+            color = if (isDark) Color(0xFF262626).copy(alpha = 0.85f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.90f),
+            border = BorderStroke(
+                0.8.dp,
+                if (isDark) Color(0xFF454545) else MaterialTheme.colorScheme.outlineVariant,
+            ),
             modifier = modifier
                 .height(36.dp)
                 .clickable(
@@ -1073,13 +1109,13 @@ internal fun NetflixSearchCapsule(
                 Icon(
                     imageVector = Icons.Outlined.Search,
                     contentDescription = null,
-                    tint = AuroraMediaLabel,
+                    tint = fgColor,
                     modifier = Modifier.size(17.dp),
                 )
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
-                    color = AuroraMediaLabel,
+                    color = fgColor,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
                 )
@@ -1099,11 +1135,15 @@ internal fun CenteredSearchBar(
     isSearching: Boolean = false,
     modifier: Modifier = Modifier,
     testTag: String? = null,
+    forceDark: Boolean = false,
 ) {
     val haptic = LocalHapticFeedback.current
+    val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
+    val contentFg = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+    val mutedFg = if (isDark) AuroraMediaLabel else MaterialTheme.colorScheme.onSurfaceVariant
     GlassSurface(
         shape = RoundedCornerShape(24.dp),
-        forceDark = true,
+        forceDark = forceDark,
         modifier = modifier
             .fillMaxWidth()
             .height(48.dp),
@@ -1125,19 +1165,7 @@ internal fun CenteredSearchBar(
                     Icon(
                         imageVector = Icons.AutoMirrored.Default.ArrowBack,
                         contentDescription = "返回",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
-            } else {
-                Box(
-                    modifier = Modifier.size(38.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = AuroraMediaLabel,
+                        tint = contentFg,
                         modifier = Modifier.size(20.dp),
                     )
                 }
@@ -1146,7 +1174,7 @@ internal fun CenteredSearchBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = 4.dp),
+                    .padding(horizontal = if (onBack == null) 12.dp else 4.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 if (query.isEmpty()) {
@@ -1154,7 +1182,7 @@ internal fun CenteredSearchBar(
                         text = placeholder,
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontSize = 14.sp,
-                            color = AuroraMediaLabel,
+                            color = mutedFg,
                         ),
                         maxLines = 1,
                     )
@@ -1165,7 +1193,7 @@ internal fun CenteredSearchBar(
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
                         fontSize = 14.sp,
-                        color = Color.White,
+                        color = contentFg,
                     ),
                     cursorBrush = SolidColor(AuroraCoral),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -1191,7 +1219,7 @@ internal fun CenteredSearchBar(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "清除",
-                        tint = AuroraMediaMuted,
+                        tint = mutedFg,
                         modifier = Modifier.size(16.dp),
                     )
                 }
@@ -1220,7 +1248,7 @@ internal fun CenteredSearchBar(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "开始搜索",
-                        tint = if (query.isNotBlank()) Color.White else Color(0xFF666666),
+                        tint = if (query.isNotBlank()) contentFg else mutedFg.copy(alpha = 0.45f),
                         modifier = Modifier.size(20.dp),
                     )
                 }

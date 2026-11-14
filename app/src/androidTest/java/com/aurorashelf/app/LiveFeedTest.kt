@@ -14,7 +14,7 @@ import org.junit.Test
 /** Optional network smoke check. Never prints or captures remote titles or images. */
 class LiveFeedTest {
     @Test fun configuredSourceReturnsUsableRecords() {
-        if (InstrumentationRegistry.getArguments().getString("live") != "true") return
+        org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.live=true to run live tests", InstrumentationRegistry.getArguments().getString("live") == "true")
         runBlocking {
             val repository = VideoRepository()
             val source = InstrumentationRegistry.getArguments().getString("source") ?: AppPreferences.DEFAULT_SOURCE

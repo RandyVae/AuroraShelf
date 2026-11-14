@@ -9,6 +9,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Base64
 import android.webkit.MimeTypeMap
+import androidx.core.net.toUri
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -181,7 +182,7 @@ internal class ForumImageSaver(
             contentType?.substringBefore(';')?.trim()?.lowercase()
                 ?.takeIf { it.startsWith("image/") }
                 ?.let { return it }
-            val extension = Uri.parse(imageUrl).lastPathSegment
+            val extension = imageUrl.toUri().lastPathSegment
                 ?.substringAfterLast('.', missingDelimiterValue = "")
                 ?.lowercase()
                 .orEmpty()

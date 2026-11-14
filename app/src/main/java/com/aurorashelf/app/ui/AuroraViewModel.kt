@@ -243,7 +243,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.update {
                         it.copy(
                             isSearching = false,
-                            searchMessage = "搜索失败：${error.message ?: "网络异常"}",
+                            searchMessage = "搜索失败：${VideoRepository.friendlyLoadErrorMessage(error, "网络异常")}",
                         )
                     }
                 }
@@ -328,7 +328,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                         it.copy(
                             isLoading = false,
                             canLoadMore = false,
-                            message = error.message ?: "内容加载失败，请稍后重试。",
+                            message = VideoRepository.friendlyLoadErrorMessage(error, "内容加载失败，请稍后重试。"),
                         )
                     }
                 }
@@ -364,7 +364,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.update {
                     it.copy(
                         isLoadingMore = false,
-                        message = error.message ?: "加载更多失败，请稍后重试。",
+                        message = VideoRepository.friendlyLoadErrorMessage(error, "加载更多失败，请稍后重试。"),
                     )
                 }
             }

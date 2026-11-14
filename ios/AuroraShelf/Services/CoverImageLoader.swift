@@ -10,7 +10,7 @@ public actor CoverImageLoader {
     private let fileManager = FileManager.default
     private let cacheDirectory: URL
     private let session: URLSession
-    private var inFlightTasks: [String: Task<UIImage?, Never>] = [:]
+    private var inFlightTasks: [String: (id: UUID, task: Task<UIImage?, Never>)] = [:]
 
     // 91動漫 / 黃果 AES-128-CBC 解密密鑰與 IV
     private let aesKey = "f5d965df75336270"
@@ -77,10 +77,11 @@ public actor CoverImageLoader {
 
         // 3. 正在進行的相同下載任務（防擊穿防重入）
         if let ongoing = inFlightTasks[cacheKey] {
-            return await ongoing.value
+            return await ongoing.task.value
         }
 
         // 4. 網絡拉取並解密（去重任務）
+        let taskToken = UUID()
         let session = self.session
         let aesKey = self.aesKey
         let aesIv = self.aesIv
@@ -141,8 +142,12 @@ public actor CoverImageLoader {
             }
         }
 
-        inFlightTasks[cacheKey] = task
-        defer { inFlightTasks[cacheKey] = nil }
+        inFlightTasks[cacheKey] = (id: taskToken, task: task)
+        defer {
+            if inFlightTasks[cacheKey]?.id == taskToken {
+                inFlightTasks[cacheKey] = nil
+            }
+        }
 
         if let image = await task.value {
             memoryCache.setObject(image, forKey: cacheKey as NSString, cost: Self.imageCost(image))
@@ -236,7 +241,7 @@ public actor CoverImageLoader {
 
     static func imageRequest(for url: URL, referer suppliedReferer: String? = nil, forceNoReferer: Bool = false) -> URLRequest {
         var request = URLRequest(url: url)
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
         request.setValue("image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", forHTTPHeaderField: "Accept")
         if forceNoReferer {
             return request
