@@ -17,23 +17,11 @@ public struct AuroraSwipeBackModifier: ViewModifier {
     }
 
     public func body(content: Content) -> some View {
+        // 交由 iOS 26/27 SDK 原生 UINavigationController 交互式转场接管：
+        // 同时启用 interactivePopGestureRecognizer（边缘侧滑）与 interactiveContentPopGestureRecognizer（全内容区右滑），
+        // 消除生硬的瞬间 dismiss() 跳切。
         content
             .background(NavigationPopGestureEnabler(isEnabled: isEnabled))
-            // 边缘右滑返回手势增强保障（针对 iPad 宽屏与边缘防误触特性进行阈值调优）
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 15, coordinateSpace: .global)
-                    .onEnded { value in
-                        guard isEnabled else { return }
-                        let isPad = UIDevice.current.userInterfaceIdiom == .pad
-                        let maxEdgeX: CGFloat = isPad ? 280 : 60
-                        if value.startLocation.x <= maxEdgeX && value.translation.width > 50 && abs(value.translation.width) > abs(value.translation.height) * 1.1 {
-                            let impact = UIImpactFeedbackGenerator(style: .light)
-                            impact.impactOccurred()
-                            onDismiss()
-                            dismiss()
-                        }
-                    }
-            )
     }
 }
 
@@ -395,8 +383,10 @@ public final class PopGestureEnablerController: UIViewController {
         nav.delegate = coordinator
         nav.setNavigationBarHidden(true, animated: false)
         nav.interactivePopGestureRecognizer?.isEnabled = isEnabled
-        if isEnabled {
-            nav.interactivePopGestureRecognizer?.delegate = coordinator
+        nav.interactivePopGestureRecognizer?.delegate = isEnabled ? coordinator : nil
+        if #available(iOS 26.0, *) {
+            nav.interactiveContentPopGestureRecognizer?.isEnabled = isEnabled
+            nav.interactiveContentPopGestureRecognizer?.delegate = isEnabled ? coordinator : nil
         }
     }
 
@@ -492,7 +482,11 @@ public final class NavigationPopCoordinator: NSObject, UIGestureRecognizerDelega
         if navigationController.viewControllers.count > 1 {
             navigationController.setNavigationBarHidden(true, animated: false)
             navigationController.interactivePopGestureRecognizer?.isEnabled = isEnabled
-            navigationController.interactivePopGestureRecognizer?.delegate = self
+            navigationController.interactivePopGestureRecognizer?.delegate = isEnabled ? self : nil
+            if #available(iOS 26.0, *) {
+                navigationController.interactiveContentPopGestureRecognizer?.isEnabled = isEnabled
+                navigationController.interactiveContentPopGestureRecognizer?.delegate = isEnabled ? self : nil
+            }
         }
     }
 
@@ -503,8 +497,12 @@ public final class NavigationPopCoordinator: NSObject, UIGestureRecognizerDelega
         }
         if let pan = gestureRecognizer as? UIPanGestureRecognizer, let view = pan.view {
             let velocity = pan.velocity(in: view)
-            // 仅在明确向左反向拖曳且速度较大时予以忽略，杜绝初始零速度被误杀
-            if velocity.x < -100 {
+            // 非边缘全内容区右滑需要明确正向水平意图，防止垂直滚动或反向滑动误触发
+            if !(gestureRecognizer is UIScreenEdgePanGestureRecognizer) {
+                if velocity.x <= 0 || abs(velocity.x) <= abs(velocity.y) * 1.15 {
+                    return false
+                }
+            } else if velocity.x < -100 {
                 return false
             }
         }
@@ -515,8 +513,11 @@ public final class NavigationPopCoordinator: NSObject, UIGestureRecognizerDelega
         _ gestureRecognizer: UIGestureRecognizer,
         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
     ) -> Bool {
-        // 允许与 ScrollView、Tap 手势等同时识别，杜绝 iPad 宽屏下边缘右滑被下层手势死锁
-        return true
+        // 边缘返回手势允许与下层手势共存；iOS 26/27 全内容区返回不与横向滚动冲突
+        if gestureRecognizer is UIScreenEdgePanGestureRecognizer {
+            return true
+        }
+        return !(otherGestureRecognizer.view is UIScrollView)
     }
 
     public func gestureRecognizer(

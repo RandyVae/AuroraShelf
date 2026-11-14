@@ -381,7 +381,8 @@ public struct VideoDetailPlaybackScreen: View {
                                 Button("重试") {
                                     Task { await startPlayback(for: currentVideo) }
                                 }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(.glassProminent)
+                                .buttonBorderShape(.capsule)
                                 .tint(AuroraColor.brand)
                             }
                         }
@@ -539,6 +540,7 @@ public struct VideoDetailPlaybackScreen: View {
                 // 底部进度条与时间控制
                 bottomControlBar
             }
+            .environment(\.colorScheme, .dark)
             .padding(.horizontal, isPad ? 24 : 14)
             .padding(.top, topBarPadding)
             .padding(.bottom, isFullScreen ? max(16, DeviceLayout.safeAreaBottom) : (isPad ? 14 : 8))
@@ -583,242 +585,223 @@ public struct VideoDetailPlaybackScreen: View {
     // 顶部控制条（Apple TV 标准布局）
     private func topControlBar(isRotated: Bool) -> some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        return HStack(spacing: isPad ? 16 : 12) {
-            if isFullScreen {
-                // 全屏退出折叠按钮（Apple TV 标准向下折叠箭头，留出充足间距防文字重叠）
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        isFullScreen = false
-                        isLandscape = false
-                        isShowingInPlayerEpisodes = false
+        return GlassEffectContainer(spacing: isPad ? 14 : 10) {
+            HStack(spacing: isPad ? 16 : 12) {
+                if isFullScreen {
+                    // 全屏退出折叠按钮（iOS 27 原生 Liquid Glass 圆形按钮）
+                    Button {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            isFullScreen = false
+                            isLandscape = false
+                            isShowingInPlayerEpisodes = false
+                        }
+                        scheduleHideControls()
+                    } label: {
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: isPad ? 18 : 16, weight: .bold))
+                            .frame(width: isPad ? 32 : 26, height: isPad ? 32 : 26)
                     }
-                    scheduleHideControls()
-                } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: isPad ? 18 : 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: isPad ? 44 : 38, height: isPad ? 44 : 38)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .glassEffect(.regular.interactive(), in: .circle)
-                        .contentShape(Rectangle())
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .accessibilityLabel("退出全屏")
-                
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(currentVideo.title)
-                        .font(isPad ? .title3.bold() : .headline.bold())
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel("退出全屏")
                     
-                    HStack(spacing: 8) {
-                        if let ep = currentEpisode {
-                            Text(ep.label)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(currentVideo.title)
+                            .font(isPad ? .title3.bold() : .headline.bold())
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                        
+                        HStack(spacing: 8) {
+                            if let ep = currentEpisode {
+                                Text(ep.label)
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(AuroraColor.brand, in: Capsule())
+                            }
+                            
+                            Text(currentVideo.sourceName)
                                 .font(.caption2.bold())
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(AuroraColor.brand, in: Capsule())
-                        }
-                        
-                        Text(currentVideo.sourceName)
-                            .font(.caption2.bold())
-                            .foregroundStyle(AuroraColor.brandLabel)
-                        
-                        Text("4K HDR")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.85))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 3))
-                    }
-                }
-                .padding(.leading, 4)
-            } else {
-                // 内嵌模式：返回上一层页面按钮（iPad 端显示醒目胶囊微按钮）
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    cleanupPlayer()
-                    onDismiss()
-                    dismiss()
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "chevron.backward")
-                            .font(.system(size: isPad ? 17 : 16, weight: .bold))
-                        if isPad {
-                            Text("返回")
-                                .font(.subheadline.bold())
+                                .foregroundStyle(AuroraColor.brandLabel)
+                            
+                            Text("4K HDR")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Color.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 3))
                         }
                     }
-                    .foregroundStyle(.white)
-                    .frame(height: isPad ? 42 : 38)
-                    .padding(.horizontal, isPad ? 16 : 0)
-                    .frame(width: isPad ? nil : 38)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .glassEffect(.regular.interactive(), in: .capsule)
-                    .contentShape(Rectangle())
+                    .padding(.leading, 4)
+                } else {
+                    // 内嵌模式：返回上一层页面按钮（iOS 27 原生 Liquid Glass 胶囊 / 圆形按钮）
+                    Button {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        cleanupPlayer()
+                        onDismiss()
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "chevron.backward")
+                                .font(.system(size: isPad ? 17 : 16, weight: .bold))
+                            if isPad {
+                                Text("返回")
+                                    .font(.subheadline.bold())
+                            }
+                        }
+                        .padding(.horizontal, isPad ? 6 : 0)
+                        .frame(width: isPad ? nil : 26, height: isPad ? 30 : 26)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(isPad ? .capsule : .circle)
                     .frame(minWidth: isPad ? 54 : 44, minHeight: 44)
+                    .accessibilityLabel("返回")
                 }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .accessibilityLabel("返回")
-            }
-            
-            Spacer()
-            
-            // 全屏倍速控制菜单（0.5x ~ 2.0x）
-            if isFullScreen {
-                Menu {
-                    ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { speed in
-                        Button {
-                            let impact = UIImpactFeedbackGenerator(style: .light)
-                            impact.impactOccurred()
-                            playbackRate = Float(speed)
-                            player?.rate = Float(speed)
-                            showHud(
-                                icon: "gauge.with.dots.needle.bottom.50percent",
-                                text: "\(speed == 1.0 ? "1.0" : String(format: "%.2g", speed))x 倍速"
-                            )
-                        } label: {
-                            HStack {
-                                Text(speed == 1.0 ? "正常 (1.0x)" : "\(String(format: "%.2g", speed))x")
-                                if playbackRate == Float(speed) {
-                                    Image(systemName: "checkmark")
+                
+                Spacer()
+                
+                // 全屏倍速控制菜单（0.5x ~ 2.0x）
+                if isFullScreen {
+                    Menu {
+                        ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { speed in
+                            Button {
+                                let impact = UIImpactFeedbackGenerator(style: .light)
+                                impact.impactOccurred()
+                                playbackRate = Float(speed)
+                                player?.rate = Float(speed)
+                                showHud(
+                                    icon: "gauge.with.dots.needle.bottom.50percent",
+                                    text: "\(speed == 1.0 ? "1.0" : String(format: "%.2g", speed))x 倍速"
+                                )
+                            } label: {
+                                HStack {
+                                    Text(speed == 1.0 ? "正常 (1.0x)" : "\(String(format: "%.2g", speed))x")
+                                    if playbackRate == Float(speed) {
+                                        Image(systemName: "checkmark")
+                                    }
                                 }
                             }
                         }
-                    }
-                } label: {
-                    Text(playbackRate == 1.0 ? "1.0x" : "\(String(format: "%.2g", playbackRate))x")
-                        .font(.system(size: isPad ? 14 : 12, weight: .bold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, isPad ? 12 : 10)
-                        .padding(.vertical, isPad ? 8 : 6)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.18), lineWidth: 1))
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("播放倍速: \(playbackRate)x")
-            }
-            
-            // AirPlay 原生路由选择器
-            AirPlayRoutePicker()
-                .frame(width: isPad ? 44 : 38, height: isPad ? 44 : 38)
-                .background(.ultraThinMaterial, in: Circle())
-                .frame(minWidth: 44, minHeight: 44)
-            
-            if isFullScreen {
-                // 画幅切换（Aspect Fit / Aspect Fill 满铺）
-                Button {
-                    toggleFillMode()
-                } label: {
-                    Image(systemName: isFillMode ? "arrow.down.forward.and.arrow.up.backward" : "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: isPad ? 15 : 13, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: isPad ? 44 : 38, height: isPad ? 44 : 38)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .contentShape(Rectangle())
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .accessibilityLabel(isFillMode ? "原片比例" : "满铺全屏")
-                
-                // 旋转切换（仅 iPhone 端提供锁定横竖屏按钮；iPad 端由机身物理重力全向感应）
-                if !isPad {
-                    Button {
-                        toggleOrientation()
                     } label: {
-                        Image(systemName: isLandscape ? "iphone.portrait" : "iphone.landscape")
-                            .font(.system(size: 13, weight: .bold))
+                        Text(playbackRate == 1.0 ? "1.0x" : "\(String(format: "%.2g", playbackRate))x")
+                            .font(.system(size: isPad ? 14 : 12, weight: .bold))
                             .foregroundStyle(.white)
-                            .frame(width: 38, height: 38)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .contentShape(Rectangle())
+                            .padding(.horizontal, isPad ? 12 : 10)
+                            .padding(.vertical, isPad ? 8 : 6)
+                            .glassEffect(.regular.interactive(), in: .capsule)
                             .frame(minWidth: 44, minHeight: 44)
                     }
-                    .buttonStyle(.plain)
-                    .contentShape(Rectangle())
-                    .accessibilityLabel(isLandscape ? "竖屏模式" : "横屏沉浸")
+                    .accessibilityLabel("播放倍速: \(playbackRate)x")
                 }
-            } else {
-                // 内嵌模式：展开为全屏大画幅
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        isFullScreen = true
+                
+                // AirPlay 原生路由选择器
+                AirPlayRoutePicker()
+                    .frame(width: isPad ? 42 : 38, height: isPad ? 42 : 38)
+                    .glassEffect(.regular.interactive(), in: .circle)
+                    .frame(minWidth: 44, minHeight: 44)
+                
+                if isFullScreen {
+                    // 画幅切换（Aspect Fit / Aspect Fill 满铺）
+                    Button {
+                        toggleFillMode()
+                    } label: {
+                        Image(systemName: isFillMode ? "arrow.down.forward.and.arrow.up.backward" : "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: isPad ? 15 : 13, weight: .bold))
+                            .frame(width: isPad ? 32 : 26, height: isPad ? 32 : 26)
                     }
-                    scheduleHideControls()
-                } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .font(.system(size: isPad ? 16 : 14, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: isPad ? 44 : 38, height: isPad ? 44 : 38)
-                        .background(.ultraThinMaterial, in: Circle())
-                        .contentShape(Rectangle())
-                        .frame(minWidth: isPad ? 48 : 44, minHeight: 44)
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityLabel(isFillMode ? "原片比例" : "满铺全屏")
+                    
+                    // 旋转切换（仅 iPhone 端提供锁定横竖屏按钮；iPad 端由机身物理重力全向感应）
+                    if !isPad {
+                        Button {
+                            toggleOrientation()
+                        } label: {
+                            Image(systemName: isLandscape ? "iphone.portrait" : "iphone.landscape")
+                                .font(.system(size: 13, weight: .bold))
+                                .frame(width: 26, height: 26)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .accessibilityLabel(isLandscape ? "竖屏模式" : "横屏沉浸")
+                    }
+                } else {
+                    // 内嵌模式：展开为全屏大画幅
+                    Button {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            isFullScreen = true
+                        }
+                        scheduleHideControls()
+                    } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: isPad ? 16 : 14, weight: .bold))
+                            .frame(width: isPad ? 32 : 26, height: isPad ? 32 : 26)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .frame(minWidth: isPad ? 48 : 44, minHeight: 44)
+                    .accessibilityLabel("全屏播放")
                 }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .accessibilityLabel("全屏播放")
             }
         }
     }
     
-    // 中央控制区（Apple TV 影院级大尺寸控制器）
+    // 中央控制区（iOS 27 原生 Liquid Glass Container 融合控制器）
     private var centerControlGroup: some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let rewindForwardSize: CGFloat = isPad ? 60 : (isFullScreen ? 48 : 40)
-        let playPauseSize: CGFloat = isPad ? 80 : (isFullScreen ? 64 : 54)
-        let groupSpacing: CGFloat = isPad ? 60 : (isFullScreen ? 40 : 28)
+        let rewindForwardSize: CGFloat = isPad ? 48 : (isFullScreen ? 40 : 32)
+        let playPauseSize: CGFloat = isPad ? 64 : (isFullScreen ? 52 : 44)
+        let groupSpacing: CGFloat = isPad ? 52 : (isFullScreen ? 36 : 24)
 
-        return HStack(spacing: groupSpacing) {
-            // 快退 15 秒
-            Button {
-                seekRelative(-15)
-            } label: {
-                Image(systemName: "gobackward.15")
-                    .font(.system(size: isPad ? 28 : (isFullScreen ? 26 : 20), weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: rewindForwardSize, height: rewindForwardSize)
-                    .background(.ultraThinMaterial, in: Circle())
+        return GlassEffectContainer(spacing: groupSpacing) {
+            HStack(spacing: groupSpacing) {
+                // 快退 15 秒
+                Button {
+                    seekRelative(-15)
+                } label: {
+                    Image(systemName: "gobackward.15")
+                        .font(.system(size: isPad ? 26 : (isFullScreen ? 24 : 18), weight: .semibold))
+                        .frame(width: rewindForwardSize, height: rewindForwardSize)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .accessibilityLabel("快退 15 秒")
+                
+                // 播放/暂停主按钮（Prominent Liquid Glass 主操作）
+                Button {
+                    togglePlayPause()
+                } label: {
+                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: isPad ? 32 : (isFullScreen ? 28 : 24), weight: .bold))
+                        .frame(width: playPauseSize, height: playPauseSize)
+                }
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.circle)
+                .tint(AuroraColor.brand)
+                .accessibilityLabel(isPlaying ? "暂停" : "播放")
+                
+                // 快进 15 秒
+                Button {
+                    seekRelative(15)
+                } label: {
+                    Image(systemName: "goforward.15")
+                        .font(.system(size: isPad ? 26 : (isFullScreen ? 24 : 18), weight: .semibold))
+                        .frame(width: rewindForwardSize, height: rewindForwardSize)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .accessibilityLabel("快进 15 秒")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("快退 15 秒")
-            
-            // 播放/暂停主按钮
-            Button {
-                togglePlayPause()
-            } label: {
-                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                    .font(.system(size: isPad ? 36 : (isFullScreen ? 32 : 26), weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: playPauseSize, height: playPauseSize)
-                    .background(AuroraColor.brand.opacity(0.92), in: Circle())
-                    .shadow(color: .black.opacity(0.5), radius: 10, y: 4)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isPlaying ? "暂停" : "播放")
-            
-            // 快进 15 秒
-            Button {
-                seekRelative(15)
-            } label: {
-                Image(systemName: "goforward.15")
-                    .font(.system(size: isPad ? 28 : (isFullScreen ? 26 : 20), weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: rewindForwardSize, height: rewindForwardSize)
-                    .background(.ultraThinMaterial, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("快进 15 秒")
         }
     }
     
@@ -844,33 +827,41 @@ public struct VideoDetailPlaybackScreen: View {
             .padding(.horizontal, 16)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 12) {
-                    ForEach(episodes) { ep in
-                        let isSelected = (currentEpisode?.number == ep.number)
-                        Button {
-                            switchEpisode(ep)
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                isShowingInPlayerEpisodes = false
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                if isSelected {
-                                    Image(systemName: "play.circle.fill")
-                                        .font(.system(size: 13))
+                GlassEffectContainer(spacing: 10) {
+                    LazyHStack(spacing: 12) {
+                        ForEach(episodes) { ep in
+                            let isSelected = (currentEpisode?.number == ep.number)
+                            let pillButton = Button {
+                                switchEpisode(ep)
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    isShowingInPlayerEpisodes = false
                                 }
-                                Text(ep.label)
-                                    .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                            } label: {
+                                HStack(spacing: 6) {
+                                    if isSelected {
+                                        Image(systemName: "play.circle.fill")
+                                            .font(.system(size: 13))
+                                    }
+                                    Text(ep.label)
+                                        .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
                             }
-                            .foregroundStyle(isSelected ? .black : .white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .background(isSelected ? Color.white : Color.black.opacity(0.4), in: Capsule())
-                            .overlay(Capsule().stroke(isSelected ? Color.white : Color.white.opacity(0.2), lineWidth: 1))
+                            .buttonBorderShape(.capsule)
+
+                            if isSelected {
+                                pillButton
+                                    .buttonStyle(.glassProminent)
+                                    .tint(AuroraColor.brand)
+                            } else {
+                                pillButton
+                                    .buttonStyle(.glass)
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.horizontal, 16)
                 }
-                .padding(.horizontal, 16)
             }
         }
         .padding(.vertical, 12)
@@ -913,48 +904,56 @@ public struct VideoDetailPlaybackScreen: View {
             .buttonStyle(.plain)
             .accessibilityLabel(showRemainingTime ? "切换至总时长" : "切换至倒计时")
             
-            // 下一集快捷跳转按钮
-            if isFullScreen, let currentEp = currentEpisode, let nextEp = episodes.first(where: { $0.number == currentEp.number + 1 }) {
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    switchEpisode(nextEp)
-                } label: {
-                    Image(systemName: "forward.end.fill")
-                        .font(.system(size: isPad ? 15 : 13, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: isPad ? 38 : 32, height: isPad ? 38 : 32)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("播放下一集")
-            }
-            
-            // 全屏状态下的快捷选集按钮
-            if isFullScreen && episodes.count > 1 {
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        isShowingInPlayerEpisodes.toggle()
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    // 下一集快捷跳转按钮
+                    if isFullScreen, let currentEp = currentEpisode, let nextEp = episodes.first(where: { $0.number == currentEp.number + 1 }) {
+                        Button {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            switchEpisode(nextEp)
+                        } label: {
+                            Image(systemName: "forward.end.fill")
+                                .font(.system(size: isPad ? 15 : 13, weight: .bold))
+                                .frame(width: isPad ? 26 : 22, height: isPad ? 26 : 22)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.circle)
+                        .accessibilityLabel("播放下一集")
                     }
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "square.stack.3d.down.right")
-                            .font(.system(size: isPad ? 14 : 13, weight: .bold))
-                        if isPad {
-                            Text("选集")
-                                .font(.caption.bold())
+                    
+                    // 全屏状态下的快捷选集按钮
+                    if isFullScreen && episodes.count > 1 {
+                        let epToggleButton = Button {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                isShowingInPlayerEpisodes.toggle()
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "square.stack.3d.down.right")
+                                    .font(.system(size: isPad ? 14 : 13, weight: .bold))
+                                if isPad {
+                                    Text("选集")
+                                        .font(.caption.bold())
+                                }
+                            }
+                            .padding(.horizontal, isPad ? 6 : 2)
+                        }
+                        .buttonBorderShape(.capsule)
+                        .accessibilityLabel("切换集数")
+
+                        if isShowingInPlayerEpisodes {
+                            epToggleButton
+                                .buttonStyle(.glassProminent)
+                                .tint(AuroraColor.brand)
+                        } else {
+                            epToggleButton
+                                .buttonStyle(.glass)
                         }
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, isPad ? 14 : 10)
-                    .padding(.vertical, isPad ? 8 : 6)
-                    .background(isShowingInPlayerEpisodes ? AuroraColor.brand : Color.white.opacity(0.18), in: Capsule())
-                    .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("切换集数")
             }
         }
     }
@@ -1027,227 +1026,230 @@ public struct VideoDetailPlaybackScreen: View {
         let isDownloaded = downloadManager.isDownloaded(video: currentVideo, episode: currentEpisode)
         
         if isPad {
-            HStack(spacing: 16) {
-                // Apple TV 标志性白底黑字主播放大胶囊
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    if isPlaying {
-                        togglePlayPause()
-                    } else {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            isFullScreen = true
-                        }
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 16, weight: .bold))
-                        Text(isPlaying ? "正在播放" : (currentEpisode != nil ? "播放 \(currentEpisode!.label)" : "立即播放"))
-                            .font(.system(size: 16, weight: .bold))
-                    }
-                    .foregroundStyle(.black)
-                    .frame(height: 48)
-                    .padding(.horizontal, 28)
-                    .background(Color.white, in: Capsule())
-                    .shadow(color: .white.opacity(0.2), radius: 8, y: 2)
-                }
-                .buttonStyle(AppleSpringCardButtonStyle())
-                
-                // 加入片单
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    try? watchlist.setBookmarked(!isBookmarked, for: currentVideo)
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: isBookmarked ? "bookmark.fill" : "plus")
-                            .font(.system(size: 15, weight: .bold))
-                        Text(isBookmarked ? "已在片单" : "加入片单")
-                            .font(.system(size: 14, weight: .semibold))
-                    }
-                    .foregroundStyle(isBookmarked ? AuroraColor.brand : .white)
-                    .frame(height: 48)
-                    .padding(.horizontal, 18)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
-                }
-                .buttonStyle(AppleSpringCardButtonStyle())
-                
-                // 离线缓存
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    if !isDownloaded {
-                        downloadManager.startDownload(video: currentVideo, episode: currentEpisode)
-                        showToast(text: "已加入缓存队列")
-                    } else {
-                        showToast(text: "该视频已完成离线缓存")
-                    }
-                } label: {
-                    HStack(spacing: 6) {
-                        if isDownloaded {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                            Text("已缓存")
-                        } else if let status = downloadStatus, status.isDownloading {
-                            ProgressView(value: status.progressValue)
-                                .frame(width: 16, height: 16)
-                                .tint(AuroraColor.brand)
-                            Text("\(Int(status.progressValue * 100))%")
-                        } else {
-                            Image(systemName: "arrow.down.circle")
-                            Text("缓存")
-                        }
-                    }
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(height: 48)
-                    .padding(.horizontal, 18)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
-                }
-                .buttonStyle(AppleSpringCardButtonStyle())
-                
-                // 选集入口（多集时可见）
-                if episodes.count > 1 {
+            GlassEffectContainer(spacing: 12) {
+                HStack(spacing: 12) {
+                    // Apple TV 标志性主播放大胶囊（iOS 27 glassProminent）
                     Button {
-                        isShowingEpisodePicker = true
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        if isPlaying {
+                            togglePlayPause()
+                        } else {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                isFullScreen = true
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                .font(.system(size: 16, weight: .bold))
+                            Text(isPlaying ? "正在播放" : (currentEpisode != nil ? "播放 \(currentEpisode!.label)" : "立即播放"))
+                                .font(.system(size: 16, weight: .bold))
+                        }
+                        .frame(height: 34)
+                        .padding(.horizontal, 14)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.capsule)
+                    .tint(AuroraColor.brand)
+                    
+                    // 加入片单
+                    let bookmarkButton = Button {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        try? watchlist.setBookmarked(!isBookmarked, for: currentVideo)
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "square.stack.3d.down.right")
-                                .font(.system(size: 14, weight: .bold))
-                            Text("选集 (\(episodes.count))")
+                            Image(systemName: isBookmarked ? "bookmark.fill" : "plus")
+                                .font(.system(size: 15, weight: .bold))
+                            Text(isBookmarked ? "已在片单" : "加入片单")
                                 .font(.system(size: 14, weight: .semibold))
                         }
-                        .foregroundStyle(.white)
-                        .frame(height: 48)
-                        .padding(.horizontal, 18)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                        .frame(height: 34)
+                        .padding(.horizontal, 8)
                     }
-                    .buttonStyle(AppleSpringCardButtonStyle())
-                }
-                
-                // 分享
-                if let shareURL = URL(string: currentVideo.playbackUrl), !currentVideo.playbackUrl.isEmpty {
-                    ShareLink(item: shareURL) {
+                    .buttonBorderShape(.capsule)
+
+                    if isBookmarked {
+                        bookmarkButton
+                            .buttonStyle(.glassProminent)
+                            .tint(AuroraColor.brand)
+                    } else {
+                        bookmarkButton
+                            .buttonStyle(.glass)
+                    }
+                    
+                    // 离线缓存
+                    Button {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        if !isDownloaded {
+                            downloadManager.startDownload(video: currentVideo, episode: currentEpisode)
+                            showToast(text: "已加入缓存队列")
+                        } else {
+                            showToast(text: "该视频已完成离线缓存")
+                        }
+                    } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.system(size: 14, weight: .bold))
-                            Text("分享")
-                                .font(.system(size: 14, weight: .semibold))
+                            if isDownloaded {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                Text("已缓存")
+                            } else if let status = downloadStatus, status.isDownloading {
+                                ProgressView(value: status.progressValue)
+                                    .frame(width: 16, height: 16)
+                                    .tint(AuroraColor.brand)
+                                Text("\(Int(status.progressValue * 100))%")
+                            } else {
+                                Image(systemName: "arrow.down.circle")
+                                Text("缓存")
+                            }
                         }
-                        .foregroundStyle(.white)
-                        .frame(height: 48)
-                        .padding(.horizontal, 18)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(height: 34)
+                        .padding(.horizontal, 8)
                     }
-                    .buttonStyle(AppleSpringCardButtonStyle())
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.capsule)
+                    
+                    // 选集入口（多集时可见）
+                    if episodes.count > 1 {
+                        Button {
+                            isShowingEpisodePicker = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "square.stack.3d.down.right")
+                                    .font(.system(size: 14, weight: .bold))
+                                Text("选集 (\(episodes.count))")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .frame(height: 34)
+                            .padding(.horizontal, 8)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
+                    }
+                    
+                    // 分享
+                    if let shareURL = URL(string: currentVideo.playbackUrl), !currentVideo.playbackUrl.isEmpty {
+                        ShareLink(item: shareURL) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 14, weight: .bold))
+                                Text("分享")
+                                    .font(.system(size: 14, weight: .semibold))
+                            }
+                            .frame(height: 34)
+                            .padding(.horizontal, 8)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.capsule)
+                    }
+                    
+                    Spacer()
                 }
-                
-                Spacer()
             }
         } else {
-            HStack(spacing: 12) {
-                // 收藏按钮
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    try? watchlist.setBookmarked(!isBookmarked, for: currentVideo)
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
-                            .font(.title3)
-                            .foregroundStyle(isBookmarked ? AuroraColor.brand : AuroraColor.textPrimary)
-                        Text(isBookmarked ? "已收藏" : "收藏")
-                            .font(.caption2)
-                            .foregroundStyle(isBookmarked ? AuroraColor.brand : AuroraColor.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                
-                // 缓存下载按钮
-                Button {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    if !isDownloaded {
-                        downloadManager.startDownload(video: currentVideo, episode: currentEpisode)
-                        showToast(text: "已加入缓存队列")
-                    } else {
-                        showToast(text: "该视频已完成离线缓存")
-                    }
-                } label: {
-                    VStack(spacing: 4) {
-                        if isDownloaded {
-                            Image(systemName: "checkmark.circle.fill")
-                                .font(.title3)
-                                .foregroundStyle(.green)
-                            Text("已缓存")
-                                .font(.caption2)
-                                .foregroundStyle(.green)
-                        } else if let status = downloadStatus, status.isDownloading {
-                            ProgressView(value: status.progressValue)
-                                .frame(width: 24, height: 24)
-                                .tint(AuroraColor.brand)
-                            Text("\(Int(status.progressValue * 100))%")
-                                .font(.caption2)
-                                .foregroundStyle(AuroraColor.brand)
-                        } else {
-                            Image(systemName: "arrow.down.circle")
-                                .font(.title3)
-                                .foregroundStyle(AuroraColor.textPrimary)
-                            Text("缓存")
-                                .font(.caption2)
-                                .foregroundStyle(AuroraColor.textSecondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                
-                // 选集入口（多集时可见）
-                if episodes.count > 1 {
-                    Button {
-                        isShowingEpisodePicker = true
+            GlassEffectContainer(spacing: 10) {
+                HStack(spacing: 10) {
+                    // 收藏按钮
+                    let mobileBookmarkButton = Button {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        try? watchlist.setBookmarked(!isBookmarked, for: currentVideo)
                     } label: {
                         VStack(spacing: 4) {
-                            Image(systemName: "square.stack.3d.down.right")
+                            Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
                                 .font(.title3)
-                                .foregroundStyle(AuroraColor.textPrimary)
-                            Text("选集(\(episodes.count))")
+                            Text(isBookmarked ? "已收藏" : "收藏")
                                 .font(.caption2)
-                                .foregroundStyle(AuroraColor.textSecondary)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .padding(.vertical, 6)
                     }
-                    .buttonStyle(.plain)
-                }
-                
-                // 原生分享
-                if let shareURL = URL(string: currentVideo.playbackUrl), !currentVideo.playbackUrl.isEmpty {
-                    ShareLink(item: shareURL) {
+                    .buttonBorderShape(.roundedRectangle(radius: 14))
+
+                    if isBookmarked {
+                        mobileBookmarkButton
+                            .buttonStyle(.glassProminent)
+                            .tint(AuroraColor.brand)
+                    } else {
+                        mobileBookmarkButton
+                            .buttonStyle(.glass)
+                    }
+                    
+                    // 缓存下载按钮
+                    Button {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
+                        if !isDownloaded {
+                            downloadManager.startDownload(video: currentVideo, episode: currentEpisode)
+                            showToast(text: "已加入缓存队列")
+                        } else {
+                            showToast(text: "该视频已完成离线缓存")
+                        }
+                    } label: {
                         VStack(spacing: 4) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.title3)
-                                .foregroundStyle(AuroraColor.textPrimary)
-                            Text("分享")
-                                .font(.caption2)
-                                .foregroundStyle(AuroraColor.textSecondary)
+                            if isDownloaded {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(.green)
+                                Text("已缓存")
+                                    .font(.caption2)
+                                    .foregroundStyle(.green)
+                            } else if let status = downloadStatus, status.isDownloading {
+                                ProgressView(value: status.progressValue)
+                                    .frame(width: 24, height: 24)
+                                    .tint(AuroraColor.brand)
+                                Text("\(Int(status.progressValue * 100))%")
+                                    .font(.caption2)
+                                    .foregroundStyle(AuroraColor.brand)
+                            } else {
+                                Image(systemName: "arrow.down.circle")
+                                    .font(.title3)
+                                Text("缓存")
+                                    .font(.caption2)
+                            }
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .padding(.vertical, 6)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.roundedRectangle(radius: 14))
+                    
+                    // 选集入口（多集时可见）
+                    if episodes.count > 1 {
+                        Button {
+                            isShowingEpisodePicker = true
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: "square.stack.3d.down.right")
+                                    .font(.title3)
+                                Text("选集(\(episodes.count))")
+                                    .font(.caption2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.roundedRectangle(radius: 14))
+                    }
+                    
+                    // 原生分享
+                    if let shareURL = URL(string: currentVideo.playbackUrl), !currentVideo.playbackUrl.isEmpty {
+                        ShareLink(item: shareURL) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.title3)
+                                Text("分享")
+                                    .font(.caption2)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                        }
+                        .buttonStyle(.glass)
+                        .buttonBorderShape(.roundedRectangle(radius: 14))
+                    }
                 }
             }
         }

@@ -7,7 +7,7 @@ public struct AirPlayRoutePicker: UIViewRepresentable {
     
     public func makeUIView(context: Context) -> AVRoutePickerView {
         let picker = AVRoutePickerView()
-        picker.tintColor = UIColor(AuroraColor.textPrimary)
+        picker.tintColor = .white
         picker.activeTintColor = UIColor(AuroraColor.brand)
         picker.prioritizesVideoDevices = true
         picker.backgroundColor = .clear

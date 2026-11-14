@@ -1,3 +1,18 @@
+## 最新交接：2026-11-14 — 播放器原生 SDK 按键样式（iOS 27 Liquid Glass / Google Material 3）＋双端原生 SDK 滑动与预测返回升级 · v2.16.26 (Build 252)
+
+- **范围**：
+  - 响应 Randy 需求：「播放器的各个按钮样式 iOS 和 iPadOS 直接使用 iOS 27 SDK 自带最新样式，Android 直接使用 Google 提供最新 SDK 样式；同时改进目前生硬的滑动返回，直接使用最新 SDK 原生返回效果」。
+  1. **iOS / iPadOS（`iphoneos27.2` SDK）**：
+     - 在 `VideoDetailPlaybackScreen.swift`、`NativePlayerView.swift`、`LivePlayerView.swift`、`LiveDetailView.swift`、`PlayerOverlayBar.swift`、`AirPlayRoutePicker.swift` 将播放器顶栏/中央控制/底部栏/选集胶囊/详情操作按钮全面改为原生 `GlassEffectContainer` + `.buttonStyle(.glass)` / `.buttonStyle(.glassProminent)` + `.buttonBorderShape(...)`；
+     - 在 `AuroraSwipeBackModifier.swift` 移除生硬触发 `dismiss()` 的 SwiftUI 覆盖 `DragGesture`，统一由 UIKit `interactivePopGestureRecognizer` 与 iOS 26/27 `interactiveContentPopGestureRecognizer` 提供原生跟手弹簧返回转场，并在 `SwipeBackTests.swift` 补全测试断言。
+  2. **Android（`compileSdk 37` / Material 3 `1.4.0` / `activity-compose 1.13.0`）**：
+     - 在 `PlayerScreen.kt`、`NativeSitePlayer.kt`、`LiveScreen.kt` 全面采用原生 Material 3 `FilledTonalIconButton`、`FilledIconButton`、`FilterChip` 与 `Surface(onClick = ...)`；
+     - 在 `AndroidManifest.xml` 开启 `android:enableOnBackInvokedCallback="true"`，在 `AppComponents.kt` 实现 `PredictiveBackContainer`（基于原生 `PredictiveBackHandler`）并消除 `auroraSwipeBack` 脱手回零跳闪，接入 `AuroraShelfApp.kt`、`ComicScreen.kt`、`LiveScreen.kt`、`ForumScreen.kt`。
+  3. **验证与发布（v2.16.26 Build 252）**：
+     - `./gradlew testDebugUnitTest lintVitalRelease` 与 `xcodebuild build-for-testing`（Simulator 27.2 SDK）全绿通过；
+     - `node scripts/probe_all_sources.mjs`：34 源中 33 源连通；
+     - `./scripts/publish_ota.sh Release`：双端 Release APK (`197M`) 与 IPA (`193M`/`194M`) 已上传至 `bananarey.us` 完成同名覆盖，服务器可用磁盘 `11G`；版本号全链路递增至 `v2.16.26 (Build 252)`。
+
 ## 最新交接：2026-11-12 — 遊戲大廳人物立繪相對居中與下邊緣貼合重構＋屏幕雙擊放大根除（5層立體防禦）＋特殊立绘全身竖屏重映射＋雙端版本號升級至 v2.16.19 (Build 245) 並發布至 bananarey.us 與 GitHub Release
 
 - **範圍**：

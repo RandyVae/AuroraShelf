@@ -9,12 +9,17 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import androidx.activity.BackEventCompat
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -151,7 +156,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.util.lerp
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -1220,57 +1230,149 @@ internal fun CenteredSearchBar(
 }
 
 /**
- * 全局右滑返回交互手势（遵循 Apple HIG 交互规范）
- * 支持从屏幕左边缘轻扫拖拽、实时水平位移跟踪与触觉反馈，超过阈值触发 onDismiss，否则弹性平滑归位。
+ * Wraps an in-app destination with Android's native SDK [PredictiveBackHandler] motion
+ * (live finger-tracked scale, directional edge shift, rounded card reveal, and smooth spring settle)
+ * paired with seamless edge drag-back via [auroraSwipeBack].
+ */
+@Composable
+internal fun PredictiveBackContainer(
+    enabled: Boolean,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val progress = remember { Animatable(0f) }
+    var swipeEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
+    var touchDeltaY by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+    val shiftPx = with(density) { 42.dp.toPx() }
+
+    PredictiveBackHandler(enabled = enabled) { backEvents ->
+        var initialY: Float? = null
+        try {
+            backEvents.collect { event ->
+                val startY = initialY ?: event.touchY.also { initialY = it }
+                swipeEdge = event.swipeEdge
+                touchDeltaY = ((event.touchY - startY) * 0.12f)
+                    .coerceIn(-shiftPx, shiftPx)
+                progress.snapTo(event.progress.coerceIn(0f, 1f))
+            }
+            onBack()
+        } catch (_: CancellationException) {
+            progress.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.85f,
+                    stiffness = Spring.StiffnessMedium,
+                ),
+            )
+            touchDeltaY = 0f
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .auroraSwipeBack(enabled = enabled, onDismiss = onBack)
+            .graphicsLayer {
+                val p = progress.value
+                if (p > 0f) {
+                    val scale = lerp(1f, 0.88f, p)
+                    scaleX = scale
+                    scaleY = scale
+                    val direction = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -1f else 1f
+                    translationX = direction * shiftPx * p
+                    translationY = touchDeltaY * p
+                    shape = RoundedCornerShape((28f * p).dp)
+                    clip = true
+                }
+            },
+    ) {
+        content()
+    }
+}
+
+/**
+ * Enables edge swipe-to-dismiss with continuous finger tracking, Material predictive scale/corner
+ * feedback, and uninterrupted exit translation on release.
  */
 internal fun Modifier.auroraSwipeBack(
     enabled: Boolean = true,
     onDismiss: () -> Unit,
 ): Modifier = composed {
     if (!enabled) return@composed this
-    var dragOffsetPx by remember { mutableFloatStateOf(0f) }
+    val dragOffsetPx = remember { Animatable(0f) }
     var isDragging by remember { mutableStateOf(false) }
-    val animatedOffsetPx by animateFloatAsState(
-        targetValue = if (isDragging) dragOffsetPx else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.85f,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
-        label = "auroraSwipeBackOffset",
-    )
+    var containerWidthPx by remember { mutableFloatStateOf(1080f) }
+    val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
-    val triggerDistancePx = with(density) { 90.dp.toPx() }
-    val edgeThresholdPx = with(density) { 60.dp.toPx() }
+    val triggerDistancePx = with(density) { 96.dp.toPx() }
+    val edgeThresholdPx = with(density) { 48.dp.toPx() }
 
     this
-        .offset { IntOffset(x = animatedOffsetPx.roundToInt().coerceAtLeast(0), y = 0) }
+        .onSizeChanged { containerWidthPx = it.width.toFloat().coerceAtLeast(1f) }
+        .graphicsLayer {
+            val offset = dragOffsetPx.value.coerceAtLeast(0f)
+            if (offset > 0f) {
+                val p = (offset / containerWidthPx).coerceIn(0f, 1f)
+                translationX = offset
+                val scale = lerp(1f, 0.92f, p)
+                scaleX = scale
+                scaleY = scale
+                shape = RoundedCornerShape((24f * p).dp)
+                clip = true
+            }
+        }
         .pointerInput(enabled) {
             detectHorizontalDragGestures(
                 onDragStart = { offset ->
                     if (offset.x <= edgeThresholdPx) {
                         isDragging = true
-                        dragOffsetPx = 0f
                     }
                 },
                 onDragEnd = {
                     if (isDragging) {
                         isDragging = false
-                        if (dragOffsetPx > triggerDistancePx) {
+                        if (dragOffsetPx.value > triggerDistancePx) {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            onDismiss()
+                            scope.launch {
+                                dragOffsetPx.animateTo(
+                                    targetValue = containerWidthPx,
+                                    animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+                                )
+                                onDismiss()
+                            }
+                        } else {
+                            scope.launch {
+                                dragOffsetPx.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = 0.85f,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                    ),
+                                )
+                            }
                         }
-                        dragOffsetPx = 0f
                     }
                 },
                 onDragCancel = {
                     isDragging = false
-                    dragOffsetPx = 0f
+                    scope.launch {
+                        dragOffsetPx.animateTo(
+                            targetValue = 0f,
+                            animationSpec = spring(
+                                dampingRatio = 0.85f,
+                                stiffness = Spring.StiffnessMediumLow,
+                            ),
+                        )
+                    }
                 },
                 onHorizontalDrag = { change, dragAmount ->
                     if (isDragging) {
                         change.consume()
-                        dragOffsetPx = (dragOffsetPx + dragAmount).coerceAtLeast(0f)
+                        val next = (dragOffsetPx.value + dragAmount).coerceAtLeast(0f)
+                        scope.launch { dragOffsetPx.snapTo(next) }
                     }
                 },
             )

@@ -161,12 +161,12 @@ public struct LivePlayerView: View {
                                 }) {
                                     Text("重新连接")
                                         .font(.headline)
-                                        .foregroundStyle(.white)
-                                        .padding(.horizontal, AuroraMetrics.spacingXL)
-                                        .padding(.vertical, AuroraMetrics.spacingM)
-                                        .background(AuroraColor.brand, in: .capsule)
+                                        .padding(.horizontal, AuroraMetrics.spacingL)
+                                        .padding(.vertical, AuroraMetrics.spacingXS)
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.glassProminent)
+                                .buttonBorderShape(.capsule)
+                                .tint(AuroraColor.brand)
                                 .accessibilityLabel("重新连接直播流")
                             }
                             .padding(.top, safeTop + 44)
@@ -226,7 +226,7 @@ public struct LivePlayerView: View {
             .allowsHitTesting(false)
 
             HStack(spacing: AuroraMetrics.spacingM) {
-                // 左侧：返回 / 退出全屏按钮
+                // 左侧：返回 / 退出全屏按钮（iOS 27 原生 Liquid Glass 按键样式）
                 Button(action: {
                     let impact = UIImpactFeedbackGenerator(style: .medium)
                     impact.impactOccurred()
@@ -240,15 +240,11 @@ public struct LivePlayerView: View {
                 }) {
                     Image(systemName: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "chevron.left")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 38, height: 38)
-                        .background(Color.black.opacity(0.45), in: Circle())
-                        .glassEffect(.regular.interactive(), in: .circle)
-                        .contentShape(Rectangle())
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(width: 26, height: 26)
                 }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .frame(minWidth: 44, minHeight: 44)
                 .accessibilityLabel(isFullScreen ? "退出全屏" : "返回")
 
                 // 主播信息与 LIVE 状态（严格单行、杜绝换行挤压）
@@ -292,58 +288,61 @@ public struct LivePlayerView: View {
 
                 Spacer()
 
-                // 右侧功能键区
-                HStack(spacing: 4) {
-                    // 1. 聊天室按钮
-                    controlCircleButton(systemImage: "bubble.left.and.bubble.right", label: "打开聊天室") {
-                        showRoomChat = true
-                    }
-
-                    // 2. 画幅切换（Fit / Fill）
-                    controlCircleButton(
-                        systemImage: isFillMode ? "arrow.down.forward.and.arrow.up.backward" : "arrow.up.left.and.arrow.down.right",
-                        label: isFillMode ? "自适应画幅" : "填满全屏"
-                    ) {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
-                        withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
-                            isFillMode.toggle()
+                // 右侧功能键区（iOS 27 GlassEffectContainer 融合按键群组）
+                GlassEffectContainer(spacing: 6) {
+                    HStack(spacing: 6) {
+                        // 1. 聊天室按钮
+                        controlCircleButton(systemImage: "bubble.left.and.bubble.right", label: "打开聊天室") {
+                            showRoomChat = true
                         }
-                        onToggleHUD?(isFillMode ? "已切换为填满全屏（无黑边）" : "已切换为自适应画幅（原片比例）")
-                    }
 
-                    // 3. 全屏模式下的横竖屏手动微调旋转
-                    if isFullScreen {
+                        // 2. 画幅切换（Fit / Fill）
                         controlCircleButton(
-                            systemImage: isLandscape ? "iphone.portrait" : "iphone.landscape",
-                            label: isLandscape ? "切换竖屏" : "切换横屏"
+                            systemImage: isFillMode ? "arrow.down.forward.and.arrow.up.backward" : "arrow.up.left.and.arrow.down.right",
+                            label: isFillMode ? "自适应画幅" : "填满全屏"
                         ) {
                             let impact = UIImpactFeedbackGenerator(style: .medium)
                             impact.impactOccurred()
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                isLandscape.toggle()
+                            withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                                isFillMode.toggle()
                             }
-                            onToggleHUD?(isLandscape ? "已切换为横屏沉浸" : "已切换为竖屏模式")
+                            onToggleHUD?(isFillMode ? "已切换为填满全屏（无黑边）" : "已切换为自适应画幅（原片比例）")
                         }
-                    }
 
-                    // 4. 自适应全屏按钮（纵向流纵向全屏，横向流横向全屏）
-                    controlCircleButton(
-                        systemImage: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "viewfinder",
-                        label: isFullScreen ? "退出全屏" : "自适应全屏"
-                    ) {
-                        toggleAdaptiveFullscreen(in: geo)
-                    }
+                        // 3. 全屏模式下的横竖屏手动微调旋转
+                        if isFullScreen {
+                            controlCircleButton(
+                                systemImage: isLandscape ? "iphone.portrait" : "iphone.landscape",
+                                label: isLandscape ? "切换竖屏" : "切换横屏"
+                            ) {
+                                let impact = UIImpactFeedbackGenerator(style: .medium)
+                                impact.impactOccurred()
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    isLandscape.toggle()
+                                }
+                                onToggleHUD?(isLandscape ? "已切换为横屏沉浸" : "已切换为竖屏模式")
+                            }
+                        }
 
-                    // 5. AirPlay 原生投屏
-                    AirPlayRoutePicker()
-                        .frame(width: 38, height: 38)
-                        .background(Color.black.opacity(0.45), in: Circle())
-                        .frame(minWidth: 44, minHeight: 44)
+                        // 4. 自适应全屏按钮（纵向流纵向全屏，横向流横向全屏）
+                        controlCircleButton(
+                            systemImage: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "viewfinder",
+                            label: isFullScreen ? "退出全屏" : "自适应全屏"
+                        ) {
+                            toggleAdaptiveFullscreen(in: geo)
+                        }
+
+                        // 5. AirPlay 原生投屏
+                        AirPlayRoutePicker()
+                            .frame(width: 38, height: 38)
+                            .glassEffect(.regular.interactive(), in: .circle)
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
                 }
             }
             .padding(.horizontal, 12)
             .padding(.top, topPadding)
+            .environment(\.colorScheme, .dark)
         }
     }
 
@@ -375,15 +374,11 @@ public struct LivePlayerView: View {
         Button(action: action) {
             Image(systemName: systemImage)
                 .font(.system(size: 14, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 38, height: 38)
-                .background(Color.black.opacity(0.45), in: Circle())
-                .glassEffect(.regular.interactive(), in: .circle)
-                .contentShape(Rectangle())
-                .frame(minWidth: 44, minHeight: 44)
+                .frame(width: 26, height: 26)
         }
-        .buttonStyle(.plain)
-        .contentShape(Rectangle())
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .frame(minWidth: 44, minHeight: 44)
         .accessibilityLabel(label)
     }
 

@@ -88,8 +88,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -197,17 +199,21 @@ internal fun LiveScreen(
     onClose: () -> Unit,
     onSettings: () -> Unit = {},
 ) {
-    BackHandler(enabled = state.selectedItem != null && !isFullscreen) { onClose() }
     Surface(color = AuroraImmersiveBackground, modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize()) {
             state.selectedItem?.let { item ->
-                LivePlayerScreen(
-                    item = item,
-                    isFullscreen = isFullscreen,
-                    onFullscreenChange = onFullscreenChange,
-                    onVideoOrientationChange = onVideoOrientationChange,
+                PredictiveBackContainer(
+                    enabled = !isFullscreen,
                     onBack = onClose,
-                )
+                ) {
+                    LivePlayerScreen(
+                        item = item,
+                        isFullscreen = isFullscreen,
+                        onFullscreenChange = onFullscreenChange,
+                        onVideoOrientationChange = onVideoOrientationChange,
+                        onBack = onClose,
+                    )
+                }
             } ?: LiveFeed(
                 state = state,
                 bottomPadding = bottomPadding,
@@ -1142,7 +1148,6 @@ private fun LivePlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(AuroraImmersiveBackground)
-            .auroraSwipeBack(enabled = !isFullscreen, onDismiss = onBack)
             .testTag("live-player"),
     ) {
         val playerModifier = if (isFullscreen) {
@@ -1239,18 +1244,19 @@ private fun LivePlayerScreen(
                             Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
                         }
                         CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
-                        IconButton(
+                        FilledTonalIconButton(
                             onClick = onBack,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.56f),
+                                contentColor = Color.White,
+                            ),
                             modifier = Modifier
                                 .align(Alignment.TopStart)
                                 .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
-                                .padding(12.dp),
+                                .padding(12.dp)
+                                .size(44.dp),
                         ) {
-                            Surface(shape = CircleShape, color = Color.Black.copy(alpha = 0.55f), modifier = Modifier.size(36.dp)) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White, modifier = Modifier.size(18.dp))
-                                }
-                            }
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -1530,21 +1536,19 @@ private fun NativeLivePlayer(
                     .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                IconButton(onClick = onBack) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.Black.copy(alpha = 0.55f),
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = if (isFullscreen) "退出全屏" else "返回直播列表",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
+                FilledTonalIconButton(
+                    onClick = onBack,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.56f),
+                        contentColor = Color.White,
+                    ),
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = if (isFullscreen) "退出全屏" else "返回直播列表",
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
                 Spacer(Modifier.width(6.dp))
                 Text(
@@ -1569,34 +1573,40 @@ private fun NativeLivePlayer(
                     )
                 }
                 Spacer(Modifier.weight(1f))
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (isDanmakuEnabled) AuroraCoral.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.65f),
-                    border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color.White.copy(alpha = 0.35f)),
+                FilterChip(
+                    selected = isDanmakuEnabled,
                     onClick = {
                         isDanmakuEnabled = !isDanmakuEnabled
                         feedbackMessage = if (isDanmakuEnabled) "已开启弹幕浮层" else "已开启纯净观看模式（评论已关闭）"
                     },
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    ) {
+                    label = {
+                        Text(
+                            text = if (isDanmakuEnabled) "弹幕 开" else "纯净模式",
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    },
+                    leadingIcon = {
                         Icon(
                             imageVector = if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
                             contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(15.dp),
+                            modifier = Modifier.size(FilterChipDefaults.IconSize),
                         )
-                        Text(
-                            text = if (isDanmakuEnabled) "弹幕 开" else "纯净模式",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Color.Black.copy(alpha = 0.62f),
+                        labelColor = Color.White,
+                        iconColor = Color.White,
+                        selectedContainerColor = AuroraCoral,
+                        selectedLabelColor = Color.White,
+                        selectedLeadingIconColor = Color.White,
+                    ),
+                    border = FilterChipDefaults.filterChipBorder(
+                        enabled = true,
+                        selected = isDanmakuEnabled,
+                        borderColor = Color.White.copy(alpha = 0.35f),
+                        selectedBorderColor = AuroraCoral,
+                    ),
+                )
             }
         }
 
@@ -2252,21 +2262,19 @@ private fun EmbeddedLivePlayer(
                     .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                IconButton(onClick = onBack) {
-                    Surface(
-                        shape = CircleShape,
-                        color = Color.Black.copy(alpha = 0.55f),
-                        modifier = Modifier.size(36.dp),
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = if (isFullscreen) "退出全屏" else "返回直播列表",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp),
-                            )
-                        }
-                    }
+                FilledTonalIconButton(
+                    onClick = onBack,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.56f),
+                        contentColor = Color.White,
+                    ),
+                    modifier = Modifier.size(44.dp),
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = if (isFullscreen) "退出全屏" else "返回直播列表",
+                        modifier = Modifier.size(20.dp),
+                    )
                 }
                 item?.let {
                     Spacer(Modifier.width(6.dp))

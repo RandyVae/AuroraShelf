@@ -561,32 +561,22 @@ fun AuroraShelfApp(
 
         AnimatedVisibility(
             visible = state.selectedVideo != null,
-            enter = slideInVertically(
-                animationSpec = spring(stiffness = 280f, dampingRatio = 0.86f),
-                initialOffsetY = { it / 4 },
-            ) + scaleIn(
-                animationSpec = spring(stiffness = 280f, dampingRatio = 0.86f),
-                initialScale = 0.93f,
-            ) + fadeIn(spring(stiffness = 280f, dampingRatio = 0.86f)),
-            exit = slideOutVertically(
-                animationSpec = spring(stiffness = 300f, dampingRatio = 0.88f),
-                targetOffsetY = { it / 3 },
-            ) + scaleOut(
-                animationSpec = spring(stiffness = 300f, dampingRatio = 0.88f),
-                targetScale = 0.95f,
-            ) + fadeOut(tween(160)),
+            enter = fadeIn(tween(220)) + scaleIn(
+                animationSpec = spring(stiffness = 320f, dampingRatio = 0.88f),
+                initialScale = 0.94f,
+            ),
+            exit = fadeOut(tween(170)) + scaleOut(
+                animationSpec = tween(170),
+                targetScale = 0.94f,
+            ),
         ) {
             state.selectedVideo?.let { video ->
                 val currentRelatedVideos = remember(video.id, state.videos) {
                     relatedVideos(video, state.videos)
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .auroraSwipeBack(
-                            enabled = !isPlayerFullscreen,
-                            onDismiss = viewModel::closeVideo,
-                        ),
+                PredictiveBackContainer(
+                    enabled = !isPlayerFullscreen,
+                    onBack = viewModel::closeVideo,
                 ) {
                     PlayerScreen(
                         video = video,

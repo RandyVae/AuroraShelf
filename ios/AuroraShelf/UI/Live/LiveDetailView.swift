@@ -205,33 +205,47 @@ public struct LiveDetailView: View {
     // MARK: - 3. 核心动作按钮组
 
     private var actionButtonsSection: some View {
-        HStack(spacing: AuroraMetrics.spacingM) {
-            actionButton("heart.fill", title: "点赞 \(localLikes)", tint: .pink) {
-                let impact = UIImpactFeedbackGenerator(style: .medium)
-                impact.impactOccurred()
-                localLikes += 1
-            }
-            actionButton(isBookmarked ? "bookmark.fill" : "bookmark", title: isBookmarked ? "已收藏" : "收藏", tint: AuroraColor.brand) {
-                let impact = UIImpactFeedbackGenerator(style: .medium)
-                impact.impactOccurred()
-                isBookmarked.toggle()
-            }
-            actionButton("bubble.left.and.bubble.right.fill", title: "聊天室", tint: AuroraColor.brand) {
-                showChat = true
+        GlassEffectContainer(spacing: AuroraMetrics.spacingM) {
+            HStack(spacing: AuroraMetrics.spacingM) {
+                actionButton("heart.fill", title: "点赞 \(localLikes)", tint: .pink) {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    localLikes += 1
+                }
+                actionButton(
+                    isBookmarked ? "bookmark.fill" : "bookmark",
+                    title: isBookmarked ? "已收藏" : "收藏",
+                    tint: AuroraColor.brand,
+                    isProminent: isBookmarked
+                ) {
+                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                    impact.impactOccurred()
+                    isBookmarked.toggle()
+                }
+                actionButton("bubble.left.and.bubble.right.fill", title: "聊天室", tint: AuroraColor.brand) {
+                    showChat = true
+                }
             }
         }
     }
 
-    private func actionButton(_ icon: String, title: String, tint: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    @ViewBuilder
+    private func actionButton(_ icon: String, title: String, tint: Color, isProminent: Bool = false, action: @escaping () -> Void) -> some View {
+        let base = Button(action: action) {
             Label(title, systemImage: icon)
                 .font(.subheadline.weight(.semibold))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 12)
+                .padding(.vertical, 8)
         }
-        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
         .tint(tint)
         .accessibilityLabel(title)
+
+        if isProminent {
+            base.buttonStyle(.glassProminent)
+        } else {
+            base.buttonStyle(.glass)
+        }
     }
 
     private func showHUD(_ text: String) {

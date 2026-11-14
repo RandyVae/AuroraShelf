@@ -1,6 +1,22 @@
 # Project State
 
-## 最新工作状态（2026年11月14日 · MissAV 封面加载与防广告/预览片拦截全端修复＋iPad 详情页右侧推荐栏收窄适配 YouTube 比例 · v2.16.25 Build 251）
+## 最新工作状态（2026年11月14日 · 双端播放器原生 SDK 按键样式升级＋原生 SDK 滑动/预测返回过渡 · v2.16.26 Build 252）
+
+- **iOS / iPadOS 播放器按键升级为 iOS 27 SDK 原生 Liquid Glass 样式**（[VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift)、[NativePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/NativePlayerView.swift)、[LivePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LivePlayerView.swift)、[LiveDetailView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LiveDetailView.swift)、[PlayerOverlayBar.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/PlayerOverlayBar.swift)、[AirPlayRoutePicker.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/AirPlayRoutePicker.swift)）：
+  - 全面移除播放器控制栏、详情工具条与直播浮层的手写 `.ultraThinMaterial` + `.buttonStyle(.plain)` 叠层，分组采用 **`GlassEffectContainer`** 包裹；
+  - 常规控制与辅助操作采用 iOS 26/27 SDK 原生 **`.buttonStyle(.glass)`** 与 `.buttonBorderShape(.circle / .capsule / .roundedRectangle)`，主要播放/高亮状态采用 **`.buttonStyle(.glassProminent)`** + `.tint(AuroraColor.brand)`，并在播放器浮层注入 `.environment(\.colorScheme, .dark)` 保障亮/暗画面对比度一致。
+- **Android 播放器按键升级为 Google Material 3 (`1.4.0`) 原生 SDK 样式**（[PlayerScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PlayerScreen.kt)、[NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt)、[LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt)）：
+  - 播放器返回/全屏/投屏/字幕/直播返回按键全面替换为原生 **`FilledTonalIconButton`** 与 **`FilledIconButton`**（`IconButtonDefaults.filledTonalIconButtonColors`），直播弹幕/纯净模式胶囊升级为原生 **`FilterChip`**，详情操作区替换为原生 **`Surface(onClick = ...)`** 与标准 Material 3 涟漪反馈。
+- **双端原生 SDK 滑动返回与 Predictive Back 过渡升级**：
+  - **iOS / iPadOS**（[AuroraSwipeBackModifier.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/AuroraSwipeBackModifier.swift)、[SwipeBackTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/SwipeBackTests.swift)）：移除导致生硬直接 `dismiss()` 的 SwiftUI 覆盖 `DragGesture.onEnded`，同时启用 UIKit **`interactivePopGestureRecognizer`**（边缘侧滑）与 iOS 26/27 原生 **`interactiveContentPopGestureRecognizer`**（全内容区水平交互返回），并对横向 `UIScrollView` 与垂直/反向手势做方向与手势隔离；
+  - **Android**（[AndroidManifest.xml](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/AndroidManifest.xml)、[AppComponents.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AppComponents.kt)、[AuroraShelfApp.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AuroraShelfApp.kt)、[ComicScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ComicScreen.kt)、[LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt)、[ForumScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ForumScreen.kt)）：开启 `android:enableOnBackInvokedCallback="true"`，新增原生 **`PredictiveBackHandler`** 驱动的 `PredictiveBackContainer`（跟随手指进度实时缩放 `1.0 -> 0.88`、按 `swipeEdge` 偏移并圆角化至 `28dp`），重构 `auroraSwipeBack` 为触发后先平滑动画移出屏幕再 `onDismiss()`，消除归零跳闪。
+- **全量验证与交付（v2.16.26 Build 252）**：
+  - `./gradlew testDebugUnitTest lintVitalRelease --console=plain`：PASS（`BUILD SUCCESSFUL`）；
+  - `xcodebuild build-for-testing -project ios/AuroraShelf.xcodeproj -scheme AuroraShelf -destination 'generic/platform=iOS Simulator'`：PASS（`** TEST BUILD SUCCEEDED **`）；
+  - `node scripts/probe_all_sources.mjs`：34 源中 33 源可达（JAVSB 受本机网络 TLS 断开阻塞）；
+  - `./scripts/publish_ota.sh Release`：Android `Netgrey.apk` (`197M`) 与 iOS 签名 `Netgrey.ipa` (`194M` 远端 / `193M` 本地) 构建上传成功，远端磁盘剩余 `11G`（29% 使用率），`https://bananarey.us/manifest.plist` 已生效为 `2.16.26`。
+
+## 历史工作状态（2026年11月14日 · MissAV 封面加载与防广告/预览片拦截全端修复＋iPad 详情页右侧推荐栏收窄适配 YouTube 比例 · v2.16.25 Build 251）
 
 - **MissAV 封面与播放内容修复（iOS + Android）**：
   1. **iOS 封面与去广告/预览片修复**（[HTMLVideoSourceAdapter.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HTMLVideoSourceAdapter.swift)、[CoverImageLoader.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/CoverImageLoader.swift)）：

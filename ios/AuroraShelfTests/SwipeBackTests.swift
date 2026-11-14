@@ -117,9 +117,23 @@ final class SwipeBackTests: XCTestCase {
         coordinator.isEnabled = false
         XCTAssertFalse(coordinator.gestureRecognizerShouldBegin(dummyGesture), "禁用态（如全屏播放）必须严禁触发手势返回")
 
-        // 手势隔离规则：允许与内部滚动和手势同时识别（尤其 iPad 宽屏），返回手势严禁被其他手势强迫失败
+        // 手势隔离规则：边缘手势始终允许同时识别；全内容区右滑手势不与 UIScrollView 冲突，且不被强迫失败
+        let edgeGesture = UIScreenEdgePanGestureRecognizer()
+        let scrollContainer = UIScrollView()
+        let scrollGesture = UIPanGestureRecognizer()
+        scrollContainer.addGestureRecognizer(scrollGesture)
+        XCTAssertTrue(coordinator.gestureRecognizer(edgeGesture, shouldRecognizeSimultaneouslyWith: scrollGesture))
+        XCTAssertFalse(coordinator.gestureRecognizer(dummyGesture, shouldRecognizeSimultaneouslyWith: scrollGesture))
         XCTAssertTrue(coordinator.gestureRecognizer(dummyGesture, shouldRecognizeSimultaneouslyWith: UIGestureRecognizer()))
         XCTAssertFalse(coordinator.gestureRecognizer(dummyGesture, shouldBeRequiredToFailBy: UIGestureRecognizer()))
+
+        // didShow 后同步开启 iOS 26/27 原生全内容区交互返回手势
+        coordinator.isEnabled = true
+        coordinator.navigationController(nav, didShow: detailVC, animated: false)
+        XCTAssertEqual(nav.interactivePopGestureRecognizer?.isEnabled, true)
+        if #available(iOS 26.0, *) {
+            XCTAssertEqual(nav.interactiveContentPopGestureRecognizer?.isEnabled, true)
+        }
     }
 
     func testPopGestureEnablerControllerConfiguration() {

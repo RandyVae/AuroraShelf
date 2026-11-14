@@ -347,21 +347,21 @@ internal fun NativeSitePlayer(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
-                    // Non-fullscreen: below PlayerScreen's 44dp back button; fullscreen: near edge.
-                    .padding(start = 10.dp, top = if (isFullscreen) 10.dp else 58.dp),
+                    // Non-fullscreen: below PlayerScreen's 48dp back button; fullscreen: near edge.
+                    .padding(start = 12.dp, top = if (isFullscreen) 12.dp else 64.dp),
             ) {
-                IconButton(
+                FilledTonalIconButton(
                     onClick = { subtitleMenuExpanded = true },
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.58f)),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.56f),
+                        contentColor = Color.White,
+                    ),
+                    modifier = Modifier.size(44.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Subtitles,
                         contentDescription = "字幕",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp),
+                        modifier = Modifier.size(20.dp),
                     )
                 }
                 DropdownMenu(

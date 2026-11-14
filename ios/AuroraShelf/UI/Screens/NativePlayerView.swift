@@ -242,7 +242,8 @@ public struct NativePlayerView: View {
                                     dismiss()
                                 }
                             ) {
-                                HStack(spacing: isLandscape ? AuroraMetrics.spacingM : 8) {
+                                GlassEffectContainer(spacing: isLandscape ? AuroraMetrics.spacingM : 8) {
+                                    HStack(spacing: isLandscape ? AuroraMetrics.spacingM : 8) {
                                     // 1. 选集入口（多集时显示，宽屏模式采用右侧毛玻璃抽屉，窄屏采用模态弹窗）
                                     if episodes.count > 1 {
                                         Button(action: {
@@ -260,13 +261,12 @@ public struct NativePlayerView: View {
                                                 Text(currentEpisode?.label ?? "player.episodes".localized)
                                                     .font(.caption.bold())
                                             }
-                                            .foregroundStyle(.white)
-                                            .padding(.horizontal, 10)
-                                            .frame(height: AuroraMetrics.minTouchTarget)
-                                            .frame(minWidth: AuroraMetrics.minTouchTarget)
-                                            .glassEffect(.regular.interactive(), in: Capsule())
+                                            .padding(.horizontal, 6)
+                                            .frame(height: 36)
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(.glass)
+                                        .buttonBorderShape(.capsule)
+                                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                                         .hoverEffect(.highlight)
                                         .accessibilityLabel("选集，当前：\(currentEpisode?.label ?? "第 1 集")")
                                     }
@@ -275,11 +275,11 @@ public struct NativePlayerView: View {
                                     Button(action: toggleFillMode) {
                                         Image(systemName: isFillMode ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
                                             .font(.subheadline.bold())
-                                            .foregroundStyle(.white)
-                                            .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                            .glassEffect(.regular.interactive(), in: .circle)
+                                            .frame(width: 28, height: 28)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.glass)
+                                    .buttonBorderShape(.circle)
+                                    .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                                     .hoverEffect(.highlight)
                                     .accessibilityLabel(isFillMode ? "自适应画幅" : "填满全屏")
 
@@ -288,11 +288,11 @@ public struct NativePlayerView: View {
                                         Button(action: toggleOrientation) {
                                             Image(systemName: isLandscape ? "iphone.portrait" : "iphone.landscape")
                                                 .font(.subheadline.bold())
-                                                .foregroundStyle(.white)
-                                                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                                .glassEffect(.regular.interactive(), in: .circle)
+                                                .frame(width: 28, height: 28)
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(.glass)
+                                        .buttonBorderShape(.circle)
+                                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                                         .hoverEffect(.highlight)
                                         .accessibilityLabel(isLandscape ? "竖屏模式" : "横屏沉浸")
                                     }
@@ -327,8 +327,8 @@ public struct NativePlayerView: View {
                                         Text(playbackSpeed == 1.0 ? "1.0x" : "\(String(format: "%.2g", playbackSpeed))x")
                                             .font(.system(size: 11, weight: .bold))
                                             .foregroundStyle(.white)
-                                            .padding(.horizontal, 8)
-                                            .frame(height: AuroraMetrics.minTouchTarget)
+                                            .padding(.horizontal, 10)
+                                            .frame(height: 36)
                                             .glassEffect(.regular.interactive(), in: Capsule())
                                     }
                                     .accessibilityLabel("播放倍速，当前：\(playbackSpeed) 倍速")
@@ -337,11 +337,11 @@ public struct NativePlayerView: View {
                                     Button(action: { isShowingInSight = true }) {
                                         Image(systemName: "info.circle")
                                             .font(.subheadline.bold())
-                                            .foregroundStyle(.white)
-                                            .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                            .glassEffect(.regular.interactive(), in: .circle)
+                                            .frame(width: 28, height: 28)
                                     }
-                                    .buttonStyle(.plain)
+                                    .buttonStyle(.glass)
+                                    .buttonBorderShape(.circle)
+                                    .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                                     .accessibilityLabel("InSight 媒体信息与控制")
 
                                     // 5. 系统画中画
@@ -349,57 +349,60 @@ public struct NativePlayerView: View {
                                         Button(action: { PictureInPictureManager.shared.toggle() }) {
                                             Image(systemName: "rectangle.inset.filled")
                                                 .font(.subheadline.bold())
-                                                .foregroundStyle(.white)
-                                                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                                .glassEffect(.regular.interactive(), in: .circle)
+                                                .frame(width: 28, height: 28)
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(.glass)
+                                        .buttonBorderShape(.circle)
+                                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                                         .accessibilityLabel("画中画")
                                     }
 
                                     // 6. AirPlay
                                     AirPlayRoutePicker()
-                                        .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                                        .frame(width: 38, height: 38)
+                                        .glassEffect(.regular.interactive(), in: .circle)
+                                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                                 }
+                            }
                             }
                             .padding(.top, max(12, geo.safeAreaInsets.top))
 
                             Spacer()
 
-                            // 中心播放/快进控制组
-                            HStack(spacing: AuroraMetrics.spacingXXXL) {
-                                Button(action: { seekBy(-15) }) {
-                                    Image(systemName: "gobackward.15")
-                                        .font(.title2)
-                                        .foregroundStyle(.white)
-                                        .frame(width: 48, height: 48)
-                                        .glassEffect(.regular.interactive(), in: .circle)
-                                }
-                                .buttonStyle(.plain)
-                                .hoverEffect(.highlight)
-                                .accessibilityLabel("快退 15 秒")
+                            // 中心播放/快进控制组（iOS 27 原生 Liquid Glass Container 融合按键组）
+                            GlassEffectContainer(spacing: AuroraMetrics.spacingXXXL) {
+                                HStack(spacing: AuroraMetrics.spacingXXXL) {
+                                    Button(action: { seekBy(-15) }) {
+                                        Image(systemName: "gobackward.15")
+                                            .font(.title2)
+                                            .frame(width: 40, height: 40)
+                                    }
+                                    .buttonStyle(.glass)
+                                    .buttonBorderShape(.circle)
+                                    .hoverEffect(.highlight)
+                                    .accessibilityLabel("快退 15 秒")
 
-                                Button(action: { togglePlayPause() }) {
-                                    Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                        .font(.title)
-                                        .foregroundStyle(.white)
-                                        .frame(width: 68, height: 68)
-                                        .background(AuroraColor.brand, in: .circle)
-                                }
-                                .buttonStyle(.plain)
-                                .hoverEffect(.highlight)
-                                .accessibilityLabel(isPlaying ? "暂停" : "播放")
+                                    Button(action: { togglePlayPause() }) {
+                                        Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                            .font(.title)
+                                            .frame(width: 56, height: 56)
+                                    }
+                                    .buttonStyle(.glassProminent)
+                                    .buttonBorderShape(.circle)
+                                    .tint(AuroraColor.brand)
+                                    .hoverEffect(.highlight)
+                                    .accessibilityLabel(isPlaying ? "暂停" : "播放")
 
-                                Button(action: { seekBy(15) }) {
-                                    Image(systemName: "goforward.15")
-                                        .font(.title2)
-                                        .foregroundStyle(.white)
-                                        .frame(width: 48, height: 48)
-                                        .glassEffect(.regular.interactive(), in: .circle)
+                                    Button(action: { seekBy(15) }) {
+                                        Image(systemName: "goforward.15")
+                                            .font(.title2)
+                                            .frame(width: 40, height: 40)
+                                    }
+                                    .buttonStyle(.glass)
+                                    .buttonBorderShape(.circle)
+                                    .hoverEffect(.highlight)
+                                    .accessibilityLabel("快进 15 秒")
                                 }
-                                .buttonStyle(.plain)
-                                .hoverEffect(.highlight)
-                                .accessibilityLabel("快进 15 秒")
                             }
 
                             Spacer()
@@ -432,6 +435,7 @@ public struct NativePlayerView: View {
                             .padding(.horizontal, AuroraMetrics.contentInset)
                             .padding(.bottom, max(16, geo.safeAreaInsets.bottom))
                         }
+                        .environment(\.colorScheme, .dark)
                         .zIndex(30)
                     }
                     .transition(.opacity)

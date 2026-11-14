@@ -588,8 +588,8 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
             error = "帖子加载超时，请检查网络后重试"
         }
     }
-    BackHandler {
-        if (canGoBack && webView.canGoBack()) webView.goBack() else onClose()
+    BackHandler(enabled = canGoBack && webView.canGoBack()) {
+        webView.goBack()
     }
     DisposableEffect(webView, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
@@ -607,7 +607,11 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
         }
     }
 
-    Column(Modifier.fillMaxSize().background(Color(0xFF141218)).statusBarsPadding().testTag("forum-reader")) {
+    PredictiveBackContainer(
+        enabled = !(canGoBack && webView.canGoBack()),
+        onBack = onClose,
+    ) {
+        Column(Modifier.fillMaxSize().background(Color(0xFF141218)).statusBarsPadding().testTag("forum-reader")) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp),
@@ -689,6 +693,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 hostState = snackbarHostState,
                 modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
             )
+        }
         }
     }
 

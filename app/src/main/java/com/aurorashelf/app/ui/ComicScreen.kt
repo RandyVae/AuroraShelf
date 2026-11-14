@@ -159,10 +159,6 @@ internal fun ComicScreen(
     onDownloadAll: (() -> Unit)? = null,
     downloadedChapters: List<com.aurorashelf.app.data.comic.DownloadedComicChapter> = emptyList(),
 ) {
-    BackHandler(enabled = state.reader != null || state.details != null) {
-        if (state.reader != null) onCloseReader() else onCloseDetails()
-    }
-
     Surface(
         color = AuroraImmersiveBackground,
         modifier = Modifier.fillMaxSize(),
@@ -178,7 +174,7 @@ internal fun ComicScreen(
         ) { screen ->
             when (screen) {
                 "reader" -> state.reader?.let {
-                    Box(Modifier.fillMaxSize().auroraSwipeBack(enabled = true, onDismiss = onCloseReader)) {
+                    PredictiveBackContainer(enabled = true, onBack = onCloseReader) {
                         ComicReader(
                             state = state,
                             onBack = onCloseReader,
@@ -191,7 +187,7 @@ internal fun ComicScreen(
                     }
                 }
                 "details" -> state.details?.let {
-                    Box(Modifier.fillMaxSize().auroraSwipeBack(enabled = true, onDismiss = onCloseDetails)) {
+                    PredictiveBackContainer(enabled = true, onBack = onCloseDetails) {
                         ComicDetailsScreen(
                             details = it,
                             onBack = onCloseDetails,

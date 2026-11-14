@@ -98,9 +98,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -544,19 +547,19 @@ internal fun PlayerScreen(
             )
 
             if (!isFullscreen) {
-                GlassSurface(
-                    shape = CircleShape,
-                    forceDark = true,
+                FilledTonalIconButton(
+                    onClick = onBack,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.52f),
+                        contentColor = Color.White,
+                    ),
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .statusBarsPadding()
                         .padding(10.dp)
-                        .size(44.dp)
-                        .clickable(onClick = onBack),
+                        .size(44.dp),
                 ) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
-                    }
+                    Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
                 }
                 Row(
                     modifier = Modifier
@@ -565,37 +568,53 @@ internal fun PlayerScreen(
                         .padding(10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    GlassSurface(
-                        shape = CircleShape,
-                        forceDark = true,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clickable {
+                    if (isCasting) {
+                        FilledIconButton(
+                            onClick = {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 isCastSheetVisible = true
                             },
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            colors = IconButtonDefaults.filledIconButtonColors(
+                                containerColor = AuroraCoral,
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(44.dp),
+                        ) {
                             Icon(
-                                imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
-                                contentDescription = if (isCasting) "投屏中" else "投屏",
-                                tint = if (isCasting) AuroraCoral else Color.White,
+                                imageVector = Icons.Filled.CastConnected,
+                                contentDescription = "投屏中",
+                            )
+                        }
+                    } else {
+                        FilledTonalIconButton(
+                            onClick = {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                isCastSheetVisible = true
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.52f),
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(44.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Cast,
+                                contentDescription = "投屏",
                             )
                         }
                     }
-                    GlassSurface(
-                        shape = CircleShape,
-                        forceDark = true,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .clickable {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onFullscreenChange(true)
-                            },
+                    FilledTonalIconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onFullscreenChange(true)
+                        },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = Color.Black.copy(alpha = 0.52f),
+                            contentColor = Color.White,
+                        ),
+                        modifier = Modifier.size(44.dp),
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(Icons.Default.Fullscreen, contentDescription = "全屏播放")
-                        }
+                        Icon(Icons.Default.Fullscreen, contentDescription = "全屏播放")
                     }
                 }
             }
@@ -922,12 +941,15 @@ private fun PlayerActionButton(
     stateDescriptionText: String? = null,
     icon: @Composable () -> Unit,
 ) {
-    GlassSurface(
-        shape = RoundedCornerShape(16.dp),
-        forceDark = true,
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = MaterialTheme.shapes.large,
+        color = Color.White.copy(alpha = 0.08f),
+        contentColor = if (enabled) Color.White.copy(alpha = 0.94f) else Color.White.copy(alpha = 0.38f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.10f)),
         modifier = modifier
             .height(68.dp)
-            .applePressEffect(enabled = enabled, pressedScale = 0.94f, onClick = onClick)
             .then(
                 if (stateDescriptionText != null) {
                     Modifier.semantics { stateDescription = stateDescriptionText }
