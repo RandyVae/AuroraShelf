@@ -4769,7 +4769,22 @@ cp build.nosync/app/outputs/apk/release/app-release.apk \
 
 - Android 与 iOS 首页新增可跳过的“注册免费账号 / 注册 / 登录”引导卡片，点击进入现有账号页面；视频、直播和内容加载链路未改动。
 - 双端 Release 包已构建并 OTA 发布；Android JVM 测试、iOS generic Simulator build 通过。
-## 最新交接：2026-11-14 — 逐源分类统一＋iPad 横屏 YouTube 双栏布局（v2.16.23 Build 249）
+## 最新交接：2026-11-14 — 视频源 404 根治＋XVideos 41 分类路由与分页精准校准＋全链路升級至 v2.16.24 (Build 250) 並發布至 bananarey.us 與 GitHub Release
+
+- **範圍**：
+  - 響應用戶反饋「大量視頻源出現404」：
+    1. **XVideos 41 分類路由與分頁校準（iOS 端）**：
+       - 排查確認 Codex 在前一版本引入的 `xvideosCategoryPaths` 缺失原站官方分類數字 ID（如 `/c/Chinese/`、`/new/`），原站返回 HTTP 404；
+       - 校準 `UniversalVideoEngine.swift`：最新對齊 `/`、熱門 `/best`、中文 `/tags/chinese`、認證 `/tags/verified`，其餘 37 個分類對齊原站數字 ID（如 `/c/Amateur-65`、`/c/Milf-19` 等）；
+       - 校準分頁拼裝：非最新分類分頁為 `${categoryPath}/${page - 1}`，最新分類分頁為 `/new/${page - 1}`；實測全部 41 個分類 82 個分頁用例 100% 返回 HTTP 200。
+    2. **雙端全鏈路版本號遞增**：
+       - Android: `versionCode = 250`, `versionName = "2.16.24"`；
+       - iOS: `CURRENT_PROJECT_VERSION: 250`, `MARKETING_VERSION: "2.16.24"`；
+       - 遊戲前端、OTA 網頁與 `manifest.plist` 同步升級至 `v2.16.24 (Build 250)`。
+    3. **雙端 Release 構建、自動化簽名與 OTA 原子覆蓋**：
+       - Android Release APK（197MB）與 iOS 簽名 IPA（194MB）同名原子覆蓋至 `bananarey.us`；伺服器磁碟維持 11GB 可用（29% 使用率）。
+
+## 歷史交接：2026-11-14 — 逐源分类统一＋iPad 横屏 YouTube 双栏布局（v2.16.23 Build 249）
 
 - **分类统一**：Android `ContentSourceCatalog.sourceCategories()` 直接使用 PipePipe 每个服务报告的完整 kiosk ID；`AuroraViewModel`、首页分类栏、缓存键和 `VideoRepository` 已接入稳定的 `SourceCategory`，播放解析器没有改动。
 - **iOS 分类统一**：`VideoSourceCatalog` 增加稳定分类 ID；XVideos 显示 41 个官方栏目；MissAV/KissJAV/85po/Pornhub/JAV-NONI/JAVSB/TOKYO Motion 等按原站 latest/popular/recommended；SpankBang、xHamster、EPORNER、OHentai、XNXX 只保留实际存在的 latest 栏目。`HTMLVideoSourceAdapter` 路由测试覆盖 Pornhub/JAVSB 等易错映射。

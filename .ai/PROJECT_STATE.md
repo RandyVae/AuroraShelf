@@ -1,6 +1,19 @@
 # Project State
 
-## 最新工作状态（2026年11月14日 · 逐源分类统一＋iPad 横屏 YouTube 双栏布局 · v2.16.23 Build 249）
+## 最新工作状态（2026年11月14日 · 视频源 404 根治＋XVideos 41 分类路由与分页精准校准 · v2.16.24 Build 250）
+
+- **404 根因排查与修复（已验证）**：
+  1. **XVideos 41 分类路由与分页校准（iOS）**：
+     - Codex 在 `v2.16.23` 中引入的 `xvideosCategoryPaths` 缺失官方分类数字 ID（例如 `"中文": "/c/Chinese/"`、`"最新": "/new/"`），直接触发原站 404 拦截；
+     - 彻底校准 [UniversalVideoEngine.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/UniversalVideoEngine.swift) 中的 `xvideosCategoryPaths` 字典：最新使用 `/`、热门使用 `/best`、中文使用 `/tags/chinese`、认证使用 `/tags/verified`，其余各分类全部对齐原站官方带有数字 ID 的规范路由（如 `/c/Amateur-65`、`/c/Milf-19`、`/c/AI-239` 等）；
+     - 修复分页路由拼装：第一页使用分类路径本身，第二页及之后统一规范拼装为 `${categoryPath}/${page - 1}`（最新分类则走 `/new/${page - 1}`），全部 41 个分类在第 1 页与第 2 页经脚本并发实测 82/82 项全部 HTTP 200 OK 通过。
+- **全量测试与构建验证**：
+  - Android：`./gradlew testDebugUnitTest` 全量通过；
+  - iOS：`xcodebuild build-for-testing` 全量通过；
+  - 双端 Release 签名打包与 OTA 发布（`./scripts/publish_ota.sh Release`）成功，版本号全链路升级至 `v2.16.24 (Build 250)`。
+  - 服务器 `bananarey.us` 线上部署校验：`manifest.plist` 与 `index.html` 已更新至 `2.16.24`，磁盘剩余约 11GB。
+
+## 历史工作状态（2026年11月14日 · 逐源分类统一＋iPad 横屏 YouTube 双栏布局 · v2.16.23 Build 249）
 
 - Android 新增 `SourceCategory` 适配层，分类栏现在读取每个 PipePipe 源完整的官方 kiosk ID 清单，不再截断为通用五分类；旧 `FeedCategory` 入口保留给直连源、缓存和既有测试。
 - iOS 统一源分类清单：XVideos 补齐 41 个官方栏目；国际扩展源按其 PipePipe 原站 kiosk 收敛为 latest/popular/recommended（仅有 latest 的源不再显示虚构栏目）；Pornhub、JAVSB、TOKYO Motion 等分类标签与 feed 路由一一对应。

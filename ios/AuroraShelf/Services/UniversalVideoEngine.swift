@@ -35,7 +35,7 @@ public enum UniversalVideoEngine {
         if page == 1 {
             finalPath = categoryPath
         } else {
-            finalPath = categoryPath == "/" ? "/new/\(page - 1)" : "\(categoryPath)\(page - 1)"
+            finalPath = categoryPath == "/" ? "/new/\(page - 1)" : "\(categoryPath)/\(page - 1)"
         }
 
         guard let url = URL(string: "https://www.xvideos.com\(finalPath)") else {
@@ -61,20 +61,20 @@ public enum UniversalVideoEngine {
     }
 
     private static let xvideosCategoryPaths: [String: String] = [
-        "最新": "/new/", "热门": "/best/", "中文": "/c/Chinese/", "自拍": "/c/Amateur-65/",
-        "亚洲": "/c/Asian_Woman-32/", "认证": "/c/Verified/", "AI": "/c/AI/", "熟女": "/c/MILF/",
-        "少女": "/c/Teen/", "巨乳": "/c/Big-Tits/", "美臀": "/c/Big-Ass/", "巨屌": "/c/Big-Cock/",
-        "口交": "/c/Blowjob/", "肛交": "/c/Anal/", "潮吹": "/c/Squirting/", "内射": "/c/Creampie/",
-        "颜射": "/c/Cumshot/", "丝袜": "/c/Stockings/", "内衣": "/c/Lingerie/", "金发": "/c/Blonde/",
-        "棕发": "/c/Brunette/", "红发": "/c/Redhead/", "黑人": "/c/Black/", "拉丁": "/c/Latina/",
-        "印度": "/c/Indian/", "阿拉伯": "/c/Arab/", "跨种族": "/c/Interracial/", "女同": "/c/Lesbian/",
-        "双性": "/c/Bi/", "女王": "/c/Femdom/", "群交": "/c/Gangbang/", "家庭": "/c/Family/",
-        "绿帽": "/c/Cuckold/", "丰满": "/c/BBW/", "成熟": "/c/Mature/", "独角戏": "/c/Solo/",
-        "油压": "/c/Oiled/", "拳交": "/c/Fisting/", "扩肛": "/c/Gapes/", "网络直播": "/c/Cam/", "ASMR": "/c/ASMR/"
+        "最新": "/", "热门": "/best", "中文": "/tags/chinese", "自拍": "/c/Amateur-65",
+        "亚洲": "/c/Asian_Woman-32", "认证": "/tags/verified", "AI": "/c/AI-239", "熟女": "/c/Milf-19",
+        "少女": "/c/Teen-13", "巨乳": "/c/Big_Tits-23", "美臀": "/c/Big_Ass-24", "巨屌": "/c/Big_Cock-34",
+        "口交": "/c/Blowjob-15", "肛交": "/c/Anal-12", "潮吹": "/c/Squirting-56", "内射": "/c/Creampie-40",
+        "颜射": "/c/Cumshot-18", "丝袜": "/c/Stockings-28", "内衣": "/c/Lingerie-83", "金发": "/c/Blonde-20",
+        "棕发": "/c/Brunette-25", "红发": "/c/Redhead-31", "黑人": "/c/Black_Woman-30", "拉丁": "/c/Latina-16",
+        "印度": "/c/Indian-89", "阿拉伯": "/c/Arab-159", "跨种族": "/c/Interracial-27", "女同": "/c/Lesbian-26",
+        "双性": "/c/Bi_Sexual-62", "女王": "/c/Femdom-235", "群交": "/c/Gangbang-69", "家庭": "/c/Fucked_Up_Family-81",
+        "绿帽": "/c/Cuckold-237", "丰满": "/c/bbw-51", "成熟": "/c/Mature-38", "独角戏": "/c/Solo_and_Masturbation-33",
+        "油压": "/c/Oiled-22", "拳交": "/c/Fisting-165", "扩肛": "/c/Gapes-167", "网络直播": "/c/Cam_Porn-58", "ASMR": "/c/ASMR-229"
     ]
 
     private static let legacyXVideosCategoryPaths: [String: String] = [
-        "热播": "/best/", "最佳": "/best/", "日本": "/tags/japanese/", "4K超清": "/tags/4k/", "全部": "/"
+        "热播": "/best", "最佳": "/best", "日本": "/tags/japanese", "4K超清": "/tags/4k", "全部": "/"
     ]
 
     static func decodeXVideosFeed(data: Data, statusCode: Int, category: String) throws -> [VideoItem] {
