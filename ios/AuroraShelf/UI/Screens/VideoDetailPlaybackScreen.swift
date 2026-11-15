@@ -63,6 +63,10 @@ public struct VideoDetailPlaybackScreen: View {
     @State private var isViewDismissed: Bool = false
     @State private var showDownloadToast: Bool = false
     @State private var downloadToastText: String = ""
+    @State private var measuredSafeInsets: EdgeInsets = {
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        return EdgeInsets(top: isPad ? 24 : 59, leading: 0, bottom: isPad ? 20 : 34, trailing: 0)
+    }()
     
     @ObservedObject private var watchlist = WatchlistStore.shared
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
@@ -88,23 +92,52 @@ public struct VideoDetailPlaybackScreen: View {
         videoRepo.feedVideos.filter { $0.id != currentVideo.id }
     }
     
+    private func resolvedSafeTop(in size: CGSize) -> CGFloat {
+        if measuredSafeInsets.top > 0 {
+            return measuredSafeInsets.top
+        }
+        if size.width > size.height, UIDevice.current.userInterfaceIdiom != .pad {
+            return 12
+        }
+        return UIDevice.current.userInterfaceIdiom == .pad ? 24 : 59
+    }
+
+    private var resolvedSafeBottom: CGFloat {
+        if measuredSafeInsets.bottom > 0 {
+            return measuredSafeInsets.bottom
+        }
+        return UIDevice.current.userInterfaceIdiom == .pad ? 20 : 34
+    }
+
     public var body: some View {
-        GeometryReader { screenGeo in
-            let layoutMode = VideoDetailLayout.mode(size: screenGeo.size, idiom: UIDevice.current.userInterfaceIdiom)
-            ZStack(alignment: .top) {
-                AuroraColor.canvas.ignoresSafeArea()
+        ZStack {
+            Color.clear
+                .onGeometryChange(for: EdgeInsets.self) { proxy in
+                    proxy.safeAreaInsets
+                } action: { insets in
+                    if insets != measuredSafeInsets {
+                        measuredSafeInsets = insets
+                    }
+                }
+                .allowsHitTesting(false)
+
+            GeometryReader { screenGeo in
+                let screenSize = screenGeo.size
+                let layoutMode = VideoDetailLayout.mode(size: screenSize, idiom: UIDevice.current.userInterfaceIdiom)
+                ZStack(alignment: .top) {
+                    AuroraColor.canvas.ignoresSafeArea()
 
                 if layoutMode == .padLandscapeSplit && !isFullScreen {
-                    let columns = VideoDetailLayout.columns(for: screenGeo.size, idiom: UIDevice.current.userInterfaceIdiom)
-                    let playerWidth = columns.playerWidth(for: screenGeo.size.width)
-                    let recommendationWidth = columns.recommendationWidth(for: screenGeo.size.width)
-                    let safeTop = DeviceLayout.safeAreaTop(in: screenGeo.size)
-                    let playerHeight = min(playerWidth * 9.0 / 16.0, screenGeo.size.height * 0.62) + safeTop
+                    let columns = VideoDetailLayout.columns(for: screenSize, idiom: UIDevice.current.userInterfaceIdiom)
+                    let playerWidth = columns.playerWidth(for: screenSize.width)
+                    let recommendationWidth = columns.recommendationWidth(for: screenSize.width)
+                    let safeTop = resolvedSafeTop(in: screenSize)
+                    let playerHeight = min(playerWidth * 9.0 / 16.0, screenSize.height * 0.62) + safeTop
 
                     // iPad 横屏采用 YouTube 式双栏：左侧保持播放器与当前视频上下文，右侧独立滚动推荐。
                     HStack(alignment: .top, spacing: 0) {
                         VStack(spacing: 0) {
-                            topPlayerContainer(in: screenGeo, width: playerWidth, height: playerHeight)
+                            topPlayerContainer(screenSize: screenSize, width: playerWidth, height: playerHeight)
                                 .zIndex(10)
 
                             ScrollView(.vertical, showsIndicators: false) {
@@ -126,7 +159,7 @@ public struct VideoDetailPlaybackScreen: View {
                 } else {
                     VStack(spacing: 0) {
                         // 1. 顶部播放器视口（支持原位动态展开至全屏，同一个 AVPlayer 实例不中断）
-                        topPlayerContainer(in: screenGeo)
+                        topPlayerContainer(screenSize: screenSize)
                             .zIndex(10)
 
                         // 2. 下方可滚动详情、选集与推荐内容（全屏时平滑折叠退场）
@@ -161,8 +194,10 @@ public struct VideoDetailPlaybackScreen: View {
                     .zIndex(20)
                 }
             }
+            .frame(width: screenSize.width, height: screenSize.height)
+            }
+            .ignoresSafeArea()
         }
-        .ignoresSafeArea()
         .toolbar(.hidden, for: .tabBar)
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarHidden(true)
@@ -377,26 +412,26 @@ public struct VideoDetailPlaybackScreen: View {
     // MARK: - 1. 顶部播放器视口（内嵌 / 全屏通用）
     
     @ViewBuilder
-    private func topPlayerContainer(in screenGeo: GeometryProxy, width: CGFloat? = nil, height: CGFloat? = nil) -> some View {
+    private func topPlayerContainer(screenSize: CGSize, width: CGFloat? = nil, height: CGFloat? = nil) -> some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let isPhysicallyLandscape = screenGeo.size.width > screenGeo.size.height
+        let isPhysicallyLandscape = screenSize.width > screenSize.height
         // iPad 端依靠机身感应全向自然旋转，严禁施加 90 度强制逆向视图旋转
         let isRotated = !isPad && isFullScreen && isLandscape && !isPhysicallyLandscape
-        let targetWidth = isRotated ? screenGeo.size.height : (width ?? screenGeo.size.width)
-        let safeTop = DeviceLayout.safeAreaTop(in: screenGeo.size)
+        let targetWidth = isRotated ? screenSize.height : (width ?? screenSize.width)
+        let safeTop = resolvedSafeTop(in: screenSize)
         let needsTopOffset = !isFullScreen && (!isLandscape || isPad)
         let targetHeight: CGFloat = {
             if let height, !isFullScreen {
                 return height
             }
             if isFullScreen {
-                return isRotated ? screenGeo.size.width : screenGeo.size.height
+                return isRotated ? screenSize.width : screenSize.height
             }
             if isPad {
                 // iPad 宽屏内嵌态：严格限制播放器黄金视口高度，留出 >= 50% 竖向空间展现选集与简介，根治下半部被挤压问题
-                return min(screenGeo.size.height * 0.48, 440) + safeTop
+                return min(screenSize.height * 0.48, 440) + safeTop
             }
-            return (screenGeo.size.width * 9.0 / 16.0) + safeTop
+            return (screenSize.width * 9.0 / 16.0) + safeTop
         }()
         
         ZStack {
@@ -486,7 +521,7 @@ public struct VideoDetailPlaybackScreen: View {
             
             // 播放器控制覆盖层（Apple HIG 悬浮胶囊与进度条）
             if showControls && resolveError == nil {
-                playerControlsOverlay(in: screenGeo, playerWidth: targetWidth, isRotated: isRotated)
+                playerControlsOverlay(screenSize: screenSize, playerWidth: targetWidth, isRotated: isRotated)
                     .transition(.opacity)
             }
             
@@ -529,8 +564,8 @@ public struct VideoDetailPlaybackScreen: View {
         .frame(width: targetWidth, height: targetHeight)
         .rotationEffect(isRotated ? .degrees(90) : .zero)
         .frame(
-            width: isFullScreen ? screenGeo.size.width : (width ?? screenGeo.size.width),
-            height: isFullScreen ? screenGeo.size.height : targetHeight,
+            width: isFullScreen ? screenSize.width : (width ?? screenSize.width),
+            height: isFullScreen ? screenSize.height : targetHeight,
             alignment: .top
         )
         .clipped()
@@ -542,13 +577,13 @@ public struct VideoDetailPlaybackScreen: View {
     // MARK: - 播放器控制栏（内嵌 / 全屏自适应）
     
     @ViewBuilder
-    private func playerControlsOverlay(in screenGeo: GeometryProxy, playerWidth: CGFloat, isRotated: Bool) -> some View {
+    private func playerControlsOverlay(screenSize: CGSize, playerWidth: CGFloat, isRotated: Bool) -> some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let safeTop = DeviceLayout.safeAreaTop(in: screenGeo.size)
+        let safeTop = resolvedSafeTop(in: screenSize)
         // 顶栏无论内嵌还是全屏，均必须刚性避让 safeTop（灵动岛/状态栏 59pt），杜绝按钮飞出屏幕或陷入灵动岛
         let topBarPadding: CGFloat = isRotated ? 16 : (isPad ? (isFullScreen ? 24 : max(safeTop, 24) + 8) : (safeTop + 8))
         let topGradientHeight: CGFloat = isRotated ? 100 : max(topBarPadding + 54, 115)
-        let bottomGradientHeight: CGFloat = isRotated ? 90 : (isFullScreen ? max(110, DeviceLayout.safeAreaBottom + 70) : (isPad ? 85 : 75))
+        let bottomGradientHeight: CGFloat = isRotated ? 90 : (isFullScreen ? max(110, resolvedSafeBottom + 70) : (isPad ? 85 : 75))
 
         ZStack {
             // 背景全屏轻触与 Apple TV 三区双击 / 双侧滑动手势交互层
@@ -659,7 +694,7 @@ public struct VideoDetailPlaybackScreen: View {
             .environment(\.colorScheme, .dark)
             .padding(.horizontal, isPad ? 24 : 14)
             .padding(.top, topBarPadding)
-            .padding(.bottom, isFullScreen ? max(16, DeviceLayout.safeAreaBottom) : (isPad ? 14 : 8))
+            .padding(.bottom, isFullScreen ? max(16, resolvedSafeBottom) : (isPad ? 14 : 8))
         }
     }
     
@@ -1423,11 +1458,13 @@ public struct VideoDetailPlaybackScreen: View {
             }
             
             if isLoadingEpisodes {
-                HStack(spacing: AuroraMetrics.spacingM) {
-                    ForEach(0..<4, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(AuroraColor.surfaceCard.opacity(0.6))
-                            .frame(width: isPad ? 250 : 110, height: isPad ? 140 : 56)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: AuroraMetrics.spacingM) {
+                        ForEach(0..<4, id: \.self) { _ in
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(AuroraColor.surfaceCard.opacity(0.6))
+                                .frame(width: isPad ? 250 : 110, height: isPad ? 140 : 56)
+                        }
                     }
                 }
             } else if isPad {

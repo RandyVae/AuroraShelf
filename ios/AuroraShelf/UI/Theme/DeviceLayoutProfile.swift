@@ -197,6 +197,79 @@ public struct DeviceLayout {
         }
     }
 
+    private final class SafeAreaCache: @unchecked Sendable {
+        static let shared = SafeAreaCache()
+        private let lock = NSLock()
+        private var portraitTop: CGFloat = 0
+        private var portraitBottom: CGFloat = 0
+        private var currentLeft: CGFloat = 0
+        private var currentRight: CGFloat = 0
+        private var isRefreshScheduled = false
+        private var lastRefreshUptime: TimeInterval = 0
+
+        private init() {
+            scheduleRefreshIfNeeded()
+        }
+
+        // Reading `UIWindow.safeAreaInsets` synchronously inside SwiftUI `View.body` triggers an
+        // AttributeGraph dependency cycle on iOS 27.2+, so cache insets outside body evaluation.
+        func scheduleRefreshIfNeeded() {
+            let now = ProcessInfo.processInfo.systemUptime
+            lock.lock()
+            let shouldSchedule = !isRefreshScheduled && (now - lastRefreshUptime > 0.25)
+            if shouldSchedule {
+                isRefreshScheduled = true
+            }
+            lock.unlock()
+            guard shouldSchedule else { return }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+                let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+                let window = activeScene?.windows.first(where: { $0.isKeyWindow }) ?? activeScene?.windows.first
+                let insets = window?.safeAreaInsets ?? .zero
+                let bounds = window?.bounds.size ?? .zero
+                let isLandscape = bounds.width > bounds.height
+
+                self.lock.lock()
+                self.isRefreshScheduled = false
+                self.lastRefreshUptime = ProcessInfo.processInfo.systemUptime
+                self.currentLeft = insets.left
+                self.currentRight = insets.right
+                if !isLandscape || UIDevice.current.userInterfaceIdiom == .pad {
+                    if insets.top > 0 { self.portraitTop = insets.top }
+                    if insets.bottom > 0 { self.portraitBottom = insets.bottom }
+                }
+                self.lock.unlock()
+            }
+        }
+
+        func readPortraitTop() -> CGFloat {
+            scheduleRefreshIfNeeded()
+            lock.lock()
+            let value = portraitTop
+            lock.unlock()
+            return value
+        }
+
+        func readBottom() -> CGFloat {
+            scheduleRefreshIfNeeded()
+            lock.lock()
+            let value = portraitBottom
+            lock.unlock()
+            return value
+        }
+
+        func readHorizontal() -> (leading: CGFloat, trailing: CGFloat) {
+            scheduleRefreshIfNeeded()
+            lock.lock()
+            let result = (currentLeft, currentRight)
+            lock.unlock()
+            return result
+        }
+    }
+
     /// 获取当前窗口真实安全区顶部高度（动态适配 Dynamic Island 59pt、刘海屏 47/44pt 与 iPad 24pt）
     public static var safeAreaTop: CGFloat {
         safeAreaTop(in: nil)
@@ -204,16 +277,13 @@ public struct DeviceLayout {
 
     /// 针对特定尺寸或当前窗口计算安全区顶部高度
     public static func safeAreaTop(in size: CGSize? = nil) -> CGFloat {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
-        let window = activeScene?.windows.first(where: { $0.isKeyWindow }) ?? activeScene?.windows.first
-        let top = window?.safeAreaInsets.top ?? 0
-        if top > 0 {
-            return top
-        }
         // 如果给定了尺寸且为物理横屏（width > height 且非 iPad）
         if let s = size, s.width > s.height, UIDevice.current.userInterfaceIdiom != .pad {
             return 12
+        }
+        let cachedTop = SafeAreaCache.shared.readPortraitTop()
+        if cachedTop > 0 {
+            return cachedTop
         }
         if UIDevice.current.userInterfaceIdiom == .pad {
             return 24
@@ -223,23 +293,16 @@ public struct DeviceLayout {
 
     /// 获取当前窗口真实安全区底部高度（Home 条 34pt / 21pt）
     public static var safeAreaBottom: CGFloat {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
-        let window = activeScene?.windows.first(where: { $0.isKeyWindow }) ?? activeScene?.windows.first
-        let bottom = window?.safeAreaInsets.bottom ?? 0
-        if bottom > 0 {
-            return bottom
+        let cachedBottom = SafeAreaCache.shared.readBottom()
+        if cachedBottom > 0 {
+            return cachedBottom
         }
-        return 34
+        return UIDevice.current.userInterfaceIdiom == .pad ? 20 : 34
     }
 
     /// 获取横屏下避让灵动岛或刘海的侧边安全边距
     public static var safeAreaHorizontalInsets: (leading: CGFloat, trailing: CGFloat) {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
-        let window = activeScene?.windows.first(where: { $0.isKeyWindow }) ?? activeScene?.windows.first
-        let insets = window?.safeAreaInsets ?? .zero
-        return (insets.left, insets.right)
+        SafeAreaCache.shared.readHorizontal()
     }
 }
 

@@ -1,3 +1,21 @@
+## 最新交接：2026-11-15 — iOS 27.2 AttributeGraph 布局死循环根治（华视有声音无画面）＋多集骨架水平溢出修复＋双端 Release 验证与 OTA 发布 · v2.16.32 (Build 258)
+
+### 本次完成
+1. **彻底根治华视「有声音无画面」（iOS 27.2 `AttributeGraph` 布局循环冻结）**：
+   - 在 `ios/AuroraShelf/UI/Theme/DeviceLayoutProfile.swift`（`L200-296`）新增线程安全 `@unchecked Sendable` `SafeAreaCache`（`NSLock` + 节流异步主线程读取 `UIWindow.safeAreaInsets`），消除在 SwiftUI `View.body` 求值阶段同步访问窗口安全区引发的 `AttributeGraph: Cycle detected through attribute` 死循环。
+   - 重构 `ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift` 顶部安全区采集：改用外层非忽略安全区的 `Color.clear.onGeometryChange(for: EdgeInsets.self)`（`measuredSafeInsets`）配对视口边界 `GeometryReader { screenGeo in ... }.ignoresSafeArea()`，使 `resolvedSafeTop(in:)` / `resolvedSafeBottom` 脱离循环依赖；同时将 `episodesShelfSection` 加载骨架 `HStack`（`isLoadingEpisodes`）纳入横向 `ScrollView(.horizontal, showsIndicators: false)`，消除已暴露的 `508.0pt` 水平溢出。
+   - 删除 `VideoDetailPlaybackScreen.swift`、`PlayerScrubberBar.swift`、`MainContainerView.swift` 的全部临时 `[DIAG]` 日志与 `.onChange` 调试探针；在 `ios/AuroraShelfTests/SwipeBackTests.swift` 新增清洁回归测试 `testVideoDetailPlaybackScreenUpdatesInsideNavigationHostWithoutLayoutFreeze()`。
+2. **版本号递增与全仓库对齐 (`v2.16.32 / Build 258`)**：
+   - 同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`（软链同步 `ios/AuroraShelf/Resources/www/index.html`）、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html`；全库检索旧版本号 `2.16.31`/`257` 仅剩无关 Hex UUID，无任何残留。
+3. **双端构建、自动化测试、Release 模拟器实测与 OTA 发布**：
+   - **iOS Release**：`xcodebuild build ... -configuration Release` **BUILD SUCCEEDED**；`iPhone 18 Pro`（`huavod` `谷雨`、`134x` `JUFE-633`、`live` `tunderose`）与 `iPad Pro 13-inch (M5)`（`huavod` `谷雨` Portrait、`live` `ginacali`）Release 实测均呈现流畅视频画面且日志 `ZERO_CYCLES_CONFIRMED` / `IPAD_ZERO_CYCLES_CONFIRMED`；`AuroraShelfTests` **181 项**（`173 通过 / 7 跳过 / 1 失败`：`ComicRepositoryTests.testBaoziLiveFetchComicsChaptersAndPages` 外部图床 TLS `-9816`，`SwipeBackTests` **8/8 通过**）；`TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1` 下 `X134SourceServiceTests` **3/3 通过**、`testHuavodDetailedLivePlaybackAndSegmentDownload` **通过**、`testEveryConfiguredVideoSourceLoadsAndResolvesLiveItemsWhenOptedIn` **18/20 通过**（`javsb` 外部 TLS 断连、`spankbang` 外部 HTTP 403）。
+   - **Android Release**：`./gradlew testDebugUnitTest lintDebug assembleRelease` **BUILD SUCCESSFUL**（42 套件 261 项：**253 通过 / 8 跳过 / 0 失败**；SARIF lint `0 error / 0 warning / 0 hint`）；`RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` **20/20 全通过**；`emulator-5554` R8 `app-release.apk`（`258 / 2.16.32`）实测首页、华视播放、退出 `ExoPlayerImpl: Release`、论坛滚动与重入起播（`2566ms` 首帧）通过。
+   - **OTA 与探针**：`node scripts/probe_all_sources.mjs` 35 源 **33/35 通过**（`javsb` `CONNECT_FAIL`、`jm` `code=401`）；`./scripts/publish_ota.sh Release` 完成 `https://bananarey.us` 原子覆盖（`Netgrey.apk` `206,892,939` bytes、`Netgrey.ipa` `202,681,543` bytes、`manifest.plist` `2.16.32` 均 `HTTP/1.1 200 OK`，服务器 `/` 剩余空间 `11G` / 使用率 `29%`）。
+
+### 交接提醒
+- 工作区无待处理代码缺陷；实测 `LiveVideoSourceAuditTests` 时须在命令行前置环境变量 `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1` 传给测试进程，否则 Live 探针用例会被 `XCTSkip` 跳过。
+- 外部上游限制（`jav.sb` TLS 断连、`spankbang` HTTP 403、`s1-mha1-nlams.bzcdn.net` 偶发 TLS `-9816`、`jm` Node 无密钥 `401`）属第三方站点风控/网络状态，均已在记录中如实披露。
+
 ## 最新交接：2026-11-15 — 播放退出彻底停播与重入修复、加载期顺滑滚动、Hero Cinema Stage 高清化、安卓论坛滑动恢复与 iPad UIKit 外层沉浸导航重构 · v2.16.31 (Build 257)
 
 - **范围**：

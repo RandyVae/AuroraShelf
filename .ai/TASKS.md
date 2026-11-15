@@ -1,5 +1,7 @@
 # Active
 
+- [x] 根治华视播放「有声音无画面」（iOS 27.2 `AttributeGraph` 布局循环冻结与多集骨架 `508.0pt` 水平溢出），清理全部临时 `[DIAG]` 日志并固化 `SwipeBackTests` 回归测试，升级版本至 `v2.16.32 / Build 258` 并完成双端 Release 打包、模拟器全检、OTA 原子覆盖与 GitHub Release 发布。
+
 - [x] 修复播放退出后残留背景音频及重入无法播放、视频加载期下方滑动阻塞、首页 Hero 分辨率偏低（Cinema Stage）、安卓端论坛滑不动及 iPad 横屏侧边栏遮挡沉浸播放页（`v2.16.31 / Build 257`）：完成双端播放退场立即停播清理与缓存失效保护、加载期滑动顺畅化、双端 Hero Cinema Stage 高清展示与 Android `createAmbientBlurredBitmap`、Android 论坛 `WebView` 独立触控滚动与延迟限流预取、以及 iOS `ImmersiveNavigationHost` UIKit 外层沉浸路由重构；Android 253/253 单测与 20/20 在线专项全通、`lintDebug` 0 error、iOS `LiveVideoSourceAuditTests` 19/20 通（`javsb` 外部 TLS 阻断）、iOS Unit 172/173 通（Baozi 外网图床 `s1-mha1-nlams.bzcdn.net` 403/SSL 波动）、双端 Release 模拟器截屏（iPhone 10 张 / iPad 7 张 / Android R8 APK）核验与 `./scripts/publish_ota.sh Release` 完成 — 2026-11-15。
 
 - [x] 修复漫画卡死与导航消失、全源连通性加固、iPad/Android 平板直播详情双栏适配、华视高清 Hero/封面及详情演员表/基本介绍匹配（`v2.16.30 / Build 256`）：完成双端漫画加载取消与状态恢复、iPad 非全屏状态栏避让与平板横屏直播双栏、华视 `.ft4` 片名评分过滤与 `<span class="slash">/</span>` 多演员解析修复及回归单测；末次修改后 Android（42 套件 257 项：0 失败 8 跳过，`lintDebug` 0 error，Release APK `206,876,555` bytes）与 iOS（177 项：0 失败 7 跳过，Simulator Release 通过）全绿，双端 Release 模拟器截屏核验与 `./scripts/publish_ota.sh Release` 完成（`bananarey.us` HTTP 200，远端磁盘可用 `11G`）— 2026-11-14。

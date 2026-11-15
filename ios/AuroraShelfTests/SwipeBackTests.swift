@@ -159,4 +159,33 @@ final class SwipeBackTests: XCTestCase {
 
         XCTAssertFalse(nav.isNavigationBarHidden, "启用侧滑手势不得强制隐藏 UINavigationBar，避免导航栏消失")
     }
+
+    @MainActor
+    func testVideoDetailPlaybackScreenUpdatesInsideNavigationHostWithoutLayoutFreeze() async throws {
+        let video = VideoItem(
+            id: "cycle-regression-1",
+            title: "Regression Test Video",
+            subtitle: "134X",
+            coverUrl: "",
+            playbackUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+            sourceName: "134X"
+        )
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: UIScreen.main.bounds)
+        let rootVC = UIHostingController(rootView: Text("Root"))
+        let nav = UINavigationController(rootViewController: rootVC)
+        let detailVC = UIHostingController(rootView: VideoDetailPlaybackScreen(video: video, onDismiss: {}))
+        nav.setNavigationBarHidden(true, animated: false)
+        nav.pushViewController(detailVC, animated: false)
+        window.rootViewController = nav
+        window.makeKeyAndVisible()
+        nav.view.layoutIfNeeded()
+
+        try await Task.sleep(nanoseconds: 800_000_000)
+        // Verifies hosting view remains strictly constrained to window bounds (no 508pt skeleton overflow).
+        XCTAssertLessThanOrEqual(detailVC.view.bounds.width, window.bounds.width + 1.0)
+        window.isHidden = true
+    }
 }

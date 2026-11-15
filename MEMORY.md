@@ -23,32 +23,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `81408b2`（2026-11-14），未提交 42 个文件
+- Git：`main` @ `8672c1d`（2026-11-15），未提交 16 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-15（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-15（今天）
   - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-15（今天）
   - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-15（今天）
-  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（20 天前）
+  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（21 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-15（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-15 08:01 by `sync.py`
+- 最后同步：2026-11-15 12:26 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-15 · Build 257 / v2.16.31）：已完成播放退出彻底停播与同片重入修复、视频加载期下方顺滑滚动、首页推荐 Hero Cinema Stage 高清化、安卓端论坛 WebView 原生滑动恢复、以及 iPad UIKit 外层沉浸路由重构。(1) 播放退场零残留音频：iOS `VideoDetailPlaybackScreen`、`AuroraPlayerSurface.dismantleUIView` 与 `PictureInPictureManager` 引入 `isViewDismissed` / `dismissView()`、异步解析令牌作废、`replaceCurrentItem(with: nil)` 与 `AVAudioSession` 后台反激活；Android `AuroraShelfApp` / `PlayerScreen` / `NativeSitePlayer` 增加 `isClosing` / `localDismissing` / `suppressPlayback` 立即停播清源；(2) 加载中顺滑滚动与 Hero 高清展示：iOS 延后 500ms 后台启动多集预热，Android `PlayerScreen` 上滑并发弹簧收缩返回 `Velocity.Zero`；双端 Hero 接入 `Cinema Stage` 高清无裁切居中舞台与环境虚化底图；(3) 安卓论坛滑动修复：`ForumReader` 关闭 `isNestedScrollingEnabled` 独占垂直触摸与惯性，配合 `ForumReaderRevealPolicy` 与限流预取；(4) iPad 外层 UIKit 沉浸导航：`ImmersiveNavigationHost` / `ImmersiveNavigationController` 包裹 `.sidebarAdaptable` `TabView`，彻底消除横屏全屏播放时左侧边栏遮挡并完整保留内层 Tab 标题与搜索按钮；(5) 最终验证与 OTA：Android 42 套件 261 项 **253 通过 / 8 跳过 / 0 失败**、`lintDebug` 0 error / 20 warnings、`RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` **20/20 全通过**；iOS `AuroraShelfTests` **172 通过 / 7 跳过 / 1 失败**（Baozi 外网图片 CDN 403/SSL 波动）、`LiveVideoSourceAuditTests` **19/20 视频源通过**（`javsb` 外部 TLS 断连）；Node 探针 35 源 **33 可达**；iPhone 18 Pro（10 截图）、iPad Pro 13-inch（竖/横 7 截图）与 Android R8 Release 实测通过；`./scripts/publish_ota.sh Release` 完成 `bananarey.us` 原子覆盖（`Netgrey.apk` `206,892,939` bytes、`Netgrey.ipa` `202,676,477` bytes，`manifest.plist` `2.16.31`，HTTPS `200 OK`，服务器磁盘可用 `11G`）。
+- 当前阶段（2026-11-15 · Build 258 / v2.16.32）：已完成华视播放「有声音无画面」根因修复（iOS 27.2 `AttributeGraph` 布局死循环根治＋多集骨架 `508.0pt` 水平溢出修复）、全部临时 `[DIAG]` 清理、回归单测固化及双端 Release 交付。(1) `DeviceLayoutProfile.swift` 引入 `@unchecked Sendable` `SafeAreaCache`（`NSLock` + 节流异步主线程捕获窗口边距），禁止在 SwiftUI `View.body` 期间同步读取 `UIWindow.safeAreaInsets`；`VideoDetailPlaybackScreen.swift` 改用外层非忽略安全区的 `Color.clear.onGeometryChange`（`measuredSafeInsets`）配合视口受限 `GeometryReader` 并在 `isLoadingEpisodes` 骨架 `HStack` 外层包裹横向 `ScrollView`，消除 `AttributeGraph: Cycle detected` 冻结与水平溢出；`SwipeBackTests` 新增 `testVideoDetailPlaybackScreenUpdatesInsideNavigationHostWithoutLayoutFreeze()` 并移除全部 `[DIAG]` 日志（0 匹配）；(2) 最终验证与 OTA：iOS `Release` 构建与 `iPhone 18 Pro`（`huavod`/`134x`/`live`）/ `iPad Pro 13-inch`（`huavod`/`live`）实测全部 `ZERO_CYCLES_CONFIRMED`；`AuroraShelfTests` 181 项 **173 通过 / 7 跳过 / 1 外部失败**（包子图床 `s1-mha1-nlams.bzcdn.net` TLS `-9816`，`SwipeBackTests` **8/8 通过**）；`TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1` 下 `X134SourceServiceTests` **3/3 通过**、`testHuavodDetailedLivePlaybackAndSegmentDownload` **通过**、全视频源 **18/20 通过**（`javsb` 外部 TLS 断连、`spankbang` 外部 403）；Android `./gradlew testDebugUnitTest lintDebug assembleRelease` **253 通过 / 8 跳过 / 0 失败**（SARIF lint **0/0/0**）、`RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` **20/20 通过**、`emulator-5554` R8 APK 实测通过；Node 探针 35 源 **33 通过 / 2 外部失败**（`javsb`、`jm` `401`）；`./scripts/publish_ota.sh Release` 完成 `bananarey.us` 原子覆盖（`Netgrey.apk` `206,892,939` bytes、`Netgrey.ipa` `202,681,543` bytes，`manifest.plist` `2.16.32`，`HTTP/1.1 200 OK`，服务器可用 `11G`）。
 - 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，并持续跟踪各外部站点源可用性。
 - 下一步：接入用户资料/收藏历史云同步与后续订阅权益接口。
-- 阻塞：`JAVSB`（`jav.sb` 外部 TLS 握手断连）为外部网络限制；包子漫画章内图床 `s1-mha1-nlams.bzcdn.net` 偶发 SSL `-9816` / `403`；`禁漫天堂` 在 Node 脚本因缺少协议密钥返回 `API code=401`（原生双端实测通过）；`哔咔` 需配置协议凭据；上述受限情况已在测试报告中如实声明。
+- 阻塞：`JAVSB`（`jav.sb` 外部 TLS 握手断连）与 `SpankBang`（iOS Live Probe 返回外部 HTTP 403）为外部网络/风控限制；包子漫画章内图床 `s1-mha1-nlams.bzcdn.net` 偶发 SSL `-9816`；`禁漫天堂` 在 Node 脚本因缺少协议密钥返回 `API code=401`（Android 实测通过）；`哔咔` 需配置协议凭据；上述受限情况已在测试报告中如实声明。
 - 最近一次更新：2026-11-15 by Antigravity (Claude Opus)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-15（Antigravity）：iOS 27.2 `AttributeGraph` 布局循环冻结与多集骨架水平溢出根治（v2.16.32 Build 258）。针对华视播放时「有声音无画面」（视频与浮层卡死、仅声音继续播放）问题，定位根因是 `DeviceLayoutProfile.swift` 在 SwiftUI `View.body` 求值期同步读取 `UIWindow.safeAreaInsets` 与 `VideoDetailPlaybackScreen` 顶层几何耦合在 iOS 27.2 触发 `AttributeGraph: Cycle detected through attribute`，同时 `isLoadingEpisodes` 4 项骨架 `HStack` 未包横向滚动导致 `508.0pt` 水平溢出。通过在 `DeviceLayoutProfile` 落地 `SafeAreaCache`（`NSLock` + 节流主线程异步采样）、在 `VideoDetailPlaybackScreen` 改用非忽略安全区 `onGeometryChange` 采样并给骨架加 `ScrollView(.horizontal)`，彻底清零循环并清理全部 `[DIAG]` 日志，在 `SwipeBackTests` 固化防冻结回归测试。
 
 - 2026-11-15（Antigravity）：播放退场彻底停播、加载期顺滑滚动、Hero Cinema Stage、安卓论坛原生滑动与 iPad UIKit 沉浸路由重构（v2.16.31 Build 257）。(1) 根除退出后无缩略窗仍播声音及重入失败：iOS 在 `VideoDetailPlaybackScreen` 引入 `isViewDismissed` / `dismissView()` 立刻作废 `activeResolveID`、清空 `AVPlayerLayer`（`dismantleUIView`）、清理 `PictureInPictureManager` 健康度校验与留存播放器 `replaceCurrentItem(with: nil)`、失败时清 `VideoPreloadManager` 缓存，Android 引入 `suppressPlayback` 在退出瞬间立即 `stop()` + `clearMediaItems()`，杜绝幽灵音轨与僵尸播放器；(2) 加载期顺滑滚动：iOS 将后续剧集 `GlobalStartupPrefetchEngine` 窗口预热延后 500ms 至后台线程，Android `PlayerScreen` 在向上折叠 fling 时返回 `Velocity.Zero` 将速度让渡下方 `LazyColumn`；(3) 首页 Hero 高清化与论坛恢复：双端落地 `Cinema Stage` 模式避免超宽图裁剪和低清图过放模糊，`ForumReader` 关闭 `isNestedScrollingEnabled` 独占垂直滑动手势；(4) iPad 横屏沉浸路由隔离：用 UIKit `ImmersiveNavigationHost` / `ImmersiveNavigationController` 取代外层 SwiftUI `NavigationStack` 包裹 `.sidebarAdaptable` `TabView`，同时解决 iPad 侧边栏遮挡播放页`< 返回`与外层 `NavigationStack` 吞噬内层 Tab 导航栏的双重冲突，双端 Release 模拟器截图全检通过。
 
@@ -390,6 +392,8 @@
 - 2026-11-08：Spine 资产天然朝向对称性与 WebKit Keyframe 居中陷阱：①原厂 assets 资产命名中，`*_player` 天然朝右，`*_enemy` 天然朝左；若对所有敌军盲目加 `flip: true`，反而导致敌军被翻转为朝右，造成全场人员同向朝右的严重反向缺陷；朝向判定法则必须严格绑定命名特征（我方 `unit.endsWith('_enemy')` 翻转，敌方 `unit.endsWith('_player')` 翻转）；并在 Spine 的 `update` 循环中每帧锁定 `v.skeleton.scaleX`，防止骨骼重绘将镜像覆盖；②WebKit keyframes 初始布局时未 decode 的图片宽度判定为 0，`translateX(-50%)` 计算坍缩为 0，导致绝对定位元素被左边缘固定在 `left: 50%` 呈现严重偏右；采用盒模型 `left: 0; right: 0; margin-inline: auto` 是唯一不受 GPU 初始缓存与图片未 decode 污染的物理居中方案。
 - 2026-11-15：iPadOS `.tabViewStyle(.sidebarAdaptable)` 与外层 SwiftUI `NavigationStack` 冲突陷阱：直接在 Tab 内使用 `.navigationDestination` 推入全屏播放页时，iPadOS 27 横屏浮动侧边栏仍浮盖在 `< 返回` 与播放器左侧之上；但若改用外层 SwiftUI `NavigationStack` 包裹 `TabView` 并隐藏外层栏，外层栈会劫持并吞掉内层各 Tab 原生 `NavigationStack` 的标题栏与工具栏按钮（如首页 `N` / 搜索键、`Library` 大标题）。做法是用 UIKit `UINavigationController` 包装体（`ImmersiveNavigationHost` / `ImmersiveNavigationController`）置于 `TabView` 外层统一推入沉浸式页面，隔离内层 SwiftUI `NavigationStack` 并保留 `AuroraSwipeBackModifier` 原生交互返回。
 - 2026-11-15：JVM 单例缓存跨在线/离线单元测试串扰陷阱：当实时测试与离线单元测试共用进程级单例（如 `X134Repository.metaCache`）时，若离线单元测试夹具使用线上真实存在的 ID（如真实推文 ID），在开启 `RUN_LIVE_SOURCE_TESTS=1` 同进程先后执行时，实时测试写入的线上元数据会命中单元测试期望 fallback 的分支；单元测试夹具 ID 必须使用合成隔离 ID。
+- 2026-11-15（2）：iOS 27.2 SwiftUI `View.body` 内同步访问 `UIWindow.safeAreaInsets` 引发 `AttributeGraph: Cycle detected through attribute` 冻结陷阱：在播控/详情界面频繁重绘期间，若布局属性在 `body` 内同步读取底层 `UIWindow.safeAreaInsets` 或将顶层安全区与全屏忽略容器互相引用，会导致 iOS 27.2 AttributeGraph 触发循环依赖死锁——表现为播放器音频继续正常解码发声，但视频图层与界面 UI 完全停滞卡死（「有声音无画面」）。做法是用带锁缓存 + 节流异步主线程采集（`SafeAreaCache`）配合外层非忽略安全区 `onGeometryChange(for: EdgeInsets.self)` 测量边距，并确保多元素横向骨架也使用 `ScrollView(.horizontal)` 避免 `508.0pt` 类宽度撑破视口。
+- 2026-11-15（3）：运行 `LiveVideoSourceAuditTests` 须前置环境变量 `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1 xcodebuild test ...`（无检查进仓库的共享 `.xcscheme` 时，不能用 `RUN_IOS_LIVE_SOURCE_AUDIT=1` 或将其作为 build setting），否则在线源审计测试会被 `XCTSkip` 跳过。
 
 ## 权威来源（细节以这些文件为准）
 

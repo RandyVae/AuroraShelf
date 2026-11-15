@@ -745,5 +745,22 @@ Evidence:
 - iOS / iPadOS: Release UI QA (`iPhone 18 Pro` 10 screenshots + `iPad Pro 13-inch (M5)` Portrait & Landscape 7 screenshots confirming unobstructed full-bleed playback, `< 返回`, `Library`, and Search buttons); `AuroraShelfTests` (180 executed: 172 passed, 7 skipped, 1 external failure on `testBaoziLiveFetchComicsChaptersAndPages` due to upstream `s1-mha1-nlams.bzcdn.net` SSL `-9816`/`403`); `LiveVideoSourceAuditTests` (19/20 video sources + Huavod M3U8/`206` segment download passed, `javsb` external TLS fail).
 - Probe & OTA: `node scripts/probe_all_sources.mjs` (33/35 reachable; `javsb` TLS, `jm` key `401`); `./scripts/publish_ota.sh Release` verified `HTTP/1.1 200 OK` on `https://bananarey.us` (`Netgrey.apk` `206,892,939` bytes, `Netgrey.ipa` `202,676,477` bytes, `manifest.plist` `2.16.31`, `11G` free).
 
+## Safe-area AttributeGraph cycle elimination & episode skeleton horizontal containment (v2.16.32 Build 258)
+
+Date: 2026-11-15
+
+Status: Implemented, regression unit-tested, live-verified on iOS/iPadOS Simulator Release & Android R8 Release APK, and published via OTA.
+
+Decision:
+1. Never synchronously access `UIWindow.safeAreaInsets` during SwiftUI `View.body` evaluation: replace synchronous window lookups in `DeviceLayoutProfile.swift` (`DeviceLayout.safeAreaTop(in:)`, `safeAreaBottom`, `safeAreaHorizontalInsets`) with thread-safe `@unchecked Sendable` `SafeAreaCache` (`NSLock` + throttled `DispatchQueue.main.async` capture), breaking the iOS 27.2 `AttributeGraph: Cycle detected through attribute` loop that froze playback UI overlays while audio continued playing.
+2. Pair `SafeAreaCache` at screen level in `VideoDetailPlaybackScreen.swift` by measuring safe-area insets passively through a non-ignoring `Color.clear.onGeometryChange(for: EdgeInsets.self)` (`measuredSafeInsets`) alongside a viewport-bounded `GeometryReader { screenGeo in ... }.ignoresSafeArea()`, eliminating both cyclic dependency feedback and a `508.0pt` horizontal overflow caused by an unwrapped 4-item skeleton `HStack` (`isLoadingEpisodes`, now wrapped in `ScrollView(.horizontal, showsIndicators: false)`).
+3. Remove all temporary `[DIAG]` diagnostics and lock regression coverage with `SwipeBackTests.testVideoDetailPlaybackScreenUpdatesInsideNavigationHostWithoutLayoutFreeze()`.
+
+Evidence:
+- iOS / iPadOS: Release build `BUILD SUCCEEDED`; Release QA on `iPhone 18 Pro` (`huavod` `谷雨`, `134x` `JUFE-633`, `live` `tunderose`) and `iPad Pro 13-inch (M5)` (`huavod` `谷雨` Portrait, `live` `ginacali`) rendered live video frames with `ZERO_CYCLES_CONFIRMED` / `IPAD_ZERO_CYCLES_CONFIRMED`; `AuroraShelfTests` **181 tests** (`173 passed`, `7 skipped`, `1 external failure` on `ComicRepositoryTests.testBaoziLiveFetchComicsChaptersAndPages` due to `s1-mha1-nlams.bzcdn.net` TLS `-9816`; `SwipeBackTests` **8/8 passed**); `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1` passed `X134SourceServiceTests` (**3/3**), `testHuavodDetailedLivePlaybackAndSegmentDownload` (**206/1025B**), and **18/20** video sources (`javsb` external TLS fail, `spankbang` external HTTP 403).
+- Android: `./gradlew testDebugUnitTest lintDebug assembleRelease` (`42 suites, 261 tests: 253 passed, 8 skipped, 0 failures`; SARIF lint `0 errors, 0 warnings, 0 hints`); `RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` (**20/20 passed**); `emulator-5554` R8 Release APK (`258 / 2.16.32`) verified Home, Huavod playback, back teardown, forum scroll & re-entry playback (`timing first frame ms=2566` -> `ready ms=2744`).
+- Probe & OTA: `node scripts/probe_all_sources.mjs` (**33/35 passed**; `javsb` `CONNECT_FAIL`, `jm` `code=401`); `./scripts/publish_ota.sh Release` uploaded `Netgrey.apk` (`206,892,939` bytes) & `Netgrey.ipa` (`202,681,543` bytes) to `https://bananarey.us` (`HTTP/1.1 200 OK`, `manifest.plist` `2.16.32`, `11G` free).
+
+
 
 
