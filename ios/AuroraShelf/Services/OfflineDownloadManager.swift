@@ -103,6 +103,26 @@ public final class OfflineDownloadManager: ObservableObject {
     public var completedItems: [OfflineDownloadItem] {
         items.filter { $0.status.isCompleted }
     }
+
+    public var activeItems: [OfflineDownloadItem] {
+        items.filter { $0.status.isDownloading }
+    }
+
+    public var failedItems: [OfflineDownloadItem] {
+        items.filter {
+            if case .failed = $0.status { return true }
+            return false
+        }
+    }
+
+    public var overallProgress: Double {
+        let active = activeItems
+        if !active.isEmpty {
+            let total = active.reduce(0.0) { $0 + $1.status.progressValue }
+            return max(0.0, min(1.0, total / Double(active.count)))
+        }
+        return completedItems.isEmpty ? 0.0 : 1.0
+    }
     
     public var totalDownloadedBytes: Int64 {
         items.filter { $0.status.isCompleted }.reduce(0) { $0 + $1.downloadedBytes }
@@ -428,7 +448,7 @@ public final class OfflineDownloadManager: ObservableObject {
         req.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)", forHTTPHeaderField: "User-Agent")
         
         let localFileURL = targetDir.appendingPathComponent("video.mp4")
-        let (tempURL, response) = try await URLSession.permissiveShared.download(for: req)
+        let (tempURL, response) = try await performDirectDownload(itemId: itemId, request: req)
         try Task.checkCancellation()
         try Self.requireSuccessfulMediaResponse(response)
         
@@ -446,6 +466,68 @@ public final class OfflineDownloadManager: ObservableObject {
             item.totalBytes = size
         }
         saveToDisk()
+    }
+
+    private func performDirectDownload(itemId: String, request: URLRequest) async throws -> (URL, URLResponse) {
+        final class TaskBox: @unchecked Sendable {
+            var task: URLSessionDownloadTask?
+        }
+        let box = TaskBox()
+        let stableTempURL = fileManager.temporaryDirectory
+            .appendingPathComponent("aurorashelf_dl_\(UUID().uuidString).tmp")
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let downloadTask = URLSession.permissiveShared.downloadTask(with: request) { tempURL, response, error in
+                    if let error = error {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+                    guard let tempURL = tempURL, let response = response else {
+                        continuation.resume(throwing: NSError(
+                            domain: "OfflineDownload",
+                            code: -1,
+                            userInfo: [NSLocalizedDescriptionKey: "下载响应为空"]
+                        ))
+                        return
+                    }
+                    do {
+                        if FileManager.default.fileExists(atPath: stableTempURL.path) {
+                            try? FileManager.default.removeItem(at: stableTempURL)
+                        }
+                        try FileManager.default.moveItem(at: tempURL, to: stableTempURL)
+                        continuation.resume(returning: (stableTempURL, response))
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+                box.task = downloadTask
+
+                Task { @MainActor [weak self] in
+                    while downloadTask.state == .running || downloadTask.state == .suspended {
+                        let received = max(Int64(0), downloadTask.countOfBytesReceived)
+                        let expected = max(Int64(0), downloadTask.countOfBytesExpectedToReceive)
+                        let fraction: Double = expected > 0
+                            ? min(0.99, max(0.05, Double(received) / Double(expected)))
+                            : 0.1
+                        self?.updateItem(id: itemId) { item in
+                            if item.status.isDownloading {
+                                item.status = .downloading(progress: fraction, bytesWritten: received, totalBytes: expected)
+                                item.downloadedBytes = received
+                                if expected > 0 {
+                                    item.totalBytes = expected
+                                }
+                            }
+                        }
+                        try? await Task.sleep(nanoseconds: 250_000_000)
+                    }
+                }
+
+                downloadTask.resume()
+            }
+        } onCancel: {
+            box.task?.cancel()
+        }
     }
 
     private static func requireSuccessfulMediaResponse(_ response: URLResponse) throws {

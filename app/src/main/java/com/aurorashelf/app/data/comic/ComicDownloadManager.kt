@@ -167,6 +167,31 @@ class ComicDownloadManager private constructor(appContext: Context) {
         }
     }
 
+    fun retryDownload(
+        id: String,
+        repository: ComicRepository,
+    ) {
+        val record = findChapter(id) ?: return
+        if (record.status == ComicDownloadStatus.COMPLETED ||
+            record.status == ComicDownloadStatus.DOWNLOADING ||
+            record.status == ComicDownloadStatus.RESOLVING ||
+            record.status == ComicDownloadStatus.QUEUED
+        ) {
+            return
+        }
+        val comic = ComicSummary(
+            sourceId = record.sourceId,
+            id = record.comicId,
+            title = record.comicTitle,
+            coverUrl = record.coverUrl,
+        )
+        val chapter = ComicChapter(
+            id = record.chapterId,
+            title = record.chapterTitle,
+        )
+        startDownload(comic, chapter, repository)
+    }
+
     fun removeDownload(id: String) {
         activeJobs.remove(id)?.cancel()
         val item = _chapters.value.find { it.id == id }

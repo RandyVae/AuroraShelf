@@ -40,6 +40,44 @@ public actor CoverImageLoader {
         }
     }
 
+    public func loadRawData(from urlString: String, requestReferer: String? = nil) async -> Data? {
+        let rawNormalized = Self.normalizeUrl(urlString)
+        let normalized = DoubanPosterResolver.upgradePosterURL(rawNormalized) ?? rawNormalized
+        guard let url = URL(string: normalized), !normalized.isEmpty else { return nil }
+
+        let cacheKey = Self.cacheKey(for: normalized)
+        let diskPath = cacheDirectory.appendingPathComponent(cacheKey)
+        if let diskData = try? Data(contentsOf: diskPath), !diskData.isEmpty {
+            return diskData
+        }
+
+        let initialRequest = Self.imageRequest(for: url, referer: requestReferer)
+        var rawData: Data?
+        if let (data, response) = try? await session.data(for: initialRequest),
+           let httpResp = response as? HTTPURLResponse,
+           (200...299).contains(httpResp.statusCode),
+           !data.isEmpty {
+            rawData = data
+        } else {
+            let noRefererRequest = Self.imageRequest(for: url, referer: nil, forceNoReferer: true)
+            if let (data, response) = try? await session.data(for: noRefererRequest),
+               let httpResp = response as? HTTPURLResponse,
+               (200...299).contains(httpResp.statusCode),
+               !data.isEmpty {
+                rawData = data
+            }
+        }
+        guard var finalData = rawData, !finalData.isEmpty else { return nil }
+        if Self.decodeForDisplay(finalData) == nil,
+           Self.requiresAESDecryption(url: url) || Self.isPossibleEncryptedImage(finalData),
+           let decrypted = Self.decryptAES128CBC(data: finalData, key: aesKey, iv: aesIv) {
+            finalData = decrypted
+        }
+        guard Self.decodeForDisplay(finalData) != nil else { return nil }
+        try? finalData.write(to: diskPath)
+        return finalData
+    }
+
     public func loadImage(from urlString: String, title: String? = nil, baseURL: URL? = nil, requestReferer: String? = nil) async -> UIImage? {
         let rawNormalized = Self.normalizeUrl(urlString, baseURL: baseURL)
         let normalized = DoubanPosterResolver.upgradePosterURL(rawNormalized) ?? rawNormalized

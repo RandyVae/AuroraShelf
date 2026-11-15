@@ -30,9 +30,20 @@ public struct SearchSheetView: View {
         VideoSourceCatalog.searchableSources.count
     }
 
+    private func sourceDisplayRank(_ sourceName: String) -> Int {
+        if sourceName == repo.currentSource.name { return 0 }
+        if sourceName == "华视影院" { return 1 }
+        return 2
+    }
+
     private var availableSources: [String] {
         var sources = ["全部"]
-        let uniqueSources = Set(repo.searchResults.map { $0.sourceName }).sorted()
+        let uniqueSources = Set(repo.searchResults.map { $0.sourceName }).sorted { lhs, rhs in
+            let lRank = sourceDisplayRank(lhs)
+            let rRank = sourceDisplayRank(rhs)
+            if lRank != rRank { return lRank < rRank }
+            return lhs < rhs
+        }
         sources.append(contentsOf: uniqueSources)
         return sources
     }
@@ -55,22 +66,27 @@ public struct SearchSheetView: View {
         let topResults = Array(items.prefix(topCount))
         shelves.append((title: "热门匹配", items: topResults))
 
-        // 2. 按分类归集横向货架
-        let categoryGroups = Dictionary(grouping: items) { item -> String in
-            let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines)
-            return cat.isEmpty ? "精选推荐" : cat
-        }
-
-        if categoryGroups.count > 1 {
-            for (cat, groupItems) in categoryGroups.sorted(by: { $0.value.count > $1.value.count }) {
-                shelves.append((title: cat, items: groupItems))
+        // 2. 按分类或来源归集横向货架（优先置顶当前源与华视影院）
+        let sourceGroups = Dictionary(grouping: items) { $0.sourceName }
+        if sourceGroups.count > 1 {
+            let sortedSources = sourceGroups.sorted { lhs, rhs in
+                let lRank = sourceDisplayRank(lhs.key)
+                let rRank = sourceDisplayRank(rhs.key)
+                if lRank != rRank { return lRank < rRank }
+                if lhs.value.count != rhs.value.count { return lhs.value.count > rhs.value.count }
+                return lhs.key < rhs.key
+            }
+            for (source, groupItems) in sortedSources {
+                shelves.append((title: "\(source) 结果", items: groupItems))
             }
         } else {
-            // 若为同分类，按视频源聚合货架
-            let sourceGroups = Dictionary(grouping: items) { $0.sourceName }
-            if sourceGroups.count > 1 {
-                for (source, groupItems) in sourceGroups.sorted(by: { $0.value.count > $1.value.count }) {
-                    shelves.append((title: "\(source) 结果", items: groupItems))
+            let categoryGroups = Dictionary(grouping: items) { item -> String in
+                let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines)
+                return cat.isEmpty ? "精选推荐" : cat
+            }
+            if categoryGroups.count > 1 {
+                for (cat, groupItems) in categoryGroups.sorted(by: { $0.value.count > $1.value.count }) {
+                    shelves.append((title: cat, items: groupItems))
                 }
             } else {
                 shelves.append((title: "全部精选", items: items))
@@ -93,7 +109,7 @@ public struct SearchSheetView: View {
     public var body: some View {
         NavigationStack {
             Group {
-                if repo.isSearching {
+                if repo.isSearching && repo.searchResults.isEmpty {
                     VStack(spacing: AuroraMetrics.spacingL) {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
@@ -108,6 +124,18 @@ public struct SearchSheetView: View {
                     // Apple TV 标志性分类货架流搜索结果呈现
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
+                            if repo.isSearching {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(AuroraColor.brand)
+                                    Text("已优先显示命中结果，正在同步其余视频源…")
+                                        .font(.caption)
+                                        .foregroundStyle(AuroraColor.textSecondary)
+                                }
+                                .padding(.horizontal, AuroraMetrics.contentInset)
+                                .padding(.top, AuroraMetrics.spacingS)
+                            }
                             // 1. 顶部分源过滤栏与布局切换胶囊
                             HStack {
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -470,6 +498,7 @@ public struct SearchSheetView: View {
         searchTask?.cancel()
         let submittedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !submittedQuery.isEmpty else { return }
+        selectedSourceFilter = "全部"
         addRecentSearch(submittedQuery)
         searchTask = Task {
             await repo.searchAllSources(query: submittedQuery)

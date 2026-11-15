@@ -453,4 +453,76 @@ class VideoRepositoryTest {
         val enriched = repo.enrichHuavodWithHeroSlides(cards, slides, FeedCategory.RECENT)
         assertEquals("https://puui.qpic.cn/media_img/lena/PICf1e680_1800_800/0", enriched.first().heroThumbnailUrl)
     }
+
+    @Test
+    fun parseHuavodSearchHtml_extractsSearchBoxAndIgnoresSidebar() {
+        val searchHtml = """
+            <div class="box-width">
+              <div class="search-box">
+                <a href="/voddetail/204999.html">
+                  <img data-src="https://img3.doubanio.com/view/photo/s_ratio_poster/public/p999.jpg" alt="惊蛰无声封面图" />
+                  <span class="public-list-prb">HD国语</span>
+                </a>
+                <div class="thumb-txt"><a href="/voddetail/204999.html">惊蛰无声</a></div>
+                <div class="thumb-else">2026 / 内地 / 悬疑</div>
+              </div>
+              <div class="wap-diy-vod-e">
+                <h5>热播影片</h5>
+                <div class="public-list-box">
+                  <a href="/voddetail/195322.html" title="玫瑰战争粤语">
+                    <img data-src="https://img.example/hot.jpg" alt="玫瑰战争粤语封面图" />
+                  </a>
+                </div>
+              </div>
+            </div>
+        """.trimIndent()
+        val repo = VideoRepository()
+        val items = repo.parseDocument(Jsoup.parse(searchHtml, "https://huavod.com/vodsearch/"), "https://huavod.com")
+        assertEquals(1, items.size)
+        assertEquals("惊蛰无声", items.single().title)
+        assertEquals("https://huavod.com/voddetail/204999.html", items.single().pageUrl)
+        assertEquals("https://img3.doubanio.com/view/photo/l_ratio_poster/public/p999.jpg", items.single().thumbnailUrl)
+    }
+
+    @Test
+    fun parseHuavodSuggestJson_parsesAjaxItems() {
+        val raw = """{"code":1,"list":[{"id":195322,"name":"玫瑰战争","pic":"https://img.example/mg.jpg"}]}"""
+        val items = VideoRepository().parseHuavodSuggestJson(raw, "https://huavod.com")
+        assertEquals(1, items.size)
+        assertEquals("玫瑰战争", items.single().title)
+        assertEquals("https://huavod.com/voddetail/195322.html", items.single().pageUrl)
+    }
+
+    @Test
+    fun rankSearchResults_prioritizesExactMatchAndHuavod() {
+        val otherExact = com.aurorashelf.app.model.VideoItem(
+            id = "o1",
+            title = "折月亮",
+            author = "其他源",
+            duration = "",
+            views = "",
+            pageUrl = "https://other.example/1",
+            thumbnailUrl = null,
+        )
+        val huavodExact = com.aurorashelf.app.model.VideoItem(
+            id = "h1",
+            title = "折月亮",
+            author = "华视影院",
+            duration = "",
+            views = "",
+            pageUrl = "https://huavod.com/voddetail/204741.html",
+            thumbnailUrl = null,
+        )
+        val huavodPartial = com.aurorashelf.app.model.VideoItem(
+            id = "h2",
+            title = "折月亮 花絮",
+            author = "华视影院",
+            duration = "",
+            views = "",
+            pageUrl = "https://huavod.com/voddetail/204742.html",
+            thumbnailUrl = null,
+        )
+        val ranked = VideoRepository().rankSearchResults(listOf(huavodPartial, otherExact, huavodExact), "折月亮")
+        assertEquals(listOf("h1", "o1", "h2"), ranked.map { it.id })
+    }
 }

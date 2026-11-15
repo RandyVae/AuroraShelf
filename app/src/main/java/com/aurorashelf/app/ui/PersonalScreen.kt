@@ -97,6 +97,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -170,6 +172,8 @@ import com.aurorashelf.app.data.PlaybackResolver
 import com.aurorashelf.app.data.OfflineCacheManager
 import com.aurorashelf.app.data.OfflineCacheState
 import com.aurorashelf.app.data.OfflineVideo
+import com.aurorashelf.app.data.comic.ComicDownloadStatus
+import com.aurorashelf.app.data.comic.DownloadedComicChapter
 import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
 import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
 import com.aurorashelf.app.ui.theme.AuroraCoral
@@ -193,6 +197,18 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
 private enum class SettingsRoute { OVERVIEW, VIDEO_SOURCES, COMIC_SOURCES, LIVE_SOURCES, OFFLINE_CACHE }
 
+private enum class OfflineMediaTab(val label: String) {
+    VIDEO("视频"),
+    COMIC("漫画"),
+}
+
+private enum class OfflineStatusFilter(val label: String) {
+    ALL("全部"),
+    DOWNLOADING("下载中"),
+    COMPLETED("已完成"),
+    FAILED("失败"),
+}
+
 @Composable
 internal fun PersonalScreen(
     route: PersonalRoute,
@@ -204,6 +220,7 @@ internal fun PersonalScreen(
     comicSources: List<ComicSourceInfo>,
     selectedComicSourceId: String,
     selectedLiveSourceId: String = LiveSourceCatalog.STRIPCHAT.id,
+    comicDownloadedChapters: List<DownloadedComicChapter> = emptyList(),
     onVideo: (VideoItem) -> Unit,
     onFavorite: (VideoItem) -> Unit,
     onBrowseHome: () -> Unit,
@@ -211,6 +228,9 @@ internal fun PersonalScreen(
     onComicSource: (String) -> Unit,
     onLiveSource: (String) -> Unit = {},
     onOpenCached: (VideoItem) -> Unit,
+    onRemoveComicDownload: (String) -> Unit = {},
+    onRetryComicDownload: (String) -> Unit = {},
+    onClearComicDownloads: () -> Unit = {},
     onOpenGame: () -> Unit = {},
     onAccount: () -> Unit = {},
 ) {
@@ -266,10 +286,14 @@ internal fun PersonalScreen(
                     comicSources = comicSources,
                     selectedComicSourceId = selectedComicSourceId,
                     selectedLiveSourceId = selectedLiveSourceId,
+                    comicDownloadedChapters = comicDownloadedChapters,
                     onSave = onSave,
                     onComicSource = onComicSource,
                     onLiveSource = onLiveSource,
                     onOpenCached = onOpenCached,
+                    onRemoveComicDownload = onRemoveComicDownload,
+                    onRetryComicDownload = onRetryComicDownload,
+                    onClearComicDownloads = onClearComicDownloads,
                     onBrowseHome = onBrowseHome,
                     onBack = { onRoute(PersonalRoute.OVERVIEW) },
                 )
@@ -501,10 +525,14 @@ private fun SettingsScreen(
     comicSources: List<ComicSourceInfo>,
     selectedComicSourceId: String,
     selectedLiveSourceId: String,
+    comicDownloadedChapters: List<DownloadedComicChapter>,
     onSave: (String) -> Unit,
     onComicSource: (String) -> Unit,
     onLiveSource: (String) -> Unit,
     onOpenCached: (VideoItem) -> Unit,
+    onRemoveComicDownload: (String) -> Unit,
+    onRetryComicDownload: (String) -> Unit,
+    onClearComicDownloads: () -> Unit,
     onBrowseHome: () -> Unit,
     onBack: () -> Unit,
 ) {
@@ -517,11 +545,34 @@ private fun SettingsScreen(
     var introSoundEnabled by remember { mutableStateOf(preferences.introSoundEnabled) }
     var sourceUrl by remember(currentUrl) { mutableStateOf(currentUrl) }
     var showClearConfirmation by remember { mutableStateOf(false) }
+    var clearTargetIsComic by remember { mutableStateOf(false) }
     var route by rememberSaveable { mutableStateOf(SettingsRoute.OVERVIEW) }
     val addressError = SourceAddress.error(sourceUrl)
     val selectedSourceId = ContentSourceCatalog.find(currentUrl)?.id
     val downloadedBytes = cachedVideos.sumOf(OfflineVideo::bytesDownloaded)
     val completedCount = cachedVideos.count(OfflineVideo::isPlayableOffline)
+    val comicDownloadedBytes = comicDownloadedChapters.sumOf(DownloadedComicChapter::totalBytes)
+    val completedComicCount = comicDownloadedChapters.count { it.status == ComicDownloadStatus.COMPLETED }
+    val activeVideoItems = cachedVideos.filter {
+        it.state == OfflineCacheState.RESOLVING ||
+            it.state == OfflineCacheState.QUEUED ||
+            it.state == OfflineCacheState.DOWNLOADING
+    }
+    val activeComicItems = comicDownloadedChapters.filter {
+        it.status == ComicDownloadStatus.QUEUED ||
+            it.status == ComicDownloadStatus.RESOLVING ||
+            it.status == ComicDownloadStatus.DOWNLOADING
+    }
+    val totalActiveCount = activeVideoItems.size + activeComicItems.size
+    val combinedActiveProgress = if (totalActiveCount > 0) {
+        val sum = activeVideoItems.sumOf { (it.percentDownloaded / 100f).coerceIn(0f, 1f).toDouble() } +
+            activeComicItems.sumOf { it.progress.coerceIn(0f, 1f).toDouble() }
+        (sum / totalActiveCount).toFloat().coerceIn(0f, 1f)
+    } else if (completedCount > 0 || completedComicCount > 0) {
+        1f
+    } else {
+        0f
+    }
 
     BackHandler(enabled = route != SettingsRoute.OVERVIEW) {
         route = SettingsRoute.OVERVIEW
@@ -530,12 +581,16 @@ private fun SettingsScreen(
     if (showClearConfirmation) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
-            title = { Text("清空离线缓存？") },
-            text = { Text("所有已缓存视频和正在进行的任务都会被移除。") },
+            title = { Text(if (clearTargetIsComic) "清空漫画离线缓存？" else "清空视频离线缓存？") },
+            text = { Text(if (clearTargetIsComic) "所有已下载漫画章节和正在进行的漫画任务都会被移除。" else "所有已缓存视频和正在进行的视频任务都会被移除。") },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        cacheManager.clearAll()
+                        if (clearTargetIsComic) {
+                            onClearComicDownloads()
+                        } else {
+                            cacheManager.clearAll()
+                        }
                         showClearConfirmation = false
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
@@ -562,6 +617,10 @@ private fun SettingsScreen(
                     selectedLiveSource = LiveSourceCatalog.find(selectedLiveSourceId),
                     completedCount = completedCount,
                     downloadedBytes = downloadedBytes,
+                    completedComicCount = completedComicCount,
+                    comicDownloadedBytes = comicDownloadedBytes,
+                    totalActiveCount = totalActiveCount,
+                    combinedActiveProgress = combinedActiveProgress,
                     videoPreloadEnabled = videoPreloadEnabled,
                     onVideoPreloadChange = { enabled ->
                         videoPreloadEnabled = enabled
@@ -605,14 +664,24 @@ private fun SettingsScreen(
                 )
                 SettingsRoute.OFFLINE_CACHE -> OfflineCachePage(
                     cachedVideos = cachedVideos,
+                    comicChapters = comicDownloadedChapters,
                     completedCount = completedCount,
                     downloadedBytes = downloadedBytes,
+                    completedComicCount = completedComicCount,
+                    comicDownloadedBytes = comicDownloadedBytes,
+                    totalActiveCount = totalActiveCount,
+                    combinedActiveProgress = combinedActiveProgress,
                     onBack = { route = SettingsRoute.OVERVIEW },
                     onOpenCached = onOpenCached,
                     onBrowseHome = onBrowseHome,
-                    onClear = { showClearConfirmation = true },
+                    onClear = { isComic ->
+                        clearTargetIsComic = isComic
+                        showClearConfirmation = true
+                    },
                     onRetry = cacheManager::retry,
                     onRemove = cacheManager::remove,
+                    onRetryComic = onRetryComicDownload,
+                    onRemoveComic = onRemoveComicDownload,
                 )
             }
         }
@@ -626,6 +695,10 @@ private fun SettingsOverview(
     selectedLiveSource: LiveSourceInfo?,
     completedCount: Int,
     downloadedBytes: Long,
+    completedComicCount: Int,
+    comicDownloadedBytes: Long,
+    totalActiveCount: Int,
+    combinedActiveProgress: Float,
     videoPreloadEnabled: Boolean,
     onVideoPreloadChange: (Boolean) -> Unit,
     introAnimationEnabled: Boolean,
@@ -682,10 +755,16 @@ private fun SettingsOverview(
                     modifier = Modifier.testTag("settings-live-sources"),
                 )
                 HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
+                val totalOfflineBytes = downloadedBytes + comicDownloadedBytes
+                val offlineSummary = if (totalActiveCount > 0) {
+                    "下载中 $totalActiveCount 项 (${(combinedActiveProgress * 100).toInt()}%) · ${formatBytes(totalOfflineBytes)}"
+                } else {
+                    "$completedCount 视频 · $completedComicCount 漫章 · ${formatBytes(totalOfflineBytes)}"
+                }
                 SettingsNavigationRow(
                     icon = { Icon(Icons.Default.Download, contentDescription = null) },
                     title = "离线缓存",
-                    supporting = "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
+                    supporting = offlineSummary,
                     onClick = onOfflineCache,
                     modifier = Modifier.testTag("settings-offline-cache"),
                 )
@@ -1118,18 +1197,61 @@ private fun ComicSourcesPage(
 @Composable
 private fun OfflineCachePage(
     cachedVideos: List<OfflineVideo>,
+    comicChapters: List<DownloadedComicChapter>,
     completedCount: Int,
     downloadedBytes: Long,
+    completedComicCount: Int,
+    comicDownloadedBytes: Long,
+    totalActiveCount: Int,
+    combinedActiveProgress: Float,
     onBack: () -> Unit,
     onOpenCached: (VideoItem) -> Unit,
     onBrowseHome: () -> Unit,
-    onClear: () -> Unit,
+    onClear: (Boolean) -> Unit,
     onRetry: (OfflineVideo) -> Unit,
     onRemove: (String) -> Unit,
+    onRetryComic: (String) -> Unit,
+    onRemoveComic: (String) -> Unit,
 ) {
+    var selectedTab by rememberSaveable { mutableStateOf(OfflineMediaTab.VIDEO) }
+    var statusFilter by rememberSaveable { mutableStateOf(OfflineStatusFilter.ALL) }
+    val totalStorageBytes = downloadedBytes + comicDownloadedBytes
+
+    val filteredVideos = remember(cachedVideos, statusFilter) {
+        when (statusFilter) {
+            OfflineStatusFilter.ALL -> cachedVideos
+            OfflineStatusFilter.DOWNLOADING -> cachedVideos.filter {
+                it.state == OfflineCacheState.RESOLVING ||
+                    it.state == OfflineCacheState.QUEUED ||
+                    it.state == OfflineCacheState.DOWNLOADING
+            }
+            OfflineStatusFilter.COMPLETED -> cachedVideos.filter(OfflineVideo::isPlayableOffline)
+            OfflineStatusFilter.FAILED -> cachedVideos.filter { it.state == OfflineCacheState.FAILED }
+        }
+    }
+
+    val filteredComics = remember(comicChapters, statusFilter) {
+        when (statusFilter) {
+            OfflineStatusFilter.ALL -> comicChapters
+            OfflineStatusFilter.DOWNLOADING -> comicChapters.filter {
+                it.status == ComicDownloadStatus.QUEUED ||
+                    it.status == ComicDownloadStatus.RESOLVING ||
+                    it.status == ComicDownloadStatus.DOWNLOADING
+            }
+            OfflineStatusFilter.COMPLETED -> comicChapters.filter { it.status == ComicDownloadStatus.COMPLETED }
+            OfflineStatusFilter.FAILED -> comicChapters.filter { it.status == ComicDownloadStatus.FAILED }
+        }
+    }
+
+    val subtitleText = if (totalActiveCount > 0) {
+        "下载中 $totalActiveCount 项 (${(combinedActiveProgress * 100).toInt()}%) · ${formatBytes(totalStorageBytes)}"
+    } else {
+        "$completedCount 视频 · $completedComicCount 漫章 · ${formatBytes(totalStorageBytes)}"
+    }
+
     SettingsSubpageScaffold(
         title = "离线缓存",
-        subtitle = "$completedCount 个可离线观看 · ${formatBytes(downloadedBytes)}",
+        subtitle = subtitleText,
         onBack = onBack,
         listTag = "offline-cache-page",
     ) {
@@ -1147,31 +1269,50 @@ private fun OfflineCachePage(
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("本地存储空间", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
-                        Text("已占用 ${formatBytes(downloadedBytes)}", style = MaterialTheme.typography.labelSmall, color = AuroraCoral)
+                        Text(
+                            if (totalActiveCount > 0) "正在后台下载 $totalActiveCount 项任务" else "本地存储空间",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            if (totalActiveCount > 0) "${(combinedActiveProgress * 100).toInt()}%" else "已占用 ${formatBytes(totalStorageBytes)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = AuroraCoral,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)),
-                    ) {
-                        Row(Modifier.fillMaxSize()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(0.18f)
-                                    .background(Color(0xFF0A84FF)),
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(0.10f)
-                                    .background(Color(0xFFFF9F0A)),
-                            )
+                    if (totalActiveCount > 0) {
+                        LinearProgressIndicator(
+                            progress = { combinedActiveProgress },
+                            color = AuroraCoral,
+                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                        )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)),
+                        ) {
+                            Row(Modifier.fillMaxSize()) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(if (downloadedBytes > 0L) 0.22f else 0.06f)
+                                        .background(Color(0xFF0A84FF)),
+                                )
+                                Spacer(Modifier.width(2.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(if (comicDownloadedBytes > 0L) 0.14f else 0.04f)
+                                        .background(Color(0xFFFF9F0A)),
+                                )
+                            }
                         }
                     }
                     Row(
@@ -1180,68 +1321,314 @@ private fun OfflineCachePage(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF0A84FF)))
-                            Text("已缓存视频", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "视频 $completedCount/${cachedVideos.size} (${formatBytes(downloadedBytes)})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFFF9F0A)))
-                            Text("海报与元数据", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                "漫画 $completedComicCount/${comicChapters.size} (${formatBytes(comicDownloadedBytes)})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                     }
                 }
             }
         }
-        if (cachedVideos.isEmpty()) {
-            item {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.fillMaxWidth(),
+        item {
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = null,
-                            tint = AuroraCoral,
-                            modifier = Modifier.size(36.dp),
-                        )
-                        Text("暂无离线内容", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
-                        Text(
-                            "播放视频时点击缓存按钮，任务和已下载内容会显示在这里。",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                        Button(
-                            onClick = onBrowseHome,
-                            colors = ButtonDefaults.buttonColors(containerColor = AuroraCoral, contentColor = Color.White),
-                        ) { Text("去首页缓存视频") }
+                    val tabs = listOf(
+                        OfflineMediaTab.VIDEO to "视频 (${cachedVideos.size})",
+                        OfflineMediaTab.COMIC to "漫画 (${comicChapters.size})",
+                    )
+                    tabs.forEach { (tab, label) ->
+                        val selected = selectedTab == tab
+                        Surface(
+                            onClick = { selectedTab = tab },
+                            color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
+                            shape = RoundedCornerShape(10.dp),
+                            tonalElevation = if (selected) 2.dp else 0.dp,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            )
+                        }
                     }
                 }
             }
-        } else {
-            item {
-                TextButton(
-                    onClick = onClear,
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Default.DeleteSweep, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("清空全部缓存")
+        }
+        item {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                items(OfflineStatusFilter.entries) { filter ->
+                    val count = when (selectedTab) {
+                        OfflineMediaTab.VIDEO -> when (filter) {
+                            OfflineStatusFilter.ALL -> cachedVideos.size
+                            OfflineStatusFilter.DOWNLOADING -> cachedVideos.count {
+                                it.state == OfflineCacheState.RESOLVING ||
+                                    it.state == OfflineCacheState.QUEUED ||
+                                    it.state == OfflineCacheState.DOWNLOADING
+                            }
+                            OfflineStatusFilter.COMPLETED -> cachedVideos.count(OfflineVideo::isPlayableOffline)
+                            OfflineStatusFilter.FAILED -> cachedVideos.count { it.state == OfflineCacheState.FAILED }
+                        }
+                        OfflineMediaTab.COMIC -> when (filter) {
+                            OfflineStatusFilter.ALL -> comicChapters.size
+                            OfflineStatusFilter.DOWNLOADING -> comicChapters.count {
+                                it.status == ComicDownloadStatus.QUEUED ||
+                                    it.status == ComicDownloadStatus.RESOLVING ||
+                                    it.status == ComicDownloadStatus.DOWNLOADING
+                            }
+                            OfflineStatusFilter.COMPLETED -> comicChapters.count { it.status == ComicDownloadStatus.COMPLETED }
+                            OfflineStatusFilter.FAILED -> comicChapters.count { it.status == ComicDownloadStatus.FAILED }
+                        }
+                    }
+                    FilterChip(
+                        selected = statusFilter == filter,
+                        onClick = { statusFilter = filter },
+                        label = { Text("${filter.label} ($count)") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AuroraCoral,
+                            selectedLabelColor = Color.White,
+                        ),
+                    )
                 }
             }
-            items(cachedVideos, key = OfflineVideo::id) { cached ->
-                OfflineCacheRow(
-                    cached = cached,
-                    onOpen = { if (cached.isPlayableOffline) onOpenCached(cached.asVideoItem()) },
-                    onRetry = { onRetry(cached) },
-                    onRemove = { onRemove(cached.id) },
+        }
+        if (selectedTab == OfflineMediaTab.VIDEO) {
+            if (cachedVideos.isEmpty()) {
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shape = RoundedCornerShape(24.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = null,
+                                tint = AuroraCoral,
+                                modifier = Modifier.size(36.dp),
+                            )
+                            Text("暂无离线视频", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                            Text(
+                                "播放视频时点击缓存按钮，任务和已下载内容会显示在这里。",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Button(
+                                onClick = onBrowseHome,
+                                colors = ButtonDefaults.buttonColors(containerColor = AuroraCoral, contentColor = Color.White),
+                            ) { Text("去首页缓存视频") }
+                        }
+                    }
+                }
+            } else if (filteredVideos.isEmpty()) {
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        ) {
+                            Text("当前筛选无视频任务", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                            Text("可切换状态筛选查看其他视频下载记录。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            } else {
+                item {
+                    TextButton(
+                        onClick = { onClear(false) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("清空全部视频缓存")
+                    }
+                }
+                items(filteredVideos, key = OfflineVideo::id) { cached ->
+                    OfflineCacheRow(
+                        cached = cached,
+                        onOpen = { if (cached.isPlayableOffline) onOpenCached(cached.asVideoItem()) },
+                        onRetry = { onRetry(cached) },
+                        onRemove = { onRemove(cached.id) },
+                    )
+                }
+            }
+        } else {
+            if (comicChapters.isEmpty()) {
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shape = RoundedCornerShape(24.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp),
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.MenuBook,
+                                contentDescription = null,
+                                tint = AuroraCoral,
+                                modifier = Modifier.size(36.dp),
+                            )
+                            Text("暂无离线漫画", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
+                            Text(
+                                "在漫画详情页或阅读器内点击下载章节/下载全本，进度与离线章节会显示在这里。",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                }
+            } else if (filteredComics.isEmpty()) {
+                item {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        ) {
+                            Text("当前筛选无漫画任务", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                            Text("可切换状态筛选查看其他漫画章节记录。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            } else {
+                item {
+                    TextButton(
+                        onClick = { onClear(true) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("清空全部漫画缓存")
+                    }
+                }
+                items(filteredComics, key = DownloadedComicChapter::id) { chapter ->
+                    OfflineComicChapterRow(
+                        chapter = chapter,
+                        onRetry = { onRetryComic(chapter.id) },
+                        onRemove = { onRemoveComic(chapter.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OfflineComicChapterRow(
+    chapter: DownloadedComicChapter,
+    onRetry: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    val pct = (chapter.progress.coerceIn(0f, 1f) * 100).toInt()
+    val maxPages = maxOf(chapter.totalPages, chapter.downloadedPages)
+    val detail = when (chapter.status) {
+        ComicDownloadStatus.QUEUED -> "排队等待 · $maxPages 页"
+        ComicDownloadStatus.RESOLVING -> "正在解析章节图片…"
+        ComicDownloadStatus.DOWNLOADING -> "下载中 ${chapter.downloadedPages}/$maxPages 页 ($pct%)"
+        ComicDownloadStatus.COMPLETED -> "已完成 · $maxPages 页 · ${formatBytes(chapter.totalBytes)}"
+        ComicDownloadStatus.PAUSED -> "已暂停 · ${chapter.downloadedPages}/$maxPages 页"
+        ComicDownloadStatus.FAILED -> chapter.errorMessage?.takeIf { it.isNotBlank() }?.let { "失败: $it" } ?: "下载失败"
+    }
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = RoundedCornerShape(20.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(start = 14.dp, top = 12.dp, bottom = 12.dp, end = 6.dp),
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    chapter.comicTitle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
+                Text(
+                    chapter.chapterTitle,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AuroraCoral,
+                )
+                Text(
+                    detail,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (chapter.status == ComicDownloadStatus.FAILED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (chapter.status == ComicDownloadStatus.DOWNLOADING ||
+                    chapter.status == ComicDownloadStatus.RESOLVING ||
+                    chapter.status == ComicDownloadStatus.QUEUED
+                ) {
+                    LinearProgressIndicator(
+                        progress = { chapter.progress.coerceIn(0f, 1f) },
+                        color = AuroraCoral,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    )
+                }
+            }
+            if (chapter.status == ComicDownloadStatus.FAILED) {
+                IconButton(onClick = onRetry) {
+                    Icon(Icons.Default.Refresh, contentDescription = "重试漫画下载")
+                }
+            }
+            IconButton(onClick = onRemove) {
+                Icon(Icons.Default.Delete, contentDescription = "删除漫画缓存")
             }
         }
     }
@@ -1294,7 +1681,16 @@ private fun OfflineCacheRow(
                         when (cached.state) {
                             OfflineCacheState.RESOLVING -> "正在解析"
                             OfflineCacheState.QUEUED -> "等待缓存"
-                            OfflineCacheState.DOWNLOADING -> "缓存中 ${cached.percentDownloaded.toInt()}%"
+                            OfflineCacheState.DOWNLOADING -> {
+                                val bytesPart = if (cached.contentLength > 0L) {
+                                    " · ${formatBytes(cached.bytesDownloaded)} / ${formatBytes(cached.contentLength)}"
+                                } else if (cached.bytesDownloaded > 0L) {
+                                    " · ${formatBytes(cached.bytesDownloaded)}"
+                                } else {
+                                    ""
+                                }
+                                "下载中 ${cached.percentDownloaded.toInt()}%$bytesPart"
+                            }
                             OfflineCacheState.COMPLETED -> formatBytes(cached.bytesDownloaded)
                             OfflineCacheState.FAILED -> "缓存失败"
                             OfflineCacheState.REMOVING -> "正在移除"
@@ -1305,6 +1701,7 @@ private fun OfflineCacheRow(
                 if (cached.state == OfflineCacheState.DOWNLOADING) {
                     LinearProgressIndicator(
                         progress = { (cached.percentDownloaded / 100f).coerceIn(0f, 1f) },
+                        color = AuroraCoral,
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
                 }

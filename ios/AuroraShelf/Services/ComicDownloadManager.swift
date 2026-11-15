@@ -89,6 +89,30 @@ public final class ComicDownloadManager: ObservableObject {
         return ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
     }
 
+    public var activeChapters: [DownloadedComicChapter] {
+        chapters.filter { $0.status.isDownloading }
+    }
+
+    public var completedChapters: [DownloadedComicChapter] {
+        chapters.filter { $0.status.isCompleted }
+    }
+
+    public var failedChapters: [DownloadedComicChapter] {
+        chapters.filter {
+            if case .failed = $0.status { return true }
+            return false
+        }
+    }
+
+    public var overallProgress: Double {
+        let active = activeChapters
+        if !active.isEmpty {
+            let sum = active.reduce(0.0) { $0 + $1.status.progressValue }
+            return max(0.0, min(1.0, sum / Double(active.count)))
+        }
+        return completedChapters.isEmpty ? 0.0 : 1.0
+    }
+
     /// 查询某章节当前下载状态
     public func status(for comicId: String, chapterId: String) -> ComicDownloadStatus? {
         let id = generateID(comicId: comicId, chapterId: chapterId)
@@ -163,6 +187,27 @@ public final class ComicDownloadManager: ObservableObject {
         for chapter in comic.chapters {
             startDownload(comic: comic, chapter: chapter)
         }
+    }
+
+    /// 重试指定章节下载
+    public func retryDownload(id: String) {
+        guard let item = chapters.first(where: { $0.id == id }),
+              !item.status.isCompleted,
+              !item.status.isDownloading else { return }
+        let chapter = ComicChapter(
+            id: item.chapterId,
+            title: item.chapterTitle,
+            pageCount: item.totalPages
+        )
+        let comic = ComicItem(
+            id: item.comicId,
+            sourceId: item.sourceId,
+            title: item.comicTitle,
+            author: "",
+            coverUrl: item.coverUrl,
+            chapters: [chapter]
+        )
+        startDownload(comic: comic, chapter: chapter)
     }
 
     /// 删除指定章节下载

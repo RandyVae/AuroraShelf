@@ -97,6 +97,7 @@
 		F19E208B1968E1C1786A890F /* TabItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90DE75B27AB3DDCCB26A9E57 /* TabItem.swift */; };
 		F439A2A8C363D3A054FAEE7F /* AuroraCoverImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 019581BF19B8D91E6A55A4CD /* AuroraCoverImage.swift */; };
 		F46B739C21AB05C6EE312A8F /* DoubanPosterResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35ED609593297B2E7AB3A75 /* DoubanPosterResolver.swift */; };
+		F6A38A99C7334B1C064B3B0B /* ForumImageSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75401653321D72E542BFF4A3 /* ForumImageSaver.swift */; };
 		F6CB3BBD0A560C7D611676B2 /* CategoryShelfView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28EE478BBB114A0D104FAD90 /* CategoryShelfView.swift */; };
 		F89EA9CBB7C5FE92616FF5A4 /* AirPlayRoutePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 416C023188BD71D379651DCC /* AirPlayRoutePicker.swift */; };
 		F8A997F081414A41A1535249 /* UniversalVideoEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40CCFCDEBDA584EBD485134A /* UniversalVideoEngine.swift */; };
@@ -161,6 +162,7 @@
 		6B197DCE99300EEDF196F858 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
 		6C257A6C03CD39D72EACF3D9 /* StripchatLiveWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StripchatLiveWebView.swift; sourceTree = "<group>"; };
 		6E76E5B6E0151105F3CED3B1 /* ForumPostDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumPostDetailView.swift; sourceTree = "<group>"; };
+		75401653321D72E542BFF4A3 /* ForumImageSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForumImageSaver.swift; sourceTree = "<group>"; };
 		76383B8549C83F79AC2A9C88 /* VideoPreloadManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPreloadManagerTests.swift; sourceTree = "<group>"; };
 		7B718BFF6E49F9898D9D0D56 /* EpisodePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodePickerSheet.swift; sourceTree = "<group>"; };
 		7C63492158D1544479BAFA52 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -304,6 +306,7 @@
 				958009DA2F9C05A45A2F8B5C /* ComicPageImageLoader.swift */,
 				C32FF8887EB9DF3C3730C0B6 /* CoverImageLoader.swift */,
 				C35ED609593297B2E7AB3A75 /* DoubanPosterResolver.swift */,
+				75401653321D72E542BFF4A3 /* ForumImageSaver.swift */,
 				99A45CD73DB9190002329983 /* GlobalStartupPrefetchEngine.swift */,
 				5BBE033BB25CF19AB5ED6C45 /* HTMLVideoSourceAdapter.swift */,
 				AEEB04B9A850FF3CCC032FE8 /* LocalizationManager.swift */,
@@ -680,6 +683,7 @@
 				A1680532CD1C4507A5B43DF8 /* DeviceLayoutProfile.swift in Sources */,
 				F46B739C21AB05C6EE312A8F /* DoubanPosterResolver.swift in Sources */,
 				FF04079BE64FA92350BD8B7E /* EpisodePickerSheet.swift in Sources */,
+				F6A38A99C7334B1C064B3B0B /* ForumImageSaver.swift in Sources */,
 				76AAAD1613CE62934281E0E1 /* ForumPostDetailView.swift in Sources */,
 				5D5C4FF9088A3B125E97C393 /* ForumScreen.swift in Sources */,
 				0576FB7FB782FD4BD218C97D /* ForumSourceCatalog.swift in Sources */,
@@ -930,7 +934,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 259;
+				CURRENT_PROJECT_VERSION = 260;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -940,7 +944,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.33;
+				MARKETING_VERSION = 2.16.34;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
@@ -956,7 +960,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 259;
+				CURRENT_PROJECT_VERSION = 260;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -966,7 +970,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.33;
+				MARKETING_VERSION = 2.16.34;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;

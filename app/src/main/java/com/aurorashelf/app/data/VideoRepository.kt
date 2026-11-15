@@ -142,15 +142,7 @@ class VideoRepository {
             require(query.isNotBlank()) { "请输入搜索内容" }
             require(page >= 1) { "页码必须从 1 开始" }
             if (ContentSourceCatalog.isHuavod(baseUrl)) {
-                val encodedQuery = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8.name())
-                val searchPath = if (page <= 1) {
-                    "/vodsearch/-------------.html?wd=$encodedQuery"
-                } else {
-                    "/vodsearch/page/$page/wd/$encodedQuery.html"
-                }
-                val searchUrl = URI("$baseUrl/").resolve(searchPath).toString()
-                val document = fetchDocument(searchUrl, baseUrl)
-                return@withContext parseDocument(document, baseUrl)
+                return@withContext searchHuavod(baseUrl, query.trim(), page)
             }
             if (ContentSourceCatalog.isBeeg(baseUrl)) {
                 return@withContext searchBeeg(query, page)
@@ -194,7 +186,7 @@ class VideoRepository {
         }
 
     /**
-     * 全局搜索：并发跨所有视频源统一搜索同一关键词，聚合结果并按视频源归属清晰标明。
+     * 全局搜索：并发跨所有视频源统一搜索同一关键词，聚合结果并按标题相关性与华视优先级排序。
      */
     suspend fun searchAll(query: String): List<VideoItem> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
@@ -204,7 +196,7 @@ class VideoRepository {
             val deferreds = sources.map { source ->
                 async {
                     runCatching {
-                        withTimeout(6_000L) {
+                        withTimeout(12_000L) {
                             search(source.baseUrl, trimmed, 1)
                         }
                     }.getOrDefault(emptyList()).map { item ->
@@ -216,8 +208,106 @@ class VideoRepository {
                 }
             }
             val perSourceLists = deferreds.awaitAll().filter { it.isNotEmpty() }
-            interleave(perSourceLists).distinctBy(VideoItem::id)
+            rankSearchResults(interleave(perSourceLists).distinctBy(VideoItem::id), trimmed)
         }
+    }
+
+    internal fun rankSearchResults(items: List<VideoItem>, query: String): List<VideoItem> {
+        val normalized = query.trim().lowercase()
+        if (normalized.isEmpty()) return items
+        val tokens = normalized.split(Regex("\\s+")).filter { it.isNotBlank() }
+        return items.withIndex().sortedWith(
+            compareByDescending<IndexedValue<VideoItem>> { (_, item) ->
+                val title = item.title.lowercase()
+                var score = when {
+                    title == normalized -> 400
+                    title.startsWith(normalized) -> 300
+                    title.contains(normalized) -> 200
+                    tokens.size > 1 && tokens.all { title.contains(it) } -> 150
+                    else -> 0
+                }
+                if (ContentSourceCatalog.isHuavod(item.pageUrl) || item.author == "华视影院") {
+                    score += 40
+                }
+                score
+            }.thenBy { it.index },
+        ).map { it.value }
+    }
+
+    internal suspend fun searchHuavod(baseUrl: String, query: String, page: Int = 1): List<VideoItem> = coroutineScope {
+        val encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8.name())
+        val searchPath = if (page <= 1) {
+            "/vodsearch/-------------.html?wd=$encodedQuery"
+        } else {
+            "/vodsearch/page/$page/wd/$encodedQuery.html"
+        }
+        val searchUrl = URI("${baseUrl.trimEnd('/')}/").resolve(searchPath).toString()
+        val htmlDeferred = async {
+            runCatching { parseDocument(fetchDocument(searchUrl, baseUrl), baseUrl) }.getOrDefault(emptyList())
+        }
+        val suggestDeferred = async {
+            if (page > 1) {
+                emptyList()
+            } else {
+                val suggestUrl = URI("${baseUrl.trimEnd('/')}/")
+                    .resolve("/index.php/ajax/suggest?mid=1&wd=$encodedQuery&limit=20")
+                    .toString()
+                runCatching { parseHuavodSuggestJson(fetchJson(suggestUrl), baseUrl) }.getOrDefault(emptyList())
+            }
+        }
+
+        val htmlItems = htmlDeferred.await()
+        val suggestItems = suggestDeferred.await()
+        val merged = (htmlItems + suggestItems).distinctBy { it.pageUrl }
+        if (merged.isNotEmpty() || page > 1) {
+            return@coroutineScope merged
+        }
+        val fallbackPath = huavodTrendingFallbackPath(query) ?: return@coroutineScope emptyList()
+        val fallbackUrl = URI("${baseUrl.trimEnd('/')}/").resolve(fallbackPath).toString()
+        runCatching { parseDocument(fetchDocument(fallbackUrl, baseUrl), baseUrl).take(12) }
+            .getOrDefault(emptyList())
+    }
+
+    internal fun parseHuavodSuggestJson(rawJson: String, baseUrl: String = "https://huavod.com"): List<VideoItem> {
+        val trimmed = rawJson.trim()
+        if (!trimmed.startsWith("{")) return emptyList()
+        val root = runCatching { JSONObject(trimmed) }.getOrNull() ?: return emptyList()
+        val list = root.optJSONArray("list") ?: return emptyList()
+        val base = "${baseUrl.trimEnd('/')}/"
+        val items = mutableListOf<VideoItem>()
+        for (i in 0 until list.length()) {
+            val obj = list.optJSONObject(i) ?: continue
+            val vodId = obj.optString("id").trim().ifBlank { obj.optLong("id", 0L).takeIf { it > 0L }?.toString().orEmpty() }
+            val title = Parser.unescapeEntities(obj.optString("name"), false).trim()
+            if (vodId.isBlank() || title.length < MIN_TITLE_LENGTH) continue
+            val pageUrl = URI(base).resolve("/voddetail/$vodId.html").toString()
+            val rawPic = obj.optString("pic").trim()
+            val resolvedPic = SourceAddress.resolve(base, rawPic)
+                ?.takeUnless { CoverImageLoader.isDeadCoverHost(it) }
+                ?.let { CoverImageLoader.upgradeCoverUrl(it) }
+                ?: CoverImageLoader.quickDoubanLookup(title)
+            items += VideoItem(
+                id = pageUrl.sha256(),
+                title = title,
+                author = "华视影院",
+                duration = "--:--",
+                views = "华视影院 · 精准匹配",
+                pageUrl = pageUrl,
+                thumbnailUrl = resolvedPic,
+            )
+        }
+        return items
+    }
+
+    private fun huavodTrendingFallbackPath(query: String): String? = when (query.trim()) {
+        "最新电影", "热门精选", "4K 超清" -> "/vodshow/1.html"
+        "热门连续剧" -> "/vodshow/2.html"
+        "高分综艺" -> "/vodshow/3.html"
+        "热血动漫" -> "/vodshow/4.html"
+        "经典港片" -> "/vodshow/1---%E9%A6%99%E6%B8%AF--.html"
+        "悬疑惊悚" -> "/vodshow/1---%E6%82%AC%E7%96%91--.html"
+        "科幻大片" -> "/vodshow/1---%E7%A7%91%E5%B9%BB--.html"
+        else -> null
     }
 
     internal fun interleave(lists: List<List<VideoItem>>): List<VideoItem> {
@@ -350,6 +440,18 @@ class VideoRepository {
             if (dmItems.isNotEmpty()) return dmItems
         }
         if (ContentSourceCatalog.isHuavod(baseUrl)) {
+            val isSearchPage = document.location().contains("/vodsearch", ignoreCase = true) ||
+                document.selectFirst(".search-box") != null
+            if (isSearchPage) {
+                val searchDoc = document.clone().apply {
+                    select(".wap-diy-vod-e").remove()
+                }
+                return searchDoc.select(".search-box, .public-list-box")
+                    .asSequence()
+                    .mapNotNull { it.toHuavodVideoItem(baseUrl) }
+                    .distinctBy(VideoItem::pageUrl)
+                    .toList()
+            }
             val huavodItems = document.select(".public-list-box")
                 .asSequence()
                 .mapNotNull { it.toHuavodVideoItem(baseUrl) }
@@ -474,8 +576,10 @@ class VideoRepository {
         val href = link.attr("href").trim()
         val pageUrl = SourceAddress.resolve(documentBase(baseUrl), href) ?: return null
         val image = link.selectFirst("img") ?: selectFirst("img")
-        val title = link.attr("title").ifBlank { selectFirst(".time-title")?.text().orEmpty() }
-            .ifBlank { image?.attr("alt").orEmpty().removeSuffix("封面图") }
+        val title = selectFirst(".thumb-txt a, .thumb-txt")?.text().orEmpty()
+            .ifBlank { link.attr("title") }
+            .ifBlank { selectFirst(".time-title")?.text().orEmpty() }
+            .ifBlank { image?.attr("alt").orEmpty().removeSuffix("封面图").removeSuffix("海报") }
             .trim()
             .let { Parser.unescapeEntities(it, false) }
             .replace(Regex("\\s+"), " ")
@@ -493,18 +597,25 @@ class VideoRepository {
             ?.let { CoverImageLoader.upgradeCoverUrl(it) }
         val thumbnail = upgradedThumbnail ?: CoverImageLoader.quickDoubanLookup(title)
 
+        val badgeText = selectFirst(".public-list-prb")?.text()?.trim().orEmpty()
         val score = (selectFirst(".public-list-prb .ft4") ?: selectFirst("i.ft4, span.ft4"))
             ?.text()
             ?.trim()
             ?.takeIf { it.matches(Regex("""^\d+(?:\.\d+)?$""")) }
         val tag = selectFirst(".public-prt")?.text()?.trim()?.takeIf(String::isNotBlank)
-        val views = score?.let { "评分 $it" } ?: (tag ?: "全网热播")
+        val elseMeta = selectFirst(".thumb-else")?.text()?.trim()?.takeIf(String::isNotBlank)
+        val views = score?.let { "评分 $it" }
+            ?: tag
+            ?: elseMeta
+            ?: badgeText.takeIf(String::isNotBlank)
+            ?: "全网热播"
+        val duration = if (score == null && badgeText.isNotBlank()) badgeText else "--:--"
 
         return VideoItem(
             id = pageUrl.sha256(),
             title = title,
             author = "华视影院",
-            duration = "--:--",
+            duration = duration,
             views = views,
             pageUrl = pageUrl,
             thumbnailUrl = thumbnail,

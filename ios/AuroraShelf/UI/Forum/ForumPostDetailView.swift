@@ -3,9 +3,12 @@ import SwiftUI
 public struct ForumPostDetailView: View {
     public let post: ForumPostItem
     public let onDismiss: (() -> Void)?
+    @ObservedObject private var imageSaver = ForumImageSaver.shared
     @State private var loadedPost: ForumPostItem?
     @State private var loadError: String?
     @State private var isLoading = false
+    @State private var saveFeedbackMessage: String?
+    @State private var feedbackDismissTask: Task<Void, Never>?
     @Environment(\.dismiss) private var dismiss
 
     public init(post: ForumPostItem, onDismiss: (() -> Void)? = nil) {
@@ -28,6 +31,28 @@ public struct ForumPostDetailView: View {
 
                 Divider()
                     .overlay(AuroraColor.hairline)
+
+                if let batch = imageSaver.batchProgress {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Label("正在下载论坛图片 \(batch.completed) / \(batch.total)", systemImage: "arrow.down.circle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(AuroraColor.brand)
+                            Spacer()
+                            Text("\(Int(Double(batch.completed) / Double(max(1, batch.total)) * 100))%")
+                                .font(.caption.monospacedDigit().bold())
+                                .foregroundStyle(AuroraColor.textSecondary)
+                        }
+                        ProgressView(value: Double(batch.completed), total: Double(max(1, batch.total)))
+                            .tint(AuroraColor.brand)
+                    }
+                    .padding(AuroraMetrics.spacingM)
+                    .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius)
+                            .stroke(AuroraColor.hairline, lineWidth: 1)
+                    )
+                }
 
                 if isLoading {
                     ProgressView("正在加载帖子正文…")
@@ -53,7 +78,13 @@ public struct ForumPostDetailView: View {
 
                 ForEach(detailImageURLs, id: \.self) { imageURL in
                     if let url = URL(string: imageURL) {
-                        ForumPostImage(url: url, referer: post.threadUrl)
+                        ForumPostImage(
+                            url: url,
+                            referer: post.threadUrl,
+                            onSaveCompleted: { message in
+                                showFeedback(message)
+                            }
+                        )
                     }
                 }
             }
@@ -62,6 +93,19 @@ public struct ForumPostDetailView: View {
             .frame(maxWidth: .infinity)
         }
         .background(AuroraColor.canvas)
+        .overlay(alignment: .bottom) {
+            if let feedback = saveFeedbackMessage {
+                Text(feedback)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.black.opacity(0.84), in: Capsule())
+                    .padding(.bottom, 24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: saveFeedbackMessage)
         .navigationTitle(post.boardName)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
@@ -80,20 +124,65 @@ public struct ForumPostDetailView: View {
                 .accessibilityLabel("返回")
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Text(post.boardName)
-                    .font(.caption.bold())
-                    .foregroundStyle(post.boardName.contains("草榴") ? AuroraColor.forestGreen : AuroraColor.brand)
-                    .padding(.horizontal, AuroraMetrics.spacingS)
-                    .padding(.vertical, AuroraMetrics.spacingXS)
-                    .background(
-                        (post.boardName.contains("草榴") ? AuroraColor.forestGreen : AuroraColor.brand).opacity(0.18),
-                        in: .capsule
-                    )
-                    .accessibilityHidden(true)
+                HStack(spacing: 8) {
+                    if !detailImageURLs.isEmpty {
+                        Button {
+                            Task {
+                                let urls = detailImageURLs
+                                let result = await imageSaver.saveAllImages(urls, referer: post.threadUrl)
+                                if result.succeeded == 0 {
+                                    showFeedback("图片下载失败，请检查网络连接")
+                                } else if result.savedToPhotoLibraryCount > 0 {
+                                    showFeedback("已保存 \(result.succeeded)/\(result.total) 张原图到相册与文档")
+                                } else {
+                                    showFeedback("已缓存 \(result.succeeded)/\(result.total) 张原图到本地文档")
+                                }
+                            }
+                        } label: {
+                            if let batch = imageSaver.batchProgress {
+                                HStack(spacing: 4) {
+                                    ProgressView()
+                                        .controlSize(.mini)
+                                    Text("\(batch.completed)/\(batch.total)")
+                                        .font(.caption.monospacedDigit().bold())
+                                }
+                            } else {
+                                Label("下载图片(\(detailImageURLs.count))", systemImage: "arrow.down.circle")
+                                    .font(.caption.weight(.semibold))
+                            }
+                        }
+                        .disabled(imageSaver.batchProgress != nil)
+                        .accessibilityLabel("下载本帖全部 \(detailImageURLs.count) 张图片")
+                    }
+
+                    Text(post.boardName)
+                        .font(.caption.bold())
+                        .foregroundStyle(post.boardName.contains("草榴") ? AuroraColor.forestGreen : AuroraColor.brand)
+                        .padding(.horizontal, AuroraMetrics.spacingS)
+                        .padding(.vertical, AuroraMetrics.spacingXS)
+                        .background(
+                            (post.boardName.contains("草榴") ? AuroraColor.forestGreen : AuroraColor.brand).opacity(0.18),
+                            in: .capsule
+                        )
+                        .accessibilityHidden(true)
+                }
             }
         }
         .enableSwipeBack {
             closeDetail()
+        }
+        .onDisappear {
+            feedbackDismissTask?.cancel()
+        }
+    }
+
+    private func showFeedback(_ message: String) {
+        feedbackDismissTask?.cancel()
+        saveFeedbackMessage = message
+        feedbackDismissTask = Task {
+            try? await Task.sleep(for: .seconds(2.6))
+            guard !Task.isCancelled else { return }
+            saveFeedbackMessage = nil
         }
     }
 
@@ -190,8 +279,18 @@ public struct ForumPostDetailView: View {
 private struct ForumPostImage: View {
     let url: URL
     let referer: String
+    let onSaveCompleted: (String) -> Void
+    @ObservedObject private var saver = ForumImageSaver.shared
     @State private var image: UIImage?
     @State private var didFail = false
+
+    private var isSaving: Bool {
+        saver.activeSavingURLs.contains(url.absoluteString)
+    }
+
+    private var isSaved: Bool {
+        saver.isSaved(urlString: url.absoluteString)
+    }
 
     var body: some View {
         Group {
@@ -200,6 +299,53 @@ private struct ForumPostImage: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .clipShape(RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
+                    .overlay(alignment: .bottomTrailing) {
+                        Button {
+                            triggerSave()
+                        } label: {
+                            Group {
+                                if isSaving {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(.white)
+                                } else if isSaved {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 18, weight: .bold))
+                                        .foregroundStyle(.green)
+                                } else {
+                                    Image(systemName: "arrow.down.to.line")
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                            .frame(width: 38, height: 38)
+                            .background(.ultraThinMaterial, in: Circle())
+                            .overlay(Circle().stroke(Color.white.opacity(0.22), lineWidth: 0.75))
+                            .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isSaving)
+                        .padding(10)
+                        .accessibilityLabel(isSaved ? "原图已保存" : "下载原图")
+                    }
+                    .contextMenu {
+                        Button {
+                            triggerSave()
+                        } label: {
+                            Label(isSaved ? "重新保存原图" : "保存原图到相册", systemImage: "square.and.arrow.down")
+                        }
+                        if let localURL = saver.savedLocalURLs[url.absoluteString] {
+                            ShareLink(item: localURL) {
+                                Label("分享原图", systemImage: "square.and.arrow.up")
+                            }
+                        }
+                        Button {
+                            UIPasteboard.general.string = url.absoluteString
+                            onSaveCompleted("已复制图片链接")
+                        } label: {
+                            Label("复制图片链接", systemImage: "doc.on.doc")
+                        }
+                    }
             } else if didFail {
                 ContentUnavailableView(
                     "图片无法加载",
@@ -217,6 +363,21 @@ private struct ForumPostImage: View {
                 requestReferer: referer
             )
             didFail = image == nil
+        }
+    }
+
+    private func triggerSave() {
+        Task {
+            do {
+                let outcome = try await saver.saveImage(urlString: url.absoluteString, referer: referer)
+                if outcome.savedToPhotoLibrary {
+                    onSaveCompleted("图片已保存到系统相册")
+                } else {
+                    onSaveCompleted("已保存到本地文档")
+                }
+            } catch {
+                onSaveCompleted(error.localizedDescription)
+            }
         }
     }
 }

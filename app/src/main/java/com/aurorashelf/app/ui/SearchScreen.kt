@@ -206,7 +206,9 @@ internal fun SearchScreen(
     var selectedSourceFilter by rememberSaveable { mutableStateOf("全部") }
     val availableSources = remember(matches) {
         if (matches.isEmpty()) listOf("全部")
-        else listOf("全部") + matches.map { ContentSourceCatalog.inferSourceName(it.pageUrl) }.distinct().sorted()
+        else listOf("全部") + matches.map { ContentSourceCatalog.inferSourceName(it.pageUrl) }
+            .distinct()
+            .sortedWith(compareBy<String> { if (it.contains("华视")) 0 else 1 }.thenBy { it })
     }
     LaunchedEffect(availableSources) {
         if (selectedSourceFilter !in availableSources) {

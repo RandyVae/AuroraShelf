@@ -54,6 +54,30 @@ internal data class ForumImageRequest(
     val cookies: String?,
 )
 
+internal data class BatchImageSaveResult(
+    val total: Int,
+    val succeeded: Int,
+    val failed: Int,
+)
+
+internal fun deduplicateForumImageUrls(urls: List<String>): List<String> {
+    val seen = LinkedHashSet<String>()
+    for (raw in urls) {
+        val trimmed = raw.trim()
+        if (trimmed.startsWith("https://", ignoreCase = true)) {
+            val canonical = if (!trimmed.contains('?') && !trimmed.contains('#')) {
+                trimmed.trimEnd('/')
+            } else {
+                trimmed
+            }
+            seen.add(canonical)
+        } else if (trimmed.startsWith("data:image/", ignoreCase = true)) {
+            seen.add(trimmed)
+        }
+    }
+    return seen.toList()
+}
+
 /** Saves forum images without decoding them, preserving GIF/WebP animation and avoiding bitmap OOMs. */
 internal class ForumImageSaver(
     context: Context,
@@ -73,6 +97,25 @@ internal class ForumImageSaver(
                 else -> throw IOException("仅支持 HTTPS 或页面内嵌图片")
             }
         }
+    }
+
+    suspend fun saveBatch(
+        requests: List<ForumImageRequest>,
+        onProgress: (completed: Int, total: Int, succeeded: Int) -> Unit = { _, _, _ -> },
+    ): BatchImageSaveResult = withContext(Dispatchers.IO) {
+        val uniqueRequests = requests.distinctBy { it.imageUrl }
+        val total = uniqueRequests.size
+        if (total == 0) return@withContext BatchImageSaveResult(total = 0, succeeded = 0, failed = 0)
+        var succeeded = 0
+        var completed = 0
+        for (req in uniqueRequests) {
+            if (save(req).isSuccess) {
+                succeeded += 1
+            }
+            completed += 1
+            onProgress(completed, total, succeeded)
+        }
+        BatchImageSaveResult(total = total, succeeded = succeeded, failed = total - succeeded)
     }
 
     private fun saveRemoteImage(request: ForumImageRequest): Uri {

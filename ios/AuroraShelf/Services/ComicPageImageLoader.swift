@@ -95,12 +95,21 @@ actor ComicPageImageLoader {
             let (fetchedData, _) = try await request(url: imageURL, headers: page.headers, referer: imageReferer)
             data = fetchedData
         } catch {
-            // 1. Baozi CDN 容灾自动回退：当 bzcdn 节点遭 RST 阻断或返回 404/503 时，自动回退到官方直连节点 static-tw.baozimh.com
-            if let host = imageURL.host?.lowercased(), host.hasSuffix("bzcdn.net"),
+            // 1. Baozi CDN 容灾自动回退：轮询官方与镜像节点
+            if let host = imageURL.host?.lowercased(),
+               (host.hasSuffix("bzcdn.net") || host.hasSuffix("baozicdn.com") || host.hasSuffix("baozimh.com")),
                var fallbackComponents = URLComponents(url: imageURL, resolvingAgainstBaseURL: true) {
-                fallbackComponents.host = "static-tw.baozimh.com"
-                if let fallbackURL = fallbackComponents.url {
-                    let (fallbackData, _) = try await request(url: fallbackURL, headers: page.headers, referer: "https://cn.twbzmg.com/")
+                let backupHosts = ["s1.baozicdn.com", "s2.baozicdn.com", "s1.bzcdn.net", "s2.bzcdn.net", "static-tw.baozimh.com"]
+                var fallbackData: Data?
+                for backupHost in backupHosts where backupHost != host {
+                    fallbackComponents.host = backupHost
+                    if let fallbackURL = fallbackComponents.url,
+                       let (candidateData, _) = try? await request(url: fallbackURL, headers: page.headers, referer: "https://cn.twbzmg.com/") {
+                        fallbackData = candidateData
+                        break
+                    }
+                }
+                if let fallbackData {
                     data = fallbackData
                 } else {
                     throw error

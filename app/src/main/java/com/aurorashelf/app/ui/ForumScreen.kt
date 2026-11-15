@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
@@ -109,12 +110,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.aurorashelf.app.data.forum.ForumImageRequest
 import com.aurorashelf.app.data.forum.ForumImageSaver
 import com.aurorashelf.app.data.forum.ForumPostCache
+import com.aurorashelf.app.data.forum.deduplicateForumImageUrls
 import com.aurorashelf.app.data.forum.shouldForwardCookies
 import com.aurorashelf.app.model.ForumPost
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun ForumScreen(
@@ -470,7 +474,25 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     var loadGeneration by remember(post.url) { mutableIntStateOf(0) }
     var pendingImageRequest by remember(post.url) { mutableStateOf<ForumImageRequest?>(null) }
     var permissionImageRequest by remember(post.url) { mutableStateOf<ForumImageRequest?>(null) }
+    var permissionBatchRequests by remember(post.url) { mutableStateOf<List<ForumImageRequest>?>(null) }
     var isSavingImage by remember(post.url) { mutableStateOf(false) }
+    var batchSaveProgress by remember(post.url) { mutableStateOf<Pair<Int, Int>?>(null) }
+    var detectedImageUrls by remember(post.url) { mutableStateOf<List<String>>(emptyList()) }
+    var readerUserAgent by remember(post.url) { mutableStateOf("Mozilla/5.0") }
+
+    val buildImageRequest: (String, String) -> ForumImageRequest = { imageUrl, currentPageUrl ->
+        ForumImageRequest(
+            imageUrl = imageUrl,
+            pageUrl = currentPageUrl,
+            userAgent = readerUserAgent,
+            cookies = if (shouldForwardCookies(currentPageUrl, imageUrl)) {
+                CookieManager.getInstance().getCookie(currentPageUrl)
+            } else {
+                null
+            },
+        )
+    }
+
     val saveImage: (ForumImageRequest) -> Unit = { request ->
         if (!isSavingImage) {
             isSavingImage = true
@@ -479,26 +501,80 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 isSavingImage = false
                 snackbarHostState.showSnackbar(
                     result.fold(
-                        onSuccess = { "图片已保存到系统相册" },
+                        onSuccess = { "图片已保存到系统相册 Pictures/AuroraShelf" },
                         onFailure = { failure -> failure.message ?: "图片保存失败，请稍后重试" },
                     ),
                 )
             }
         }
     }
+
+    val saveAllImages: (List<ForumImageRequest>) -> Unit = { requests ->
+        if (!isSavingImage && requests.isNotEmpty()) {
+            isSavingImage = true
+            batchSaveProgress = 0 to requests.size
+            coroutineScope.launch {
+                val result = imageSaver.saveBatch(requests) { completed, total, _ ->
+                    coroutineScope.launch(Dispatchers.Main) {
+                        batchSaveProgress = completed to total
+                    }
+                }
+                isSavingImage = false
+                batchSaveProgress = null
+                val summary = if (result.succeeded > 0) {
+                    "已保存 ${result.succeeded}/${result.total} 张论坛图片到 Pictures/AuroraShelf"
+                } else {
+                    "图片批量下载失败，请检查网络连接"
+                }
+                snackbarHostState.showSnackbar(summary)
+            }
+        }
+    }
+
     val storagePermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { isGranted ->
-        val request = permissionImageRequest
+        val singleRequest = permissionImageRequest
+        val batchRequests = permissionBatchRequests
         permissionImageRequest = null
-        if (isGranted && request != null) {
-            saveImage(request)
-        } else if (!isGranted) {
+        permissionBatchRequests = null
+        if (isGranted) {
+            when {
+                batchRequests != null -> saveAllImages(batchRequests)
+                singleRequest != null -> saveImage(singleRequest)
+            }
+        } else {
             coroutineScope.launch { snackbarHostState.showSnackbar("没有存储权限，无法保存图片") }
         }
     }
+
+    val triggerSaveWithPermission: (ForumImageRequest) -> Unit = { req ->
+        val needsLegacyPermission = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+        if (needsLegacyPermission) {
+            permissionImageRequest = req
+            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            saveImage(req)
+        }
+    }
+
+    val triggerBatchSaveWithPermission: (List<ForumImageRequest>) -> Unit = { reqs ->
+        val needsLegacyPermission = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
+            PackageManager.PERMISSION_GRANTED
+        if (needsLegacyPermission) {
+            permissionBatchRequests = reqs
+            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            saveAllImages(reqs)
+        }
+    }
+
     val webView = remember(post.url) {
         WebView(context).apply {
+            readerUserAgent = settings.userAgentString
             // ForumReader sits directly inside a Box + PredictiveBackContainer without a
             // nested-scrolling parent; disabling nested scroll lets WebView own 100% of
             // vertical touch pans and flings natively without competing with Compose.
@@ -532,6 +608,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     view?.applyMobileForumLayout(
                         isDarkTheme = isDarkTheme,
                         onHtml = null,
+                        onImages = { imgs -> if (imgs.isNotEmpty()) detectedImageUrls = imgs },
                     ) { wasApplied ->
                         if (currentGen == loadGeneration && wasApplied) {
                             isLoading = false
@@ -546,6 +623,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     earlyStyledGeneration = -1
                     isLoading = true
                     error = null
+                    detectedImageUrls = emptyList()
                     Log.i(TAG, "pageStarted cacheHit=${cachedHtml != null}")
                 }
 
@@ -557,6 +635,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     view?.applyMobileForumLayout(
                         isDarkTheme = isDarkTheme,
                         onHtml = null,
+                        onImages = { imgs -> if (imgs.isNotEmpty()) detectedImageUrls = imgs },
                     ) {
                         if (visibleGen == loadGeneration) {
                             isLoading = false
@@ -572,6 +651,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     view?.applyMobileForumLayout(
                         isDarkTheme = isDarkTheme,
                         onHtml = { html -> ForumPostCache.put(post.url, html) },
+                        onImages = { imgs -> detectedImageUrls = imgs },
                     ) { wasApplied ->
                         if (finishedGeneration != loadGeneration) return@applyMobileForumLayout
                         isLoading = false
@@ -590,8 +670,18 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     }
                 }
 
-                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean =
-                    request?.url?.scheme != "https"
+                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                    val targetUri = request?.url ?: return true
+                    if (targetUri.scheme == "aurorashelf" && targetUri.host == "save-image") {
+                        val imageUrl = targetUri.getQueryParameter("url").orEmpty()
+                        if (imageUrl.isNotBlank()) {
+                            val currentPageUrl = view?.url ?: post.url
+                            triggerSaveWithPermission(buildImageRequest(imageUrl, currentPageUrl))
+                        }
+                        return true
+                    }
+                    return targetUri.scheme != "https"
+                }
             }
             setOnLongClickListener {
                 val hit = hitTestResult
@@ -601,16 +691,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 if (!isImage || imageUrl.isBlank()) return@setOnLongClickListener false
                 performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                 val currentPageUrl = url ?: post.url
-                pendingImageRequest = ForumImageRequest(
-                    imageUrl = imageUrl,
-                    pageUrl = currentPageUrl,
-                    userAgent = settings.userAgentString,
-                    cookies = if (shouldForwardCookies(currentPageUrl, imageUrl)) {
-                        CookieManager.getInstance().getCookie(currentPageUrl)
-                    } else {
-                        null
-                    },
-                )
+                pendingImageRequest = buildImageRequest(imageUrl, currentPageUrl)
                 true
             }
             if (cachedHtml != null) {
@@ -671,8 +752,72 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 Text(post.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onBackground)
                 Text(post.sourceName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (detectedImageUrls.isNotEmpty()) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = AuroraCoral.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.35f)),
+                    modifier = Modifier
+                        .padding(end = 4.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable(enabled = !isSavingImage) {
+                            val currentPageUrl = webView.url ?: post.url
+                            val requests = detectedImageUrls.map { buildImageRequest(it, currentPageUrl) }
+                            triggerBatchSaveWithPermission(requests)
+                        }
+                        .testTag("forum-batch-download-images"),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = "下载本帖全部图片",
+                            tint = AuroraCoral,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text(
+                            text = batchSaveProgress?.let { "${it.first}/${it.second}" } ?: "下载 ${detectedImageUrls.size} 图",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = AuroraCoral,
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
             IconButton(onClick = { webView.reload() }) {
                 Icon(Icons.Default.Refresh, contentDescription = "刷新帖子", tint = MaterialTheme.colorScheme.onBackground)
+            }
+        }
+        batchSaveProgress?.let { (completed, total) ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(
+                        text = "正在保存本帖图片 $completed / $total…",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "${(completed * 100 / total.coerceAtLeast(1))}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = AuroraCoral,
+                    )
+                }
+                LinearProgressIndicator(
+                    progress = { completed.toFloat() / total.coerceAtLeast(1).toFloat() },
+                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    color = AuroraCoral,
+                )
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -780,21 +925,43 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
 private fun WebView.applyMobileForumLayout(
     isDarkTheme: Boolean,
     onHtml: ((String) -> Unit)? = null,
+    onImages: ((List<String>) -> Unit)? = null,
     onComplete: (Boolean) -> Unit,
 ) {
     settings.javaScriptEnabled = true
     evaluateJavascript(mobileForumScript(isDarkTheme)) { result ->
-        if (result == "true" && onHtml != null) {
-            evaluateJavascript("document.documentElement.outerHTML") { raw ->
-                if (raw != null && raw != "null") {
-                    runCatching { JSONArray("[$raw]").getString(0) }.getOrNull()?.let(onHtml)
+        val applied = result == "true"
+        val finishWithHtml: () -> Unit = {
+            if (applied && onHtml != null) {
+                evaluateJavascript("document.documentElement.outerHTML") { raw ->
+                    if (raw != null && raw != "null") {
+                        runCatching { JSONArray("[$raw]").getString(0) }.getOrNull()?.let(onHtml)
+                    }
+                    settings.javaScriptEnabled = false
+                    onComplete(true)
                 }
+            } else {
                 settings.javaScriptEnabled = false
-                onComplete(true)
+                onComplete(applied)
+            }
+        }
+
+        if (applied && onImages != null) {
+            evaluateJavascript("JSON.stringify(window.__auroraPostImages || [])") { rawImages ->
+                val list = runCatching {
+                    val jsonString = rawImages?.takeIf { it != "null" }?.let { JSONArray("[$it]").getString(0) } ?: "[]"
+                    val arr = JSONArray(jsonString)
+                    buildList {
+                        for (i in 0 until arr.length()) {
+                            arr.optString(i).takeIf { it.isNotBlank() }?.let(::add)
+                        }
+                    }.let(::deduplicateForumImageUrls)
+                }.getOrDefault(emptyList())
+                onImages(list)
+                finishWithHtml()
             }
         } else {
-            settings.javaScriptEnabled = false
-            onComplete(result == "true")
+            finishWithHtml()
         }
     }
 }
@@ -1018,8 +1185,9 @@ internal val MOBILE_FORUM_SCRIPT =
           border-color: rgba(202, 196, 208, 0.18) !important;
           color: #cac4d0 !important;
         }
-        body.aurora-dark a,
+        body.aurora-dark a:not(.aurora-img-save-btn),
         body.aurora-dark .aurora-pages a { color: #aac7ff !important; }
+        .aurora-img-save-btn { color: #ffffff !important; }
       `;
       if (!style.parentNode) document.head.appendChild(style);
 
@@ -1067,6 +1235,39 @@ internal val MOBILE_FORUM_SCRIPT =
         const source = image.getAttribute('file');
         if (source && source.startsWith('https://')) image.src = source;
       });
+      document.querySelectorAll('img[data-src]').forEach((image) => {
+        const source = image.getAttribute('data-src');
+        if (source && source.startsWith('https://')) image.src = source;
+      });
+
+      const contentImgs = Array.from(document.querySelectorAll('.tpc_content img, .postmessage img, .t_msgfont img, td.postcontent img'));
+      const collected = [];
+      const seenImg = new Set();
+      contentImgs.forEach((img) => {
+        const src = (img.currentSrc || img.src || '').trim();
+        if (!(src.startsWith('https://') || src.startsWith('data:image/'))) return;
+        const lower = src.toLowerCase();
+        if (lower.includes('smiley') || lower.includes('/smiles/') || lower.includes('/static/image/common/') || lower.includes('avatar')) return;
+        if (img.naturalWidth > 0 && img.naturalWidth < 48 && img.naturalHeight > 0 && img.naturalHeight < 48) return;
+        if (!seenImg.has(src)) {
+          seenImg.add(src);
+          collected.push(src);
+        }
+        if (!img.parentElement?.classList?.contains('aurora-img-wrap')) {
+          const wrap = document.createElement('div');
+          wrap.className = 'aurora-img-wrap';
+          wrap.style.cssText = 'position:relative;display:block;margin:0 auto 10px;text-align:center;';
+          img.parentNode?.insertBefore(wrap, img);
+          wrap.appendChild(img);
+          const btn = document.createElement('a');
+          btn.className = 'aurora-img-save-btn';
+          btn.href = 'aurorashelf://save-image?url=' + encodeURIComponent(src);
+          btn.textContent = '保存原图';
+          btn.style.cssText = 'position:absolute;right:8px;bottom:8px;padding:4px 10px;border-radius:14px;background:rgba(18,18,22,0.78);color:#fff;font-size:12px;font-weight:600;text-decoration:none;border:1px solid rgba(255,255,255,0.22);z-index:5;';
+          wrap.appendChild(btn);
+        }
+      });
+      window.__auroraPostImages = collected;
       return true;
       } catch (error) {
         return false;

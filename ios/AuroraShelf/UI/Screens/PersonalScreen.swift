@@ -7,6 +7,7 @@ public struct PersonalScreen: View {
     @ObservedObject private var watchlist = WatchlistStore.shared
     @ObservedObject private var locManager = LocalizationManager.shared
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
+    @ObservedObject private var comicDownloadManager = ComicDownloadManager.shared
     @ObservedObject private var account = AccountService.shared
     public let onPlayVideo: (VideoItem) -> Void
 
@@ -226,7 +227,7 @@ public struct PersonalScreen: View {
                             settingRow(
                                 icon: "arrow.down.circle",
                                 title: "settings.offline_download".localized,
-                                value: downloadManager.completedItems.isEmpty ? "0 部" : "\(downloadManager.completedItems.count) 部 · \(downloadManager.formattedTotalSpace())",
+                                value: offlineDownloadSummary,
                                 isNavigable: true
                             )
                         }
@@ -319,6 +320,24 @@ public struct PersonalScreen: View {
             }
             Button("取消", role: .cancel) {}
         }
+    }
+
+    private var offlineDownloadSummary: String {
+        let activeVideo = downloadManager.activeItems.count
+        let activeComic = comicDownloadManager.activeChapters.count
+        let totalActive = activeVideo + activeComic
+        if totalActive > 0 {
+            let activeProgresses = downloadManager.activeItems.map(\.status.progressValue)
+                + comicDownloadManager.activeChapters.map(\.status.progressValue)
+            let avg = activeProgresses.isEmpty ? 0.0 : activeProgresses.reduce(0, +) / Double(activeProgresses.count)
+            return "下载中 \(totalActive) 项 (\(Int(avg * 100))%)"
+        }
+        let videoCount = downloadManager.completedItems.count
+        let comicCount = comicDownloadManager.completedChapters.count
+        if videoCount == 0 && comicCount == 0 {
+            return "0 项"
+        }
+        return "\(videoCount) 视频 · \(comicCount) 漫章"
     }
 
     private var shortAppVersion: String {

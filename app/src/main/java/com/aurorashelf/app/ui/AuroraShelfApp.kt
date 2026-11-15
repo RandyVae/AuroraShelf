@@ -436,6 +436,8 @@ fun AuroraShelfApp(
                         onDownloadChapter = comicViewModel::downloadChapter,
                         onDownloadAll = comicViewModel::downloadAllChapters,
                         downloadedChapters = comicDownloadedChapters,
+                        onRetryComicDownload = comicViewModel::retryComicDownload,
+                        onRemoveComicDownload = comicViewModel::removeComicDownload,
                         onCancelOpening = comicViewModel::cancelOpeningComic,
                         onDismissDetailsError = comicViewModel::dismissDetailsError,
                         onRetryOpening = comicViewModel::retryOpeningComic,
@@ -496,6 +498,7 @@ fun AuroraShelfApp(
                     comicSources = comicState.sources,
                     selectedComicSourceId = comicState.selectedSourceId,
                     selectedLiveSourceId = liveState.selectedSourceId,
+                    comicDownloadedChapters = comicDownloadedChapters,
                     onVideo = viewModel::openVideo,
                     onFavorite = viewModel::toggleFavorite,
                     onBrowseHome = { viewModel.selectDestination(AppDestination.HOME) },
@@ -503,6 +506,9 @@ fun AuroraShelfApp(
                     onComicSource = comicViewModel::selectSource,
                     onLiveSource = liveViewModel::selectSource,
                     onOpenCached = viewModel::openVideo,
+                    onRemoveComicDownload = comicViewModel::removeComicDownload,
+                    onRetryComicDownload = comicViewModel::retryComicDownload,
+                    onClearComicDownloads = comicViewModel::clearAllComicDownloads,
                     onOpenGame = {
                         context.startActivity(android.content.Intent(context, com.aurorashelf.app.game.GameActivity::class.java))
                     },

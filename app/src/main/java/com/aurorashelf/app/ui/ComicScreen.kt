@@ -42,6 +42,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -120,12 +121,17 @@ import coil3.request.transformations
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.aurorashelf.app.data.VideoRepository
+import com.aurorashelf.app.data.comic.ComicDownloadStatus
 import com.aurorashelf.app.data.comic.ComicPageResolver
+import com.aurorashelf.app.data.comic.DownloadedComicChapter
 import com.aurorashelf.app.model.ComicChapter
 import com.aurorashelf.app.model.ComicDetails
 import com.aurorashelf.app.model.ComicPage
 import com.aurorashelf.app.model.ComicSummary
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.CheckCircle
 import com.aurorashelf.app.ui.theme.AuroraCoral
@@ -141,6 +147,7 @@ import com.aurorashelf.app.ui.theme.AuroraReaderBackground
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ComicScreen(
     state: ComicUiState,
@@ -161,11 +168,15 @@ internal fun ComicScreen(
     onSettings: () -> Unit = {},
     onDownloadChapter: ((ComicChapter) -> Unit)? = null,
     onDownloadAll: (() -> Unit)? = null,
-    downloadedChapters: List<com.aurorashelf.app.data.comic.DownloadedComicChapter> = emptyList(),
+    downloadedChapters: List<DownloadedComicChapter> = emptyList(),
+    onRetryComicDownload: ((String) -> Unit)? = null,
+    onRemoveComicDownload: ((String) -> Unit)? = null,
     onCancelOpening: () -> Unit = {},
     onDismissDetailsError: () -> Unit = {},
     onRetryOpening: () -> Unit = {},
 ) {
+    var showDownloadSheet by rememberSaveable { mutableStateOf(false) }
+
     Surface(
         color = MaterialTheme.colorScheme.background,
         modifier = Modifier.fillMaxSize(),
@@ -202,11 +213,14 @@ internal fun ComicScreen(
                             onDownloadChapter = onDownloadChapter,
                             onDownloadAll = onDownloadAll,
                             downloadedChapters = downloadedChapters,
+                            onOpenDownloadProgress = { showDownloadSheet = true },
+                            onRetryComicDownload = onRetryComicDownload,
                         )
                     }
                 }
                 else -> ComicLibrary(
                     state = state,
+                    downloadedChapters = downloadedChapters,
                     onCategory = onCategory,
                     onQuery = onQuery,
                     onSearch = onSearch,
@@ -216,8 +230,23 @@ internal fun ComicScreen(
                     onAuthenticate = onAuthenticate,
                     onSignOut = onSignOut,
                     onSettings = onSettings,
+                    onOpenDownloadProgress = { showDownloadSheet = true },
                 )
             }
+        }
+    }
+
+    if (showDownloadSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showDownloadSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surface,
+        ) {
+            ComicDownloadProgressSheetContent(
+                chapters = downloadedChapters,
+                onRetry = { id -> onRetryComicDownload?.invoke(id) },
+                onRemove = { id -> onRemoveComicDownload?.invoke(id) },
+            )
         }
     }
 
@@ -297,6 +326,7 @@ internal fun ComicScreen(
 @Composable
 private fun ComicLibrary(
     state: ComicUiState,
+    downloadedChapters: List<DownloadedComicChapter>,
     onCategory: (String) -> Unit,
     onQuery: (String) -> Unit,
     onSearch: () -> Unit,
@@ -306,6 +336,7 @@ private fun ComicLibrary(
     onAuthenticate: (String, String) -> Unit,
     onSignOut: () -> Unit,
     onSettings: () -> Unit,
+    onOpenDownloadProgress: () -> Unit,
 ) {
     val gridState = rememberLazyGridState()
     val fontScale = LocalDensity.current.fontScale
@@ -504,6 +535,11 @@ private fun ComicLibrary(
                     modifier = Modifier.padding(bottom = 6.dp),
                     forceDark = overlayDarkHeader,
                 ) {
+                    ComicDownloadProgressIcon(
+                        downloadedChapters = downloadedChapters,
+                        forceDark = overlayDarkHeader,
+                        onClick = onOpenDownloadProgress,
+                    )
                     NetflixSearchCapsule(
                         label = if (state.activeQuery.isNotBlank()) state.activeQuery else "搜索漫画",
                         onClick = { isSearchOpen = true },
@@ -866,13 +902,211 @@ private fun ComicCard(comic: ComicSummary, onClick: () -> Unit) {
 }
 
 @Composable
+private fun ComicDownloadProgressIcon(
+    downloadedChapters: List<DownloadedComicChapter>,
+    forceDark: Boolean,
+    onClick: () -> Unit,
+) {
+    val activeCount = downloadedChapters.count {
+        it.status == ComicDownloadStatus.QUEUED ||
+            it.status == ComicDownloadStatus.RESOLVING ||
+            it.status == ComicDownloadStatus.DOWNLOADING
+    }
+    val tint = if (activeCount > 0) {
+        AuroraCoral
+    } else if (forceDark) {
+        Color.White
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+    Box(contentAlignment = Alignment.TopEnd) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.testTag("comic-download-progress-button"),
+        ) {
+            Icon(
+                Icons.Default.Download,
+                contentDescription = "漫画下载进度",
+                tint = tint,
+            )
+        }
+        if (activeCount > 0) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .padding(top = 6.dp, end = 6.dp)
+                    .size(16.dp)
+                    .clip(CircleShape)
+                    .background(AuroraCoral),
+            ) {
+                Text(
+                    text = activeCount.coerceAtMost(99).toString(),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ComicDownloadProgressSheetContent(
+    chapters: List<DownloadedComicChapter>,
+    onRetry: (String) -> Unit,
+    onRemove: (String) -> Unit,
+) {
+    val activeChapters = chapters.filter {
+        it.status == ComicDownloadStatus.QUEUED ||
+            it.status == ComicDownloadStatus.RESOLVING ||
+            it.status == ComicDownloadStatus.DOWNLOADING
+    }
+    val completedCount = chapters.count { it.status == ComicDownloadStatus.COMPLETED }
+    val avgProgress = if (activeChapters.isNotEmpty()) {
+        activeChapters.map { it.progress.coerceIn(0f, 1f) }.average().toFloat()
+    } else {
+        0f
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "漫画下载进度",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "进行中 ${activeChapters.size} 话 · 已完成 $completedCount 话",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (activeChapters.isNotEmpty()) {
+                Text(
+                    "${(avgProgress * 100).toInt()}%",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = AuroraCoral,
+                )
+            }
+        }
+        if (activeChapters.isNotEmpty()) {
+            LinearProgressIndicator(
+                progress = { avgProgress },
+                color = AuroraCoral,
+                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+            )
+        }
+        if (chapters.isEmpty()) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+            ) {
+                Text(
+                    "暂无漫画下载任务，可在漫画详情或阅读器中点击下载按钮。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        } else {
+            LazyColumn(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+            ) {
+                items(chapters.size, key = { chapters[it].id }) { idx ->
+                    val record = chapters[idx]
+                    val maxPages = maxOf(record.totalPages, record.downloadedPages)
+                    val pct = (record.progress.coerceIn(0f, 1f) * 100).toInt()
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        ) {
+                            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(
+                                    record.comicTitle,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    record.chapterTitle,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AuroraCoral,
+                                )
+                                val statusLine = when (record.status) {
+                                    ComicDownloadStatus.QUEUED -> "排队等待 · $maxPages 页"
+                                    ComicDownloadStatus.RESOLVING -> "正在解析章节…"
+                                    ComicDownloadStatus.DOWNLOADING -> "下载中 ${record.downloadedPages}/$maxPages 页 ($pct%)"
+                                    ComicDownloadStatus.COMPLETED -> "已完成 · $maxPages 页"
+                                    ComicDownloadStatus.PAUSED -> "已暂停 · ${record.downloadedPages}/$maxPages 页"
+                                    ComicDownloadStatus.FAILED -> record.errorMessage?.takeIf { it.isNotBlank() }?.let { "失败: $it" } ?: "下载失败"
+                                }
+                                Text(
+                                    statusLine,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (record.status == ComicDownloadStatus.FAILED) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                if (record.status == ComicDownloadStatus.DOWNLOADING ||
+                                    record.status == ComicDownloadStatus.RESOLVING ||
+                                    record.status == ComicDownloadStatus.QUEUED
+                                ) {
+                                    LinearProgressIndicator(
+                                        progress = { record.progress.coerceIn(0f, 1f) },
+                                        color = AuroraCoral,
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                    )
+                                }
+                            }
+                            if (record.status == ComicDownloadStatus.FAILED) {
+                                IconButton(onClick = { onRetry(record.id) }) {
+                                    Icon(Icons.Default.Refresh, contentDescription = "重试下载")
+                                }
+                            }
+                            IconButton(onClick = { onRemove(record.id) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "删除任务")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ComicDetailsScreen(
     details: ComicDetails,
     onBack: () -> Unit,
     onChapter: (Int) -> Unit,
     onDownloadChapter: ((ComicChapter) -> Unit)? = null,
     onDownloadAll: (() -> Unit)? = null,
-    downloadedChapters: List<com.aurorashelf.app.data.comic.DownloadedComicChapter> = emptyList(),
+    downloadedChapters: List<DownloadedComicChapter> = emptyList(),
+    onOpenDownloadProgress: () -> Unit = {},
+    onRetryComicDownload: ((String) -> Unit)? = null,
 ) {
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -895,6 +1129,12 @@ private fun ComicDetailsScreen(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.semantics { heading() },
+                        )
+                        Spacer(Modifier.weight(1f))
+                        ComicDownloadProgressIcon(
+                            downloadedChapters = downloadedChapters,
+                            forceDark = false,
+                            onClick = onOpenDownloadProgress,
                         )
                     }
                 }
@@ -1019,21 +1259,47 @@ private fun ComicDetailsScreen(
                             modifier = Modifier.weight(1f),
                         )
 
-                        if (downloadRecord?.status == com.aurorashelf.app.data.comic.ComicDownloadStatus.COMPLETED) {
+                        if (downloadRecord?.status == ComicDownloadStatus.COMPLETED) {
                             Icon(
                                 Icons.Default.CheckCircle,
                                 contentDescription = "已离线",
                                 tint = Color(0xFF34C759),
                                 modifier = Modifier.size(20.dp).padding(end = 8.dp),
                             )
-                        } else if (downloadRecord?.status == com.aurorashelf.app.data.comic.ComicDownloadStatus.DOWNLOADING ||
-                                   downloadRecord?.status == com.aurorashelf.app.data.comic.ComicDownloadStatus.RESOLVING) {
+                        } else if (downloadRecord?.status == ComicDownloadStatus.DOWNLOADING ||
+                                   downloadRecord?.status == ComicDownloadStatus.RESOLVING ||
+                                   downloadRecord?.status == ComicDownloadStatus.QUEUED) {
+                            val pct = (downloadRecord.progress.coerceIn(0f, 1f) * 100).toInt()
+                            Text(
+                                text = "${downloadRecord.downloadedPages}/${maxOf(downloadRecord.totalPages, downloadRecord.downloadedPages)}页 · $pct%",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AuroraCoral,
+                                modifier = Modifier.padding(end = 6.dp),
+                            )
                             CircularProgressIndicator(
                                 progress = { downloadRecord.progress },
                                 color = AuroraCoral,
                                 modifier = Modifier.size(18.dp).padding(end = 8.dp),
                                 strokeWidth = 2.dp,
                             )
+                        } else if (downloadRecord?.status == ComicDownloadStatus.FAILED) {
+                            IconButton(
+                                onClick = {
+                                    if (onRetryComicDownload != null) {
+                                        onRetryComicDownload(downloadRecord.id)
+                                    } else {
+                                        onDownloadChapter?.invoke(chapter)
+                                    }
+                                },
+                                modifier = Modifier.size(28.dp).padding(end = 6.dp),
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = "重试下载章节",
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
                         } else if (onDownloadChapter != null) {
                             IconButton(
                                 onClick = { onDownloadChapter(chapter) },

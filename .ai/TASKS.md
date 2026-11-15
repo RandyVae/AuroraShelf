@@ -1,5 +1,7 @@
 # Active
 
+- [x] 全量 Bug 筛查与修复、华视搜索修复、论坛图片单张与批量下载、视频及漫画下载进度实时查询与重试（`v2.16.34 / Build 260`）：双端修复华视 `.search-box` 解析并加入 `/index.php/ajax/suggest` 联想与搜索排名优化、落地论坛单图与全帖批量存图及相册权限/去重、打通统一「离线缓存」视频/漫画进度查询与失败重试（含漫画库顶部弹窗）、扩展包子图床镜像并新增 9 项回归单测；完成版本号全仓更新、`./gradlew testDebugUnitTest`、iOS 目标 XCTest（84/84 通过＋2 跳过）与 `SwipeBackTests`（9/9 通过）、Android `emulator-5554` R8 APK 与 iPhone 17 / iPad Pro 13-inch (M5) Release 实测、`LiveVideoSourceAuditTests` 18/20 通过（`javsb` 外部 TLS EOF、`spankbang` 外部 HTTP 403）、Node 探针 33/35 通过，以及 `./scripts/publish_ota.sh Release` 原子发布（`Netgrey.apk` 198M / `Netgrey.ipa` 194M，`bananarey.us` HTTPS 200 OK，远端 `/` 剩 `11G`）— 2026-11-15。
+
 - [x] 修复 iPad / Android 平板从竖屏转向横屏时视频详情页 YouTube 双栏布局失效问题（单播放器跨布局持久复用、700pt/700dp 平板分栏阈值、`ImmersiveNavigationController` `viewWillTransition` 传播与外层 `onGeometryChange` 尺寸兜底），固化 `SwipeBackTests` 旋转回归测试并升级版本至 `v2.16.33 / Build 259`，完成全源核验（iOS 19/20 视频、Android `app.data.*` 159/159、Node 33/35）、双端 Release 模拟器旋转实测、OTA 原子覆盖与 GitHub Release 发布 — 2026-11-15。
 
 - [x] 根治华视播放「有声音无画面」（iOS 27.2 `AttributeGraph` 布局循环冻结与多集骨架 `508.0pt` 水平溢出），清理全部临时 `[DIAG]` 日志并固化 `SwipeBackTests` 回归测试，升级版本至 `v2.16.32 / Build 258` 并完成双端 Release 打包、模拟器全检、OTA 原子覆盖与 GitHub Release 发布。

@@ -7,23 +7,98 @@ public enum OfflineTab: String, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
+public enum OfflineStatusFilter: String, CaseIterable, Identifiable {
+    case all = "全部"
+    case downloading = "下载中"
+    case completed = "已完成"
+    case failed = "失败"
+
+    public var id: String { rawValue }
+
+    func matches(videoStatus: OfflineDownloadStatus) -> Bool {
+        switch self {
+        case .all: return true
+        case .downloading: return videoStatus.isDownloading
+        case .completed: return videoStatus.isCompleted
+        case .failed:
+            if case .failed = videoStatus { return true }
+            return false
+        }
+    }
+
+    func matches(comicStatus: ComicDownloadStatus) -> Bool {
+        switch self {
+        case .all: return true
+        case .downloading: return comicStatus.isDownloading
+        case .completed: return comicStatus.isCompleted
+        case .failed:
+            if case .failed = comicStatus { return true }
+            return false
+        }
+    }
+}
+
 /// 离线缓存与双端下载管理界面（支持视频离线播放、漫画离线阅读、存储占用统计与分项管理）
 public struct OfflineDownloadsScreen: View {
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
     @ObservedObject private var comicDownloadManager = ComicDownloadManager.shared
+    public let showCloseButton: Bool
     public let onPlayVideo: (VideoItem) -> Void
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedTab: OfflineTab = .video
+    @State private var selectedTab: OfflineTab
+    @State private var statusFilter: OfflineStatusFilter = .all
     @State private var showingClearAlert = false
     @State private var editMode: EditMode = .inactive
     @State private var selectedItemIDs = Set<String>()
     
-    public init(onPlayVideo: @escaping (VideoItem) -> Void) {
+    public init(
+        initialTab: OfflineTab = .video,
+        showCloseButton: Bool = false,
+        onPlayVideo: @escaping (VideoItem) -> Void
+    ) {
+        self.showCloseButton = showCloseButton
         self.onPlayVideo = onPlayVideo
+        self._selectedTab = State(initialValue: initialTab)
+    }
+
+    private var totalActiveCount: Int {
+        downloadManager.activeItems.count + comicDownloadManager.activeChapters.count
+    }
+
+    private var combinedActiveProgress: Double {
+        let activeProgresses = downloadManager.activeItems.map(\.status.progressValue)
+            + comicDownloadManager.activeChapters.map(\.status.progressValue)
+        guard !activeProgresses.isEmpty else {
+            let hasCompleted = !downloadManager.completedItems.isEmpty || !comicDownloadManager.completedChapters.isEmpty
+            return hasCompleted ? 1.0 : 0.0
+        }
+        return activeProgresses.reduce(0, +) / Double(activeProgresses.count)
+    }
+
+    private var filteredVideoItems: [OfflineDownloadItem] {
+        downloadManager.items.filter { statusFilter.matches(videoStatus: $0.status) }
+    }
+
+    private var filteredComicChapters: [DownloadedComicChapter] {
+        comicDownloadManager.chapters.filter { statusFilter.matches(comicStatus: $0.status) }
+    }
+
+    private func filterCount(for filter: OfflineStatusFilter) -> Int {
+        switch selectedTab {
+        case .video:
+            return downloadManager.items.filter { filter.matches(videoStatus: $0.status) }.count
+        case .comic:
+            return comicDownloadManager.chapters.filter { filter.matches(comicStatus: $0.status) }.count
+        }
     }
     
     public var body: some View {
         VStack(spacing: 0) {
+                downloadOverviewCard
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+
                 // 分段选择器（视频 / 漫画）
                 Picker("下载类型", selection: $selectedTab) {
                     Text("视频 (\(downloadManager.items.count))").tag(OfflineTab.video)
@@ -31,8 +106,12 @@ public struct OfflineDownloadsScreen: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
+                .padding(.vertical, 6)
                 .background(AuroraColor.canvas)
+
+                statusFilterStrip
+                    .padding(.bottom, 6)
+                    .background(AuroraColor.canvas)
                 
                 Group {
                     switch selectedTab {
@@ -42,6 +121,12 @@ public struct OfflineDownloadsScreen: View {
                                 icon: "video.slash",
                                 title: "暂无离线视频",
                                 description: "在视频二级详情页轻点「缓存」按钮，即可将视频下载至本地，无网络也能随时流畅观看。"
+                            )
+                        } else if filteredVideoItems.isEmpty {
+                            emptyStateView(
+                                icon: "line.3.horizontal.decrease.circle",
+                                title: "当前筛选无视频任务",
+                                description: "可切换上方状态筛选查看进行中、已完成或失败的视频下载记录。"
                             )
                         } else {
                             videoDownloadsListView
@@ -53,6 +138,12 @@ public struct OfflineDownloadsScreen: View {
                                 title: "暂无离线漫画",
                                 description: "在漫画阅读器顶栏轻点「下载」按钮，即可将单话或全本漫画离线至沙盒，断网也能秒开畅读。"
                             )
+                        } else if filteredComicChapters.isEmpty {
+                            emptyStateView(
+                                icon: "line.3.horizontal.decrease.circle",
+                                title: "当前筛选无漫画任务",
+                                description: "可切换上方状态筛选查看进行中、已完成或失败的漫画下载记录。"
+                            )
                         } else {
                             comicDownloadsListView
                         }
@@ -63,10 +154,20 @@ public struct OfflineDownloadsScreen: View {
                 editMode = .inactive
                 selectedItemIDs.removeAll()
             }
-            .navigationTitle("离线缓存")
+            .onChange(of: statusFilter) { _, _ in
+                editMode = .inactive
+                selectedItemIDs.removeAll()
+            }
+            .navigationTitle("下载与离线中心")
             .navigationBarTitleDisplayMode(.inline)
             .environment(\.editMode, $editMode)
             .toolbar {
+                if showCloseButton {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("关闭") { dismiss() }
+                            .font(.body)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     let hasItems = selectedTab == .video ? !downloadManager.items.isEmpty : !comicDownloadManager.chapters.isEmpty
                     if hasItems {
@@ -132,6 +233,68 @@ public struct OfflineDownloadsScreen: View {
             }
     }
     
+    private var downloadOverviewCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: totalActiveCount > 0 ? "arrow.down.circle.fill" : "internaldrive.fill")
+                    .font(.title3)
+                    .foregroundStyle(AuroraColor.brand)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(totalActiveCount > 0 ? "正在后台下载 \(totalActiveCount) 项任务" : "下载与本地存储总览")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(AuroraColor.textPrimary)
+                    Text("视频 \(downloadManager.completedItems.count)/\(downloadManager.items.count) (\(downloadManager.formattedTotalSpace())) · 漫画 \(comicDownloadManager.completedChapters.count)/\(comicDownloadManager.chapters.count) (\(comicDownloadManager.formattedTotalSpace()))")
+                        .font(.caption)
+                        .foregroundStyle(AuroraColor.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if totalActiveCount > 0 {
+                    Text("\(Int(combinedActiveProgress * 100))%")
+                        .font(.caption.monospacedDigit().bold())
+                        .foregroundStyle(AuroraColor.brand)
+                }
+            }
+
+            if totalActiveCount > 0 {
+                ProgressView(value: combinedActiveProgress)
+                    .tint(AuroraColor.brand)
+            }
+        }
+        .padding(12)
+        .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private var statusFilterStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(OfflineStatusFilter.allCases, id: \.self) { filter in
+                    let count = filterCount(for: filter)
+                    let isSelected = statusFilter == filter
+                    Button {
+                        statusFilter = filter
+                    } label: {
+                        Text("\(filter.rawValue) (\(count))")
+                            .font(.caption.weight(isSelected ? .bold : .medium))
+                            .foregroundStyle(isSelected ? Color.white : AuroraColor.textSecondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
     private func emptyStateView(icon: String, title: String, description: String) -> some View {
         VStack(spacing: AuroraMetrics.spacingL) {
             Image(systemName: icon)
@@ -164,8 +327,8 @@ public struct OfflineDownloadsScreen: View {
                     .listRowBackground(Color.clear)
             }
             
-            Section(header: Text("视频缓存列表 (\(downloadManager.items.count))")) {
-                ForEach(downloadManager.items) { item in
+            Section(header: Text("视频缓存列表 (\(filteredVideoItems.count))")) {
+                ForEach(filteredVideoItems) { item in
                     downloadVideoRow(item: item)
                         .contentShape(Rectangle())
                         .onTapGesture {
@@ -231,11 +394,13 @@ public struct OfflineDownloadsScreen: View {
                             .font(.caption2)
                             .foregroundStyle(AuroraColor.brand)
                     }
-                case .downloading(let progress, _, _):
+                case .downloading(let progress, let written, let total):
                     VStack(alignment: .leading, spacing: 2) {
                         ProgressView(value: progress)
                             .tint(AuroraColor.brand)
-                        Text("正在缓存 \(Int(progress * 100))%")
+                        let writtenStr = ByteCountFormatter.string(fromByteCount: written, countStyle: .file)
+                        let totalStr = total > 0 ? " / \(ByteCountFormatter.string(fromByteCount: total, countStyle: .file))" : ""
+                        Text("正在下载 \(Int(progress * 100))% · \(writtenStr)\(totalStr)")
                             .font(.caption2)
                             .foregroundStyle(AuroraColor.textSecondary)
                     }
@@ -266,6 +431,16 @@ public struct OfflineDownloadsScreen: View {
                 Image(systemName: "play.circle.fill")
                     .font(.title2)
                     .foregroundStyle(AuroraColor.brand)
+            } else if case .failed = item.status {
+                Button {
+                    downloadManager.retryDownload(id: item.id)
+                } label: {
+                    Image(systemName: "arrow.clockwise.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(AuroraColor.brand)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("重试视频下载")
             }
         }
         .padding(.vertical, 4)
@@ -290,13 +465,16 @@ public struct OfflineDownloadsScreen: View {
                 .padding(.vertical, 4)
             }
 
-            Section(header: Text("已缓存章节 (\(comicDownloadManager.chapters.count))")) {
-                ForEach(comicDownloadManager.chapters) { item in
+            Section(header: Text("已缓存章节 (\(filteredComicChapters.count))")) {
+                ForEach(filteredComicChapters) { item in
                     downloadComicRow(item: item)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if editMode == .inactive && item.status.isCompleted {
+                            guard editMode == .inactive else { return }
+                            if item.status.isCompleted {
                                 openOfflineComic(item)
+                            } else if case .failed = item.status {
+                                comicDownloadManager.retryDownload(id: item.id)
                             }
                         }
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -337,7 +515,7 @@ public struct OfflineDownloadsScreen: View {
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
-                    Text("\(item.downloadedPages)/\(item.totalPages) 页")
+                    Text("\(item.downloadedPages)/\(max(item.totalPages, item.downloadedPages)) 页")
                         .font(.caption2.bold())
                         .foregroundStyle(AuroraColor.textSecondary)
 
@@ -360,7 +538,7 @@ public struct OfflineDownloadsScreen: View {
                     VStack(alignment: .leading, spacing: 2) {
                         ProgressView(value: progress)
                             .tint(AuroraColor.brand)
-                        Text("下载中 \(done)/\(total) (\(Int(progress * 100))%)")
+                        Text("下载中 \(done)/\(max(total, done)) (\(Int(progress * 100))%)")
                             .font(.caption2)
                             .foregroundStyle(AuroraColor.textSecondary)
                     }
@@ -391,6 +569,16 @@ public struct OfflineDownloadsScreen: View {
                 Image(systemName: "book.circle.fill")
                     .font(.title2)
                     .foregroundStyle(AuroraColor.brand)
+            } else if case .failed = item.status {
+                Button {
+                    comicDownloadManager.retryDownload(id: item.id)
+                } label: {
+                    Image(systemName: "arrow.clockwise.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(AuroraColor.brand)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("重试漫画下载")
             }
         }
         .padding(.vertical, 4)

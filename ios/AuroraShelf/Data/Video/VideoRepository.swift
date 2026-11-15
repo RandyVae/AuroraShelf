@@ -54,7 +54,7 @@ public struct CategoryShelf: Identifiable, Sendable, Equatable {
 @MainActor
 public final class VideoRepository: ObservableObject {
     public static let shared = VideoRepository()
-    private static let USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+    nonisolated private static let USER_AGENT = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
 
     // 默认使用 华视影院（大陆直连推荐）
     @Published public var currentSource: VideoSourceDefinition = VideoSourceCatalog.huavod
@@ -1484,16 +1484,46 @@ public final class VideoRepository: ObservableObject {
             .replacingOccurrences(of: "&gt;", with: ">")
     }
 
+    nonisolated private static func firstMatch(_ pattern: String, in text: String) -> String? {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive, .dotMatchesLineSeparators]) else {
+            return nil
+        }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        guard let match = regex.firstMatch(in: text, range: range),
+              match.numberOfRanges > 1,
+              let swiftRange = Range(match.range(at: 1), in: text) else {
+            return nil
+        }
+        return decodeBasicHtmlEntities(String(text[swiftRange])).trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    nonisolated private static func stripHtmlTags(_ raw: String) -> String {
+        decodeBasicHtmlEntities(raw.replacingOccurrences(of: #"<[^>]+>"#, with: " ", options: .regularExpression))
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     nonisolated func parseHuavodHtml(_ html: String, category: String) -> [VideoItem] {
         let heroSlides = Self.parseHuavodHeroSlides(from: html)
         let heroBannerByVodId = Dictionary(heroSlides.map { ($0.vodId, $0.bannerUrl) }, uniquingKeysWith: { first, _ in first })
 
+        // 截断右侧热播榜单边栏，避免搜索页卡片被“热播影片”边栏（如“玫瑰战争粤语”）污染
+        var mainHtml = html
+        for sidebarMarker in [#"<div[^>]*class=["'][^"']*wap-diy-vod-e[^"']*["']"#, #"<h5>\s*热播影片\s*</h5>"#] {
+            if let markerRange = mainHtml.range(of: sidebarMarker, options: .regularExpression) {
+                mainHtml = String(mainHtml[..<markerRange.lowerBound])
+                break
+            }
+        }
+
         var videos: [VideoItem] = []
         let rawCards: [String]
-        if html.contains("public-list-box") {
-            rawCards = Array(html.components(separatedBy: "public-list-box").dropFirst())
-        } else if html.contains("public-list-exp") {
-            rawCards = Array(html.components(separatedBy: "public-list-exp").dropFirst().map { "class=\"public-list-exp\"" + $0 })
+        if mainHtml.contains("search-box") {
+            rawCards = Array(mainHtml.components(separatedBy: "search-box").dropFirst())
+        } else if mainHtml.contains("public-list-box") {
+            rawCards = Array(mainHtml.components(separatedBy: "public-list-box").dropFirst())
+        } else if mainHtml.contains("public-list-exp") {
+            rawCards = Array(mainHtml.components(separatedBy: "public-list-exp").dropFirst().map { "class=\"public-list-exp\"" + $0 })
         } else {
             rawCards = []
         }
@@ -1512,17 +1542,23 @@ public final class VideoRepository: ObservableObject {
             let vodId = digits
             guard seenCardVodIds.insert(vodId).inserted else { continue }
 
-            var title = "视频 \(vodId)"
-            if let titleRange = card.range(of: #"title=["']([^"']+)["']"#, options: .regularExpression) {
-                let rawTitleAttr = String(card[titleRange])
-                if let cleaned = rawTitleAttr.split(separator: "\"").dropFirst().first ?? rawTitleAttr.split(separator: "'").dropFirst().first {
-                    title = Self.decodeBasicHtmlEntities(String(cleaned)).trimmingCharacters(in: .whitespacesAndNewlines)
-                }
-            } else if let timeTitleRange = card.range(of: #"class=["'][^"']*time-title[^"']*["'][^>]*>([^<]+)<"#, options: .regularExpression) {
-                let tagStr = String(card[timeTitleRange])
-                if let inside = tagStr.split(separator: ">").last?.split(separator: "<").first {
-                    title = Self.decodeBasicHtmlEntities(String(inside)).trimmingCharacters(in: .whitespacesAndNewlines)
-                }
+            var title = Self.firstMatch(#"<div[^>]*class=["'][^"']*thumb-txt[^"']*["'][^>]*>[\s\S]*?<a[^>]*>([^<]+)</a>"#, in: card)
+                ?? Self.firstMatch(#"<a[^>]+class=["'][^"']*public-list-exp[^"']*["'][^>]+title=["']([^"']+)["']"#, in: card)
+                ?? Self.firstMatch(#"<div[^>]*class=["'][^"']*time-title[^"']*["'][^>]*>([^<]+)</div>"#, in: card)
+                ?? ""
+            if title.isEmpty,
+               let attrTitle = Self.firstMatch(#"\btitle=["']([^"']+)["']"#, in: card),
+               !attrTitle.isEmpty {
+                title = attrTitle
+            }
+            if title.isEmpty,
+               let altTitle = Self.firstMatch(#"<img[^>]+alt=["']([^"']+)["']"#, in: card),
+               !altTitle.isEmpty {
+                title = altTitle.replacingOccurrences(of: #"(?:封面图|海报)$"#, with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            if title.isEmpty {
+                title = "视频 \(vodId)"
             }
 
             var coverUrl = ""
@@ -1567,6 +1603,7 @@ public final class VideoRepository: ObservableObject {
             }
 
             var rating = ""
+            var statusBadge = ""
             if let rateRange = card.range(of: #"<(?:i|span)[^>]*class=["'][^"']*ft4[^"']*["'][^>]*>([^<]+)<"#, options: .regularExpression)
                 ?? card.range(of: #"class=["'][^"']*public-list-prb[^"']*["'][^>]*>([^<]+)<"#, options: .regularExpression) {
                 let tagStr = String(card[rateRange])
@@ -1574,19 +1611,25 @@ public final class VideoRepository: ObservableObject {
                     let candidate = Self.decodeBasicHtmlEntities(String(inside)).trimmingCharacters(in: .whitespacesAndNewlines)
                     if candidate.range(of: #"^\d+(?:\.\d+)?$"#, options: .regularExpression) != nil {
                         rating = candidate
+                    } else if !candidate.isEmpty {
+                        statusBadge = candidate
                     }
                 }
             }
+
+            let rawElse = Self.firstMatch(#"<div[^>]*class=["'][^"']*thumb-else[^"']*["'][^>]*>([\s\S]*?)</div>"#, in: card) ?? ""
+            let cleanElse = rawElse.isEmpty ? "" : Self.stripHtmlTags(rawElse)
+            let subtitleText = cleanElse.isEmpty ? "华视影院 · \(category)" : "华视影院 · \(cleanElse)"
 
             let playbackPageUrl = "https://huavod.com/vodplay/\(vodId)-1-1.html"
             let item = VideoItem(
                 id: "hua-\(vodId)",
                 title: title,
-                subtitle: "华视影院 · \(category)",
+                subtitle: subtitleText,
                 coverUrl: coverUrl,
                 heroCoverUrl: heroBannerByVodId[vodId],
                 playbackUrl: playbackPageUrl,
-                duration: "",
+                duration: statusBadge,
                 rating: rating,
                 tags: ["华视影院", category],
                 category: category,
@@ -2041,6 +2084,7 @@ public final class VideoRepository: ObservableObject {
             return
         }
 
+        let preferredSourceName = currentSource.name
         let searchableSources = VideoSourceCatalog.searchableSources
         let results = await withTaskGroup(of: [VideoItem]?.self, returning: [[VideoItem]?].self) { group in
             for source in searchableSources {
@@ -2055,7 +2099,11 @@ public final class VideoRepository: ObservableObject {
             var collected: [[VideoItem]?] = []
             for await result in group {
                 collected.append(result)
-                let visible = collected.compactMap { $0 }.flatMap { $0 }
+                let visible = Self.sortSearchResults(
+                    collected.compactMap { $0 }.flatMap { $0 },
+                    query: trimmed,
+                    preferredSourceName: preferredSourceName
+                )
                 self.searchResults = visible
             }
             return collected
@@ -2066,7 +2114,11 @@ public final class VideoRepository: ObservableObject {
             return
         }
 
-        let allVideos = results.compactMap { $0 }.flatMap { $0 }
+        let allVideos = Self.sortSearchResults(
+            results.compactMap { $0 }.flatMap { $0 },
+            query: trimmed,
+            preferredSourceName: preferredSourceName
+        )
         searchResults = allVideos
         let failedFeedCount = results.filter { $0 == nil }.count
         if failedFeedCount == results.count {
@@ -2077,10 +2129,196 @@ public final class VideoRepository: ObservableObject {
         isSearching = false
     }
 
+    nonisolated static func sortSearchResults(
+        _ items: [VideoItem],
+        query: String,
+        preferredSourceName: String
+    ) -> [VideoItem] {
+        let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let queryTokens = normalizedQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        var deduped: [VideoItem] = []
+        var seenIDs = Set<String>()
+        for item in items where seenIDs.insert(item.id).inserted {
+            deduped.append(item)
+        }
+
+        return deduped.enumerated().sorted { lhs, rhs in
+            let lScore = searchRelevanceScore(lhs.element, query: normalizedQuery, tokens: queryTokens, preferredSourceName: preferredSourceName)
+            let rScore = searchRelevanceScore(rhs.element, query: normalizedQuery, tokens: queryTokens, preferredSourceName: preferredSourceName)
+            if lScore != rScore {
+                return lScore > rScore
+            }
+            return lhs.offset < rhs.offset
+        }.map(\.element)
+    }
+
+    nonisolated private static func searchRelevanceScore(
+        _ item: VideoItem,
+        query: String,
+        tokens: [String],
+        preferredSourceName: String
+    ) -> Int {
+        let title = item.title.lowercased()
+        var score = 0
+        if !query.isEmpty {
+            if title == query {
+                score += 400
+            } else if title.hasPrefix(query) {
+                score += 300
+            } else if title.contains(query) {
+                score += 200
+            } else if tokens.count > 1 && tokens.allSatisfy({ title.contains($0) }) {
+                score += 150
+            }
+        }
+        if item.sourceName == preferredSourceName {
+            score += 40
+        } else if item.sourceName == "华视影院" {
+            score += 30
+        }
+        return score
+    }
+
+    nonisolated static func parseHuavodSuggestJson(_ data: Data, category: String = "搜索") -> [VideoItem] {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let list = root["list"] as? [[String: Any]] else {
+            return []
+        }
+        var results: [VideoItem] = []
+        var seenIds = Set<String>()
+        for entry in list {
+            let vodId: String
+            if let strId = entry["id"] as? String {
+                vodId = strId.trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if let numId = entry["id"] as? NSNumber {
+                vodId = numId.stringValue
+            } else {
+                continue
+            }
+            guard !vodId.isEmpty, seenIds.insert(vodId).inserted else { continue }
+            guard let rawName = entry["name"] as? String else { continue }
+            let title = decodeBasicHtmlEntities(rawName).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty else { continue }
+
+            var coverUrl = (entry["pic"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if coverUrl.hasPrefix("//") {
+                coverUrl = "https:" + coverUrl
+            } else if coverUrl.hasPrefix("/") {
+                coverUrl = "https://huavod.com" + coverUrl
+            }
+            if coverUrl.isEmpty || coverUrl.contains("dbzy.tv") || coverUrl.contains("dbzy5.com") {
+                coverUrl = DoubanPosterResolver.shared.quickLookup(for: title) ?? ""
+            } else {
+                coverUrl = DoubanPosterResolver.upgradePosterURL(coverUrl) ?? coverUrl
+            }
+
+            results.append(VideoItem(
+                id: "hua-\(vodId)",
+                title: title,
+                subtitle: "华视影院 · 精准匹配",
+                coverUrl: coverUrl,
+                heroCoverUrl: nil,
+                playbackUrl: "https://huavod.com/vodplay/\(vodId)-1-1.html",
+                duration: "",
+                rating: "",
+                tags: ["华视影院", category],
+                category: category,
+                isTop10: false,
+                rankNumber: nil,
+                sourceName: "华视影院"
+            ))
+        }
+        return results
+    }
+
+    nonisolated static func huavodTrendingFallbackPath(for query: String) -> String? {
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch q {
+        case "最新电影", "热门精选", "4K 超清":
+            return "/vodshow/1.html"
+        case "热门连续剧":
+            return "/vodshow/2.html"
+        case "高分综艺":
+            return "/vodshow/3.html"
+        case "热血动漫":
+            return "/vodshow/4.html"
+        case "经典港片":
+            return "/vodshow/1---%E9%A6%99%E6%B8%AF--.html"
+        case "悬疑惊悚":
+            return "/vodshow/1---%E6%82%AC%E7%96%91--.html"
+        case "科幻大片":
+            return "/vodshow/1---%E7%A7%91%E5%B9%BB--.html"
+        default:
+            return nil
+        }
+    }
+
+    private func searchHuavodVideos(query: String, source: VideoSourceDefinition) async throws -> [VideoItem] {
+        let baseUrl = HTMLVideoSourceAdapter.baseURL(for: source)
+        let htmlURL = HTMLVideoSourceAdapter.searchURL(for: source, query: query)
+        var suggestComponents = URLComponents(string: baseUrl + "/index.php/ajax/suggest")
+        suggestComponents?.queryItems = [
+            URLQueryItem(name: "mid", value: "1"),
+            URLQueryItem(name: "wd", value: query),
+            URLQueryItem(name: "limit", value: "20")
+        ]
+        let suggestURL = suggestComponents?.url
+
+        async let htmlItemsTask: [VideoItem] = {
+            guard let htmlURL else { return [] }
+            var req = URLRequest(url: htmlURL)
+            req.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
+            req.setValue(baseUrl + "/", forHTTPHeaderField: "Referer")
+            req.setValue("text/html,application/xhtml+xml,*/*;q=0.8", forHTTPHeaderField: "Accept")
+            guard let data = try? await requestFeedData(for: req, source: source.name),
+                  let html = String(data: data, encoding: .utf8) else {
+                return []
+            }
+            return parseHuavodHtml(html, category: "搜索")
+        }()
+
+        async let suggestItemsTask: [VideoItem] = {
+            guard let suggestURL else { return [] }
+            var req = URLRequest(url: suggestURL)
+            req.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
+            req.setValue(baseUrl + "/", forHTTPHeaderField: "Referer")
+            req.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
+            guard let data = try? await requestFeedData(for: req, source: source.name) else {
+                return []
+            }
+            return Self.parseHuavodSuggestJson(data, category: "搜索")
+        }()
+
+        let htmlItems = await htmlItemsTask
+        let suggestItems = await suggestItemsTask
+
+        var merged = htmlItems
+        var seenIds = Set(htmlItems.map(\.id))
+        for item in suggestItems where seenIds.insert(item.id).inserted {
+            merged.append(item)
+        }
+
+        if merged.isEmpty, let fallbackPath = Self.huavodTrendingFallbackPath(for: query),
+           let fallbackURL = URL(string: baseUrl + fallbackPath) {
+            var req = URLRequest(url: fallbackURL)
+            req.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
+            req.setValue(baseUrl + "/", forHTTPHeaderField: "Referer")
+            if let data = try? await requestFeedData(for: req, source: source.name),
+               let html = String(data: data, encoding: .utf8) {
+                merged = Array(parseHuavodHtml(html, category: query).prefix(12))
+            }
+        }
+        return merged
+    }
+
     private func searchVideos(for source: VideoSourceDefinition, query: String) async throws -> [VideoItem] {
         guard VideoSourceCatalog.isSupported(source),
               let url = HTMLVideoSourceAdapter.searchURL(for: source, query: query) else {
             throw VideoFeedError.unsupportedSource(source: source.name)
+        }
+
+        if source.id == VideoSourceCatalog.huavod.id {
+            return try await searchHuavodVideos(query: query, source: source)
         }
 
         if source.id == VideoSourceCatalog.x134.id {

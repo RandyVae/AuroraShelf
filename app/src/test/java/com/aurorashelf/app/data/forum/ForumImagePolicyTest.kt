@@ -1,5 +1,6 @@
 package com.aurorashelf.app.data.forum
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -136,5 +137,18 @@ class ForumImagePolicyTest {
                 "https://forum.example.com@evil.example/attachments/cover.jpg",
             ),
         )
+    }
+
+    @Test
+    fun deduplicateForumImageUrls_filtersInvalidAndDeduplicatesByNormalizedKey() {
+        val input = listOf(
+            "https://img.example/a.jpg",
+            " https://img.example/a.jpg/ ",
+            "ftp://img.example/bad.jpg",
+            "not-a-url",
+            "https://img.example/b.png",
+        )
+        val deduped = deduplicateForumImageUrls(input)
+        assertEquals(listOf("https://img.example/a.jpg", "https://img.example/b.png"), deduped)
     }
 }

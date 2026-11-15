@@ -420,6 +420,14 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         downloadManager.removeDownload(id)
     }
 
+    fun retryComicDownload(id: String) {
+        downloadManager.retryDownload(id, repository)
+    }
+
+    fun clearAllComicDownloads() {
+        downloadManager.removeAll()
+    }
+
     private fun loadChapter(details: ComicDetails, index: Int) {
         if (index !in details.chapters.indices) return
         val chapter = details.chapters[index]

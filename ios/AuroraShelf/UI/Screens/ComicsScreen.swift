@@ -509,6 +509,7 @@ public struct ComicHeroBanner: View {
 
 public struct ComicsScreen: View {
     @ObservedObject public var repo = ComicRepository.shared
+    @ObservedObject private var comicDownloadManager = ComicDownloadManager.shared
     public let onOpenSearch: () -> Void
     @State private var detailTask: Task<Void, Never>?
     @State private var detailLoadingState = ComicDetailLoadingState()
@@ -521,6 +522,7 @@ public struct ComicsScreen: View {
     @State private var spotlightIndex: Int = 0
     @State private var selectedComicForRetry: ComicItem?
     @State private var isScrolled: Bool = false
+    @State private var showDownloadCenter = false
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -636,6 +638,30 @@ public struct ComicsScreen: View {
                     AirPlayRoutePicker()
                         .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
 
+                    Button {
+                        showDownloadCenter = true
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: comicDownloadManager.activeChapters.isEmpty ? "arrow.down.circle" : "arrow.down.circle.fill")
+                                .font(.body)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(comicDownloadManager.activeChapters.isEmpty ? Color.primary : AuroraColor.brand)
+
+                            if !comicDownloadManager.activeChapters.isEmpty {
+                                Text("\(comicDownloadManager.activeChapters.count)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 1)
+                                    .background(AuroraColor.brand, in: Capsule())
+                                    .offset(x: 6, y: -5)
+                            }
+                        }
+                    }
+                    .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("漫画下载进度")
+
                     Button(action: onOpenSearch) {
                         Image(systemName: "magnifyingglass")
                             .font(.body)
@@ -701,6 +727,11 @@ public struct ComicsScreen: View {
         }
         .sheet(isPresented: $showPicacgLogin) {
             picacgLoginSheet
+        }
+        .sheet(isPresented: $showDownloadCenter) {
+            NavigationStack {
+                OfflineDownloadsScreen(initialTab: .comic, showCloseButton: true, onPlayVideo: { _ in })
+            }
         }
         .onAppear {
             let args = CommandLine.arguments
