@@ -260,10 +260,33 @@ public struct MainContainerView: View {
     }
 }
 
-private final class ImmersiveNavigationController: UINavigationController {
+final class ImmersiveNavigationController: UINavigationController {
     override var childForStatusBarHidden: UIViewController? { topViewController }
     override var childForStatusBarStyle: UIViewController? { topViewController }
     override var childForHomeIndicatorAutoHidden: UIViewController? { topViewController }
+
+    override func viewWillTransition(
+        to size: CGSize,
+        with coordinator: UIViewControllerTransitionCoordinator
+    ) {
+        super.viewWillTransition(to: size, with: coordinator)
+        coordinator.animate(alongsideTransition: { _ in
+            let bounds = CGRect(origin: .zero, size: size)
+            self.view.frame = bounds
+            for vc in self.viewControllers {
+                vc.view.frame = bounds
+                vc.view.setNeedsLayout()
+                vc.view.layoutIfNeeded()
+            }
+        }, completion: { _ in
+            let bounds = CGRect(origin: .zero, size: self.view.bounds.size)
+            for vc in self.viewControllers {
+                vc.view.frame = bounds
+                vc.view.setNeedsLayout()
+                vc.view.layoutIfNeeded()
+            }
+        })
+    }
 }
 
 private struct ImmersiveNavigationHost<Route: Hashable, RootContent: View, DestinationContent: View>: UIViewControllerRepresentable {
@@ -305,6 +328,7 @@ private struct ImmersiveNavigationHost<Route: Hashable, RootContent: View, Desti
             } else {
                 let destVC = UIHostingController(rootView: destinationContent(route))
                 destVC.view.backgroundColor = .black
+                destVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
                 coord.destinationController = destVC
                 coord.displayedRoute = route
                 let showBar = showsNavigationBar(route)
@@ -354,7 +378,7 @@ private struct ImmersiveNavigationHost<Route: Hashable, RootContent: View, Desti
             didShow viewController: UIViewController,
             animated: Bool
         ) {
-            if viewController === rootController {
+            if viewController === rootController, displayedRoute != nil {
                 displayedRoute = nil
                 destinationController = nil
                 if parent.activeRoute != nil {

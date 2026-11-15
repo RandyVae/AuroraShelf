@@ -187,5 +187,143 @@ final class SwipeBackTests: XCTestCase {
         // Verifies hosting view remains strictly constrained to window bounds (no 508pt skeleton overflow).
         XCTAssertLessThanOrEqual(detailVC.view.bounds.width, window.bounds.width + 1.0)
         window.isHidden = true
+        window.rootViewController = nil
+    }
+
+    @MainActor
+    func testVideoDetailRotatesFromPortraitToLandscapePreservesSinglePlayerSurface() async throws {
+        try XCTSkipUnless(
+            UIDevice.current.userInterfaceIdiom == .pad,
+            "YouTube 分栏横屏旋转回归测试仅在 iPad 模拟器上验证"
+        )
+
+        func firstSubview<T: UIView>(ofType _: T.Type, in root: UIView) -> T? {
+            if let match = root as? T { return match }
+            for subview in root.subviews {
+                if let match = firstSubview(ofType: T.self, in: subview) {
+                    return match
+                }
+            }
+            return nil
+        }
+
+        final class ImmediateTransitionCoordinator: NSObject, UIViewControllerTransitionCoordinator {
+            var isAnimated: Bool { false }
+            var presentationStyle: UIModalPresentationStyle { .none }
+            var initiallyInteractive: Bool { false }
+            var isInterruptible: Bool { false }
+            var isInteractive: Bool { false }
+            var isCancelled: Bool { false }
+            var transitionDuration: TimeInterval { 0 }
+            var percentComplete: CGFloat { 1 }
+            var completionVelocity: CGFloat { 0 }
+            var completionCurve: UIView.AnimationCurve { .linear }
+            var containerView: UIView { UIView() }
+            var targetTransform: CGAffineTransform { .identity }
+            func viewController(forKey key: UITransitionContextViewControllerKey) -> UIViewController? { nil }
+            func view(forKey key: UITransitionContextViewKey) -> UIView? { nil }
+            func animate(alongsideTransition animation: ((UIViewControllerTransitionCoordinatorContext) -> Void)?, completion: ((UIViewControllerTransitionCoordinatorContext) -> Void)?) -> Bool {
+                animation?(self)
+                completion?(self)
+                return true
+            }
+            func animateAlongsideTransition(in view: UIView?, animation: ((UIViewControllerTransitionCoordinatorContext) -> Void)?, completion: ((UIViewControllerTransitionCoordinatorContext) -> Void)?) -> Bool {
+                animation?(self)
+                completion?(self)
+                return true
+            }
+            func notifyWhenInteractionEnds(_ handler: @escaping (UIViewControllerTransitionCoordinatorContext) -> Void) {}
+            func notifyWhenInteractionChanges(_ handler: @escaping (UIViewControllerTransitionCoordinatorContext) -> Void) {}
+        }
+
+        let portraitSize = CGSize(width: 1032, height: 1376)
+        let landscapeSize = CGSize(width: 1376, height: 1032)
+
+        let video = VideoItem(
+            id: "pad-rotation-1",
+            title: "iPad Rotation Split Layout Verification",
+            subtitle: "DirectTest",
+            coverUrl: "",
+            playbackUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+            sourceName: "DirectTest"
+        )
+
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first
+        let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: CGRect(origin: .zero, size: portraitSize))
+        let containerVC = UIViewController()
+        let rootVC = UIHostingController(rootView: Text("Root"))
+        let nav = ImmersiveNavigationController(rootViewController: rootVC)
+        let detailVC = UIHostingController(rootView: VideoDetailPlaybackScreen(video: video, onDismiss: {}))
+        nav.setNavigationBarHidden(true, animated: false)
+        nav.pushViewController(detailVC, animated: false)
+
+        containerVC.addChild(nav)
+        containerVC.view.addSubview(nav.view)
+        nav.view.autoresizingMask = []
+        nav.view.frame = CGRect(origin: .zero, size: portraitSize)
+        nav.didMove(toParent: containerVC)
+
+        window.rootViewController = containerVC
+        window.makeKeyAndVisible()
+        defer {
+            window.isHidden = true
+            window.rootViewController = nil
+        }
+        containerVC.view.layoutIfNeeded()
+        nav.view.layoutIfNeeded()
+
+        for _ in 0..<25 {
+            if firstSubview(ofType: AuroraPlayerSurface.PlayerUIView.self, in: detailVC.view) != nil {
+                break
+            }
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+
+        let portraitPlayerView = try XCTUnwrap(
+            firstSubview(ofType: AuroraPlayerSurface.PlayerUIView.self, in: detailVC.view),
+            "竖屏态应已挂载 PlayerUIView"
+        )
+        nav.view.layoutIfNeeded()
+        detailVC.view.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 250_000_000)
+        XCTAssertEqual(portraitPlayerView.bounds.width, portraitSize.width, accuracy: 2.0)
+
+        // Simulate iPad rotation from portrait (1032x1376) to landscape (1376x1032)
+        let coordinator = ImmediateTransitionCoordinator()
+        nav.view.frame = CGRect(origin: .zero, size: landscapeSize)
+        nav.viewWillTransition(to: landscapeSize, with: coordinator)
+        nav.view.layoutIfNeeded()
+        detailVC.view.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 350_000_000)
+
+        let landscapePlayerView = try XCTUnwrap(
+            firstSubview(ofType: AuroraPlayerSurface.PlayerUIView.self, in: detailVC.view),
+            "横屏分栏态 PlayerUIView 必须持续存在"
+        )
+        let expectedSplitWidth = VideoDetailLayout.columns(for: landscapeSize, idiom: .pad)
+            .playerWidth(for: landscapeSize.width)
+        XCTAssertTrue(
+            portraitPlayerView === landscapePlayerView,
+            "竖屏转向横屏分栏态期间必须保留同一个 PlayerUIView 实例，严禁销毁重建导致黑屏"
+        )
+        XCTAssertEqual(
+            landscapePlayerView.bounds.width,
+            expectedSplitWidth,
+            accuracy: 2.0,
+            "iPad 横屏态播放器宽度应精确匹配左栏分栏宽度"
+        )
+
+        // Simulate rotating back from landscape to portrait
+        nav.view.frame = CGRect(origin: .zero, size: portraitSize)
+        nav.viewWillTransition(to: portraitSize, with: coordinator)
+        nav.view.layoutIfNeeded()
+        detailVC.view.layoutIfNeeded()
+        try await Task.sleep(nanoseconds: 350_000_000)
+
+        let restoredPlayerView = firstSubview(ofType: AuroraPlayerSurface.PlayerUIView.self, in: detailVC.view)
+        XCTAssertTrue(portraitPlayerView === restoredPlayerView)
+        XCTAssertEqual(landscapePlayerView.bounds.width, portraitSize.width, accuracy: 2.0)
     }
 }

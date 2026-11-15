@@ -1190,7 +1190,11 @@ private fun LivePlayerScreen(
             .background(AuroraImmersiveBackground)
             .testTag("live-player"),
     ) {
-        val isTwoPaneLandscape = !isFullscreen && maxWidth >= 840.dp && maxWidth > maxHeight
+        val isTwoPaneLandscape = shouldUseTwoPaneLandscapeLayout(
+            width = maxWidth,
+            height = maxHeight,
+            isFullscreen = isFullscreen,
+        )
         val leftPaneWidthFraction = if (isTwoPaneLandscape) 0.62f else 1f
         val safeAspectRatio = videoAspectRatio.coerceAtLeast(0.5f)
         val playerModifier = when {

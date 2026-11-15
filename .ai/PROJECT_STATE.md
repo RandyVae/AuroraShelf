@@ -1,6 +1,21 @@
 # Project State
 
-## 最新工作状态（2026年11月15日 · iOS 27.2 AttributeGraph 布局死循环根治（华视有声音无画面）＋多集骨架溢出修复＋回归测试与双端 Release 交付 · v2.16.32 Build 258）
+## 最新工作状态（2026年11月15日 · iPad / Android 平板竖屏转横屏播放详情页 YouTube 双栏布局失效与单播放器复用修复＋回归单测＋双端 Release 验证与 OTA 发布 · v2.16.33 Build 259）
+
+- **版本号同步升级至 `v2.16.33 (Build 259)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`ios/AuroraShelf/Resources/www/index.html`（`Version 2.16.33`）、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`。
+- **iPad 竖屏转向横屏 YouTube 双栏失效修复（iOS）**：
+  - [VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift)：将 `topPlayerContainer` 提升为跨 `.stacked`、`.padLandscapeSplit` 与全屏模式共享的单个持久子视图，消除旋转切换分支触发 `AuroraPlayerSurface.dismantleUIView` 销毁与双表面竞争问题；补充外层 `.onGeometryChange` 视口尺寸回退（`measuredViewportSize`）、显式分栏裁剪与横向 `ScrollView` 工具条包裹。
+  - [DeviceLayoutProfile.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Theme/DeviceLayoutProfile.swift)：将 `VideoDetailLayout.mode(size:idiom:)` 平板横屏双栏宽度阈值从 `900` 调整至 `700`。
+  - [MainContainerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/MainContainerView.swift)：将 `ImmersiveNavigationController` 改为 `internal final class`，补齐 `viewWillTransition(to:with:)` 尺寸传播与 `didShow` 保护。
+  - [SwipeBackTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/SwipeBackTests.swift)：完善 `testVideoDetailPlaybackScreenUpdatesInsideNavigationHostWithoutLayoutFreeze` 与 `testVideoDetailRotatesFromPortraitToLandscapePreservesSinglePlayerSurface` 窗口挂载宿主与 `defer` 清理并移除 `RunLoop.main.run(until:)`（`DeviceLayoutTests` 7/7 + `SwipeBackTests` 9/9 = **16/16 通过**）。
+- **Android 平板双端同权修复（Android）**：
+  - [PlayerScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PlayerScreen.kt) 与 [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt)：新增统一判定 `shouldUseTwoPaneLandscapeLayout`（`!isFullscreen && width >= 700.dp && width > height`），将 `NativeSitePlayer` 与 `FloatingCastStatusBanner` 提升为跨竖屏 / 横屏双栏 / 全屏模式持续复用的单一子组件，避免旋转重建。
+- **全量验证与 OTA 交付结果**：
+  - **iOS / iPadOS**：`Release` 构建 `BUILD SUCCEEDED`；`iPad Pro 13-inch (M5)` Release 实测华视 `折月亮` Portrait -> Landscape（70/30 YouTube 双栏＋实时画面）-> Portrait 与直播 `asuncionbalduf` Portrait -> Landscape（70/30 双栏＋聊天与推荐）均流畅无黑屏；`iPhone 18 Pro` Release 实测 `折月亮` 播放与首页通过；`TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1` 全量 182 项 **179 通过 / 3 失败**（19/20 视频源通过，仅 `javsb` 外部 TLS 错误；论坛 20/20、直播适配器 5/5、无鉴权漫画 8/9，外部 `baozi` 图片 CDN `httpStatus(403)` 致 2 项 Baozi 测试失败、`picacg` 缺凭据跳过、`X134SourceServiceTests` 3/3、`UniversalVideoEngineTests` 48/48、`VideoPreloadManagerTests` 9/9）；非在线运行 **182 项 174 通过 / 7 跳过 / 1 失败**（`ComicRepositoryTests.testBaoziLiveFetchComicsChaptersAndPages` 外部 403）。
+  - **Android**：`./gradlew testDebugUnitTest lintDebug assembleRelease` `BUILD SUCCESSFUL`（`2m 15s`，Release APK `197M`）；完整非在线单元测试 **42 套件 262 项 254 通过 / 8 跳过 / 0 失败 / 0 错误**；`RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1 --tests "com.aurorashelf.app.data.*"` **25 套件 159/159（含 5 个实时测试类 20/20）全通过**；`emulator-5554` R8 APK 实测平板首页、播放器 Portrait -> Landscape（62%/38% YouTube 双栏与续播）-> Portrait 及直播间（`mirabrunette`）Portrait -> Landscape 通过并恢复 `1080x2400`。
+  - **Node 探针与 OTA 发布**：`node scripts/probe_all_sources.mjs` 35 源 **33 通过 / 2 外部受限**（`JAVSB` `CONNECT_FAIL`、`禁漫天堂` `code=401`）；`https://bananarey.us` 验证 `index.html`（`21,658` bytes、`v2.16.33 (Build 259)`）、`manifest.plist`（`2.16.33`）、`Netgrey.apk`（`206,892,939` bytes / `198M`）、`Netgrey.ipa`（`202,679,105` bytes / `194M`）均 `HTTP/1.1 200 OK`，SSH 远端清理确认 `chmod 644`、零临时残留文件及 `/` 可用空间 `11G`（`29%`）。
+
+## 历史工作状态（2026年11月15日 · iOS 27.2 AttributeGraph 布局死循环根治（华视有声音无画面）＋多集骨架溢出修复＋回归测试与双端 Release 交付 · v2.16.32 Build 258）
 
 - **版本号同步升级至 `v2.16.32 (Build 258)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`（及软链 `ios/AuroraShelf/Resources/www/index.html`）、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`；`rg -n "2\.16\.31|257"` 无旧版本残留。
 - **华视「有声音无画面」根因定位与架构级修复（iOS 27.2 `AttributeGraph` 布局循环）**：

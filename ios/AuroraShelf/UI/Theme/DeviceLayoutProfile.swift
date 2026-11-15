@@ -337,7 +337,7 @@ public struct VideoDetailColumns: Equatable {
 
 public enum VideoDetailLayout {
     public static func mode(size: CGSize, idiom: UIUserInterfaceIdiom) -> VideoDetailLayoutMode {
-        guard idiom == .pad, size.width > size.height, size.width >= 900 else { return .stacked }
+        guard idiom == .pad, size.width > size.height, size.width >= 700 else { return .stacked }
         return .padLandscapeSplit
     }
 

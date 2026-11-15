@@ -63,6 +63,7 @@ public struct VideoDetailPlaybackScreen: View {
     @State private var isViewDismissed: Bool = false
     @State private var showDownloadToast: Bool = false
     @State private var downloadToastText: String = ""
+    @State private var measuredViewportSize: CGSize = .zero
     @State private var measuredSafeInsets: EdgeInsets = {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
         return EdgeInsets(top: isPad ? 24 : 59, leading: 0, bottom: isPad ? 20 : 34, trailing: 0)
@@ -122,82 +123,121 @@ public struct VideoDetailPlaybackScreen: View {
                 .allowsHitTesting(false)
 
             GeometryReader { screenGeo in
-                let screenSize = screenGeo.size
+                let rawSize = screenGeo.size
+                let screenSize = (rawSize.width > 0 && rawSize.height > 0) ? rawSize : measuredViewportSize
+                let isPad = UIDevice.current.userInterfaceIdiom == .pad
                 let layoutMode = VideoDetailLayout.mode(size: screenSize, idiom: UIDevice.current.userInterfaceIdiom)
-                ZStack(alignment: .top) {
-                    AuroraColor.canvas.ignoresSafeArea()
+                let isSplitMode = (layoutMode == .padLandscapeSplit && !isFullScreen)
+                let columns = VideoDetailLayout.columns(for: screenSize, idiom: UIDevice.current.userInterfaceIdiom)
+                let playerWidth = columns.playerWidth(for: screenSize.width)
+                let recommendationWidth = max(0, columns.recommendationWidth(for: screenSize.width) - 1)
+                let isPhysicallyLandscape = screenSize.width > screenSize.height
+                // iPad 端依靠机身感应全向自然旋转，严禁施加 90 度强制逆向视图旋转
+                let isRotated = !isPad && isFullScreen && isLandscape && !isPhysicallyLandscape
+                let safeTop = resolvedSafeTop(in: screenSize)
+                let splitPlayerHeight = min(playerWidth * 9.0 / 16.0, screenSize.height * 0.62) + safeTop
+                let portraitPlayerHeight: CGFloat = {
+                    if isPad {
+                        return min(screenSize.height * 0.48, 440) + safeTop
+                    }
+                    if isPhysicallyLandscape {
+                        return min(screenSize.width * 9.0 / 16.0, screenSize.height * 0.62) + safeTop
+                    }
+                    return (screenSize.width * 9.0 / 16.0) + safeTop
+                }()
+                let containerWidth = isFullScreen ? screenSize.width : (isSplitMode ? playerWidth : screenSize.width)
+                let targetWidth = isRotated ? screenSize.height : containerWidth
+                let targetHeight: CGFloat = {
+                    if isFullScreen {
+                        return isRotated ? screenSize.width : screenSize.height
+                    }
+                    return isSplitMode ? splitPlayerHeight : portraitPlayerHeight
+                }()
 
-                if layoutMode == .padLandscapeSplit && !isFullScreen {
-                    let columns = VideoDetailLayout.columns(for: screenSize, idiom: UIDevice.current.userInterfaceIdiom)
-                    let playerWidth = columns.playerWidth(for: screenSize.width)
-                    let recommendationWidth = columns.recommendationWidth(for: screenSize.width)
-                    let safeTop = resolvedSafeTop(in: screenSize)
-                    let playerHeight = min(playerWidth * 9.0 / 16.0, screenSize.height * 0.62) + safeTop
-
-                    // iPad 横屏采用 YouTube 式双栏：左侧保持播放器与当前视频上下文，右侧独立滚动推荐。
-                    HStack(alignment: .top, spacing: 0) {
-                        VStack(spacing: 0) {
-                            topPlayerContainer(screenSize: screenSize, width: playerWidth, height: playerHeight)
-                                .zIndex(10)
-
-                            ScrollView(.vertical, showsIndicators: false) {
-                                detailScrollContent(includeRecommendations: false)
+                ZStack(alignment: .topLeading) {
+                    AuroraColor.canvas
+                        .ignoresSafeArea()
+                        .onGeometryChange(for: CGSize.self) { proxy in
+                            proxy.size
+                        } action: { newSize in
+                            guard newSize.width > 0, newSize.height > 0 else { return }
+                            if abs(newSize.width - measuredViewportSize.width) > 0.5 ||
+                                abs(newSize.height - measuredViewportSize.height) > 0.5 {
+                                measuredViewportSize = newSize
                             }
                         }
-                        .frame(width: playerWidth)
 
-                        Rectangle()
-                            .fill(AuroraColor.hairline)
-                            .frame(width: 1)
+                    // 详情、选集与推荐列表（仅当非全屏时渲染；播放器始终在 ZStack 顶层保持唯一实例，横竖屏与全屏切换零销毁）
+                    if !isFullScreen {
+                        if isSplitMode {
+                            // iPad 横屏采用 YouTube 式双栏：左侧保持播放器与当前视频上下文，右侧独立滚动推荐。
+                            HStack(alignment: .top, spacing: 0) {
+                                ScrollView(.vertical, showsIndicators: false) {
+                                    detailScrollContent(includeRecommendations: false, columnWidth: playerWidth)
+                                }
+                                .padding(.top, targetHeight)
+                                .frame(width: playerWidth, height: screenSize.height)
 
-                        ScrollView(.vertical, showsIndicators: false) {
-                            landscapeRecommendationRail(width: recommendationWidth)
-                        }
-                        .frame(width: recommendationWidth)
-                    }
-                    .transition(.opacity)
-                } else {
-                    VStack(spacing: 0) {
-                        // 1. 顶部播放器视口（支持原位动态展开至全屏，同一个 AVPlayer 实例不中断）
-                        topPlayerContainer(screenSize: screenSize)
-                            .zIndex(10)
+                                Rectangle()
+                                    .fill(AuroraColor.hairline)
+                                    .frame(width: 1, height: screenSize.height)
 
-                        // 2. 下方可滚动详情、选集与推荐内容（全屏时平滑折叠退场）
-                        if !isFullScreen {
-                            ScrollView(.vertical, showsIndicators: false) {
-                                detailScrollContent(includeRecommendations: true)
+                                ScrollView(.vertical, showsIndicators: false) {
+                                    landscapeRecommendationRail(width: recommendationWidth, safeTop: safeTop)
+                                }
+                                .frame(width: recommendationWidth, height: screenSize.height)
+                                .accessibilityIdentifier("video-detail-right-rail")
                             }
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                            .accessibilityIdentifier("video-detail-split-layout")
+                        } else {
+                            ScrollView(.vertical, showsIndicators: false) {
+                                detailScrollContent(includeRecommendations: true, columnWidth: screenSize.width)
+                            }
+                            .padding(.top, targetHeight)
+                            .frame(width: screenSize.width, height: screenSize.height)
+                            .accessibilityIdentifier("video-detail-stacked-layout")
                         }
                     }
-                }
-                
-                // 缓存状态浮动提示
-                if showDownloadToast {
-                    VStack {
-                        Spacer().frame(height: 240)
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.down.circle.fill")
-                                .foregroundStyle(AuroraColor.brand)
-                            Text(downloadToastText)
-                                .font(.subheadline.bold())
-                                .foregroundStyle(.white)
+
+                    // 顶部播放器视口（单一常驻实例：Portrait <-> LandscapeSplit <-> Fullscreen 全程不销毁/重建 AuroraPlayerSurface）
+                    topPlayerContainer(
+                        screenSize: screenSize,
+                        containerWidth: containerWidth,
+                        targetWidth: targetWidth,
+                        targetHeight: targetHeight,
+                        safeTop: safeTop,
+                        isRotated: isRotated
+                    )
+                    .zIndex(10)
+
+                    // 缓存状态浮动提示
+                    if showDownloadToast {
+                        VStack {
+                            Spacer().frame(height: 240)
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .foregroundStyle(AuroraColor.brand)
+                                Text(downloadToastText)
+                                    .font(.subheadline.bold())
+                                    .foregroundStyle(.white)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
+                            .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                            Spacer()
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
-                        .shadow(color: .black.opacity(0.3), radius: 10, y: 5)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                        Spacer()
+                        .frame(maxWidth: .infinity)
+                        .zIndex(20)
                     }
-                    .zIndex(20)
                 }
-            }
-            .frame(width: screenSize.width, height: screenSize.height)
+                .frame(width: screenSize.width, height: screenSize.height)
             }
             .ignoresSafeArea()
         }
+        .ignoresSafeArea()
         .toolbar(.hidden, for: .tabBar)
         .toolbar(.hidden, for: .navigationBar)
         .navigationBarHidden(true)
@@ -327,7 +367,7 @@ public struct VideoDetailPlaybackScreen: View {
     }
 
     @ViewBuilder
-    private func detailScrollContent(includeRecommendations: Bool) -> some View {
+    private func detailScrollContent(includeRecommendations: Bool, columnWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
             headerInfoSection
                 .padding(.top, AuroraMetrics.spacingM)
@@ -351,9 +391,11 @@ public struct VideoDetailPlaybackScreen: View {
             Spacer().frame(height: 60)
         }
         .padding(.horizontal, AuroraMetrics.contentInset)
+        .frame(width: max(0, columnWidth), alignment: .leading)
+        .clipped()
     }
 
-    private func landscapeRecommendationRail(width: CGFloat) -> some View {
+    private func landscapeRecommendationRail(width: CGFloat, safeTop: CGFloat) -> some View {
         let horizontalPadding: CGFloat = 14
         let thumbWidth = min(152, max(118, (width - horizontalPadding * 2 - 10) * 0.43))
         let thumbHeight = (thumbWidth * 9.0 / 16.0).rounded()
@@ -405,34 +447,23 @@ public struct VideoDetailPlaybackScreen: View {
             }
         }
         .padding(.horizontal, horizontalPadding)
-        .padding(.top, 20)
+        .padding(.top, max(safeTop + 8, 24))
         .padding(.bottom, 48)
     }
     
-    // MARK: - 1. 顶部播放器视口（内嵌 / 全屏通用）
+    // MARK: - 1. 顶部播放器视口（内嵌 / 全屏 / 横屏分栏单一常驻实例）
     
     @ViewBuilder
-    private func topPlayerContainer(screenSize: CGSize, width: CGFloat? = nil, height: CGFloat? = nil) -> some View {
+    private func topPlayerContainer(
+        screenSize: CGSize,
+        containerWidth: CGFloat,
+        targetWidth: CGFloat,
+        targetHeight: CGFloat,
+        safeTop: CGFloat,
+        isRotated: Bool
+    ) -> some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let isPhysicallyLandscape = screenSize.width > screenSize.height
-        // iPad 端依靠机身感应全向自然旋转，严禁施加 90 度强制逆向视图旋转
-        let isRotated = !isPad && isFullScreen && isLandscape && !isPhysicallyLandscape
-        let targetWidth = isRotated ? screenSize.height : (width ?? screenSize.width)
-        let safeTop = resolvedSafeTop(in: screenSize)
         let needsTopOffset = !isFullScreen && (!isLandscape || isPad)
-        let targetHeight: CGFloat = {
-            if let height, !isFullScreen {
-                return height
-            }
-            if isFullScreen {
-                return isRotated ? screenSize.width : screenSize.height
-            }
-            if isPad {
-                // iPad 宽屏内嵌态：严格限制播放器黄金视口高度，留出 >= 50% 竖向空间展现选集与简介，根治下半部被挤压问题
-                return min(screenSize.height * 0.48, 440) + safeTop
-            }
-            return (screenSize.width * 9.0 / 16.0) + safeTop
-        }()
         
         ZStack {
             Color.black
@@ -564,7 +595,7 @@ public struct VideoDetailPlaybackScreen: View {
         .frame(width: targetWidth, height: targetHeight)
         .rotationEffect(isRotated ? .degrees(90) : .zero)
         .frame(
-            width: isFullScreen ? screenSize.width : (width ?? screenSize.width),
+            width: isFullScreen ? screenSize.width : containerWidth,
             height: isFullScreen ? screenSize.height : targetHeight,
             alignment: .top
         )
@@ -1198,127 +1229,128 @@ public struct VideoDetailPlaybackScreen: View {
         let isDownloaded = downloadManager.isDownloaded(video: currentVideo, episode: currentEpisode)
         
         if isPad {
-            GlassEffectContainer(spacing: 12) {
-                HStack(spacing: 12) {
-                    // Apple TV 标志性主播放大胶囊（iOS 27 glassProminent）
-                    Button {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
-                        if isPlaying {
-                            togglePlayPause()
-                        } else {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                isFullScreen = true
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                .font(.system(size: 16, weight: .bold))
-                            Text(isPlaying ? "正在播放" : (currentEpisode != nil ? "播放 \(currentEpisode!.label)" : "立即播放"))
-                                .font(.system(size: 16, weight: .bold))
-                        }
-                        .frame(height: 34)
-                        .padding(.horizontal, 14)
-                    }
-                    .buttonStyle(.glassProminent)
-                    .buttonBorderShape(.capsule)
-                    .tint(AuroraColor.brand)
-                    
-                    // 加入片单
-                    let bookmarkButton = Button {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
-                        try? watchlist.setBookmarked(!isBookmarked, for: currentVideo)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: isBookmarked ? "bookmark.fill" : "plus")
-                                .font(.system(size: 15, weight: .bold))
-                            Text(isBookmarked ? "已在片单" : "加入片单")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .frame(height: 34)
-                        .padding(.horizontal, 8)
-                    }
-                    .buttonBorderShape(.capsule)
-
-                    if isBookmarked {
-                        bookmarkButton
-                            .buttonStyle(.glassProminent)
-                            .tint(AuroraColor.brand)
-                    } else {
-                        bookmarkButton
-                            .buttonStyle(.glass)
-                    }
-                    
-                    // 离线缓存
-                    Button {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
-                        if !isDownloaded {
-                            downloadManager.startDownload(video: currentVideo, episode: currentEpisode)
-                            showToast(text: "已加入缓存队列")
-                        } else {
-                            showToast(text: "该视频已完成离线缓存")
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isDownloaded {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Text("已缓存")
-                            } else if let status = downloadStatus, status.isDownloading {
-                                ProgressView(value: status.progressValue)
-                                    .frame(width: 16, height: 16)
-                                    .tint(AuroraColor.brand)
-                                Text("\(Int(status.progressValue * 100))%")
-                            } else {
-                                Image(systemName: "arrow.down.circle")
-                                Text("缓存")
-                            }
-                        }
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(height: 34)
-                        .padding(.horizontal, 8)
-                    }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.capsule)
-                    
-                    // 选集入口（多集时可见）
-                    if episodes.count > 1 {
+            ScrollView(.horizontal, showsIndicators: false) {
+                GlassEffectContainer(spacing: 12) {
+                    HStack(spacing: 12) {
+                        // Apple TV 标志性主播放大胶囊（iOS 27 glassProminent）
                         Button {
-                            isShowingEpisodePicker = true
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            if isPlaying {
+                                togglePlayPause()
+                            } else {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                    isFullScreen = true
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 16, weight: .bold))
+                                Text(isPlaying ? "正在播放" : (currentEpisode != nil ? "播放 \(currentEpisode!.label)" : "立即播放"))
+                                    .font(.system(size: 16, weight: .bold))
+                            }
+                            .frame(height: 34)
+                            .padding(.horizontal, 14)
+                        }
+                        .buttonStyle(.glassProminent)
+                        .buttonBorderShape(.capsule)
+                        .tint(AuroraColor.brand)
+                        
+                        // 加入片单
+                        let bookmarkButton = Button {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            try? watchlist.setBookmarked(!isBookmarked, for: currentVideo)
                         } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "square.stack.3d.down.right")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("选集 (\(episodes.count))")
+                                Image(systemName: isBookmarked ? "bookmark.fill" : "plus")
+                                    .font(.system(size: 15, weight: .bold))
+                                Text(isBookmarked ? "已在片单" : "加入片单")
                                     .font(.system(size: 14, weight: .semibold))
                             }
                             .frame(height: 34)
                             .padding(.horizontal, 8)
                         }
-                        .buttonStyle(.glass)
                         .buttonBorderShape(.capsule)
-                    }
-                    
-                    // 分享
-                    if let shareURL = URL(string: currentVideo.playbackUrl), !currentVideo.playbackUrl.isEmpty {
-                        ShareLink(item: shareURL) {
+
+                        if isBookmarked {
+                            bookmarkButton
+                                .buttonStyle(.glassProminent)
+                                .tint(AuroraColor.brand)
+                        } else {
+                            bookmarkButton
+                                .buttonStyle(.glass)
+                        }
+                        
+                        // 离线缓存
+                        Button {
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                            if !isDownloaded {
+                                downloadManager.startDownload(video: currentVideo, episode: currentEpisode)
+                                showToast(text: "已加入缓存队列")
+                            } else {
+                                showToast(text: "该视频已完成离线缓存")
+                            }
+                        } label: {
                             HStack(spacing: 6) {
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("分享")
-                                    .font(.system(size: 14, weight: .semibold))
+                                if isDownloaded {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                    Text("已缓存")
+                                } else if let status = downloadStatus, status.isDownloading {
+                                    ProgressView(value: status.progressValue)
+                                        .frame(width: 16, height: 16)
+                                        .tint(AuroraColor.brand)
+                                    Text("\(Int(status.progressValue * 100))%")
+                                } else {
+                                    Image(systemName: "arrow.down.circle")
+                                    Text("缓存")
+                                }
                             }
+                            .font(.system(size: 14, weight: .semibold))
                             .frame(height: 34)
                             .padding(.horizontal, 8)
                         }
                         .buttonStyle(.glass)
                         .buttonBorderShape(.capsule)
+                        
+                        // 选集入口（多集时可见）
+                        if episodes.count > 1 {
+                            Button {
+                                isShowingEpisodePicker = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "square.stack.3d.down.right")
+                                        .font(.system(size: 14, weight: .bold))
+                                    Text("选集 (\(episodes.count))")
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                                .frame(height: 34)
+                                .padding(.horizontal, 8)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.capsule)
+                        }
+                        
+                        // 分享
+                        if let shareURL = URL(string: currentVideo.playbackUrl), !currentVideo.playbackUrl.isEmpty {
+                            ShareLink(item: shareURL) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.system(size: 14, weight: .bold))
+                                    Text("分享")
+                                        .font(.system(size: 14, weight: .semibold))
+                                }
+                                .frame(height: 34)
+                                .padding(.horizontal, 8)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.capsule)
+                        }
                     }
-                    
-                    Spacer()
+                    .padding(.vertical, 2)
                 }
             }
         } else {

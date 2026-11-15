@@ -84,7 +84,23 @@ final class DeviceLayoutTests: XCTestCase {
             .padLandscapeSplit
         )
         XCTAssertEqual(
+            VideoDetailLayout.mode(size: CGSize(width: 1180, height: 820), idiom: .pad),
+            .padLandscapeSplit
+        )
+        XCTAssertEqual(
+            VideoDetailLayout.mode(size: CGSize(width: 744, height: 500), idiom: .pad),
+            .padLandscapeSplit
+        )
+        XCTAssertEqual(
             VideoDetailLayout.mode(size: CGSize(width: 1024, height: 1366), idiom: .pad),
+            .stacked
+        )
+        XCTAssertEqual(
+            VideoDetailLayout.mode(size: CGSize(width: 820, height: 1180), idiom: .pad),
+            .stacked
+        )
+        XCTAssertEqual(
+            VideoDetailLayout.mode(size: CGSize(width: 650, height: 500), idiom: .pad),
             .stacked
         )
         XCTAssertEqual(

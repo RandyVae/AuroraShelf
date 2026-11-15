@@ -761,6 +761,25 @@ Evidence:
 - Android: `./gradlew testDebugUnitTest lintDebug assembleRelease` (`42 suites, 261 tests: 253 passed, 8 skipped, 0 failures`; SARIF lint `0 errors, 0 warnings, 0 hints`); `RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` (**20/20 passed**); `emulator-5554` R8 Release APK (`258 / 2.16.32`) verified Home, Huavod playback, back teardown, forum scroll & re-entry playback (`timing first frame ms=2566` -> `ready ms=2744`).
 - Probe & OTA: `node scripts/probe_all_sources.mjs` (**33/35 passed**; `javsb` `CONNECT_FAIL`, `jm` `code=401`); `./scripts/publish_ota.sh Release` uploaded `Netgrey.apk` (`206,892,939` bytes) & `Netgrey.ipa` (`202,681,543` bytes) to `https://bananarey.us` (`HTTP/1.1 200 OK`, `manifest.plist` `2.16.32`, `11G` free).
 
+## Persistent single-player hosting & 700pt/700dp tablet landscape split layout (v2.16.33 Build 259)
+
+Date: 2026-11-15
+
+Status: Implemented, regression unit-tested, live-verified on iOS/iPadOS Release Simulators & Android R8 Release APK, and published via OTA.
+
+Decision:
+1. Keep the active video player as a single persistent child across Portrait stacked, Tablet Landscape two-pane split, and Fullscreen states on both platforms:
+   - iOS (`VideoDetailPlaybackScreen.swift`): lift `topPlayerContainer` out of mutually exclusive `if isSplitMode ... else ...` branches so `AuroraPlayerSurface` is never dismantled (`dismantleUIView`) or duplicated on rotation; add `onGeometryChange` viewport size fallback (`measuredViewportSize`), explicit split-column clipping, and horizontal `ScrollView` wrapping for the detail toolbar.
+   - iOS (`MainContainerView.swift`): expose `internal final class ImmersiveNavigationController` with `viewWillTransition(to:with:)` propagation and a `didShow` guard.
+   - Android (`PlayerScreen.kt`, `LiveScreen.kt`): hoist `NativeSitePlayer` and `FloatingCastStatusBanner` as persistent children in `BoxWithConstraints` using a shared `shouldUseTwoPaneLandscapeLayout` predicate.
+2. Lower the tablet two-pane landscape split width threshold to `700pt` (`DeviceLayoutProfile.swift` `VideoDetailLayout.mode(size:idiom:)`) and `700.dp` (`shouldUseTwoPaneLandscapeLayout`), matching actual tablet landscape geometry reliably across iPad models and Android tablets/foldables.
+3. Stabilize rotation regression tests in `SwipeBackTests.swift` (`testVideoDetailPlaybackScreenUpdatesInsideNavigationHostWithoutLayoutFreeze`, `testVideoDetailRotatesFromPortraitToLandscapePreservesSinglePlayerSurface`) by attaching a neutral `UIWindow(windowScene:)` host with explicit `defer` teardown and removing `RunLoop.main.run(until:)`.
+
+Evidence:
+- iOS / iPadOS: Targeted layout & rotation tests **16/16 passed** (`DeviceLayoutTests` 7/7, `SwipeBackTests` 9/9); Release build `BUILD SUCCEEDED`; Release Simulator visual verification on `iPad Pro 13-inch (M5)` (`huavod` `折月亮` Portrait -> 70/30 Landscape -> Portrait; `live` `asuncionbalduf` Portrait -> Landscape) & `iPhone 18 Pro`; `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1` **182 tests** (`179 passed`, `3 external failures`: `javsb` TLS error and two `baozi` CDN `httpStatus(403)`; `19/20` video sources, `20/20` forum, `5/5` live adapters, `8/9` unauth comics, `X134SourceServiceTests` `3/3`, `UniversalVideoEngineTests` `48/48`, `VideoPreloadManagerTests` `9/9`); non-live XCTest **182 tests** (`174 passed`, `7 skipped`, `1 external failure`: `ComicRepositoryTests.testBaoziLiveFetchComicsChaptersAndPages`).
+- Android: `./gradlew testDebugUnitTest lintDebug assembleRelease` `BUILD SUCCESSFUL` (`2m 15s`, Release APK `197M`); non-live `testDebugUnitTest` **42 suites, 262 tests: 254 passed, 8 skipped, 0 failed, 0 errors**; `RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1 --tests "com.aurorashelf.app.data.*"` **25 suites, 159/159 passed** (including all 5 live probe classes **20/20**); `emulator-5554` R8 signed Release APK visual QA across tablet Portrait <-> Landscape (`PlayerScreen` 62%/38% split and `LiveScreen` `mirabrunette` 2-pane split).
+- Probe & OTA: `node scripts/probe_all_sources.mjs` (**33/35 passed**; `JAVSB` `CONNECT_FAIL`, `禁漫天堂` `code=401`); `https://bananarey.us` serves `v2.16.33 (Build 259)` (`index.html` `21,658` bytes, `manifest.plist` `2.16.33`, `Netgrey.apk` `206,892,939` bytes / `198M`, `Netgrey.ipa` `202,679,105` bytes / `194M`, `HTTP/1.1 200 OK`), remote SSH check confirmed `chmod 644`, zero `.tmp/.old/.bak/*~` files, and `11G` free (`29%` used) on `/`.
+
 
 
 

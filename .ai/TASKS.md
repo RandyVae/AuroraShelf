@@ -1,5 +1,7 @@
 # Active
 
+- [x] 修复 iPad / Android 平板从竖屏转向横屏时视频详情页 YouTube 双栏布局失效问题（单播放器跨布局持久复用、700pt/700dp 平板分栏阈值、`ImmersiveNavigationController` `viewWillTransition` 传播与外层 `onGeometryChange` 尺寸兜底），固化 `SwipeBackTests` 旋转回归测试并升级版本至 `v2.16.33 / Build 259`，完成全源核验（iOS 19/20 视频、Android `app.data.*` 159/159、Node 33/35）、双端 Release 模拟器旋转实测、OTA 原子覆盖与 GitHub Release 发布 — 2026-11-15。
+
 - [x] 根治华视播放「有声音无画面」（iOS 27.2 `AttributeGraph` 布局循环冻结与多集骨架 `508.0pt` 水平溢出），清理全部临时 `[DIAG]` 日志并固化 `SwipeBackTests` 回归测试，升级版本至 `v2.16.32 / Build 258` 并完成双端 Release 打包、模拟器全检、OTA 原子覆盖与 GitHub Release 发布。
 
 - [x] 修复播放退出后残留背景音频及重入无法播放、视频加载期下方滑动阻塞、首页 Hero 分辨率偏低（Cinema Stage）、安卓端论坛滑不动及 iPad 横屏侧边栏遮挡沉浸播放页（`v2.16.31 / Build 257`）：完成双端播放退场立即停播清理与缓存失效保护、加载期滑动顺畅化、双端 Hero Cinema Stage 高清展示与 Android `createAmbientBlurredBitmap`、Android 论坛 `WebView` 独立触控滚动与延迟限流预取、以及 iOS `ImmersiveNavigationHost` UIKit 外层沉浸路由重构；Android 253/253 单测与 20/20 在线专项全通、`lintDebug` 0 error、iOS `LiveVideoSourceAuditTests` 19/20 通（`javsb` 外部 TLS 阻断）、iOS Unit 172/173 通（Baozi 外网图床 `s1-mha1-nlams.bzcdn.net` 403/SSL 波动）、双端 Release 模拟器截屏（iPhone 10 张 / iPad 7 张 / Android R8 APK）核验与 `./scripts/publish_ota.sh Release` 完成 — 2026-11-15。

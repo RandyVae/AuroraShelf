@@ -465,7 +465,15 @@ internal fun PlayerScreen(
                 collapseOffsetDp = currentCollapseDp,
             )
 
-            val isTwoPaneLandscape = !isFullscreen && screenWidth >= 840.dp && screenWidth > screenHeight
+            val isTwoPaneLandscape = shouldUseTwoPaneLandscapeLayout(
+                width = screenWidth,
+                height = screenHeight,
+                isFullscreen = isFullscreen,
+            )
+            val twoPanePlayerHeight = (screenWidth * 0.62f * (9f / 16f))
+                .coerceIn(220.dp, screenHeight * 0.62f)
+            val leftPaneWidthFraction = if (isTwoPaneLandscape) 0.62f else 1f
+            val currentPlayerHeight = if (isTwoPaneLandscape) twoPanePlayerHeight else effectivePlayerHeight
             val handleEpisodeSelect: (PlaybackEpisode) -> Unit = { episode ->
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 playbackUrl = episode.pageUrl
@@ -563,226 +571,172 @@ internal fun PlayerScreen(
                 }
             }
 
-            if (isTwoPaneLandscape) {
-                val twoPanePlayerHeight = (screenWidth * 0.62f * (9f / 16f))
-                    .coerceIn(220.dp, screenHeight * 0.62f)
-                Row(
+            if (!isFullscreen) {
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(bottom = 32.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp),
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black)
-                        .statusBarsPadding(),
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth(leftPaneWidthFraction)
+                        .fillMaxHeight()
+                        .background(MaterialTheme.colorScheme.background)
+                        .statusBarsPadding()
+                        .then(if (isTwoPaneLandscape) Modifier else Modifier.nestedScroll(nestedScrollConnection))
+                        .testTag("player-details"),
                 ) {
-                    Column(
+                    item(key = "player-space") {
+                        Spacer(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(currentPlayerHeight),
+                        )
+                    }
+                    item(key = "player-info") {
+                        PlayerDetails(
+                            video = video,
+                            isFavorite = isFavorite,
+                            cachedVideo = cachedVideo,
+                            episodes = episodes,
+                            detailMetadata = detailMetadata,
+                            selectedEpisode = selectedEpisode,
+                            currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
+                            isEpisodePickerVisible = isEpisodePickerVisible,
+                            isCasting = isCasting,
+                            onFavorite = onFavorite,
+                            onCache = onCache,
+                            onCast = { isCastSheetVisible = true },
+                            onToggleEpisodes = { isEpisodePickerVisible = !isEpisodePickerVisible },
+                            onEpisode = handleEpisodeSelect,
+                        )
+                    }
+                    if (!isTwoPaneLandscape && relatedVideos.isNotEmpty()) {
+                        item(key = "recommendation-title") {
+                            Text(
+                                text = "接着观看",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 10.dp)
+                                    .semantics { heading() },
+                            )
+                        }
+                        items(relatedVideos, key = { "related-${it.id}" }) { related ->
+                            PlayerRecommendationRow(
+                                video = related,
+                                isFavorite = related.id in favoriteIds,
+                                onClick = { onVideo(related) },
+                                onFavorite = { onRelatedFavorite(related) },
+                            )
+                        }
+                    }
+                }
+
+                if (isTwoPaneLandscape) {
+                    Row(
                         modifier = Modifier
-                            .weight(0.62f)
-                            .fillMaxHeight(),
+                            .align(Alignment.TopEnd)
+                            .fillMaxWidth(0.38f)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.background)
+                            .statusBarsPadding(),
                     ) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(twoPanePlayerHeight),
-                        ) {
-                            NativeSitePlayer(
-                                pageUrl = playbackUrl,
-                                isFullscreen = false,
-                                onFullscreenChange = onFullscreenChange,
-                                onVideoOrientationChange = onVideoOrientationChange,
-                                onVideoAspectRatioChange = { videoAspectRatio = it },
-                                onPositionChange = { currentPositionMs = it },
-                                onDurationChange = { currentDurationMs = it },
-                                onControllerVisibilityChange = { isPlayerControllerVisible = it },
-                                onPlaybackEnded = handlePlaybackEnded,
-                                keepTopBarVisible = isCasting,
-                                suppressPlayback = suppressPlayback,
-                                topBarStart = topBarBackButton,
-                                topBarEnd = topBarRightControls,
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .testTag("native-player-container"),
-                            )
-                            FloatingCastStatusBanner(
-                                visible = isCasting,
-                                connected = castState as? CastState.Connected,
-                                castManager = castManager,
-                                onOpenSheet = { isCastSheetVisible = true },
-                                modifier = Modifier
-                                    .align(Alignment.TopCenter)
-                                    .padding(top = 60.dp, start = 16.dp, end = 16.dp),
-                            )
-                        }
-                        LazyColumn(
-                            state = listState,
-                            contentPadding = PaddingValues(bottom = 24.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f)
-                                .testTag("player-details"),
-                        ) {
-                            item(key = "player-info") {
-                                PlayerDetails(
-                                    video = video,
-                                    isFavorite = isFavorite,
-                                    cachedVideo = cachedVideo,
-                                    episodes = episodes,
-                                    detailMetadata = detailMetadata,
-                                    selectedEpisode = selectedEpisode,
-                                    currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
-                                    isEpisodePickerVisible = isEpisodePickerVisible,
-                                    isCasting = isCasting,
-                                    onFavorite = onFavorite,
-                                    onCache = onCache,
-                                    onCast = { isCastSheetVisible = true },
-                                    onToggleEpisodes = { isEpisodePickerVisible = !isEpisodePickerVisible },
-                                    onEpisode = handleEpisodeSelect,
-                                )
-                            }
-                        }
-                    }
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.outlineVariant),
-                    )
-                    LazyColumn(
-                        contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
-                        modifier = Modifier
-                            .weight(0.38f)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.background),
-                    ) {
-                        if (relatedVideos.isNotEmpty()) {
-                            item(key = "recommendation-title") {
-                                Text(
-                                    text = "接着观看",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    modifier = Modifier
-                                        .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 10.dp)
-                                        .semantics { heading() },
-                                )
-                            }
-                            items(relatedVideos, key = { "related-${it.id}" }) { related ->
-                                PlayerRecommendationRow(
-                                    video = related,
-                                    isFavorite = related.id in favoriteIds,
-                                    onClick = { onVideo(related) },
-                                    onFavorite = { onRelatedFavorite(related) },
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                if (!isFullscreen) {
-                    LazyColumn(
-                        state = listState,
-                        contentPadding = PaddingValues(bottom = 32.dp),
-                        verticalArrangement = Arrangement.spacedBy(0.dp),
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .statusBarsPadding()
-                            .nestedScroll(nestedScrollConnection)
-                            .testTag("player-details"),
-                    ) {
-                        item(key = "player-space") {
-                            Spacer(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(effectivePlayerHeight)
-                            )
-                        }
-                        item(key = "player-info") {
-                            PlayerDetails(
-                                video = video,
-                                isFavorite = isFavorite,
-                                cachedVideo = cachedVideo,
-                                episodes = episodes,
-                                detailMetadata = detailMetadata,
-                                selectedEpisode = selectedEpisode,
-                                currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
-                                isEpisodePickerVisible = isEpisodePickerVisible,
-                                isCasting = isCasting,
-                                onFavorite = onFavorite,
-                                onCache = onCache,
-                                onCast = { isCastSheetVisible = true },
-                                onToggleEpisodes = { isEpisodePickerVisible = !isEpisodePickerVisible },
-                                onEpisode = handleEpisodeSelect,
-                            )
-                        }
-                        if (relatedVideos.isNotEmpty()) {
-                            item(key = "recommendation-title") {
-                                Text(
-                                    text = "接着观看",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onBackground,
-                                    modifier = Modifier
-                                        .padding(start = 18.dp, end = 18.dp, top = 20.dp, bottom = 10.dp)
-                                        .semantics { heading() },
-                                )
-                            }
-                            items(relatedVideos, key = { "related-${it.id}" }) { related ->
-                                PlayerRecommendationRow(
-                                    video = related,
-                                    isFavorite = related.id in favoriteIds,
-                                    onClick = { onVideo(related) },
-                                    onFavorite = { onRelatedFavorite(related) },
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (!isFullscreen) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .fillMaxWidth()
-                            .background(Color.Black)
-                            .statusBarsPadding(),
-                    )
-                }
-
-                NativeSitePlayer(
-                    pageUrl = playbackUrl,
-                    isFullscreen = isFullscreen,
-                    onFullscreenChange = onFullscreenChange,
-                    onVideoOrientationChange = onVideoOrientationChange,
-                    onVideoAspectRatioChange = { videoAspectRatio = it },
-                    onPositionChange = { currentPositionMs = it },
-                    onDurationChange = { currentDurationMs = it },
-                    onControllerVisibilityChange = { isPlayerControllerVisible = it },
-                    onPlaybackEnded = handlePlaybackEnded,
-                    keepTopBarVisible = !isFullscreen && isCasting,
-                    suppressPlayback = suppressPlayback,
-                    topBarStart = topBarBackButton,
-                    topBarEnd = topBarRightControls,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .then(
-                            if (isFullscreen) {
-                                Modifier.fillMaxSize()
-                            } else {
-                                Modifier
-                                    .statusBarsPadding()
-                                    .fillMaxWidth()
-                                    .height(effectivePlayerHeight)
-                            },
+                                .width(1.dp)
+                                .fillMaxHeight()
+                                .background(MaterialTheme.colorScheme.outlineVariant),
                         )
-                        .testTag("native-player-container"),
-                )
+                        LazyColumn(
+                            contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .testTag("player-right-rail"),
+                        ) {
+                            if (relatedVideos.isNotEmpty()) {
+                                item(key = "recommendation-title") {
+                                    Text(
+                                        text = "接着观看",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier
+                                            .padding(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 10.dp)
+                                            .semantics { heading() },
+                                    )
+                                }
+                                items(relatedVideos, key = { "related-${it.id}" }) { related ->
+                                    PlayerRecommendationRow(
+                                        video = related,
+                                        isFavorite = related.id in favoriteIds,
+                                        onClick = { onVideo(related) },
+                                        onFavorite = { onRelatedFavorite(related) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth(leftPaneWidthFraction)
+                        .background(Color.Black)
+                        .statusBarsPadding(),
+                )
+            }
+
+            // Single persistent player container across portrait, tablet landscape split, and fullscreen
+            // so rotation never tears down or recreates ExoPlayer.
+            NativeSitePlayer(
+                pageUrl = playbackUrl,
+                isFullscreen = isFullscreen,
+                onFullscreenChange = onFullscreenChange,
+                onVideoOrientationChange = onVideoOrientationChange,
+                onVideoAspectRatioChange = { videoAspectRatio = it },
+                onPositionChange = { currentPositionMs = it },
+                onDurationChange = { currentDurationMs = it },
+                onControllerVisibilityChange = { isPlayerControllerVisible = it },
+                onPlaybackEnded = handlePlaybackEnded,
+                keepTopBarVisible = !isFullscreen && isCasting,
+                suppressPlayback = suppressPlayback,
+                topBarStart = topBarBackButton,
+                topBarEnd = topBarRightControls,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .then(
+                        if (isFullscreen) {
+                            Modifier.fillMaxSize()
+                        } else {
+                            Modifier
+                                .statusBarsPadding()
+                                .fillMaxWidth(leftPaneWidthFraction)
+                                .height(currentPlayerHeight)
+                        },
+                    )
+                    .testTag("native-player-container"),
+            )
+
+            Box(
+                contentAlignment = Alignment.TopCenter,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth(leftPaneWidthFraction)
+                    .statusBarsPadding()
+                    .padding(
+                        top = 60.dp,
+                        start = if (isTwoPaneLandscape) 16.dp else 20.dp,
+                        end = if (isTwoPaneLandscape) 16.dp else 20.dp,
+                    ),
+            ) {
                 FloatingCastStatusBanner(
                     visible = isCasting,
                     connected = castState as? CastState.Connected,
                     castManager = castManager,
                     onOpenSheet = { isCastSheetVisible = true },
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(top = 60.dp, start = 20.dp, end = 20.dp),
                 )
             }
 
@@ -1391,6 +1345,12 @@ private fun PlayerRecommendationRow(
         }
     }
 }
+
+internal fun shouldUseTwoPaneLandscapeLayout(
+    width: Dp,
+    height: Dp,
+    isFullscreen: Boolean,
+): Boolean = !isFullscreen && width >= 700.dp && width > height
 
 internal fun relatedVideos(current: VideoItem, videos: List<VideoItem>): List<VideoItem> =
     videos.distinctBy(VideoItem::id).filterNot { it.id == current.id }
