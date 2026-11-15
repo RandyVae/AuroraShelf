@@ -475,7 +475,6 @@ public struct LiveHeroBanner: View {
 public struct LiveScreen: View {
     @ObservedObject public var repo = LiveRepository.shared
     public let onOpenSearch: () -> Void
-    @State private var activeStream: LiveStreamItem? = nil
     @State private var spotlightIndex: Int = 0
     @State private var isScrolled: Bool = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -510,7 +509,7 @@ public struct LiveScreen: View {
                         LiveHeroBanner(
                             stream: spotlight,
                             sourceName: currentSourceName,
-                            onWatch: { activeStream = spotlight },
+                            onWatch: { openLiveStream(spotlight) },
                             onCycle: {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                     spotlightIndex = (spotlightIndex + 1) % max(1, filteredStreams.count)
@@ -561,7 +560,7 @@ public struct LiveScreen: View {
                                 LazyHStack(alignment: .top, spacing: AuroraMetrics.spacingM) {
                                     ForEach(top10Streams) { item in
                                         LiveFeaturedCard(stream: item) {
-                                            activeStream = item
+                                            openLiveStream(item)
                                         }
                                     }
                                 }
@@ -603,7 +602,7 @@ public struct LiveScreen: View {
                         LazyVGrid(columns: liveGridColumns, spacing: AuroraMetrics.spacingL) {
                             ForEach(filteredStreams) { item in
                                 Button {
-                                    activeStream = item
+                                    openLiveStream(item)
                                 } label: {
                                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
                                         ZStack(alignment: .topTrailing) {
@@ -717,34 +716,25 @@ public struct LiveScreen: View {
                 }
             }
         }
-        .navigationDestination(item: $activeStream) { stream in
-            LiveDetailView(
-                stream: stream,
-                relatedStreams: repo.liveStreams.filter { $0.id != stream.id },
-                onSelectStream: { next in
-                    activeStream = next
-                },
-                onDismiss: {
-                    activeStream = nil
-                }
-            )
-            .id(stream.id)
-            .toolbar(.hidden, for: .tabBar)
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationBarBackButtonHidden(true)
-        }
         .onAppear {
             if CommandLine.arguments.contains("--select-stripchat") {
                 repo.selectSource(LiveSourceCatalog.stripchatID)
             }
         }
         .onReceive(repo.$liveStreams) { newStreams in
-            if CommandLine.arguments.contains("--auto-open-live-detail"), let first = newStreams.first, activeStream == nil {
+            if CommandLine.arguments.contains("--auto-open-live-detail"),
+               let first = newStreams.first,
+               PlayerCoordinator.shared.activeRoute == nil {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    activeStream = first
+                    openLiveStream(first)
                 }
             }
         }
+    }
+
+    private func openLiveStream(_ stream: LiveStreamItem) {
+        let related = repo.liveStreams.filter { $0.id != stream.id }
+        PlayerCoordinator.shared.openLive(stream, relatedStreams: related)
     }
 
     @ViewBuilder

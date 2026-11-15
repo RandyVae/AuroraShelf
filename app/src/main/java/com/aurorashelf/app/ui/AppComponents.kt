@@ -9,6 +9,9 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.activity.BackEventCompat
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
@@ -27,6 +30,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -154,8 +158,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.util.lerp
@@ -195,6 +202,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import coil3.size.Size as CoilSize
 import com.aurorashelf.app.model.AppDestination
 import com.aurorashelf.app.model.ContentSource
 import com.aurorashelf.app.model.ContentSourceCatalog
@@ -428,8 +436,82 @@ internal fun VideoListRow(
     }
 }
 
+private val ambientBlurCache = LruCache<String, ImageBitmap>(12)
+
+internal fun createAmbientBlurredBitmap(cacheKey: String?, bytes: ByteArray): ImageBitmap? {
+    if (bytes.isEmpty()) return null
+    if (!cacheKey.isNullOrBlank()) {
+        ambientBlurCache.get(cacheKey)?.let { return it }
+    }
+    return runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        var sampleSize = 1
+        val maxDim = maxOf(bounds.outWidth, bounds.outHeight)
+        while (maxDim / (sampleSize * 2) >= 48) sampleSize *= 2
+        val decodeOpts = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val sampled = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts) ?: return null
+        val targetW = 40
+        val targetH = 40
+        val tiny = Bitmap.createScaledBitmap(sampled, targetW, targetH, true)
+        if (tiny !== sampled) sampled.recycle()
+
+        val count = targetW * targetH
+        val pixels = IntArray(count)
+        val scratch = IntArray(count)
+        tiny.getPixels(pixels, 0, targetW, 0, 0, targetW, targetH)
+        val radius = 3
+        val div = radius * 2 + 1
+        repeat(2) {
+            for (y in 0 until targetH) {
+                val rowOffset = y * targetW
+                for (x in 0 until targetW) {
+                    var rSum = 0
+                    var gSum = 0
+                    var bSum = 0
+                    for (dx in -radius..radius) {
+                        val px = pixels[rowOffset + (x + dx).coerceIn(0, targetW - 1)]
+                        rSum += (px ushr 16) and 0xFF
+                        gSum += (px ushr 8) and 0xFF
+                        bSum += px and 0xFF
+                    }
+                    scratch[rowOffset + x] = (0xFF shl 24) or ((rSum / div) shl 16) or ((gSum / div) shl 8) or (bSum / div)
+                }
+            }
+            for (y in 0 until targetH) {
+                for (x in 0 until targetW) {
+                    var rSum = 0
+                    var gSum = 0
+                    var bSum = 0
+                    for (dy in -radius..radius) {
+                        val py = scratch[(y + dy).coerceIn(0, targetH - 1) * targetW + x]
+                        rSum += (py ushr 16) and 0xFF
+                        gSum += (py ushr 8) and 0xFF
+                        bSum += py and 0xFF
+                    }
+                    pixels[y * targetW + x] = (0xFF shl 24) or ((rSum / div) shl 16) or ((gSum / div) shl 8) or (bSum / div)
+                }
+            }
+        }
+        tiny.setPixels(pixels, 0, targetW, 0, 0, targetW, targetH)
+        tiny.asImageBitmap().also { bmp ->
+            if (!cacheKey.isNullOrBlank()) ambientBlurCache.put(cacheKey, bmp)
+        }
+    }.getOrNull()
+}
+
 @Composable
-internal fun MediaImage(video: VideoItem, modifier: Modifier = Modifier) {
+internal fun MediaImage(
+    video: VideoItem,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    originalSize: Boolean = false,
+    ambientBlur: Boolean = false,
+    onImageDimensions: ((width: Int, height: Int) -> Unit)? = null,
+) {
     val context = LocalContext.current
     var attempt by remember(video.thumbnailUrl, video.pageUrl) { mutableIntStateOf(0) }
     var isLoading by remember(video.thumbnailUrl, video.pageUrl, attempt) { mutableStateOf(true) }
@@ -446,15 +528,34 @@ internal fun MediaImage(video: VideoItem, modifier: Modifier = Modifier) {
         }
         isLoading = false
     }
+    val ambientBitmap by produceState<ImageBitmap?>(
+        initialValue = null,
+        key1 = imageBytes,
+        key2 = video.thumbnailUrl,
+        key3 = ambientBlur,
+    ) {
+        value = if (ambientBlur && imageBytes != null) {
+            withContext(Dispatchers.Default) {
+                createAmbientBlurredBitmap(coverMemoryCacheKey(video.thumbnailUrl), imageBytes!!)
+            }
+        } else {
+            null
+        }
+    }
     // A ByteArray model has no stable cache key on its own; using the URL as the memory key lets
     // Coil reuse the decoded bitmap when the row scrolls back instead of decoding it again.
-    // Empty payloads never produce a request, so they cannot reach the decoder.
-    val coverRequest = remember(imageBytes, video.thumbnailUrl, context) {
+    // Hero banners set originalSize = true and use a #original suffix so grid downsampling never degrades Hero fidelity.
+    val coverRequest = remember(imageBytes, video.thumbnailUrl, originalSize, context) {
         imageBytes?.takeIf { it.isNotEmpty() }?.let { bytes ->
-            val key = coverMemoryCacheKey(video.thumbnailUrl)
+            val key = coverMemoryCacheKey(video.thumbnailUrl)?.let {
+                if (originalSize) "$it#original" else it
+            }
             ImageRequest.Builder(context)
                 .data(bytes)
-                .apply { if (key != null) memoryCacheKey(key) }
+                .apply {
+                    if (originalSize) size(CoilSize.ORIGINAL)
+                    if (key != null) memoryCacheKey(key)
+                }
                 .build()
         }
     }
@@ -462,11 +563,26 @@ internal fun MediaImage(video: VideoItem, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        if (coverRequest != null) {
+        if (ambientBlur && ambientBitmap != null) {
+            Image(
+                bitmap = ambientBitmap!!,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                filterQuality = FilterQuality.High,
+                modifier = Modifier.fillMaxSize(),
+            )
+            DarkModeArtworkScrim()
+        } else if (coverRequest != null) {
             AsyncImage(
                 model = coverRequest,
                 contentDescription = video.title,
-                contentScale = ContentScale.Crop,
+                contentScale = contentScale,
+                onSuccess = { state ->
+                    val s = state.painter.intrinsicSize
+                    if (s.width > 0f && s.height > 0f) {
+                        onImageDimensions?.invoke(s.width.toInt(), s.height.toInt())
+                    }
+                },
                 modifier = Modifier.fillMaxSize(),
             )
             DarkModeArtworkScrim()

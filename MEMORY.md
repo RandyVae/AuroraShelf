@@ -23,32 +23,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `45bab85`（2026-11-14），未提交 65 个文件
+- Git：`main` @ `81408b2`（2026-11-14），未提交 42 个文件
 - 权威记忆文件：
-  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-14（今天）
-  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-14（今天）
-  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-14（今天）
-  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-14（今天）
+  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-15（今天）
+  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-15（今天）
+  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-15（今天）
+  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-15（今天）
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（20 天前）
-  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-14（今天）
+  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-15（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-14 21:30 by `sync.py`
+- 最后同步：2026-11-15 08:01 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-14 · Build 256 / v2.16.30）：已完成漫画卡死与导航消失根治、全源连通性与解析修复、iPad/Android 平板直播详情页 YouTube 式双栏适配、华视影院（`huavod.com`）高清 Hero/封面升级与详请页演员表/基本介绍匹配、双端 Release 模拟器实测验收与 OTA 发布。(1) 漫画防卡死与导航持久化：双端重构漫画加载与取消机制（Android 章节加载浮层提供可点击「取消」并保留底栏 Dock 与返回堆栈，iOS 确保失败/取消退回不丢导航且不阻断后续漫画打开）；(2) 平板直播双栏与安全区避让：Android 平板与 iPad 横屏直播详情页适配 YouTube 式左右双栏（播放器＋聊天室/更多直播），同时修复 iPad 非全屏态下播放器避让 iPadOS 顶部状态栏安全区；(3) 华视高清封面与详请元数据：双端修复 `.slide-time-img3` 单引号样式匹配与 Douban 高清封面兜底，过滤 `<a class="time-title hide ft4">` 片名误当评分碰撞，并修复 `<span class="slash">/</span>` 导致的演员表首人截断，精准呈现多演员「演员表」、导演、年份、地区、分类标签与「基本介绍」；(4) 验证与交付：最后一次修改后 Android `testDebugUnitTest`（42 套件 257 项：0 失败 0 错误 8 跳过）、`lintDebug`（0 error，HTML 报告 19 warnings）、`assembleRelease`（`dist/Netgrey.apk` `206,876,555` bytes）与 iOS `AuroraShelfTests`（177 项：0 失败 7 跳过）及 Simulator Release 编译全通，双端 Release 实机级模拟器截图复核通过；`./scripts/publish_ota.sh Release` 完成 `bananarey.us` 原子覆盖（`Netgrey.apk` `206,876,555` bytes / `Netgrey.ipa` `202,630,841` bytes，HTTPS `200 OK`，远端磁盘可用 `11G`）。
+- 当前阶段（2026-11-15 · Build 257 / v2.16.31）：已完成播放退出彻底停播与同片重入修复、视频加载期下方顺滑滚动、首页推荐 Hero Cinema Stage 高清化、安卓端论坛 WebView 原生滑动恢复、以及 iPad UIKit 外层沉浸路由重构。(1) 播放退场零残留音频：iOS `VideoDetailPlaybackScreen`、`AuroraPlayerSurface.dismantleUIView` 与 `PictureInPictureManager` 引入 `isViewDismissed` / `dismissView()`、异步解析令牌作废、`replaceCurrentItem(with: nil)` 与 `AVAudioSession` 后台反激活；Android `AuroraShelfApp` / `PlayerScreen` / `NativeSitePlayer` 增加 `isClosing` / `localDismissing` / `suppressPlayback` 立即停播清源；(2) 加载中顺滑滚动与 Hero 高清展示：iOS 延后 500ms 后台启动多集预热，Android `PlayerScreen` 上滑并发弹簧收缩返回 `Velocity.Zero`；双端 Hero 接入 `Cinema Stage` 高清无裁切居中舞台与环境虚化底图；(3) 安卓论坛滑动修复：`ForumReader` 关闭 `isNestedScrollingEnabled` 独占垂直触摸与惯性，配合 `ForumReaderRevealPolicy` 与限流预取；(4) iPad 外层 UIKit 沉浸导航：`ImmersiveNavigationHost` / `ImmersiveNavigationController` 包裹 `.sidebarAdaptable` `TabView`，彻底消除横屏全屏播放时左侧边栏遮挡并完整保留内层 Tab 标题与搜索按钮；(5) 最终验证与 OTA：Android 42 套件 261 项 **253 通过 / 8 跳过 / 0 失败**、`lintDebug` 0 error / 20 warnings、`RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` **20/20 全通过**；iOS `AuroraShelfTests` **172 通过 / 7 跳过 / 1 失败**（Baozi 外网图片 CDN 403/SSL 波动）、`LiveVideoSourceAuditTests` **19/20 视频源通过**（`javsb` 外部 TLS 断连）；Node 探针 35 源 **33 可达**；iPhone 18 Pro（10 截图）、iPad Pro 13-inch（竖/横 7 截图）与 Android R8 Release 实测通过；`./scripts/publish_ota.sh Release` 完成 `bananarey.us` 原子覆盖（`Netgrey.apk` `206,892,939` bytes、`Netgrey.ipa` `202,676,477` bytes，`manifest.plist` `2.16.31`，HTTPS `200 OK`，服务器磁盘可用 `11G`）。
 - 进行中：配置 PocketBase 首个管理员与 SMTP，完成真实邮箱验证/找回密码 E2E，并持续跟踪各外部站点源可用性。
 - 下一步：接入用户资料/收藏历史云同步与后续订阅权益接口。
-- 阻塞：`JAVSB`（`jav.sb` 本机 TLS 握手断连/终止）与 `SpankBang`（`diagnose_sources.swift` 返回 HTTP 403）为外部网络或反爬限制；`禁漫天堂` 在 Node 脚本因缺少协议密钥返回 `API code=401`（原生双端实测通过）；`Chaturbate` 为上游空流/需浏览器流、`哔咔` 需配置协议凭据；上述受限情况已保留清晰可测边界并在报告中声明。
-- 最近一次更新：2026-11-14 by Antigravity (Claude Opus)
+- 阻塞：`JAVSB`（`jav.sb` 外部 TLS 握手断连）为外部网络限制；包子漫画章内图床 `s1-mha1-nlams.bzcdn.net` 偶发 SSL `-9816` / `403`；`禁漫天堂` 在 Node 脚本因缺少协议密钥返回 `API code=401`（原生双端实测通过）；`哔咔` 需配置协议凭据；上述受限情况已在测试报告中如实声明。
+- 最近一次更新：2026-11-15 by Antigravity (Claude Opus)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-15（Antigravity）：播放退场彻底停播、加载期顺滑滚动、Hero Cinema Stage、安卓论坛原生滑动与 iPad UIKit 沉浸路由重构（v2.16.31 Build 257）。(1) 根除退出后无缩略窗仍播声音及重入失败：iOS 在 `VideoDetailPlaybackScreen` 引入 `isViewDismissed` / `dismissView()` 立刻作废 `activeResolveID`、清空 `AVPlayerLayer`（`dismantleUIView`）、清理 `PictureInPictureManager` 健康度校验与留存播放器 `replaceCurrentItem(with: nil)`、失败时清 `VideoPreloadManager` 缓存，Android 引入 `suppressPlayback` 在退出瞬间立即 `stop()` + `clearMediaItems()`，杜绝幽灵音轨与僵尸播放器；(2) 加载期顺滑滚动：iOS 将后续剧集 `GlobalStartupPrefetchEngine` 窗口预热延后 500ms 至后台线程，Android `PlayerScreen` 在向上折叠 fling 时返回 `Velocity.Zero` 将速度让渡下方 `LazyColumn`；(3) 首页 Hero 高清化与论坛恢复：双端落地 `Cinema Stage` 模式避免超宽图裁剪和低清图过放模糊，`ForumReader` 关闭 `isNestedScrollingEnabled` 独占垂直滑动手势；(4) iPad 横屏沉浸路由隔离：用 UIKit `ImmersiveNavigationHost` / `ImmersiveNavigationController` 取代外层 SwiftUI `NavigationStack` 包裹 `.sidebarAdaptable` `TabView`，同时解决 iPad 侧边栏遮挡播放页`< 返回`与外层 `NavigationStack` 吞噬内层 Tab 导航栏的双重冲突，双端 Release 模拟器截图全检通过。
 
 - 2026-11-14（Antigravity）：漫画卡死恢复、全源加固、平板直播双栏、华视高清封面及演员表/基本介绍精准解析（v2.16.30 Build 256）。(1) 漫画非阻塞加载与导航恢复：漫画加载态保留底部主导航与取消入口，取消或失败后立即清理活跃加载态与锁定状态，保证返回与继续点开其他漫画畅通；(2) iPad / 平板直播双栏与安全区避让：参照视频详情页比例为直播详情接入横屏双栏布局，并在 `LivePlayerView`、`LiveDetailView` 与 `VideoDetailPlaybackScreen` 统一采用 `needsTopOffset = !isFullScreen && (!isLandscape || isPad)` 配合 `+ safeTop` 高度补偿，杜绝 iPad 非全屏顶部画面与系统状态栏重叠；(3) 华视精准解析加固：双端限制 `.ft4` 评分为数值型 `<i/span>` 或 `.public-list-prb` 子节点，避免将 `<a class="time-title hide ft4">` 片名误作评分显示，同时移除 `extractPeopleRow` 与 `.detail-info span` 对 `<span class="slash">/</span>` 的截断，完整解析华视详情页多名演员与基本介绍，全端实测截屏验收通过。
 
@@ -386,6 +388,8 @@
 - 2026-11-07：媒體播放容器包含安全區時 Aspect Fit 垂直居中導致畫面向上位移頂入靈動島陷阱：為了消除頂部白邊並在狀態欄/靈動島區域維持純黑背景，若將播放器頂層容器高度設為 `targetHeight = (width * 9 / 16) + safeTop`（如 iPhone 17 Pro 上為 280pt），且在此容器內部直接放置 `AVPlayerLayer`（`videoGravity = .resizeAspect`）或 `WKWebView` 視頻視口（`object-fit: contain; object-position: center center`），系統會在整個 280pt 容器正中排布 221pt（16:9）視頻畫面。垂直居中會使視頻上下留白各為 `(280 - 221) / 2 = 29.5pt`，即視頻頂端起始坐標為 `y = 29.5pt`。而 iPhone 靈動島下沿至 48pt、狀態欄至 59pt，導致視頻畫面頂部整整 30pt 的內容（主播面部、額頭、眼睛）被硬生生頂進狀態欄與靈動島區域，造成嚴重的“畫面向上位移遮擋”。工業級解決方案是：在嵌入態下將容器內部構建為 `VStack(spacing: 0)`，頂部顯式墊入 `Color.black.frame(height: safeTop)` 作為安全區純黑底襯（占据 `y = 0` 至 `59pt`，零白邊），下方視口高度嚴格等於 `221pt`（16:9），使視頻畫面物理渲染起點嚴格鎖定於 `y = safeTop`（59pt / 177px），全畫幅完完全全呈現在靈動島下方；全屏時安全隔離墊自動消除，視口吞噬全屏。同時為 WebKit 設置 `contentInsetAdjustmentBehavior = .never` 杜絕內邊距抖動。
 
 - 2026-11-08：Spine 资产天然朝向对称性与 WebKit Keyframe 居中陷阱：①原厂 assets 资产命名中，`*_player` 天然朝右，`*_enemy` 天然朝左；若对所有敌军盲目加 `flip: true`，反而导致敌军被翻转为朝右，造成全场人员同向朝右的严重反向缺陷；朝向判定法则必须严格绑定命名特征（我方 `unit.endsWith('_enemy')` 翻转，敌方 `unit.endsWith('_player')` 翻转）；并在 Spine 的 `update` 循环中每帧锁定 `v.skeleton.scaleX`，防止骨骼重绘将镜像覆盖；②WebKit keyframes 初始布局时未 decode 的图片宽度判定为 0，`translateX(-50%)` 计算坍缩为 0，导致绝对定位元素被左边缘固定在 `left: 50%` 呈现严重偏右；采用盒模型 `left: 0; right: 0; margin-inline: auto` 是唯一不受 GPU 初始缓存与图片未 decode 污染的物理居中方案。
+- 2026-11-15：iPadOS `.tabViewStyle(.sidebarAdaptable)` 与外层 SwiftUI `NavigationStack` 冲突陷阱：直接在 Tab 内使用 `.navigationDestination` 推入全屏播放页时，iPadOS 27 横屏浮动侧边栏仍浮盖在 `< 返回` 与播放器左侧之上；但若改用外层 SwiftUI `NavigationStack` 包裹 `TabView` 并隐藏外层栏，外层栈会劫持并吞掉内层各 Tab 原生 `NavigationStack` 的标题栏与工具栏按钮（如首页 `N` / 搜索键、`Library` 大标题）。做法是用 UIKit `UINavigationController` 包装体（`ImmersiveNavigationHost` / `ImmersiveNavigationController`）置于 `TabView` 外层统一推入沉浸式页面，隔离内层 SwiftUI `NavigationStack` 并保留 `AuroraSwipeBackModifier` 原生交互返回。
+- 2026-11-15：JVM 单例缓存跨在线/离线单元测试串扰陷阱：当实时测试与离线单元测试共用进程级单例（如 `X134Repository.metaCache`）时，若离线单元测试夹具使用线上真实存在的 ID（如真实推文 ID），在开启 `RUN_LIVE_SOURCE_TESTS=1` 同进程先后执行时，实时测试写入的线上元数据会命中单元测试期望 fallback 的分支；单元测试夹具 ID 必须使用合成隔离 ID。
 
 ## 权威来源（细节以这些文件为准）
 

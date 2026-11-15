@@ -16,6 +16,7 @@ public struct AuroraCoverImage: View {
     public let contentMode: ContentMode
     public let cornerRadius: CGFloat
     public let placeholderStyle: CoverPlaceholderStyle?
+    public let onImageLoaded: ((UIImage) -> Void)?
     
     @State private var loadedImage: UIImage? = nil
     @State private var isLoading: Bool = true
@@ -51,7 +52,8 @@ public struct AuroraCoverImage: View {
         aspectRatio: CGFloat? = AuroraMetrics.posterAspect,
         contentMode: ContentMode = .fill,
         cornerRadius: CGFloat = AuroraMetrics.cardRadius,
-        placeholderStyle: CoverPlaceholderStyle? = nil
+        placeholderStyle: CoverPlaceholderStyle? = nil,
+        onImageLoaded: ((UIImage) -> Void)? = nil
     ) {
         self.url = url
         self.title = title
@@ -60,6 +62,7 @@ public struct AuroraCoverImage: View {
         self.contentMode = contentMode
         self.cornerRadius = cornerRadius
         self.placeholderStyle = placeholderStyle
+        self.onImageLoaded = onImageLoaded
     }
     
     public var body: some View {
@@ -76,7 +79,15 @@ public struct AuroraCoverImage: View {
                         }
                     )
             } else {
-                contentBody
+                // 无固定比例模式同样通过透明基座 + GeometryReader 严格锁定父容器边界，防止超宽图（如 2560x650 / 1920x800）在 .fill 模式下横向撑开容器或溢出 TabView
+                Color.clear
+                    .overlay(
+                        GeometryReader { proxy in
+                            contentBody
+                                .frame(width: proxy.size.width, height: proxy.size.height)
+                                .clipped()
+                        }
+                    )
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
@@ -96,6 +107,9 @@ public struct AuroraCoverImage: View {
                     self.loadedImage = img
                     self.didFailToLoad = img == nil
                     self.isLoading = false
+                }
+                if let img {
+                    self.onImageLoaded?(img)
                 }
             }
         }

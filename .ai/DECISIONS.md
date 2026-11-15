@@ -728,5 +728,22 @@ Evidence:
 - Android: `./gradlew testDebugUnitTest lintDebug assembleRelease --console=plain` (`42 suites, 257 tests: 0 failures, 0 errors, 8 skipped`, `dist/Netgrey.apk` `206,876,555` bytes) plus `netgrey_phone` R8 Release APK verification (Huavod feed/detail cast & intro, `1800x2560` tablet landscape 2-pane Live Detail, Comics cancel/back recovery & reader).
 - iOS / iPadOS: `xcodebuild test ... -only-testing:AuroraShelfTests` (`177 tests executed, 7 skipped, 0 failures`), Release simulator build succeeded, and visual verification on `iPhone 18 Pro` (Huavod multi-actor cast & HD covers, 91动漫 Comic Reader) & `iPad Pro 13-inch (M5)` (Live Detail status-bar clearance & Huavod Detail).
 
+## Playback teardown hardening, smooth loading scroll, Hero Cinema Stage, Android forum scroll fix & UIKit outer immersive router (v2.16.31 Build 257)
+
+Date: 2026-11-15
+
+Status: Implemented, verified on iOS/iPadOS Simulator Release & Android R8 Release APK, test-audited after final edit, and published via OTA.
+
+Decision:
+1. Eliminate ghost audio after exiting playback and broken re-entry across both platforms: add `isViewDismissed`, `dismissView()`, active resolve token invalidation, `AuroraPlayerSurface.dismantleUIView`, strict `PictureInPictureManager` retained-player cleanup/health checks, `replaceCurrentItem(with: nil)`, `AVAudioSession` background deactivation, and failed-cache invalidation on iOS; add `isClosing` / `localDismissing` / `suppressPlayback` immediate `stop()` + `clearMediaItems()` + `onDispose` release on Android.
+2. Preserve scroll fluidity during video loading: defer iOS subsequent-episode `GlobalStartupPrefetchEngine` prewarm by 500ms on a background `.utility` task and return `Velocity.Zero` during Android `PlayerScreen` upward collapse fling animation so velocity transfers smoothly into the `LazyColumn`.
+3. Fix low-res Hero covers and Android forum scroll lock: adopt shared `Cinema Stage` presentation on ultrawide/small Hero artwork (`HeroBanner.swift` frame/clipping order fix; Android `HomeScreen.kt` `originalSize = true` + Kotlin `createAmbientBlurredBitmap` + `cleanSynopsisText` HTML entity unescaping), and disable `isNestedScrollingEnabled` on `ForumReader` `WebView` with CSS `overflow-y: visible !important; touch-action: pan-y pinch-zoom !important;` plus `ForumReaderRevealPolicy` and throttled prefetching (`400ms` delay, concurrency `2`, limit `10`).
+4. Replace outer SwiftUI `NavigationStack` wrapping `TabView(.sidebarAdaptable)` with a UIKit-backed `ImmersiveNavigationHost` / `ImmersiveNavigationController` in `MainContainerView.swift` driven by `PlayerCoordinator.activeRoute` (`AppImmersiveRoute`), hiding iPadOS's floating sidebar cleanly behind pushed full-bleed `.video`/`.live`/`.comic`/`.forumPost`/`.game` screens while keeping inner tab `NavigationStack` toolbars/titles and `AuroraSwipeBackModifier` interactive pop intact.
+
+Evidence:
+- Android: `RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` (20 passed, 0 failed across 5 live/forum test classes), `./gradlew testDebugUnitTest lintDebug assembleRelease --console=plain --no-daemon --rerun-tasks` (42 files, 261 tests: 253 passed, 8 skipped, 0 failures, 0 errors; `lintDebug` 0 errors / 20 warnings), plus `emulator-5554` R8 `Netgrey.apk` verification.
+- iOS / iPadOS: Release UI QA (`iPhone 18 Pro` 10 screenshots + `iPad Pro 13-inch (M5)` Portrait & Landscape 7 screenshots confirming unobstructed full-bleed playback, `< 返回`, `Library`, and Search buttons); `AuroraShelfTests` (180 executed: 172 passed, 7 skipped, 1 external failure on `testBaoziLiveFetchComicsChaptersAndPages` due to upstream `s1-mha1-nlams.bzcdn.net` SSL `-9816`/`403`); `LiveVideoSourceAuditTests` (19/20 video sources + Huavod M3U8/`206` segment download passed, `javsb` external TLS fail).
+- Probe & OTA: `node scripts/probe_all_sources.mjs` (33/35 reachable; `javsb` TLS, `jm` key `401`); `./scripts/publish_ota.sh Release` verified `HTTP/1.1 200 OK` on `https://bananarey.us` (`Netgrey.apk` `206,892,939` bytes, `Netgrey.ipa` `202,676,477` bytes, `manifest.plist` `2.16.31`, `11G` free).
+
 
 

@@ -601,9 +601,14 @@ fun AuroraShelfApp(
                 val currentRelatedVideos = remember(video.id, state.videos) {
                     relatedVideos(video, state.videos)
                 }
+                var isClosing by remember(video.id) { mutableStateOf(false) }
+                val handleCloseVideo: () -> Unit = {
+                    isClosing = true
+                    viewModel.closeVideo()
+                }
                 PredictiveBackContainer(
                     enabled = !isPlayerFullscreen,
-                    onBack = viewModel::closeVideo,
+                    onBack = handleCloseVideo,
                 ) {
                     PlayerScreen(
                         video = video,
@@ -611,12 +616,13 @@ fun AuroraShelfApp(
                         isFullscreen = isPlayerFullscreen,
                         relatedVideos = currentRelatedVideos,
                         favoriteIds = state.favoriteIds,
-                        onBack = viewModel::closeVideo,
+                        onBack = handleCloseVideo,
                         onFavorite = { viewModel.toggleFavorite(video) },
                         onFullscreenChange = { isPlayerFullscreen = it },
                         onVideoOrientationChange = { isCurrentVideoPortrait = it },
                         onVideo = viewModel::openVideo,
                         onRelatedFavorite = viewModel::toggleFavorite,
+                        isDismissing = isClosing,
                     )
                 }
             }

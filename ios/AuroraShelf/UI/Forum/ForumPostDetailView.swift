@@ -2,13 +2,15 @@ import SwiftUI
 
 public struct ForumPostDetailView: View {
     public let post: ForumPostItem
+    public let onDismiss: (() -> Void)?
     @State private var loadedPost: ForumPostItem?
     @State private var loadError: String?
     @State private var isLoading = false
     @Environment(\.dismiss) private var dismiss
 
-    public init(post: ForumPostItem) {
+    public init(post: ForumPostItem, onDismiss: (() -> Void)? = nil) {
         self.post = post
+        self.onDismiss = onDismiss
         if let cached = ForumRepository.shared.cachedDetail(for: post) {
             _loadedPost = State(initialValue: cached)
         }
@@ -66,7 +68,7 @@ public struct ForumPostDetailView: View {
         .task(id: post.id) { await loadDetail() }
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button(action: { dismiss() }) {
+                Button(action: { closeDetail() }) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(.primary)
@@ -91,6 +93,14 @@ public struct ForumPostDetailView: View {
             }
         }
         .enableSwipeBack {
+            closeDetail()
+        }
+    }
+
+    private func closeDetail() {
+        if let onDismiss {
+            onDismiss()
+        } else {
             dismiss()
         }
     }

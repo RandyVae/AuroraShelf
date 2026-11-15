@@ -105,7 +105,7 @@ class X134RepositoryTest {
     fun parsesFeedItemsWithCleanTitlesDurationViewsAndPosterMerge() {
         val tweets = listOf(
             mapOf(
-                "tweetId" to "2121514973625200843",
+                "tweetId" to "9990000000000000001",
                 "name" to "中文字幕 AV",
                 "screenName" to "CU_JAV",
                 "profileImage" to "https://pbs.twimg.com/profile_images/1/avatar_normal.png",
@@ -114,7 +114,7 @@ class X134RepositoryTest {
                 "playTimes" to 12_500L,
             ),
             mapOf(
-                "tweetId" to "2121514218914808037",
+                "tweetId" to "9990000000000000002",
                 "name" to "",
                 "screenName" to "only_handle",
                 "profileImage" to "https://pbs.twimg.com/profile_images/2/avatar_normal.jpg",
@@ -124,7 +124,7 @@ class X134RepositoryTest {
             ),
         )
         val meta = mapOf(
-            "2121514973625200843" to X134Repository.TweetMetadata(
+            "9990000000000000001" to X134Repository.TweetMetadata(
                 posterUrl = "https://pbs.twimg.com/amplify_video_thumb/2052979519930441728/img/poster.jpg",
                 hlsUrl = "https://video.twimg.com/amplify_video/2052979519930441728/pl/master.m3u8",
                 mp4Url = "https://video.twimg.com/amplify_video/2052979519930441728/vid/1280x720/a.mp4",
@@ -135,12 +135,12 @@ class X134RepositoryTest {
         assertEquals(2, items.size)
 
         val first = items[0]
-        assertEquals("134x-2121514973625200843", first.id)
+        assertEquals("134x-9990000000000000001", first.id)
         assertEquals("精品长片测试 第二行", first.title)
         assertEquals("中文字幕 AV", first.author)
         assertEquals("1:15:58", first.duration)
         assertEquals("1.3万 次播放", first.views)
-        assertEquals("https://134x.com/video/2121514973625200843", first.pageUrl)
+        assertEquals("https://134x.com/video/9990000000000000001", first.pageUrl)
         assertEquals("https://pbs.twimg.com/amplify_video_thumb/2052979519930441728/img/poster.jpg", first.thumbnailUrl)
 
         val second = items[1]

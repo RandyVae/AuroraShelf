@@ -60,6 +60,7 @@ public struct VideoDetailPlaybackScreen: View {
     @State private var didPlayToEndObserverToken: NSObjectProtocol?
     @State private var isSwitchingNextEpisode: Bool = false
     @State private var activeResolveID = UUID()
+    @State private var isViewDismissed: Bool = false
     @State private var showDownloadToast: Bool = false
     @State private var downloadToastText: String = ""
     
@@ -176,7 +177,7 @@ public struct VideoDetailPlaybackScreen: View {
             async let episodesTask: Void = loadEpisodes(for: currentVideo)
             async let metaTask = videoRepo.fetchDetailMetadata(for: currentVideo)
             let (_, fetchedMeta) = await (episodesTask, metaTask)
-            if !Task.isCancelled {
+            if !Task.isCancelled && !isViewDismissed {
                 detailMetadata = fetchedMeta
             }
         }
@@ -187,6 +188,7 @@ public struct VideoDetailPlaybackScreen: View {
             }
         }
         .onAppear {
+            isViewDismissed = false
             let args = CommandLine.arguments
             if args.contains("--detail-fullscreen") {
                 isFullScreen = true
@@ -202,7 +204,8 @@ public struct VideoDetailPlaybackScreen: View {
             }
         }
         .onDisappear {
-            cleanupPlayer()
+            isViewDismissed = true
+            cleanupPlayer(forceStopPlayer: !PictureInPictureManager.shared.isActive)
         }
         .sheet(isPresented: $isShowingEpisodePicker) {
             EpisodePickerSheet(
@@ -279,14 +282,12 @@ public struct VideoDetailPlaybackScreen: View {
                     isShowingInPlayerEpisodes = false
                 }
             } else {
-                cleanupPlayer()
-                onDismiss()
+                dismissView()
             }
             return .handled
         }
         .enableSwipeBack(isEnabled: !isFullScreen) {
-            cleanupPlayer()
-            onDismiss()
+            dismissView()
         }
     }
 
@@ -715,8 +716,7 @@ public struct VideoDetailPlaybackScreen: View {
                     Button {
                         let impact = UIImpactFeedbackGenerator(style: .medium)
                         impact.impactOccurred()
-                        cleanupPlayer()
-                        onDismiss()
+                        dismissView()
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "chevron.backward")
@@ -1624,7 +1624,8 @@ public struct VideoDetailPlaybackScreen: View {
                         if let onSearch = onOpenSearchKeyword {
                             Button {
                                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                cleanupPlayer()
+                                isViewDismissed = true
+                                cleanupPlayer(forceStopPlayer: true)
                                 onSearch(member.name)
                             } label: {
                                 chipBody
@@ -1720,6 +1721,7 @@ public struct VideoDetailPlaybackScreen: View {
     // MARK: - 核心播放调度引擎（单一实例，零重新缓冲）
     
     private func startPlayback(for video: VideoItem) async {
+        guard !isViewDismissed, !Task.isCancelled else { return }
         cleanupPlayer(forceStopPlayer: false)
         let resolveID = UUID()
         activeResolveID = resolveID
@@ -1727,18 +1729,33 @@ public struct VideoDetailPlaybackScreen: View {
         resolveError = nil
         resolveStatus = "正在极速秒开…"
 
-        // 若正从当前视频的画中画恢复，直接复用仍在播放中的 AVPlayer，零中断
+        // 若正从当前视频的画中画恢复，直接复用仍在播放且状态健康的 AVPlayer，零中断
         if let retainedPlayer = PictureInPictureManager.shared.consumeRetainedPlayer(for: video) {
-            attachObservers(to: retainedPlayer)
-            self.player = retainedPlayer
-            self.isPlaying = retainedPlayer.timeControlStatus != .paused
-            self.isResolving = false
-            return
+            if retainedPlayer.error == nil,
+               let item = retainedPlayer.currentItem,
+               item.status != .failed,
+               !isViewDismissed,
+               !Task.isCancelled,
+               activeResolveID == resolveID {
+                try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+                try? AVAudioSession.sharedInstance().setActive(true)
+                attachObservers(to: retainedPlayer)
+                self.player = retainedPlayer
+                if retainedPlayer.timeControlStatus == .paused || retainedPlayer.rate == 0 {
+                    retainedPlayer.play()
+                }
+                self.isPlaying = true
+                self.isResolving = false
+                return
+            } else {
+                retainedPlayer.pause()
+                retainedPlayer.replaceCurrentItem(with: nil)
+            }
         }
         
         // 优先检查本地离线缓存（.m3u8 通过本地回环 HTTP 代理提供）
         if let localURL = await downloadManager.playableLocalURL(for: video, episode: currentEpisode) {
-            guard activeResolveID == resolveID else { return }
+            guard activeResolveID == resolveID, !isViewDismissed, !Task.isCancelled else { return }
             resolveStatus = "从离线缓存中加载…"
             initPlayer(url: localURL, referer: nil)
             isResolving = false
@@ -1747,17 +1764,18 @@ public struct VideoDetailPlaybackScreen: View {
         
         do {
             let result = try await VideoRepository.shared.resolvePlayback(video: video)
-            guard activeResolveID == resolveID else { return }
+            guard activeResolveID == resolveID, !isViewDismissed, !Task.isCancelled else { return }
             initPlayer(url: result.url, referer: result.referer, headers: result.headers)
             isResolving = false
         } catch {
-            guard activeResolveID == resolveID else { return }
+            guard activeResolveID == resolveID, !isViewDismissed, !Task.isCancelled else { return }
             resolveError = error.localizedDescription
             isResolving = false
         }
     }
     
     private func initPlayer(url: URL, referer: String?, headers: [String: String] = [:]) {
+        guard !isViewDismissed else { return }
         // 激活系统级影视播放音频会话（破除物理静音键无声限制，并赋能后台与画中画 PiP）
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
         try? AVAudioSession.sharedInstance().setActive(true)
@@ -1812,7 +1830,10 @@ public struct VideoDetailPlaybackScreen: View {
             let status = item.status
             let errorDesc = item.error?.localizedDescription
             Task { @MainActor in
-                guard self.player?.currentItem === item else { return }
+                guard !self.isViewDismissed, self.player === p, self.player?.currentItem === item else {
+                    p.pause()
+                    return
+                }
                 if status == .readyToPlay {
                     self.isPlaying = true
                     self.loadMediaSelectionGroups(for: item)
@@ -1834,6 +1855,7 @@ public struct VideoDetailPlaybackScreen: View {
                     UIApplication.shared.isIdleTimerDisabled = true
                     self.scheduleHideControls()
                 } else if status == .failed {
+                    VideoPreloadManager.shared.invalidateCache(for: self.currentVideo.playbackUrl)
                     self.resolveError = errorDesc ?? "播放器解码失败"
                     UIApplication.shared.isIdleTimerDisabled = false
                 }
@@ -2005,8 +2027,17 @@ public struct VideoDetailPlaybackScreen: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.5, execute: task)
     }
     
+    private func dismissView() {
+        isViewDismissed = true
+        cleanupPlayer(forceStopPlayer: true)
+        onDismiss()
+    }
+
     private func cleanupPlayer(forceStopPlayer: Bool = false) {
         UIApplication.shared.isIdleTimerDisabled = false
+        // 使任何仍在途的异步解析令牌立即失效，防止退出后回放启动幽灵音轨
+        activeResolveID = UUID()
+        isResolving = false
         if player != nil, duration > 5.0, currentTime > 2.0, currentTime < duration - 1.0 {
             progressStore.updateProgress(
                 video: currentVideo,
@@ -2030,13 +2061,22 @@ public struct VideoDetailPlaybackScreen: View {
             p.removeTimeObserver(token)
             timeObserverToken = nil
         }
-        if !forceStopPlayer, PictureInPictureManager.shared.isActive, let activePlayer = player {
+        if !forceStopPlayer, !isViewDismissed, PictureInPictureManager.shared.isActive, let activePlayer = player {
             PictureInPictureManager.shared.retainPlayerForPiP(player: activePlayer, video: currentVideo)
         } else {
-            if forceStopPlayer {
+            if forceStopPlayer || isViewDismissed {
                 PictureInPictureManager.shared.stopAndReleasePiPIfNeeded()
+                PictureInPictureManager.shared.detach()
             }
-            player?.pause()
+            if let existingPlayer = player {
+                existingPlayer.pause()
+                existingPlayer.replaceCurrentItem(with: nil)
+            }
+            if forceStopPlayer || isViewDismissed {
+                Task.detached(priority: .utility) {
+                    try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+                }
+            }
         }
         player = nil
         currentTime = 0
@@ -2115,19 +2155,28 @@ public struct VideoDetailPlaybackScreen: View {
     private func loadEpisodes(for video: VideoItem) async {
         isLoadingEpisodes = true
         let eps = await videoRepo.resolveEpisodes(for: video)
+        guard !Task.isCancelled, !isViewDismissed else { return }
         episodes = eps
         if currentEpisode == nil {
             currentEpisode = eps.first(where: { $0.pageUrl == video.playbackUrl }) ?? eps.first
         }
         isLoadingEpisodes = false
         
-        // 若有多集，自动为后续集数开启向后滑动窗口预热
+        // 延迟 500ms 再触发滑动窗口预热，避免与详情页打开瞬间的滚动与首帧解码抢占主线程
         if let currentEp = currentEpisode {
-            GlobalStartupPrefetchEngine.shared.handleEpisodePlaying(
-                video: video,
-                currentEpisode: currentEp,
-                allEpisodes: eps
-            )
+            let videoSnapshot = video
+            let epsSnapshot = eps
+            Task.detached(priority: .utility) {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    GlobalStartupPrefetchEngine.shared.handleEpisodePlaying(
+                        video: videoSnapshot,
+                        currentEpisode: currentEp,
+                        allEpisodes: epsSnapshot
+                    )
+                }
+            }
         }
     }
     

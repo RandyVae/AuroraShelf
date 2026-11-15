@@ -15,11 +15,7 @@ public struct HomeScreen: View {
     @State private var pullOffsetY: CGFloat = 0
     @State private var selectedDetailVideo: VideoItem? = nil
     @State private var selectedCategoryForDetail: String? = nil
-    @State private var activePlaybackVideo: VideoItem? = nil
-    @State private var playerCoordinator = PlayerCoordinator.shared
-    
     private func playVideo(_ video: VideoItem) {
-        activePlaybackVideo = video
         onPlayVideo(video)
     }
 
@@ -363,38 +359,6 @@ public struct HomeScreen: View {
                         selectedDetailVideo = video
                     }
                 )
-            }
-        }
-        .navigationDestination(item: $activePlaybackVideo) { video in
-            VideoDetailPlaybackScreen(
-                video: video,
-                onDismiss: {
-                    activePlaybackVideo = nil
-                    playerCoordinator.dismiss()
-                },
-                onOpenSearchKeyword: { keyword in
-                    activePlaybackVideo = nil
-                    playerCoordinator.dismiss()
-                    if let onKeyword = onOpenSearchWithKeyword {
-                        onKeyword(keyword)
-                    } else {
-                        onOpenSearch()
-                    }
-                }
-            )
-            .toolbar(.hidden, for: .tabBar)
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationBarHidden(true)
-            .navigationBarBackButtonHidden(true)
-        }
-        .onChange(of: playerCoordinator.activeVideo) { _, newVideo in
-            if let v = newVideo, activePlaybackVideo != v {
-                activePlaybackVideo = v
-            }
-        }
-        .onChange(of: activePlaybackVideo) { _, newValue in
-            if newValue == nil && playerCoordinator.activeVideo != nil {
-                playerCoordinator.dismiss()
             }
         }
     }

@@ -17,7 +17,6 @@ public struct OfflineDownloadsScreen: View {
     @State private var showingClearAlert = false
     @State private var editMode: EditMode = .inactive
     @State private var selectedItemIDs = Set<String>()
-    @State private var activeComicForReading: ComicItem? = nil
     
     public init(onPlayVideo: @escaping (VideoItem) -> Void) {
         self.onPlayVideo = onPlayVideo
@@ -67,14 +66,6 @@ public struct OfflineDownloadsScreen: View {
             .navigationTitle("离线缓存")
             .navigationBarTitleDisplayMode(.inline)
             .environment(\.editMode, $editMode)
-            .navigationDestination(item: $activeComicForReading) { comic in
-                ComicReaderView(comic: comic) {
-                    activeComicForReading = nil
-                }
-                .toolbar(.hidden, for: .tabBar)
-                .toolbar(.hidden, for: .navigationBar)
-                .navigationBarBackButtonHidden(true)
-            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     let hasItems = selectedTab == .video ? !downloadManager.items.isEmpty : !comicDownloadManager.chapters.isEmpty
@@ -419,6 +410,6 @@ public struct OfflineDownloadsScreen: View {
             coverUrl: item.coverUrl,
             chapters: [chapter]
         )
-        activeComicForReading = comic
+        PlayerCoordinator.shared.openComic(comic)
     }
 }

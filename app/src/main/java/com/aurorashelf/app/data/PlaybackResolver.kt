@@ -711,8 +711,8 @@ class PlaybackResolver {
         return token !in setOf("未知", "暂无", "内详", "其它", "其他", "N/A", "-", "--")
     }
 
-    private fun cleanSynopsisText(raw: String): String? {
-        var text = raw
+    internal fun cleanSynopsisText(raw: String): String? {
+        var text = Parser.unescapeEntities(raw, false)
             .replace(Regex("""^(?:简介|剧情简介|内容简介)\s*[:：]?\s*"""), "")
             .replace(Regex("""\s+"""), " ")
             .trim()
@@ -720,6 +720,7 @@ class PlaybackResolver {
             .replace(Regex("""请记住本站[^。！\n]*[。！]?"""), "")
             .replace(Regex("""华视影院(?:官方网站|永久域名|备用域名)[^。！\n]*[。！]?"""), "")
             .replace(Regex("""https?://\S+"""), "")
+            .replace(Regex("""&(?:[a-zA-Z]{1,10}|#\d{1,6}|#x[0-9a-fA-F]{1,6})?$"""), "")
             .trim()
         if (text.isBlank() || text in setOf("暂无", "暂无简介", "未知")) return null
         return text

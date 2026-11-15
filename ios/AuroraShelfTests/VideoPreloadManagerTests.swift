@@ -1,4 +1,5 @@
 import XCTest
+import AVFoundation
 @testable import AuroraShelf
 
 final class VideoPreloadManagerTests: XCTestCase {
@@ -132,5 +133,83 @@ final class VideoPreloadManagerTests: XCTestCase {
         XCTAssertNotNil(manager.cachedResult(for: playUrl))
         XCTAssertNotNil(manager.cachedResult(for: detailUrl))
         XCTAssertEqual(manager.cachedResult(for: playUrl)?.url.absoluteString, "https://huavod.com/link/penny-204772.m3u8")
+
+        manager.invalidateCache(for: playUrl)
+        XCTAssertNil(manager.cachedResult(for: playUrl))
+        XCTAssertNil(manager.cachedResult(for: detailUrl))
+    }
+
+    @MainActor
+    func testParseHuavodHeroSlidesMatchesMultiClassSlideTags() {
+        let html = """
+        <div class="swiper-wrapper">
+          <div class="slide-time-bj swiper-slide">
+            <a href="/advertiser" target="_blank">
+              <div class="slide-time-img3 slide-time-img3--ad" style="background-image: url('https://ad.example/ad.jpg')"></div>
+            </a>
+          </div>
+          <div class="slide-time-bj swiper-slide">
+            <a href="/voddetail/205123.html" title="你好星期六">
+              <div class="slide-time-img3 mask-1" style="background-image: url('https://puui.qpic.cn/banner.jpg')"></div>
+              <div class="slide-info">
+                <div class="slide-info-type"><span>综艺</span></div>
+                <h3 class="slide-info-title">你好星期六</h3>
+              </div>
+            </a>
+          </div>
+        </div>
+        """
+        let slides = VideoRepository.parseHuavodHeroSlides(from: html)
+        XCTAssertEqual(slides.count, 1)
+        XCTAssertEqual(slides.first?.vodId, "205123")
+        XCTAssertEqual(slides.first?.bannerUrl, "https://puui.qpic.cn/banner.jpg")
+        XCTAssertEqual(slides.first?.categoryLabel, "综艺")
+    }
+
+    @MainActor
+    func testPictureInPictureConsumeRetainedPlayerClearsActivePiPVideo() {
+        let pip = PictureInPictureManager.shared
+        pip.stopAndReleasePiPIfNeeded()
+        let video = VideoItem(
+            id: "pip-test",
+            title: "PiP Test",
+            subtitle: "",
+            coverUrl: "",
+            playbackUrl: "https://example.com/pip-test.m3u8",
+            duration: "",
+            rating: "",
+            tags: [],
+            category: "",
+            isTop10: false,
+            rankNumber: nil,
+            sourceName: "Test"
+        )
+        let dummyPlayer = AVPlayer()
+        pip.retainPlayerForPiP(player: dummyPlayer, video: video)
+        XCTAssertEqual(pip.activePiPVideo?.playbackUrl, video.playbackUrl)
+
+        let consumed = pip.consumeRetainedPlayer(for: video)
+        XCTAssertTrue(consumed === dummyPlayer)
+        XCTAssertNil(pip.activePiPVideo, "恢复播放器后必须清空 activePiPVideo，防止再次退出残余错乱状态")
+    }
+
+    func testHeroPresentationStyleSelectsCinemaStageForUltrawideAndSmallAssets() {
+        let phoneHero = CGSize(width: 1179, height: 1485)
+        XCTAssertEqual(
+            HeroBanner.presentationStyle(imagePixelSize: CGSize(width: 2560, height: 650), containerSize: phoneHero),
+            .cinemaStage
+        )
+        XCTAssertEqual(
+            HeroBanner.presentationStyle(imagePixelSize: CGSize(width: 1280, height: 720), containerSize: phoneHero),
+            .cinemaStage
+        )
+        XCTAssertEqual(
+            HeroBanner.presentationStyle(imagePixelSize: CGSize(width: 362, height: 678), containerSize: phoneHero),
+            .cinemaStage
+        )
+        XCTAssertEqual(
+            HeroBanner.presentationStyle(imagePixelSize: CGSize(width: 1080, height: 1512), containerSize: phoneHero),
+            .fullBleed
+        )
     }
 }

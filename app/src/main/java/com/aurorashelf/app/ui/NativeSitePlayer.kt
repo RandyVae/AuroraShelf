@@ -116,6 +116,7 @@ internal fun NativeSitePlayer(
     onControllerVisibilityChange: (Boolean) -> Unit = {},
     onPlaybackEnded: (() -> Unit)? = null,
     keepTopBarVisible: Boolean = false,
+    suppressPlayback: Boolean = false,
     topBarStart: (@Composable () -> Unit)? = null,
     topBarEnd: (@Composable () -> Unit)? = null,
 ) {
@@ -255,9 +256,14 @@ internal fun NativeSitePlayer(
                 DefaultMediaSourceFactory(cachedDataSource).createMediaSource(item)
             }
             player.setMediaSource(media, position)
-            player.prepare()
             val isCurrentlyCasting = currentCastState is com.aurorashelf.app.cast.CastState.Connected
-            player.playWhenReady = shouldResume && !isCurrentlyCasting
+            if (suppressPlayback) {
+                player.playWhenReady = false
+                player.pause()
+            } else {
+                player.prepare()
+                player.playWhenReady = shouldResume && !isCurrentlyCasting
+            }
             Log.i(TAG, "player prepared playWhenReady=${player.playWhenReady}")
             Log.i(TAG, "timing prepared ms=${android.os.SystemClock.elapsedRealtime() - loadStartedAtMs.longValue}")
         } catch (failure: Exception) {
@@ -265,6 +271,15 @@ internal fun NativeSitePlayer(
             Log.e(TAG, "load failed ${failure::class.java.simpleName}: ${failure.message}", failure)
             isLoading = false
             error = "无法获取视频地址，请检查网络或站点后重试"
+        }
+    }
+    LaunchedEffect(suppressPlayback, player) {
+        if (suppressPlayback) {
+            shouldResume = false
+            player.playWhenReady = false
+            player.pause()
+            player.stop()
+            player.clearMediaItems()
         }
     }
     LaunchedEffect(player) {
@@ -373,6 +388,10 @@ internal fun NativeSitePlayer(
         onDispose {
             lifecycle.removeObserver(observer)
             player.removeListener(listener)
+            player.playWhenReady = false
+            player.pause()
+            player.stop()
+            player.clearMediaItems()
             player.release()
         }
     }

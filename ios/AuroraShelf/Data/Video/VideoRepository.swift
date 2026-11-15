@@ -95,7 +95,7 @@ public final class VideoRepository: ObservableObject {
             let src = VideoSourceCatalog.find(by: srcId)
             self.switchSource(to: src)
         } else {
-            self.switchSource(to: VideoSourceCatalog.dongman91)
+            self.switchSource(to: VideoSourceCatalog.huavod)
         }
     }
 
@@ -416,7 +416,7 @@ public final class VideoRepository: ObservableObject {
 
     // MARK: - 91动漫 真实播放流解析（实测 400ms 获取真实 M3U8）
 
-    private func cleanHlsUrl(_ raw: String) -> String {
+    nonisolated private func cleanHlsUrl(_ raw: String) -> String {
         return raw
             .replacingOccurrences(of: "\\/", with: "/")
             .replacingOccurrences(of: "\\u002F", with: "/", options: .caseInsensitive)
@@ -433,9 +433,15 @@ public final class VideoRepository: ObservableObject {
         request.setValue("https://91dongman.net/", forHTTPHeaderField: "Referer")
 
         let (data, response) = try await session.data(for: request)
-        guard let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
-              let html = String(data: data, encoding: .utf8) else {
+        guard let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode) else {
             throw NSError(domain: "VideoRepository", code: 502, userInfo: [NSLocalizedDescriptionKey: "无法加载 91动漫 播放页"])
+        }
+        return try await parse91DongmanStreamData(data, title: title)
+    }
+
+    nonisolated private func parse91DongmanStreamData(_ data: Data, title: String) async throws -> PlaybackSourceResult {
+        guard let html = String(data: data, encoding: .utf8) else {
+            throw NSError(domain: "VideoRepository", code: 502, userInfo: [NSLocalizedDescriptionKey: "无法解码 91动漫 页面"])
         }
 
         // 正则提取 data-video-url="..." 或 var url = "..."
@@ -1293,7 +1299,7 @@ public final class VideoRepository: ObservableObject {
         guard let html = String(data: data, encoding: .utf8) else {
             throw VideoFeedError.malformedResponse(source: "华视影院")
         }
-        var items = parseHuavodHtml(html, category: category)
+        var items = await parseHuavodHtmlOffMain(html, category: category)
         let slides = await slidesTask
         if !slides.isEmpty {
             let slideByVodId = Dictionary(slides.map { ("hua-\($0.vodId)", $0.bannerUrl) }, uniquingKeysWith: { first, _ in first })
@@ -1315,17 +1321,81 @@ public final class VideoRepository: ObservableObject {
                     sourceName: item.sourceName
                 )
             }
+            let matchingSlides = slides.filter { Self.huavodSlideMatchesCategory($0.categoryLabel, category: category) }
+            if !matchingSlides.isEmpty {
+                let itemByVodId = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                var promotedIds = Set<String>()
+                var promoted: [VideoItem] = []
+                for slide in matchingSlides.prefix(5) {
+                    let key = "hua-\(slide.vodId)"
+                    guard promotedIds.insert(key).inserted else { continue }
+                    if let matched = itemByVodId[key] {
+                        promoted.append(VideoItem(
+                            id: matched.id,
+                            title: matched.title,
+                            subtitle: matched.subtitle,
+                            coverUrl: matched.coverUrl,
+                            heroCoverUrl: slide.bannerUrl,
+                            playbackUrl: matched.playbackUrl,
+                            duration: matched.duration,
+                            rating: matched.rating,
+                            tags: matched.tags,
+                            category: matched.category,
+                            isTop10: matched.isTop10,
+                            rankNumber: matched.rankNumber,
+                            sourceName: matched.sourceName
+                        ))
+                    }
+                }
+                if !promoted.isEmpty {
+                    let remaining = items.filter { !promotedIds.contains($0.id) }
+                    items = promoted + remaining
+                }
+            }
         }
         return items
     }
 
+    nonisolated private static func huavodSlideMatchesCategory(_ label: String, category: String) -> Bool {
+        if category == "全部" || category == "精选推荐" { return true }
+        switch category {
+        case "电影":
+            return label.contains("电影") || label.contains("片")
+        case "电视剧":
+            return label.contains("剧") && !label.contains("短剧")
+        case "综艺":
+            return label.contains("综艺")
+        case "动漫":
+            return label.contains("动漫") || label.contains("动画")
+        case "短剧":
+            return label.contains("短剧") || label.contains("微剧")
+        default:
+            return label.contains(category)
+        }
+    }
+
+    nonisolated private func parseHuavodHtmlOffMain(_ html: String, category: String) async -> [VideoItem] {
+        parseHuavodHtml(html, category: category)
+    }
+
     public nonisolated static func parseHuavodHeroSlides(from html: String) -> [HuavodHeroSlide] {
-        guard html.contains("swiper-slide") else { return [] }
-        let blocks = html.components(separatedBy: "class=\"swiper-slide").dropFirst()
+        guard html.contains("swiper-slide"),
+              let slideTagRegex = try? NSRegularExpression(
+                pattern: #"<[a-zA-Z0-9]+\b[^>]*\bclass\s*=\s*["'][^"']*\bswiper-slide\b[^"']*["'][^>]*>"#,
+                options: [.caseInsensitive]
+              ) else {
+            return []
+        }
+        let nsHtml = html as NSString
+        let matches = slideTagRegex.matches(in: html, range: NSRange(location: 0, length: nsHtml.length))
+        guard !matches.isEmpty else { return [] }
         var slides: [HuavodHeroSlide] = []
         var seenVodIds = Set<String>()
 
-        for rawBlock in blocks {
+        for idx in matches.indices {
+            let start = matches[idx].range.location
+            let end = idx + 1 < matches.count ? matches[idx + 1].range.location : nsHtml.length
+            let rawBlock = nsHtml.substring(with: NSRange(location: start, length: max(0, end - start)))
             // 仅截取到下一个 pagination 或列表区，避免跨区块误匹配广告标签
             let block = rawBlock.components(separatedBy: "class=\"swiper-pagination").first ?? rawBlock
             if block.contains("slide-time-img3--ad") || block.contains("/advertiser") {
@@ -2109,9 +2179,8 @@ public final class VideoRepository: ObservableObject {
                 request.setValue("https://huavod.com/", forHTTPHeaderField: "Referer")
                 request.timeoutInterval = 10
                 if let (data, response) = try? await session.data(for: request),
-                   let http = response as? HTTPURLResponse, (200...399).contains(http.statusCode),
-                   let html = String(data: data, encoding: .utf8) {
-                    resolved = Self.parseHuavodDetailMetadata(from: html)
+                   let http = response as? HTTPURLResponse, (200...399).contains(http.statusCode) {
+                    resolved = await Self.decodeAndParseDetailMetadata(data: data, isHuavod: true)
                 }
             }
         } else if video.playbackUrl.contains("huangguoai.com") {
@@ -2127,9 +2196,8 @@ public final class VideoRepository: ObservableObject {
                 request.setValue("https://91dongman.net/", forHTTPHeaderField: "Referer")
                 request.timeoutInterval = 10
                 if let (data, response) = try? await session.data(for: request),
-                   let http = response as? HTTPURLResponse, (200...399).contains(http.statusCode),
-                   let html = String(data: data, encoding: .utf8) {
-                    resolved = Self.parse91DongmanDetailMetadata(from: html)
+                   let http = response as? HTTPURLResponse, (200...399).contains(http.statusCode) {
+                    resolved = await Self.decodeAndParseDetailMetadata(data: data, isHuavod: false)
                 }
             }
         }
@@ -2141,6 +2209,11 @@ public final class VideoRepository: ObservableObject {
             }
         }
         return resolved
+    }
+
+    nonisolated private static func decodeAndParseDetailMetadata(data: Data, isHuavod: Bool) async -> VideoDetailMetadata? {
+        guard let html = String(data: data, encoding: .utf8) else { return nil }
+        return isHuavod ? parseHuavodDetailMetadata(from: html) : parse91DongmanDetailMetadata(from: html)
     }
 
     nonisolated private static func canonicalDetailCacheKey(for pageUrl: String) -> String? {
@@ -2623,6 +2696,19 @@ public final class VideoRepository: ObservableObject {
         return results.sorted(by: { $0.number < $1.number })
     }
 
+    nonisolated private func parseHuavodEpisodeAndMeta(
+        data: Data
+    ) async -> (episodes: [PlaybackEpisode], huavodMeta: VideoDetailMetadata?, dmMeta: VideoDetailMetadata?) {
+        guard let html = String(data: data, encoding: .utf8) else {
+            return ([], nil, nil)
+        }
+        return (
+            parseHuavodEpisodesFromHtml(html),
+            Self.parseHuavodDetailMetadata(from: html),
+            Self.parse91DongmanDetailMetadata(from: html)
+        )
+    }
+
     private func resolveHuavodEpisodes(pageUrl: String) async -> [PlaybackEpisode] {
         guard let url = URL(string: pageUrl) else {
             return [PlaybackEpisode(number: 1, label: "第 1 集", pageUrl: pageUrl)]
@@ -2633,17 +2719,17 @@ public final class VideoRepository: ObservableObject {
         request.timeoutInterval = 10
 
         guard let (data, response) = try? await session.data(for: request),
-              let http = response as? HTTPURLResponse, (200...399).contains(http.statusCode),
-              let html = String(data: data, encoding: .utf8) else {
+              let http = response as? HTTPURLResponse, (200...399).contains(http.statusCode) else {
             return [PlaybackEpisode(number: 1, label: "第 1 集", pageUrl: pageUrl)]
         }
 
-        if let dmMeta = Self.parse91DongmanDetailMetadata(from: html), dmMeta.hasContent {
+        let initialParsed = await parseHuavodEpisodeAndMeta(data: data)
+        if let dmMeta = initialParsed.dmMeta, dmMeta.hasContent {
             detailMetadataCache[pageUrl] = dmMeta
         }
 
-        var results = parseHuavodEpisodesFromHtml(html)
-        var capturedDetailMeta = Self.parseHuavodDetailMetadata(from: html)
+        var results = initialParsed.episodes
+        var capturedDetailMeta = initialParsed.huavodMeta
 
         // 容灾兜底：若播放页解析结果小于等于 1 集，且为 vodplay 链接，尝试读取详情页补齐选集
         if (results.count <= 1 || capturedDetailMeta == nil),
@@ -2655,20 +2741,22 @@ public final class VideoRepository: ObservableObject {
                 detailReq.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
                 detailReq.timeoutInterval = 8
                 if let (detailData, detailResp) = try? await session.data(for: detailReq),
-                   let detailHttp = detailResp as? HTTPURLResponse, (200...399).contains(detailHttp.statusCode),
-                   let detailHtml = String(data: detailData, encoding: .utf8) {
-                    let detailEpisodes = parseHuavodEpisodesFromHtml(detailHtml)
-                    if detailEpisodes.count > results.count {
-                        results = detailEpisodes
+                   let detailHttp = detailResp as? HTTPURLResponse, (200...399).contains(detailHttp.statusCode) {
+                    let detailParsed = await parseHuavodEpisodeAndMeta(data: detailData)
+                    if detailParsed.episodes.count > results.count {
+                        results = detailParsed.episodes
                     }
                     if capturedDetailMeta == nil {
-                        capturedDetailMeta = Self.parseHuavodDetailMetadata(from: detailHtml)
+                        capturedDetailMeta = detailParsed.huavodMeta
                     }
                 }
             }
         }
         if let capturedDetailMeta, capturedDetailMeta.hasContent {
             detailMetadataCache[pageUrl] = capturedDetailMeta
+            if let canonicalKey = Self.canonicalDetailCacheKey(for: pageUrl) {
+                detailMetadataCache[canonicalKey] = capturedDetailMeta
+            }
             if let canonicalKey = Self.canonicalDetailCacheKey(for: pageUrl) {
                 detailMetadataCache[canonicalKey] = capturedDetailMeta
             }

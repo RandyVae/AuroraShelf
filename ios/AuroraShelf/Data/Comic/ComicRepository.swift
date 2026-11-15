@@ -53,6 +53,7 @@ public final class ComicRepository: ObservableObject {
     private var activeRequestID = UUID()
     private var chapterCache: [String: [ComicPage]] = [:]
     private var inFlightChapterTasks: [String: (id: UUID, task: Task<[ComicPage], Error>)] = [:]
+    private var preferredJMDomain: String?
 
     public func cachedChapter(sourceId: String, comicId: String, chapterId: String) -> [ComicPage]? {
         let key = "\(sourceId):\(comicId):\(chapterId)"
@@ -723,10 +724,19 @@ public final class ComicRepository: ObservableObject {
         }
     }
 
-    private func request(_ url: URL, method: String = "GET", body: Data? = nil, headers: [String: String]) async throws -> ComicHTTPResponse {
+    private func request(
+        _ url: URL,
+        method: String = "GET",
+        body: Data? = nil,
+        headers: [String: String],
+        timeoutInterval: TimeInterval? = nil
+    ) async throws -> ComicHTTPResponse {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.httpBody = body
+        if let timeoutInterval {
+            request.timeoutInterval = timeoutInterval
+        }
         headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
         do {
             let (data, response) = try await session.data(for: request)
@@ -753,19 +763,27 @@ public final class ComicRepository: ObservableObject {
 
     private func jmRequest(path: String, secretKey: String) async throws -> [String: Any] {
         var lastError: Error?
-        for domain in ["www.cdnhjk.net", "www.cdngwc.cc", "www.cdngwc.net", "www.cdngwc.club"] {
+        let baseDomains = ["www.cdnhjk.net", "www.cdngwc.cc", "www.cdngwc.net", "www.cdngwc.club"]
+        let orderedDomains: [String]
+        if let preferred = preferredJMDomain {
+            orderedDomains = [preferred] + baseDomains.filter { $0 != preferred }
+        } else {
+            orderedDomains = baseDomains
+        }
+        for domain in orderedDomains {
             do {
                 let timestamp = String(Int(Date().timeIntervalSince1970))
                 let token = ComicProtocolSecrets.md5Hex(timestamp + ComicProtocolSecrets.value(secretKey))
                 let headers = ["token": token, "tokenparam": "\(timestamp),2.1.2", "Cookie": "AVS=1", "X-Requested-With": "com.JMComic3.app"]
                 guard let url = URL(string: "https://\(domain)/\(path)") else { throw ComicFetchError.invalidURL }
-                let response = try await request(url, headers: headers)
+                let response = try await request(url, headers: headers, timeoutInterval: 7)
                 guard let outer = try JSONSerialization.jsonObject(with: response.data) as? [String: Any],
                       outer["code"] as? Int == 200, let encoded = outer["data"] as? String,
                       let decoded = ComicProtocolSecrets.decryptJMPayload(encoded, timestamp: timestamp),
                       let result = try JSONSerialization.jsonObject(with: decoded) as? [String: Any] else {
                     throw ComicFetchError.malformedResponse
                 }
+                preferredJMDomain = domain
                 return result
             } catch { lastError = error }
         }

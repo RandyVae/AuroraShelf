@@ -129,11 +129,6 @@ public struct SwipeBackContainer<Content: View>: View {
                     .ignoresSafeArea()
                 }
             }
-            .contentShape(Rectangle())
-            // 5. SwiftUI 边缘轻扫手势兜底（同样严格限制在 startLocation.x <= edgeHitZoneWidth）
-            .simultaneousGesture(
-                isEnabled ? edgeFallbackGesture(screenWidth: screenWidth, edgeHitZone: edgeHitZoneWidth) : nil
-            )
         }
         .ignoresSafeArea()
         .background(Color.clear.ignoresSafeArea())

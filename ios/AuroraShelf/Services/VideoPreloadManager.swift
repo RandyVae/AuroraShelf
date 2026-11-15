@@ -206,6 +206,16 @@ public final class VideoPreloadManager: ObservableObject {
             streamCache[k] = entry
         }
     }
+
+    /// 清除指定播放地址及其别名的缓存，避免失效令牌/链接导致重进无法播放
+    public func invalidateCache(for playbackUrl: String) {
+        let keys = Self.canonicalKeys(for: playbackUrl)
+        for k in keys {
+            streamCache.removeValue(forKey: k)
+            inFlightTasks[k]?.cancel()
+            inFlightTasks.removeValue(forKey: k)
+        }
+    }
     
     /// 清除所有缓存
     public func clearCache() {

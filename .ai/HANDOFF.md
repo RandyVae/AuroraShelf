@@ -1,4 +1,24 @@
-## 最新交接：2026-11-14 — 漫画卡死与导航恢复、全源修复、平板直播双栏、华视高清封面与演员表/简介匹配 · v2.16.30 (Build 256)
+## 最新交接：2026-11-15 — 播放退出彻底停播与重入修复、加载期顺滑滚动、Hero Cinema Stage 高清化、安卓论坛滑动恢复与 iPad UIKit 外层沉浸导航重构 · v2.16.31 (Build 257)
+
+- **范围**：
+  - 响应 Randy 反馈：「视频播放退到主界面，没有缩略窗口但声音依旧播放、重新点进无法正常播放、视频未加载完成时下方滑动困难、顶部大屏推荐封面分辨率低、安卓端论坛滑不动」，并在 Release QA 中同步发现并根治 iPad 横屏 `.sidebarAdaptable` 侧边栏遮挡播放页与内层导航栏丢失问题。
+  1. **播放器生命周期与重入隔离（iOS + Android）**：
+     - iOS：[VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift)、[AuroraPlayerSurface.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/AuroraPlayerSurface.swift)、[PictureInPictureManager.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/PictureInPictureManager.swift) 通过 `isViewDismissed`、`dismissView()`、异步解析令牌作废、`dismantleUIView` 清空 `playerLayer.player`、PiP 留存播放器健康检查、`replaceCurrentItem(with: nil)` 与 `AVAudioSession` 反激活，彻底消除退回主页后残留音轨并保障重入可播。
+     - Android：[AuroraShelfApp.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AuroraShelfApp.kt)、[PlayerScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PlayerScreen.kt)、[NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt) 新增 `isClosing` / `localDismissing` / `suppressPlayback` 状态，触发退出即刻暂停/停止并清空媒体队列。
+  2. **加载期下方滑动与 Hero 高清展示（iOS + Android）**：
+     - iOS 延后 500ms 于后台启动后续剧集预热防主线程阻塞；Android `PlayerScreen` 向上快速滑动收起时并发弹簧动画并返回 `Velocity.Zero` 将惯性留给下方 `LazyColumn`；
+     - 双端 Hero 启用 `Cinema Stage` 模式（[HeroBanner.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/HeroBanner.swift)、[AuroraCoverImage.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/AuroraCoverImage.swift)、[HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt)、[AppComponents.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AppComponents.kt)），修正 iOS 帧裁切修饰符顺序，Android 增加软件模糊底图 `createAmbientBlurredBitmap` 与 `originalSize = true` 高清加载，并在 [PlaybackResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PlaybackResolver.kt) 补齐 `cleanSynopsisText` HTML 实体清洗。
+  3. **安卓论坛滑动恢复与单元测试修复**：
+     - [ForumScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ForumScreen.kt) 停用内嵌 `WebView` `isNestedScrollingEnabled` 避免手势被外层吞噬，注入 `overflow-y: visible !important; touch-action: pan-y pinch-zoom !important;` 与 `ForumReaderRevealPolicy` 早期首屏呈现，限流后台预抓取；同步在 [X134RepositoryTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/data/X134RepositoryTest.kt) 隔离单测推文 ID 防并发 live 测试污染 `metaCache`。
+  4. **iPad 沉浸式 UIKit 外层导航重构**：
+     - [PlayerCoordinator.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/App/PlayerCoordinator.swift) ＋ [MainContainerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/MainContainerView.swift) 将 `.tabViewStyle(.sidebarAdaptable)` 置于 UIKit `ImmersiveNavigationHost` / `ImmersiveNavigationController` 之下，统一推入 `.video`/`.live`/`.comic`/`.forumPost`/`.game`，既解决 iPad 横屏播放页左侧边栏遮挡，又保留各 Tab 内层原生 `NavigationStack` 标题、搜索按钮与 `AuroraSwipeBackModifier` 交互返回。
+  5. **实测与发布状态（v2.16.31 Build 257）**：
+     - Android：`RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` 专项 20/20 通过；全量 `testDebugUnitTest lintDebug assembleRelease` 42 套件 261 项 **253 通过 / 8 跳过 / 0 失败**、`lintDebug` 0 error / 20 warnings；
+     - iOS：`AuroraShelfTests` 180 项 **172 通过 / 7 跳过 / 1 失败**（Baozi 外网图片 CDN `s1-mha1-nlams.bzcdn.net` SSL `-9816`/`403`）；`LiveVideoSourceAuditTests` **19/20 视频源通过**（`javsb` 外部 TLS 断连）＋华视分片 `206/1025 bytes` 通过；
+     - Node `probe_all_sources.mjs`：35 源 33 可达（`javsb` TLS 断连、`jm` 缺密钥 `code=401`）；
+     - 模拟器 Release 实测（`iPhone 18 Pro` 10 截图、`iPad Pro 13-inch (M5)` 竖/横 7 截图、Android `emulator-5554` R8 `Netgrey.apk`）全过；`./scripts/publish_ota.sh Release` 完成 `https://bananarey.us` 原子覆盖（`Netgrey.apk` `206,892,939` bytes / `Netgrey.ipa` `202,676,477` bytes，`manifest.plist` `2.16.31`，HTTPS `200 OK`，服务器磁盘可用 `11G`）。
+
+## 历史交接：2026-11-14 — 漫画卡死与导航恢复、全源修复、平板直播双栏、华视高清封面与演员表/简介匹配 · v2.16.30 (Build 256)
 
 - **范围**：
   - 响应 Randy 需求：「iPad 直播详情页没做视频详情页那种 YouTube 布局适配；华视的大封面要求高清，然后视频详情页要匹配演员表和基本的介绍；部分源存在无法加载的情况；漫画 bug 严重，部分漫画点进去没能加载的话，页面会卡死，导航栏消失，其他漫画也无法打开」。

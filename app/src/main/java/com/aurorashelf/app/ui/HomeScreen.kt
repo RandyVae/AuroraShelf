@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -43,8 +44,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.draw.clip
 import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
@@ -65,12 +66,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.max
+import kotlin.math.min
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -82,7 +88,6 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -518,6 +523,38 @@ private fun CategoryBar(
     }
 }
 
+internal enum class HeroPresentationStyle {
+    FULL_BLEED,
+    CINEMA_STAGE,
+}
+
+internal fun resolveHeroPresentationStyle(
+    imageWidthPx: Int,
+    imageHeightPx: Int,
+    containerWidthPx: Int,
+    containerHeightPx: Int,
+): HeroPresentationStyle {
+    if (imageWidthPx <= 0 || imageHeightPx <= 0 || containerWidthPx <= 0 || containerHeightPx <= 0) {
+        return HeroPresentationStyle.FULL_BLEED
+    }
+    val imgAspect = imageWidthPx.toFloat() / imageHeightPx.toFloat()
+    val boxAspect = containerWidthPx.toFloat() / containerHeightPx.toFloat()
+    val fillScale = max(
+        containerWidthPx.toFloat() / imageWidthPx.toFloat(),
+        containerHeightPx.toFloat() / imageHeightPx.toFloat(),
+    )
+    if (imgAspect / boxAspect > 1.65f) {
+        return HeroPresentationStyle.CINEMA_STAGE
+    }
+    if (boxAspect < 1.15f && imgAspect >= 1.25f) {
+        return HeroPresentationStyle.CINEMA_STAGE
+    }
+    if (min(imageWidthPx, imageHeightPx) < 560 && fillScale > 1.65f) {
+        return HeroPresentationStyle.CINEMA_STAGE
+    }
+    return HeroPresentationStyle.FULL_BLEED
+}
+
 @Composable
 private fun NetflixHeroBillboard(
     videos: List<VideoItem>,
@@ -545,20 +582,46 @@ private fun NetflixHeroBillboard(
 
     val screenHeightDp = LocalConfiguration.current.screenHeightDp
     val heroHeight = (screenHeightDp * 0.72f).coerceIn(300f, 460f).dp
+    val density = LocalDensity.current
+    var containerSizePx by remember { mutableStateOf(IntSize.Zero) }
+    val heroVideo = remember(video) {
+        val heroUrl = video.heroThumbnailUrl
+        if (heroUrl.isNullOrBlank()) video else video.copy(thumbnailUrl = heroUrl)
+    }
+    var imageDims by remember(heroVideo.thumbnailUrl) { mutableStateOf<Pair<Int, Int>?>(null) }
+    val presentationStyle = imageDims?.let { (w, h) ->
+        resolveHeroPresentationStyle(
+            imageWidthPx = w,
+            imageHeightPx = h,
+            containerWidthPx = containerSizePx.width,
+            containerHeightPx = containerSizePx.height,
+        )
+    } ?: HeroPresentationStyle.FULL_BLEED
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(heroHeight)
+            .clipToBounds()
+            .onSizeChanged { containerSizePx = it }
             .clickable(role = Role.Button, onClick = { onDetails(video) }),
     ) {
-        val heroVideo = remember(video) {
-            val heroUrl = video.heroThumbnailUrl
-            if (heroUrl.isNullOrBlank()) video else video.copy(thumbnailUrl = heroUrl)
-        }
+        // 底层沉浸图片：fullBleed 直接全屏高清铺满；cinemaStage 使用纯 Kotlin 软件模糊的低分辨率环境垫底，规避 RenderEffect 在部分 GPU 上的条纹伪影并保持海报无裁切清晰
         MediaImage(
             video = heroVideo,
+            contentScale = ContentScale.Crop,
+            originalSize = true,
+            ambientBlur = (presentationStyle == HeroPresentationStyle.CINEMA_STAGE),
+            onImageDimensions = { w, h -> imageDims = w to h },
             modifier = Modifier.fillMaxSize(),
         )
+        if (presentationStyle == HeroPresentationStyle.CINEMA_STAGE) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.34f)),
+            )
+        }
 
         // Top dark vignette gradient
         Box(
@@ -595,6 +658,47 @@ private fun NetflixHeroBillboard(
                     ),
                 ),
         )
+
+        // 前景无裁切高清舞台层（CINEMA_STAGE 模式下贴合原图纵横比居中悬浮，严禁溢出或超限放大）
+        if (presentationStyle == HeroPresentationStyle.CINEMA_STAGE) {
+            val dims = imageDims
+            if (dims != null) {
+                val imgW = dims.first
+                val imgH = dims.second
+                val naturalAspect = (imgW.toFloat() / imgH.toFloat()).coerceIn(0.45f, 4.2f)
+                val maxNaturalWidthDp = with(density) { (imgW * 1.45f).toDp() }
+                BoxWithConstraints(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 82.dp, bottom = 148.dp, start = 16.dp, end = 16.dp),
+                ) {
+                    val uncappedW = min(maxWidth.value, maxHeight.value * naturalAspect)
+                    val fittedW = if (min(imgW, imgH) < 560) {
+                        min(uncappedW, maxNaturalWidthDp.value).dp
+                    } else {
+                        uncappedW.dp
+                    }
+                    val fittedH = (fittedW.value / naturalAspect).dp
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        shadowElevation = 14.dp,
+                        border = BorderStroke(0.75.dp, Color.White.copy(alpha = 0.22f)),
+                        color = Color.Transparent,
+                        modifier = Modifier
+                            .size(width = fittedW, height = fittedH)
+                            .clip(RoundedCornerShape(16.dp)),
+                    ) {
+                        MediaImage(
+                            video = heroVideo,
+                            contentScale = ContentScale.Fit,
+                            originalSize = true,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+        }
 
         // Overlaid Billboard Content
         Column(

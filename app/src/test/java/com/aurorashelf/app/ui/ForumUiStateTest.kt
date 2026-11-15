@@ -52,4 +52,39 @@ class ForumUiStateTest {
         assertNull(updated.error)
         assertEquals("下一页加载失败", updated.loadMoreError)
     }
+
+    @Test
+    fun forumReaderRevealPolicyRevealsAtProgressThresholdWithoutDuplicates() {
+        assertFalse(ForumReaderRevealPolicy.shouldRevealOnProgress(progress = 25, generation = 2, styledGeneration = -1))
+        assertTrue(ForumReaderRevealPolicy.shouldRevealOnProgress(progress = 45, generation = 2, styledGeneration = -1))
+        assertFalse(ForumReaderRevealPolicy.shouldRevealOnProgress(progress = 90, generation = 2, styledGeneration = 2))
+    }
+
+    @Test
+    fun mobileForumScriptEnforcesVisibleScrollingAndHighContrastDarkTheme() {
+        val darkScript = mobileForumScript(isDarkTheme = true)
+        assertTrue(darkScript.contains("const auroraDark = true;"))
+        assertTrue(darkScript.contains("overflow-y: visible !important;"))
+        assertTrue(darkScript.contains("touch-action: pan-y pinch-zoom !important;"))
+        assertTrue(darkScript.contains("document.getElementById('aurora-mobile-style')"))
+        assertTrue(darkScript.contains("body.aurora-dark .tpc_content"))
+        assertTrue(darkScript.contains("body.aurora-dark .postmessage"))
+        assertTrue(darkScript.contains("color: #e6e0e9 !important;"))
+    }
+
+    @Test
+    fun heroPresentationStyleProtectsUltrawideAndLowResCoversFromBlurStretch() {
+        assertEquals(
+            HeroPresentationStyle.CINEMA_STAGE,
+            resolveHeroPresentationStyle(2560, 650, 1080, 1208),
+        )
+        assertEquals(
+            HeroPresentationStyle.CINEMA_STAGE,
+            resolveHeroPresentationStyle(362, 678, 1080, 1208),
+        )
+        assertEquals(
+            HeroPresentationStyle.FULL_BLEED,
+            resolveHeroPresentationStyle(1080, 1512, 1080, 1208),
+        )
+    }
 }

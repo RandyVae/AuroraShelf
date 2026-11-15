@@ -9,6 +9,7 @@ import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.View
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -137,7 +138,8 @@ internal fun ForumScreen(
     }
     LaunchedEffect(state.posts.size) {
         if (state.posts.isNotEmpty()) {
-            ForumPostCache.prefetchAll(state.posts.map { it.url }, limit = POST_PREFETCH_LIMIT)
+            kotlinx.coroutines.delay(400)
+            ForumPostCache.prefetchAll(state.posts.map { it.url }, limit = POST_PREFETCH_LIMIT, concurrency = 2)
         }
     }
     state.selectedPost?.let { post ->
@@ -180,7 +182,7 @@ internal fun ForumScreen(
                 }
 
         if (state.unavailableSources.isNotEmpty()) {
-            item {
+            item(key = "forum-unavailable") {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -197,8 +199,8 @@ internal fun ForumScreen(
             }
         }
 
-        if (state.error != null && state.posts.isNotEmpty()) {
-            item {
+        if (state.error != null && state.posts.isEmpty().not()) {
+            item(key = "forum-refresh-error") {
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer,
@@ -236,17 +238,17 @@ internal fun ForumScreen(
         }
 
         if (state.isLoading && state.posts.isEmpty()) {
-            item {
+            item(key = "forum-loading") {
                 Box(Modifier.fillParentMaxSize().padding(top = 120.dp), contentAlignment = Alignment.TopCenter) {
                     CircularProgressIndicator(modifier = Modifier.testTag("forum-loading"))
                 }
             }
         } else if (state.error != null && state.posts.isEmpty()) {
-            item {
+            item(key = "forum-error") {
                 ForumError(message = state.error, onRetry = onRefresh)
             }
         } else if (visiblePosts.isEmpty() && state.posts.isNotEmpty()) {
-            item {
+            item(key = "forum-empty") {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -267,13 +269,13 @@ internal fun ForumScreen(
         }
 
         if (state.isLoadingMore) {
-            item {
+            item(key = "forum-loading-more") {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(modifier = Modifier.size(28.dp))
                 }
             }
         } else if (state.loadMoreError != null && state.posts.isNotEmpty()) {
-            item {
+            item(key = "forum-load-more-error") {
                 Column(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -461,8 +463,8 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     val isDarkTheme = true
     val cachedHtml = remember(post.url) { ForumPostCache.get(post.url) }
     val startedAt = remember(post.url) { System.currentTimeMillis() }
-    var cachedRendered by remember(post.url) { mutableStateOf(false) }
     var isLoading by remember(post.url) { mutableStateOf(true) }
+    var earlyStyledGeneration by remember(post.url) { mutableIntStateOf(-1) }
     var error by remember(post.url) { mutableStateOf<String?>(null) }
     var canGoBack by remember(post.url) { mutableStateOf(false) }
     var loadGeneration by remember(post.url) { mutableIntStateOf(0) }
@@ -497,7 +499,11 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     }
     val webView = remember(post.url) {
         WebView(context).apply {
-            isNestedScrollingEnabled = true
+            // ForumReader sits directly inside a Box + PredictiveBackContainer without a
+            // nested-scrolling parent; disabling nested scroll lets WebView own 100% of
+            // vertical touch pans and flings natively without competing with Compose.
+            isNestedScrollingEnabled = false
+            isVerticalScrollBarEnabled = true
             overScrollMode = View.OVER_SCROLL_ALWAYS
             settings.apply {
                 javaScriptEnabled = false
@@ -511,17 +517,56 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 builtInZoomControls = true
                 displayZoomControls = false
             }
+            webChromeClient = object : WebChromeClient() {
+                override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                    val currentGen = loadGeneration
+                    if (!ForumReaderRevealPolicy.shouldRevealOnProgress(
+                            progress = newProgress,
+                            generation = currentGen,
+                            styledGeneration = earlyStyledGeneration,
+                        )
+                    ) {
+                        return
+                    }
+                    earlyStyledGeneration = currentGen
+                    view?.applyMobileForumLayout(
+                        isDarkTheme = isDarkTheme,
+                        onHtml = null,
+                    ) { wasApplied ->
+                        if (currentGen == loadGeneration && wasApplied) {
+                            isLoading = false
+                            error = null
+                        }
+                    }
+                }
+            }
             webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                     loadGeneration += 1
+                    earlyStyledGeneration = -1
                     isLoading = true
                     error = null
                     Log.i(TAG, "pageStarted cacheHit=${cachedHtml != null}")
                 }
 
+                override fun onPageCommitVisible(view: WebView?, url: String?) {
+                    if (cachedHtml == null) return
+                    val visibleGen = loadGeneration
+                    if (earlyStyledGeneration == visibleGen) return
+                    earlyStyledGeneration = visibleGen
+                    view?.applyMobileForumLayout(
+                        isDarkTheme = isDarkTheme,
+                        onHtml = null,
+                    ) {
+                        if (visibleGen == loadGeneration) {
+                            isLoading = false
+                            error = null
+                        }
+                    }
+                }
+
                 override fun onPageFinished(view: WebView?, url: String?) {
                     canGoBack = view?.canGoBack() == true
-                    if (cachedRendered) return
                     Log.i(TAG, "pageFinished totalMs=${System.currentTimeMillis() - startedAt} cacheHit=${cachedHtml != null}")
                     val finishedGeneration = loadGeneration
                     view?.applyMobileForumLayout(
@@ -531,7 +576,11 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                         if (finishedGeneration != loadGeneration) return@applyMobileForumLayout
                         isLoading = false
                         error = if (wasApplied) null else "帖子排版失败，请重新加载"
-                    } ?: run { isLoading = false }
+                    } ?: run {
+                        if (finishedGeneration == loadGeneration) {
+                            isLoading = false
+                        }
+                    }
                 }
 
                 override fun onReceivedError(view: WebView?, request: WebResourceRequest?, failure: WebResourceError?) {
@@ -567,29 +616,15 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
             if (cachedHtml != null) {
                 val baseUrl = post.url
                 if (baseUrl.contains("t66y.com", ignoreCase = true)) {
-                    CookieManager.getInstance().setCookie(baseUrl, "ismob=1; Path=/; Secure") {
-                        loadDataWithBaseURL(baseUrl, cachedHtml, "text/html", "UTF-8", null)
-                    }
-                } else {
-                    loadDataWithBaseURL(baseUrl, cachedHtml, "text/html", "UTF-8", null)
+                    CookieManager.getInstance().setCookie(baseUrl, "ismob=1; Path=/; Secure")
+                    CookieManager.getInstance().flush()
                 }
+                // Load synchronously without a racing cookie callback so cached posts never
+                // have onPageStarted arrive after an external timer clears isLoading.
+                loadDataWithBaseURL(baseUrl, cachedHtml, "text/html", "UTF-8", null)
             } else {
                 loadForumPost(post.url)
             }
-        }
-    }
-    LaunchedEffect(webView, cachedHtml) {
-        if (cachedHtml == null) return@LaunchedEffect
-        delay(250)
-        if (isLoading && !cachedRendered) {
-            cachedRendered = true
-            isLoading = false
-            error = null
-            Log.i(TAG, "cachedPaint ms=${System.currentTimeMillis() - startedAt}")
-            webView.applyMobileForumLayout(
-                isDarkTheme = isDarkTheme,
-                onHtml = { html -> ForumPostCache.put(post.url, html) },
-            ) { }
         }
     }
     LaunchedEffect(loadGeneration) {
@@ -773,14 +808,19 @@ private fun WebView.loadForumPost(url: String) {
     // The reference 1024 client asks the server for its mobile layout before
     // navigation. Waiting for the cookie callback avoids loading one desktop
     // frame before the mobile preference reaches WebView.
-    CookieManager.getInstance().setCookie(url, "ismob=1; Path=/; Secure") {
-        loadUrl(url)
-    }
+    CookieManager.getInstance().setCookie(url, "ismob=1; Path=/; Secure")
+    CookieManager.getInstance().flush()
+    loadUrl(url)
 }
 
 private const val READER_LOAD_TIMEOUT_MS = 15_000L
-private const val POST_PREFETCH_LIMIT = 20
+private const val POST_PREFETCH_LIMIT = 10
 private const val TAG = "ForumReader"
+
+internal object ForumReaderRevealPolicy {
+    fun shouldRevealOnProgress(progress: Int, generation: Int, styledGeneration: Int): Boolean =
+        progress >= 45 && styledGeneration != generation
+}
 
 internal fun mobileForumScript(isDarkTheme: Boolean): String = MOBILE_FORUM_SCRIPT.replace(
     "const auroraDark = false;",
@@ -809,10 +849,11 @@ internal val MOBILE_FORUM_SCRIPT =
         // The legacy page contains unclosed ad markup, so WebView may nest #wrap
         // under that ad container. Move the forum wrapper to the body before
         // applying direct-child cleanup selectors.
-        if (wrap) document.body.replaceChildren(wrap);
+        if (wrap && wrap.parentElement !== document.body) document.body.replaceChildren(wrap);
       }
 
-      const style = document.createElement('style');
+      const style = document.getElementById('aurora-mobile-style') || document.createElement('style');
+      style.id = 'aurora-mobile-style';
       style.textContent = `
         html, body {
           width: 100% !important;
@@ -823,8 +864,8 @@ internal val MOBILE_FORUM_SCRIPT =
           margin: 0 !important;
           padding: 0 !important;
           overflow-x: hidden !important;
-          overflow-y: auto !important;
-          -webkit-overflow-scrolling: touch !important;
+          overflow-y: visible !important;
+          touch-action: pan-y pinch-zoom !important;
         }
         *, *::before, *::after { box-sizing: border-box !important; }
         img, video, iframe {
@@ -962,24 +1003,36 @@ internal val MOBILE_FORUM_SCRIPT =
           border-color: rgba(202, 196, 208, 0.18) !important;
           background: #211f26 !important;
         }
+        body.aurora-dark .tpc_content,
+        body.aurora-dark .tpc_content *,
+        body.aurora-dark .postmessage,
+        body.aurora-dark .postmessage *,
+        body.aurora-dark .t_msgfont,
+        body.aurora-dark .t_msgfont *,
+        body.aurora-dark td.postcontent {
+          color: #e6e0e9 !important;
+          background-color: transparent !important;
+        }
         body.aurora-dark .aurora-post-meta,
         body.aurora-dark .postinfo {
           border-color: rgba(202, 196, 208, 0.18) !important;
           color: #cac4d0 !important;
         }
+        body.aurora-dark a,
         body.aurora-dark .aurora-pages a { color: #aac7ff !important; }
       `;
-      document.head.appendChild(style);
+      if (!style.parentNode) document.head.appendChild(style);
 
       const preparePageBars = (container, firstContent) => {
-        const pageBars = Array.from(container?.querySelectorAll('.pages') || []);
+        if (!container || container.querySelector(':scope > .aurora-pages')) return;
+        const pageBars = Array.from(container.querySelectorAll('.pages') || []);
         pageBars.forEach((pages, index) => {
           const navigation = document.createElement('nav');
           navigation.className = 'aurora-pages';
           navigation.setAttribute('aria-label', index === 0 ? '帖子翻页' : '帖子底部翻页');
           navigation.appendChild(pages);
           if (index === 0 && firstContent) container.insertBefore(navigation, firstContent);
-          else container?.appendChild(navigation);
+          else container.appendChild(navigation);
         });
       };
 
@@ -989,13 +1042,15 @@ internal val MOBILE_FORUM_SCRIPT =
         preparePageBars(main, firstPost);
         document.querySelectorAll('#main > .t2').forEach((post) => {
           const content = post.querySelector('tr.tr1 > th:not([rowspan])');
-          const author = post.querySelector('tr.tr1 > th[rowspan="2"] > b')?.textContent?.trim();
-          const time = post.querySelector('.tipad [data-timestamp]')?.textContent?.trim();
-          if (content && (author || time)) {
-            const meta = document.createElement('div');
-            meta.className = 'aurora-post-meta';
-            meta.textContent = [author, time].filter(Boolean).join(' · ');
-            content.prepend(meta);
+          if (content && !content.querySelector('.aurora-post-meta')) {
+            const author = post.querySelector('tr.tr1 > th[rowspan="2"] > b')?.textContent?.trim();
+            const time = post.querySelector('.tipad [data-timestamp]')?.textContent?.trim();
+            if (author || time) {
+              const meta = document.createElement('div');
+              meta.className = 'aurora-post-meta';
+              meta.textContent = [author, time].filter(Boolean).join(' · ');
+              content.prepend(meta);
+            }
           }
         });
       }

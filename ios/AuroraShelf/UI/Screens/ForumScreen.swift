@@ -490,7 +490,6 @@ public struct ForumScreen: View {
     @ObservedObject public var repo = ForumRepository.shared
     public let onOpenSearch: () -> Void
     @State private var spotlightIndex: Int = 0
-    @State private var selectedPost: ForumPostItem? = nil
     @State private var isScrolled: Bool = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -525,7 +524,7 @@ public struct ForumScreen: View {
                     if let spotlight = spotlightPost {
                         ForumHeroBillboard(
                             post: spotlight,
-                            onEnter: { selectedPost = spotlight },
+                            onEnter: { PlayerCoordinator.shared.openForumPost(spotlight) },
                             onCycle: {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                                     spotlightIndex = (spotlightIndex + 1) % max(1, repo.posts.count)
@@ -639,12 +638,6 @@ public struct ForumScreen: View {
                 }
             }
         }
-        .navigationDestination(for: ForumPostItem.self) { post in
-            ForumPostDetailView(post: post)
-        }
-        .navigationDestination(item: $selectedPost) { post in
-            ForumPostDetailView(post: post)
-        }
     }
 
     @ViewBuilder
@@ -685,7 +678,9 @@ public struct ForumScreen: View {
 
                 LazyVStack(spacing: AuroraMetrics.spacingM) {
                     ForEach(repo.posts, id: \.compositeID) { post in
-                        NavigationLink(value: post) {
+                        Button {
+                            PlayerCoordinator.shared.openForumPost(post)
+                        } label: {
                             postCard(post)
                         }
                         .buttonStyle(AppleSpringCardButtonStyle())

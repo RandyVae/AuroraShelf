@@ -64,11 +64,13 @@ public final class PictureInPictureManager: NSObject {
         guard let retainedPlayer else { return nil }
         if activePiPVideo?.playbackUrl == video.playbackUrl {
             self.retainedPlayer = nil
+            self.activePiPVideo = nil
             return retainedPlayer
         }
         // Opening a different video replaces any lingering PiP playback.
         controller?.stopPictureInPicture()
         retainedPlayer.pause()
+        retainedPlayer.replaceCurrentItem(with: nil)
         self.retainedPlayer = nil
         self.activePiPVideo = nil
         return nil
@@ -79,6 +81,7 @@ public final class PictureInPictureManager: NSObject {
             controller?.stopPictureInPicture()
         }
         retainedPlayer?.pause()
+        retainedPlayer?.replaceCurrentItem(with: nil)
         retainedPlayer = nil
         activePiPVideo = nil
         isActive = false

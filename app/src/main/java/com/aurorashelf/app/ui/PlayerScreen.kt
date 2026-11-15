@@ -220,6 +220,7 @@ internal fun PlayerScreen(
     onVideoOrientationChange: (Boolean) -> Unit,
     onVideo: (VideoItem) -> Unit,
     onRelatedFavorite: (VideoItem) -> Unit,
+    isDismissing: Boolean = false,
 ) {
     val context = LocalContext.current
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
@@ -231,6 +232,8 @@ internal fun PlayerScreen(
     val isCasting = castState is CastState.Connected
 
     var playbackUrl by remember(video.id) { mutableStateOf(video.pageUrl) }
+    var localDismissing by remember(playbackUrl) { mutableStateOf(false) }
+    val suppressPlayback = isDismissing || localDismissing
     var videoAspectRatio by remember(playbackUrl) { mutableStateOf<Float?>(null) }
     var currentPositionMs by rememberSaveable(playbackUrl) { mutableLongStateOf(0L) }
     var currentDurationMs by rememberSaveable(playbackUrl) { mutableLongStateOf(0L) }
@@ -411,6 +414,20 @@ internal fun PlayerScreen(
                             } else {
                                 0f
                             }
+                            if (available.y < 0f && target == maxCollapsePx) {
+                                // Collapse concurrently so upward fling velocity flows smoothly into LazyColumn even before video finishes loading.
+                                scope.launch {
+                                    animate(
+                                        initialValue = collapseOffsetPx,
+                                        targetValue = target,
+                                        initialVelocity = -available.y,
+                                        animationSpec = spring(dampingRatio = 0.85f, stiffness = 320f),
+                                    ) { value, _ ->
+                                        collapseOffsetPx = value
+                                    }
+                                }
+                                return Velocity.Zero
+                            }
                             animate(
                                 initialValue = collapseOffsetPx,
                                 targetValue = target,
@@ -469,7 +486,10 @@ internal fun PlayerScreen(
             }
             val topBarBackButton: @Composable () -> Unit = {
                 Surface(
-                    onClick = onBack,
+                    onClick = {
+                        localDismissing = true
+                        onBack()
+                    },
                     shape = CircleShape,
                     color = Color.Black.copy(alpha = 0.54f),
                     contentColor = Color.White,
@@ -573,6 +593,7 @@ internal fun PlayerScreen(
                                 onControllerVisibilityChange = { isPlayerControllerVisible = it },
                                 onPlaybackEnded = handlePlaybackEnded,
                                 keepTopBarVisible = isCasting,
+                                suppressPlayback = suppressPlayback,
                                 topBarStart = topBarBackButton,
                                 topBarEnd = topBarRightControls,
                                 modifier = Modifier
@@ -735,6 +756,7 @@ internal fun PlayerScreen(
                     onControllerVisibilityChange = { isPlayerControllerVisible = it },
                     onPlaybackEnded = handlePlaybackEnded,
                     keepTopBarVisible = !isFullscreen && isCasting,
+                    suppressPlayback = suppressPlayback,
                     topBarStart = topBarBackButton,
                     topBarEnd = topBarRightControls,
                     modifier = Modifier

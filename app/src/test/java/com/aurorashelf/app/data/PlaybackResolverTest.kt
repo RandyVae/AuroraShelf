@@ -450,4 +450,11 @@ class PlaybackResolverTest {
         assertEquals(listOf("杨龙"), meta!!.directors)
         assertEquals(listOf("田曦薇", "闫桉", "王一楠", "林一"), meta.actors)
     }
+
+    @Test fun cleanSynopsisTextStripsDanglingEntitiesAndUnescapes() {
+        val resolver = PlaybackResolver()
+        assertEquals("急诊科：靠推演看穿生死绝症", resolver.cleanSynopsisText("急诊科：靠推演看穿生死绝症&"))
+        assertEquals("内容测试", resolver.cleanSynopsisText("剧情简介：内容测试&hellip"))
+        assertEquals("A & B", resolver.cleanSynopsisText("A &amp; B请记住本站永久域名 huavod.com。"))
+    }
 }

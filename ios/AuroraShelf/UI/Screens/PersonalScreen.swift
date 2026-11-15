@@ -9,9 +9,7 @@ public struct PersonalScreen: View {
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
     @ObservedObject private var account = AccountService.shared
     public let onPlayVideo: (VideoItem) -> Void
-    
-    @State private var showGame: Bool = false
-    @State private var activePlaybackVideo: VideoItem? = nil
+
     @State private var showVideoSourcePicker: Bool = false
     @State private var showComicSourcePicker: Bool = false
     @State private var showLiveSourceDialog: Bool = false
@@ -78,9 +76,7 @@ public struct PersonalScreen: View {
                     .padding(.top, AuroraMetrics.spacingS)
                     
                     // 资料库核心：接着播放与最近历史（对齐 Apple TV 资料库）
-                    UpNextShelf(onPlayVideo: { video in
-                        activePlaybackVideo = video
-                    })
+                    UpNextShelf(onPlayVideo: onPlayVideo)
 
                     // 2. 娱乐板块（战术 RPG 离线单机游戏接入）
                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
@@ -90,7 +86,7 @@ public struct PersonalScreen: View {
                             .padding(.horizontal, AuroraMetrics.spacingXS)
                         
                         Button {
-                            showGame = true
+                            PlayerCoordinator.shared.openGame()
                         } label: {
                             HStack(spacing: AuroraMetrics.spacingL) {
                                 ZStack {
@@ -182,9 +178,7 @@ public struct PersonalScreen: View {
                         .buttonStyle(.plain)
                         
                         NavigationLink {
-                            WatchlistScreen(onPlayVideo: { video in
-                                activePlaybackVideo = video
-                            })
+                            WatchlistScreen(onPlayVideo: onPlayVideo)
                         } label: {
                             settingRow(
                                 icon: "bookmark",
@@ -227,9 +221,7 @@ public struct PersonalScreen: View {
                         .buttonStyle(.plain)
 
                         NavigationLink {
-                            OfflineDownloadsScreen(onPlayVideo: { video in
-                                activePlaybackVideo = video
-                            })
+                            OfflineDownloadsScreen(onPlayVideo: onPlayVideo)
                         } label: {
                             settingRow(
                                 icon: "arrow.down.circle",
@@ -276,26 +268,10 @@ public struct PersonalScreen: View {
             }
         }
         .navigationTitle("library.title".localized)
-        .navigationDestination(isPresented: $showGame) {
-            GameContainerView {
-                showGame = false
-            }
-            .toolbar(.hidden, for: .tabBar)
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationBarBackButtonHidden(true)
-        }
-        .navigationDestination(item: $activePlaybackVideo) { video in
-            VideoDetailPlaybackScreen(video: video) {
-                activePlaybackVideo = nil
-            }
-            .toolbar(.hidden, for: .tabBar)
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationBarBackButtonHidden(true)
-        }
         .onAppear {
             let args = CommandLine.arguments
             if args.contains("--game") || args.contains("--slots") || args.contains("--game-slots") || args.contains("--game-hub") || args.contains("--game-battle") || args.contains("--battle") {
-                showGame = true
+                PlayerCoordinator.shared.openGame()
             }
         }
         .sheet(isPresented: $showLanguagePicker) {

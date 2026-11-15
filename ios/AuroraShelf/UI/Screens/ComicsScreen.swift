@@ -510,7 +510,6 @@ public struct ComicHeroBanner: View {
 public struct ComicsScreen: View {
     @ObservedObject public var repo = ComicRepository.shared
     public let onOpenSearch: () -> Void
-    @State private var activeComicForReading: ComicItem? = nil
     @State private var detailTask: Task<Void, Never>?
     @State private var detailLoadingState = ComicDetailLoadingState()
     @State private var detailError: String?
@@ -648,14 +647,6 @@ public struct ComicsScreen: View {
                     .accessibilityLabel("搜索漫画")
                 }
             }
-        }
-        .navigationDestination(item: $activeComicForReading) { comic in
-            ComicReaderView(comic: comic) {
-                activeComicForReading = nil
-            }
-            .toolbar(.hidden, for: .tabBar)
-            .toolbar(.hidden, for: .navigationBar)
-            .navigationBarBackButtonHidden(true)
         }
         .alert("无法打开漫画", isPresented: Binding(
             get: { detailError != nil },
@@ -979,7 +970,7 @@ public struct ComicsScreen: View {
         if !comic.chapters.isEmpty {
             selectedComicForRetry = nil
             detailError = nil
-            activeComicForReading = comic
+            PlayerCoordinator.shared.openComic(comic)
             return
         }
         selectedComicForRetry = comic
@@ -993,7 +984,7 @@ public struct ComicsScreen: View {
                 if detailedComic.chapters.isEmpty {
                     detailError = "此漫画来源没有提供章节列表。"
                 } else {
-                    activeComicForReading = detailedComic
+                    PlayerCoordinator.shared.openComic(detailedComic)
                 }
             } catch {
                 guard !Task.isCancelled, detailLoadingState.finishRequest(requestID) else { return }
