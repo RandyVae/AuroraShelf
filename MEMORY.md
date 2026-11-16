@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `7ccef74`（2026-11-16），未提交 25 个文件
+- Git：`main` @ `8e5cbe8`（2026-11-16），未提交 3 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-16（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-16（今天）
@@ -36,7 +36,7 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-16 23:07 by `sync.py`
+- 最后同步：2026-11-16 23:13 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
@@ -49,6 +49,8 @@
 - 最近一次更新：2026-11-16 by Antigravity
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-16（Antigravity / 用户 Randy 指令）：确立「发布前双端模拟器全规模检查硬门槛」全局强制规范。正式写入全局规则（`~/.gemini/config/plugins/agent-memory/rules/AGENTS.md` 第 `2.8` 节、`~/.codex/AGENTS.md` 第 `十四` 节、`~/.claude/CLAUDE.md`）与项目 [AGENTS.md](file:///Users/itou/Documents/ChatGPT/91pron/AGENTS.md)：今后每次发布新版本（TestFlight / 网页 OTA / GitHub Release）前，必须在 **iOS 模拟器**与 **Android 模拟器**中分别采用与交付包一致的 Release 构建执行全规模检查，覆盖全部视频源（含短剧与直播播放出画）、全部论坛源、全部图片/漫画源与游戏功能；全部通过后才允许发布，严禁未测或未全过即随意发布。
 
 - 2026-11-16（Antigravity）：根治华视影院 `2004` 错误与 `.ts`/TLS 分片加载失败（v2.16.37 Build 263）。(1) 在 Android 新增 [ResilientHttpDataSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/playback/ResilientHttpDataSource.kt) 替代 `DefaultHttpDataSource` 与默认重试策略（共享 HTTP/2 `ConnectionPool(8, 2m)`、`408/428/429/503` 内联退避重试与 `Retry-After`、仅在 `SSLException` 时回落宽松 TLS、剥离第三方 GET `.ts` 跨站 `Origin`、扩展 `ResilientLoadErrorHandlingPolicy` 对 `428`/`5xx`/TLS 重试及 `2004` 恢复判定），接入 `NativeSitePlayer`/`OfflineCacheManager`/`LiveScreen`；(2) 在 iOS 新增 [HLSLoopbackRelayServer.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HLSLoopbackRelayServer.swift)（`NWListener` 回环 + `URLSession.permissive` + M3U8 重写 + `Range`/分片 4 次退避重试 `408/428/429/5xx`），并在 [VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift) 监听 `.AVPlayerItemFailedToPlayToEndTime`、统一 UA 与去跨站 `Origin`；(3) 双端 [PlaybackResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PlaybackResolver.kt) / [VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift) / [VideoPreloadManager.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/VideoPreloadManager.swift) / [AuroraViewModel.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AuroraViewModel.kt) 收紧 `/link/penny-` 缓存 TTL 至 `90s`、调用 `/Player/resolveUrl` 后立即清除一次性 `mt` 令牌、限制华视启动/滑窗预加载并发为 `1`、支持失活后先强制重解并再切换华视备用线路（`parseHuavodPlayLines`）自动恢复；(4) 验证：`./gradlew testDebugUnitTest lintDebug assembleRelease`（269 项：261 通/8 跳）及 `RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1`（269/269 全通 0 跳过）、iOS `AuroraShelfTests`（190 项：182 通/8 跳）与 `LiveVideoSourceAuditTests` 华视 M3U8/分片 `206/1025B` 全绿、`emulator-5554` R8 APK 及 `iPhone 18 Pro` / `iPad Pro 13-inch M5` Release 实测正常播映；TestFlight（Build 263）、OTA（`https://bananarey.us` 137M APK / 135M IPA）与 Git/GitHub Release 全部同步上线。
 
@@ -155,6 +157,8 @@
 - 最近一次更新：2026-11-08 by Antigravity (gemini-3.8-flash)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-16（Antigravity / 用户 Randy 指令）：确立「发布前双端模拟器全规模检查硬门槛」全局强制规范。正式写入全局规则（`~/.gemini/config/plugins/agent-memory/rules/AGENTS.md` 第 `2.8` 节、`~/.codex/AGENTS.md` 第 `十四` 节、`~/.claude/CLAUDE.md`）与项目 [AGENTS.md](file:///Users/itou/Documents/ChatGPT/91pron/AGENTS.md)：今后每次发布新版本（TestFlight / 网页 OTA / GitHub Release）前，必须在 **iOS 模拟器**与 **Android 模拟器**中分别采用与交付包一致的 Release 构建执行全规模检查，覆盖全部视频源（含短剧与直播播放出画）、全部论坛源、全部图片/漫画源与游戏功能；全部通过后才允许发布，严禁未测或未全过即随意发布。
 
 - 2026-11-14（Antigravity）：MissAV 封面与去广告/预览片拦截全端修复＋iPad 详情页右侧推荐栏收窄适配（v2.16.25 Build 251）。(1) 封面修复：MissAV `fourhoi.com` 返回 403 而有效封面位于 `fourhoi.mrstcdn.store/{code}/cover-t.jpg`，且 `missav.media` 在携带 `Referer: https://missav123.com/` 时返回 403；双端切换 Referer 至 `https://missav.media/` 并增加 `fourhoi.com -> fourhoi.mrstcdn.store` 容灾回退，同时 iOS/Android 列表解析过滤顶部/页脚约 40 个无封面导航与分类链接及国旗图标；(2) 防广告/预览片：MissAV 实时 `.m3u8` 位于 `surrit.mrstcdn.store` 且 packed 脚本含多段域名，Android 原生两段拼接与未受理 `missav.media` 会导致解析失败；双端统一优先解包 packed HLS、适配 2~4 段域名并显式屏蔽 `/preview.mp4` 及广告宿主；(3) 详情页分栏：`DeviceLayoutProfile.swift` 将 `VideoDetailColumns` 从 `0.62 / 0.38` 调整为 `0.70 / 0.30`（收窄约 1/5 对齐 YouTube Watch 页比例），`landscapeRecommendationRail` 缩略图按栏宽自适应缩放防挤压截断。
 

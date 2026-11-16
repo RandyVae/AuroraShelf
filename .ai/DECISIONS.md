@@ -814,6 +814,15 @@ Evidence:
 - iOS / iPadOS: `VideoPreloadManagerTests` (+2 unit tests), `AuroraShelfTests` offline (190 tests: 182 passed, 8 skipped, 0 failures), `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1` passing `testHuavodDetailedLivePlaybackAndSegmentDownload` (`cdn2.okhuaren.com/*.ts` HTTP `206` / `1025B`, `31352B` m3u8), `LiveSourceAdapterTests` (5/5), `ComicRepositoryTests` (30/30), `X134SourceServiceTests` (3/3), 17/20 video sources (`javnoni` read error, `javsb` `-1005`, `eporner` `HTTP 502`), and 6/7 forum images (`fid=34` external `nsaimg.com` `-1005`); Release simulator verification on both `iPhone 18 Pro` (`你好星期六`) and `iPad Pro 13-inch (M5)` (`现在就出发第四季`).
 - Distribution: `./scripts/publish_testflight.sh` uploaded `v2.16.37 (Build 263)`; `./scripts/publish_ota.sh Release` atomically updated `https://bananarey.us` (`manifest.plist` `2.16.37`, `Netgrey.apk` `143,433,689` bytes, `Netgrey.ipa` `140,644,224` bytes, HTTP `200 OK`, `/` `11G` free).
 
+## Pre-release full-scale iOS & Android simulator verification gate (Global Mandatory Rule)
+
+Date: 2026-11-16
+
+Status: Enforced across global rules (`~/.gemini/config/plugins/agent-memory/rules/AGENTS.md` §2.8, `~/.codex/AGENTS.md` §14, `~/.claude/CLAUDE.md`) and project `AGENTS.md`.
+
+Decision:
+Require a mandatory full-scale pre-release simulator verification gate before any new version release (`publish_ota.sh`, `publish_testflight.sh`, release tags, or GitHub Releases). Verification must cover all video sources (actual playback), all forum sources, all image/comic sources, and full game functionality, executed separately on both **iOS Simulator** (iPhone + iPad Release build) and **Android Emulator** (R8 Release APK). Releases are strictly blocked until all checks pass; casual or partial-check releases are prohibited.
+
 
 
 
