@@ -11,7 +11,7 @@
   - 新增 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh)（支持 `--check` 预检、`--export-only` 导出 IPA、读取 `.appstore_credentials` API Key 或 Xcode 登录态进行 `app-store-connect` 归档直传，并生成 `ios/build.nosync/ExportOptions-TestFlight.plist`）；[.gitignore](file:///Users/itou/Documents/ChatGPT/91pron/.gitignore) 新增忽略 `.appstore_credentials` 与 `*.p8`。
   - [CategoryShelfTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/CategoryShelfTests.swift) 新增 `testBundleContainsTestFlightComplianceMetadata()` 校验 `ITSAppUsesNonExemptEncryption` 与 `PrivacyInfo.xcprivacy`。
 - **验证与交付结果**：
-  - TestFlight 预检：`./scripts/publish_testflight.sh --check` 全项合规校验 PASS（并明确提示本机尚缺 `Apple Distribution` 证书与 App Store Connect 账号登录态）。
+  - TestFlight 预检与上传：`./scripts/publish_testflight.sh --check` 全项合规校验 PASS；用户签发 `Apple Distribution: YUDI WEI (U4MXHLA3GF)` 证书后，执行 `./scripts/publish_testflight.sh` 完成归档并成功上传 `AuroraShelf.ipa`（`v2.16.35 / Build 261`）至 App Store Connect（`Upload succeeded` / `** EXPORT SUCCEEDED **`）。
   - iOS 测试：`CategoryShelfTests` **9/9 通过**（含 `testBundleContainsTestFlightComplianceMetadata`）。
   - Android 单测：`./gradlew testDebugUnitTest` 42 套件 266 项：**258 通过 / 8 跳过 / 0 失败 / 0 错误**。
   - OTA 与产物核验：`./scripts/publish_ota.sh Release` 完成 `https://bananarey.us` 原子覆盖（`Netgrey.apk` `206,909,327` bytes / `198M`、`Netgrey.ipa` `202,755,543` bytes / `194M`、`manifest.plist` `2.16.35` 均 `HTTP/1.1 200 OK`，`/` 可用 `11G` / `29%`）；实测确认 `.xcarchive` 与 `Netgrey.ipa` 内已打入 `PrivacyInfo.xcprivacy`（`1246` bytes）且 `MinimumOSVersion=26.0`、`ITSAppUsesNonExemptEncryption=false`。

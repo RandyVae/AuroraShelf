@@ -10,10 +10,10 @@
    - 在 [CategoryShelfTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/CategoryShelfTests.swift) 新增 `testBundleContainsTestFlightComplianceMetadata()` 回归测试。
 3. **全链路版本号同步 (`v2.16.35 / Build 261`)、双端验证与 OTA 发布**：
    - 同步更新 `AGENTS.md`、`app/build.gradle.kts`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`；
-   - 验证结果：`./scripts/publish_testflight.sh --check` PASS；iOS `CategoryShelfTests` **9/9 通过**；Android `./gradlew testDebugUnitTest` **42 套件 266 项（258 通过 / 8 跳过 / 0 失败）**；`./scripts/publish_ota.sh Release` 成功同步覆盖至 `https://bananarey.us`（`Netgrey.apk` `206,909,327` bytes / `Netgrey.ipa` `202,755,543` bytes，`manifest.plist` `2.16.35` 均 `HTTP/1.1 200 OK`），且归档与 IPA 内确认包含 `PrivacyInfo.xcprivacy`、`MinimumOSVersion=26.0`、`ITSAppUsesNonExemptEncryption=false`。
+   - 验证结果：`./scripts/publish_testflight.sh --check` PASS；`./scripts/publish_testflight.sh` 已使用 `Apple Distribution: YUDI WEI (U4MXHLA3GF)` 完成归档并成功上传 `v2.16.35 (Build 261)` 至 App Store Connect（`Upload succeeded` / `** EXPORT SUCCEEDED **`）；iOS `CategoryShelfTests` **9/9 通过**；Android `./gradlew testDebugUnitTest` **42 套件 266 项（258 通过 / 8 跳过 / 0 失败）**；`./scripts/publish_ota.sh Release` 成功同步覆盖至 `https://bananarey.us`（`Netgrey.apk` `206,909,327` bytes / `Netgrey.ipa` `202,755,543` bytes，`manifest.plist` `2.16.35` 均 `HTTP/1.1 200 OK`），且归档与 IPA 内确认包含 `PrivacyInfo.xcprivacy`、`MinimumOSVersion=26.0`、`ITSAppUsesNonExemptEncryption=false`。
 
 ### 交接提醒
-- 本机环境尚未登录 Xcode Apple ID、未签发 `Apple Distribution` 分发证书、也未配置 `.appstore_credentials`（API Key），且 Apple Developer 后台尚未创建显式 App ID `com.aurorashelf.app` 与 App Store Connect App 记录；用户完成账号侧 3 步配置后，直接运行 `./scripts/publish_testflight.sh` 即可自动归档并直传 TestFlight。
+- `v2.16.35 (Build 261)` 已上传至 App Store Connect 并处于后台处理状态；待处理完成后在 App Store Connect -> TestFlight -> 内部测试 添加测试员即可安装。
 
 ## 历史交接：2026-11-15 — 全量 Bug 筛查与修复、华视搜索专向加固、论坛原图单张/批量下载、视频与漫画统一离线下载进度查询＋双端 Release 验证与 OTA 发布 · v2.16.34 (Build 260)
 

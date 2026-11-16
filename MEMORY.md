@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `c475411`（2026-11-15），未提交 15 个文件
+- Git：`main` @ `7b88087`（2026-11-16），未提交 3 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-16（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-16（今天）
@@ -36,16 +36,16 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-16 09:37 by `sync.py`
+- 最后同步：2026-11-16 10:17 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-16 · Build 261 / v2.16.35）：已完成 TestFlight 内部测试工程侧合规阻塞全面修复与自动化上传脚本落地，并同步完成双端版本号递增与 OTA 发布。(1) **TestFlight 隐私清单与出口合规**：新增 [PrivacyInfo.xcprivacy](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/PrivacyInfo.xcprivacy) 声明 `NSPrivacyAccessedAPICategoryUserDefaults`（`CA92.1`）、`SystemBootTime`（`35F9.1`）、`FileTimestamp`（`C617.1`）与 `DiskSpace`（`E174.1`）4 类 Required Reason API 并纳入 Xcode 资源构建阶段；在 [Info.plist](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/Info.plist) 补齐 `ITSAppUsesNonExemptEncryption = false`；(2) **系统兼容与自动化上传脚本**：[project.yml](file:///Users/itou/Documents/ChatGPT/91pron/ios/project.yml) 与 [project.pbxproj](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf.xcodeproj/project.pbxproj) 将 `IPHONEOS_DEPLOYMENT_TARGET` 从 `26.4` 下调至 `26.0` 并通过 `xcodegen` 重新生成；新增 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh)（支持 `--check` 预检、`--export-only`、ASC API Key / Xcode 账户自动上传及生成 `ExportOptions-TestFlight.plist`），在 [.gitignore](file:///Users/itou/Documents/ChatGPT/91pron/.gitignore) 忽略 `.appstore_credentials` 与 `*.p8`；在 [CategoryShelfTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/CategoryShelfTests.swift) 新增 `testBundleContainsTestFlightComplianceMetadata`；(3) **全链路版本同步与验证交付**：双端递增至 `v2.16.35 (Build 261)`，Android `./gradlew testDebugUnitTest` 42 套件 266 项（**258 通过 / 8 跳过 / 0 失败**），iOS `CategoryShelfTests` **9/9 通过**，`./scripts/publish_testflight.sh --check` 全项 PASS，`./scripts/publish_ota.sh Release` 完成 `bananarey.us` 原子覆盖（`Netgrey.apk` `206,909,327` bytes、`Netgrey.ipa` `202,755,543` bytes 且包内已确认打入 `PrivacyInfo.xcprivacy`、`manifest.plist` `2.16.35` 均 `HTTP/1.1 200 OK`）。
-- 进行中：等待用户在 Apple 开发者后台完成 Explicit App ID (`com.aurorashelf.app`) 与 App Store Connect 新建 App、在本机签发 `Apple Distribution` 证书后执行 `./scripts/publish_testflight.sh` 上传首个 TestFlight 内部测试包；另保持跟踪 PocketBase 管理员/SMTP 与外部站点源可用性。
-- 下一步：用户完成 Apple 账号侧配置后运行 `./scripts/publish_testflight.sh` 并于 TestFlight 内部测试添加测试员；后续按规划推进用户资料/收藏云同步。
-- 阻塞：本机钥匙串当前仅含 `Apple Development` 证书（0 个 `Apple Distribution` 证书）、Xcode 未登录 Apple ID 且未配置 `.appstore_credentials`（ASC API Key），无法直接无人工干预触发 Apple 服务端分发签证上传（已在脚本输出 3 步指引）；外部第三方源 `JAVSB`（TLS EOF）与 `SpankBang`（HTTP 403）维持此前受限记录。
+- 当前阶段（2026-11-16 · Build 261 / v2.16.35）：已完成 TestFlight 内部测试工程侧合规阻塞修复、自动化上传脚本落地、双端版本同步、OTA 发布以及 **TestFlight 首个构建（`v2.16.35 / Build 261`）成功归档并上传至 App Store Connect**。(1) **TestFlight 合规与上传**：新增 [PrivacyInfo.xcprivacy](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/PrivacyInfo.xcprivacy) 声明 4 类 Required Reason API、在 [Info.plist](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/Info.plist) 补齐 `ITSAppUsesNonExemptEncryption = false`、将 `IPHONEOS_DEPLOYMENT_TARGET` 下调至 `26.0`、新增 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh)；用户完成 `YUDI WEI (U4MXHLA3GF)` 的 `Apple Distribution` 证书签发后，执行 `./scripts/publish_testflight.sh` 完成归档并上传至 App Store Connect（`Upload succeeded` / `** EXPORT SUCCEEDED **`，正在后台处理中）；(2) **全链路验证与同步交付**：Android `./gradlew testDebugUnitTest` 42 套件 266 项（**258 通过 / 8 跳过 / 0 失败**），iOS `CategoryShelfTests` **9/9 通过**，`./scripts/publish_ota.sh Release` 完成 `bananarey.us` 原子覆盖，GitHub Release `v2.16.35` 已发布。
+- 进行中：等待 App Store Connect 后台完成 `v2.16.35 (Build 261)` 处理（约 5～15 分钟）后在 TestFlight 内部测试添加测试员；另持续跟踪 PocketBase 管理员/SMTP 与外部站点源可用性。
+- 下一步：在 App Store Connect -> TestFlight -> 内部测试创建群组并邀请测试员；后续按规划推进用户资料/收藏云同步。
+- 阻塞：外部第三方源 `JAVSB`（TLS EOF）与 `SpankBang`（HTTP 403）维持此前受限记录。
 - 最近一次更新：2026-11-16 by Antigravity (Gemini)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
