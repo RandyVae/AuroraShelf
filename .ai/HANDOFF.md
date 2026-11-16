@@ -1,4 +1,21 @@
-## 最新交接：2026-11-15 — 全量 Bug 筛查与修复、华视搜索专向加固、论坛原图单张/批量下载、视频与漫画统一离线下载进度查询＋双端 Release 验证与 OTA 发布 · v2.16.34 (Build 260)
+## 最新交接：2026-11-16 — TestFlight 内部测试工程合规改造、自动化预检上传脚本与双端同步发布 · v2.16.35 (Build 261)
+
+### 本次完成
+1. **TestFlight 合规文件与清单补齐**：
+   - 新增 [PrivacyInfo.xcprivacy](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/PrivacyInfo.xcprivacy) 并纳入 Xcode 资源阶段，声明 `UserDefaults`（`CA92.1`）、`SystemBootTime`（`35F9.1`）、`FileTimestamp`（`C617.1`）与 `DiskSpace`（`E174.1`）四项 Required Reason API；
+   - 在 [Info.plist](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/Info.plist) 增加 `<key>ITSAppUsesNonExemptEncryption</key><false/>`。
+2. **兼容范围扩大与自动化 TestFlight 发布流**：
+   - 修改 [project.yml](file:///Users/itou/Documents/ChatGPT/91pron/ios/project.yml) 将 `deploymentTarget` 从 `"26.4"` 下调至 `"26.0"`，递增 `CURRENT_PROJECT_VERSION` 至 `261`、`MARKETING_VERSION` 至 `"2.16.35"` 并运行 `xcodegen generate` 重建 [project.pbxproj](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf.xcodeproj/project.pbxproj)；
+   - 新增 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh)（支持 `--check`、`--export-only`、`app-store-connect` 自动上传、`.appstore_credentials` API Key 认证与操作指引）；在 [.gitignore](file:///Users/itou/Documents/ChatGPT/91pron/.gitignore) 忽略 `.appstore_credentials` 与 `*.p8`；
+   - 在 [CategoryShelfTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/CategoryShelfTests.swift) 新增 `testBundleContainsTestFlightComplianceMetadata()` 回归测试。
+3. **全链路版本号同步 (`v2.16.35 / Build 261`)、双端验证与 OTA 发布**：
+   - 同步更新 `AGENTS.md`、`app/build.gradle.kts`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`；
+   - 验证结果：`./scripts/publish_testflight.sh --check` PASS；iOS `CategoryShelfTests` **9/9 通过**；Android `./gradlew testDebugUnitTest` **42 套件 266 项（258 通过 / 8 跳过 / 0 失败）**；`./scripts/publish_ota.sh Release` 成功同步覆盖至 `https://bananarey.us`（`Netgrey.apk` `206,909,327` bytes / `Netgrey.ipa` `202,755,543` bytes，`manifest.plist` `2.16.35` 均 `HTTP/1.1 200 OK`），且归档与 IPA 内确认包含 `PrivacyInfo.xcprivacy`、`MinimumOSVersion=26.0`、`ITSAppUsesNonExemptEncryption=false`。
+
+### 交接提醒
+- 本机环境尚未登录 Xcode Apple ID、未签发 `Apple Distribution` 分发证书、也未配置 `.appstore_credentials`（API Key），且 Apple Developer 后台尚未创建显式 App ID `com.aurorashelf.app` 与 App Store Connect App 记录；用户完成账号侧 3 步配置后，直接运行 `./scripts/publish_testflight.sh` 即可自动归档并直传 TestFlight。
+
+## 历史交接：2026-11-15 — 全量 Bug 筛查与修复、华视搜索专向加固、论坛原图单张/批量下载、视频与漫画统一离线下载进度查询＋双端 Release 验证与 OTA 发布 · v2.16.34 (Build 260)
 
 ### 本次完成
 1. **华视搜索失效根治与全局搜索排序（iOS + Android）**：

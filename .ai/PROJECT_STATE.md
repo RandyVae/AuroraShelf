@@ -1,6 +1,22 @@
 # Project State
 
-## 最新工作状态（2026年11月15日 · 全量 Bug 筛查、华视搜索修复、论坛图片下载、视频/漫画下载进度查询＋双端 Release 验证与 OTA 发布 · v2.16.34 Build 260）
+## 最新工作状态（2026年11月16日 · TestFlight 内部测试工程合规改造与自动化上传脚本落地＋双端版本同步发布 · v2.16.35 Build 261）
+
+- **版本号全链路同步至 `v2.16.35 (Build 261)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`（软链同步 `ios/AuroraShelf/Resources/www/index.html`）、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`；检索确认无 `2.16.34` / `Build 260` 残留。
+- **TestFlight 隐私清单与出口加密合规补齐**：
+  - 新增 [PrivacyInfo.xcprivacy](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/PrivacyInfo.xcprivacy) 并通过 `xcodegen generate` 纳入 `PBXResourcesBuildPhase`，声明 `NSPrivacyTracking = false` 及工程内实际调用的 4 类 Required Reason API：`NSPrivacyAccessedAPICategoryUserDefaults`（`CA92.1`）、`NSPrivacyAccessedAPICategorySystemBootTime`（`35F9.1`）、`NSPrivacyAccessedAPICategoryFileTimestamp`（`C617.1`）与 `NSPrivacyAccessedAPICategoryDiskSpace`（`E174.1`）。
+  - 在 [Info.plist](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/Info.plist) 补齐 `<key>ITSAppUsesNonExemptEncryption</key><false/>`。
+- **iOS 最低系统版本调整与自动化 TestFlight 发布脚本**：
+  - [project.yml](file:///Users/itou/Documents/ChatGPT/91pron/ios/project.yml) 与 [project.pbxproj](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf.xcodeproj/project.pbxproj) 将 `IPHONEOS_DEPLOYMENT_TARGET` 由 `"26.4"` 下调至 `"26.0"`。
+  - 新增 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh)（支持 `--check` 预检、`--export-only` 导出 IPA、读取 `.appstore_credentials` API Key 或 Xcode 登录态进行 `app-store-connect` 归档直传，并生成 `ios/build.nosync/ExportOptions-TestFlight.plist`）；[.gitignore](file:///Users/itou/Documents/ChatGPT/91pron/.gitignore) 新增忽略 `.appstore_credentials` 与 `*.p8`。
+  - [CategoryShelfTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/CategoryShelfTests.swift) 新增 `testBundleContainsTestFlightComplianceMetadata()` 校验 `ITSAppUsesNonExemptEncryption` 与 `PrivacyInfo.xcprivacy`。
+- **验证与交付结果**：
+  - TestFlight 预检：`./scripts/publish_testflight.sh --check` 全项合规校验 PASS（并明确提示本机尚缺 `Apple Distribution` 证书与 App Store Connect 账号登录态）。
+  - iOS 测试：`CategoryShelfTests` **9/9 通过**（含 `testBundleContainsTestFlightComplianceMetadata`）。
+  - Android 单测：`./gradlew testDebugUnitTest` 42 套件 266 项：**258 通过 / 8 跳过 / 0 失败 / 0 错误**。
+  - OTA 与产物核验：`./scripts/publish_ota.sh Release` 完成 `https://bananarey.us` 原子覆盖（`Netgrey.apk` `206,909,327` bytes / `198M`、`Netgrey.ipa` `202,755,543` bytes / `194M`、`manifest.plist` `2.16.35` 均 `HTTP/1.1 200 OK`，`/` 可用 `11G` / `29%`）；实测确认 `.xcarchive` 与 `Netgrey.ipa` 内已打入 `PrivacyInfo.xcprivacy`（`1246` bytes）且 `MinimumOSVersion=26.0`、`ITSAppUsesNonExemptEncryption=false`。
+
+## 历史工作状态（2026年11月15日 · 全量 Bug 筛查、华视搜索修复、论坛图片下载、视频/漫画下载进度查询＋双端 Release 验证与 OTA 发布 · v2.16.34 Build 260）
 
 - **版本号全链路同步至 `v2.16.34 (Build 260)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`；检索确认无 `2.16.33` / `Build 259` 残留。
 - **华视搜索「搜不到」修复与搜索结果排序优化（iOS + Android）**：

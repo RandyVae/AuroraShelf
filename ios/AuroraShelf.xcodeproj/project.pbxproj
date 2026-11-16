@@ -61,6 +61,7 @@
 		903A163A0D4C6D077549BE02 /* LiveInlineCommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1DD373C73DD1FC817BCD50 /* LiveInlineCommentsView.swift */; };
 		90ABA578FB1CE018A17F97F5 /* ComicReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813C4C5BB8EB3EA6A44A32E6 /* ComicReaderView.swift */; };
 		965721297557E1D405AEEF0C /* WatchlistStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A072A76628F7FC2A7E1DEA59 /* WatchlistStoreTests.swift */; };
+		9693E6593227F6CDD8EBF09B /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 6453E4FE05FCE1DD14F9AA06 /* PrivacyInfo.xcprivacy */; };
 		979C0CA84CD987FEE9CF744D /* SourceFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E97B53BDBAA540B54C92D /* SourceFilterBar.swift */; };
 		9852D95598FFF9309144A5E7 /* HeroBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335CE5C09D1A36F7F502A73A /* HeroBanner.swift */; };
 		A016DA2AC7DFEBB146E7A180 /* UpNextCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92871B1E246B150EE1E59D9C /* UpNextCard.swift */; };
@@ -156,6 +157,7 @@
 		60F11EC0D8152B62A7DC3805 /* NetgreyLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetgreyLogoView.swift; sourceTree = "<group>"; };
 		613ABA539A826B76628526F3 /* LiveScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveScreen.swift; sourceTree = "<group>"; };
 		61A80A6687D4D2EBB347A010 /* PlaybackProgressStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackProgressStoreTests.swift; sourceTree = "<group>"; };
+		6453E4FE05FCE1DD14F9AA06 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		6496E2850653158E8F38360A /* X134SourceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = X134SourceService.swift; sourceTree = "<group>"; };
 		67E37DCF0FE7DFC37F1EADFF /* LiveSourceAdapterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSourceAdapterTests.swift; sourceTree = "<group>"; };
 		68B37C5E7BEFD0FE3E5D75D5 /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
@@ -492,6 +494,7 @@
 				FFF00856C690391B5FC315A2 /* Assets.xcassets */,
 				4A1E244170111677BECEE9FB /* Info.plist */,
 				D9E292EDDA87816B50371992 /* intro_film.mp4 */,
+				6453E4FE05FCE1DD14F9AA06 /* PrivacyInfo.xcprivacy */,
 				1DCD5AA5C221783195A2C2D9 /* SourceSecrets.plist */,
 				B6BF44CA367A3107302CCB2C /* Localizable.strings */,
 			);
@@ -619,6 +622,7 @@
 			files = (
 				C7C5B0CCCF577606DBAE0B3E /* Assets.xcassets in Resources */,
 				EC3434186E66FED3EF73B4C4 /* Localizable.strings in Resources */,
+				9693E6593227F6CDD8EBF09B /* PrivacyInfo.xcprivacy in Resources */,
 				E373FABC3C08F6650B0292DB /* SourceSecrets.plist in Resources */,
 				DE577D3DEB625ED0D4EE45A1 /* intro_film.mp4 in Resources */,
 				4FEE940CBCC8498A756873F8 /* www in Resources */,
@@ -774,7 +778,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -839,7 +843,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -896,7 +900,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -912,7 +916,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -934,17 +938,17 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 260;
+				CURRENT_PROJECT_VERSION = 261;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AuroraShelf/Resources/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.34;
+				MARKETING_VERSION = 2.16.35;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
@@ -960,17 +964,17 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 260;
+				CURRENT_PROJECT_VERSION = 261;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AuroraShelf/Resources/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.34;
+				MARKETING_VERSION = 2.16.35;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;

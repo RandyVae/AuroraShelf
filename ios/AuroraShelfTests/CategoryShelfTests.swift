@@ -148,4 +148,28 @@ final class CategoryShelfTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(comicProgress, 0.0)
         XCTAssertLessThanOrEqual(comicProgress, 1.0)
     }
+
+    func testBundleContainsTestFlightComplianceMetadata() throws {
+        let bundle = Bundle(for: BundleToken.self)
+        let appBundle = Bundle.main
+        XCTAssertEqual(appBundle.object(forInfoDictionaryKey: "ITSAppUsesNonExemptEncryption") as? Bool, false)
+
+        let privacyURL = try XCTUnwrap(
+            appBundle.url(forResource: "PrivacyInfo", withExtension: "xcprivacy")
+                ?? bundle.url(forResource: "PrivacyInfo", withExtension: "xcprivacy"),
+            "主应用包必须包含 PrivacyInfo.xcprivacy"
+        )
+        let data = try Data(contentsOf: privacyURL)
+        let plist = try XCTUnwrap(
+            try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        )
+        let accessedTypes = try XCTUnwrap(plist["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
+        let categories = Set(accessedTypes.compactMap { $0["NSPrivacyAccessedAPIType"] as? String })
+        XCTAssertTrue(categories.contains("NSPrivacyAccessedAPICategoryUserDefaults"))
+        XCTAssertTrue(categories.contains("NSPrivacyAccessedAPICategorySystemBootTime"))
+        XCTAssertTrue(categories.contains("NSPrivacyAccessedAPICategoryFileTimestamp"))
+        XCTAssertTrue(categories.contains("NSPrivacyAccessedAPICategoryDiskSpace"))
+    }
 }
+
+private final class BundleToken {}

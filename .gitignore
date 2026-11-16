@@ -17,6 +17,8 @@ docs/design-audit/**/*.mp4
 
 # Server deployment credentials (private)
 .server_credentials
+.appstore_credentials
+*.p8
 .env.local
 .playwright-cli/
 output/

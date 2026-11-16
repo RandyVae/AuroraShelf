@@ -2,12 +2,12 @@ name: AuroraShelf
 options:
   bundleIdPrefix: com.aurorashelf
   deploymentTarget:
-    iOS: "26.4"
+    iOS: "26.0"
 targets:
   AuroraShelf:
     type: application
     platform: iOS
-    deploymentTarget: "26.4"
+    deploymentTarget: "26.0"
     sources:
       - path: AuroraShelf
         excludes:
@@ -20,8 +20,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.aurorashelf.app
         INFOPLIST_FILE: AuroraShelf/Resources/Info.plist
         SWIFT_VERSION: "6.0"
-        CURRENT_PROJECT_VERSION: 260
-        MARKETING_VERSION: "2.16.34"
+        CURRENT_PROJECT_VERSION: 261
+        MARKETING_VERSION: "2.16.35"
         DEVELOPMENT_TEAM: "U4MXHLA3GF"
         CODE_SIGN_STYLE: "Automatic"
         CODE_SIGNING_REQUIRED: "YES"
@@ -33,7 +33,7 @@ targets:
   AuroraShelfTests:
     type: bundle.unit-test
     platform: iOS
-    deploymentTarget: "26.4"
+    deploymentTarget: "26.0"
     sources:
       - path: AuroraShelfTests
     dependencies:
