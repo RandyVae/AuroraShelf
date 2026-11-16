@@ -166,7 +166,6 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -1487,13 +1486,9 @@ private fun NativeLivePlayer(
     LaunchedEffect(player, hlsUrl, referer, reloadAttempt) {
         isLoading = true
         errorMessage = null
-        val http = DefaultHttpDataSource.Factory()
-            .setUserAgent(VideoRepository.USER_AGENT)
-            .setConnectTimeoutMs(15_000)
-            .setReadTimeoutMs(20_000)
-            .setAllowCrossProtocolRedirects(true)
+        val http = com.aurorashelf.app.data.playback.ResilientHttpDataSourceFactory(VideoRepository.USER_AGENT)
             .setDefaultRequestProperties(
-                mapOf(
+                mutableMapOf(
                     "Referer" to referer,
                     "Accept" to "*/*",
                 ),
@@ -1502,7 +1497,9 @@ private fun NativeLivePlayer(
             .setUri(hlsUrl)
             .setMimeType(androidx.media3.common.MimeTypes.APPLICATION_M3U8)
             .build()
-        val mediaSource = DefaultMediaSourceFactory(http).createMediaSource(mediaItem)
+        val mediaSource = DefaultMediaSourceFactory(http)
+            .setLoadErrorHandlingPolicy(com.aurorashelf.app.data.playback.ResilientLoadErrorHandlingPolicy())
+            .createMediaSource(mediaItem)
         player.setMediaSource(mediaSource)
         player.prepare()
         player.playWhenReady = !isPaused && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)

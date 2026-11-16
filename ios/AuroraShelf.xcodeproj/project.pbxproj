@@ -92,6 +92,7 @@
 		E39336C05497D4E28953011D /* LiveDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F1035C23843FEE7FF56BDE6 /* LiveDetailView.swift */; };
 		E49E7E51BC4C1C10535A8532 /* ComicPageImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958009DA2F9C05A45A2F8B5C /* ComicPageImageLoader.swift */; };
 		E528AF6512D63F4865E88FCA /* GeneratedSourceSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B51864BE807F9F923E64F77 /* GeneratedSourceSecrets.swift */; };
+		E654AF58CBAC6AA6CFFC719D /* HLSLoopbackRelayServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2EF7AF77FE081FD2EA608E8 /* HLSLoopbackRelayServer.swift */; };
 		E7D88E0E821FC94B20F3906F /* ComicRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A044AA1ACDFE914217128012 /* ComicRepository.swift */; };
 		EC3434186E66FED3EF73B4C4 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B6BF44CA367A3107302CCB2C /* Localizable.strings */; };
 		ED75CCED28F037937C0655E2 /* VideoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977FF6686D27110B08DB620B /* VideoRepository.swift */; };
@@ -195,6 +196,7 @@
 		9FC2F1812601C6B94E0392F6 /* ComicDownloadManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComicDownloadManagerTests.swift; sourceTree = "<group>"; };
 		A044AA1ACDFE914217128012 /* ComicRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComicRepository.swift; sourceTree = "<group>"; };
 		A072A76628F7FC2A7E1DEA59 /* WatchlistStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchlistStoreTests.swift; sourceTree = "<group>"; };
+		A2EF7AF77FE081FD2EA608E8 /* HLSLoopbackRelayServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HLSLoopbackRelayServer.swift; sourceTree = "<group>"; };
 		A4E540F9D4F1A30ED7650D12 /* PlayerCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerCoordinator.swift; sourceTree = "<group>"; };
 		A5D070424247B572DFF04A88 /* AuroraShelf.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AuroraShelf.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A710ED6C3AFD5834E13CABF0 /* VideoDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoDetailSheet.swift; sourceTree = "<group>"; };
@@ -311,6 +313,7 @@
 				C35ED609593297B2E7AB3A75 /* DoubanPosterResolver.swift */,
 				75401653321D72E542BFF4A3 /* ForumImageSaver.swift */,
 				99A45CD73DB9190002329983 /* GlobalStartupPrefetchEngine.swift */,
+				A2EF7AF77FE081FD2EA608E8 /* HLSLoopbackRelayServer.swift */,
 				5BBE033BB25CF19AB5ED6C45 /* HTMLVideoSourceAdapter.swift */,
 				AEEB04B9A850FF3CCC032FE8 /* LocalizationManager.swift */,
 				C15F0D0C87A034F3C112DC9B /* OfflineDownloadManager.swift */,
@@ -716,6 +719,7 @@
 				BCA49E85757EB2670186917F /* GameContainerView.swift in Sources */,
 				E528AF6512D63F4865E88FCA /* GeneratedSourceSecrets.swift in Sources */,
 				C97F2CA4F3F96D7CFCB887EE /* GlobalStartupPrefetchEngine.swift in Sources */,
+				E654AF58CBAC6AA6CFFC719D /* HLSLoopbackRelayServer.swift in Sources */,
 				5A28F539F95CD3BA136091C0 /* HTMLVideoSourceAdapter.swift in Sources */,
 				9852D95598FFF9309144A5E7 /* HeroBanner.swift in Sources */,
 				BB2002B6BC067E847BCDFBBC /* HomeScreen.swift in Sources */,
@@ -961,7 +965,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 262;
+				CURRENT_PROJECT_VERSION = 263;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -971,7 +975,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.36;
+				MARKETING_VERSION = 2.16.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
@@ -987,7 +991,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 262;
+				CURRENT_PROJECT_VERSION = 263;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -997,7 +1001,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.36;
+				MARKETING_VERSION = 2.16.37;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;

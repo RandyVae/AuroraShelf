@@ -9,7 +9,6 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSource
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.NoOpCacheEvictor
@@ -17,6 +16,7 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadRequest
+import com.aurorashelf.app.data.playback.ResilientHttpDataSourceFactory
 import com.aurorashelf.app.model.VideoItem
 import java.io.File
 import java.security.MessageDigest
@@ -165,11 +165,11 @@ class OfflineCacheManager private constructor(context: Context) {
         }
     }
 
-    private val upstreamFactory = DefaultHttpDataSource.Factory()
-        .setUserAgent(VideoRepository.USER_AGENT)
-        .setConnectTimeoutMs(15_000)
-        .setReadTimeoutMs(30_000)
-        .setAllowCrossProtocolRedirects(true)
+    private val upstreamFactory = ResilientHttpDataSourceFactory(
+        userAgent = VideoRepository.USER_AGENT,
+        connectTimeoutMs = 15_000,
+        readTimeoutMs = 30_000,
+    )
 
     private val downloadDataSourceFactory = ResolvingDataSource.Factory(upstreamFactory) { dataSpec ->
         val uriStr = dataSpec.uri.toString()

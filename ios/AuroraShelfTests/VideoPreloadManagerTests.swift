@@ -212,4 +212,74 @@ final class VideoPreloadManagerTests: XCTestCase {
             .fullBleed
         )
     }
+
+    func testHuavodParsePlayLinesExtractsAlternateServerLinesForEpisode() {
+        let html = """
+        <div class="anthology-list-play">
+            <a href="/vodplay/204173-1-1.html">第01集</a>
+            <a href="/vodplay/204173-1-2.html">第02集</a>
+            <a data-url="/vodplay/204173-2-1.html">第01集</a>
+            <a data-url="/vodplay/204173-2-2.html">第02集</a>
+            <a href="/vodplay/204173-3-1.html">第01集</a>
+            <a href="/vodplay/888888-1-2.html">其他影片</a>
+        </div>
+        """
+        let lines = VideoRepository.parseHuavodPlayLines(html: html, vodId: "204173", targetNid: 2)
+        XCTAssertEqual(
+            lines,
+            [
+                "https://huavod.com/vodplay/204173-1-2.html",
+                "https://huavod.com/vodplay/204173-2-2.html",
+                "https://huavod.com/vodplay/204173-3-1.html"
+            ]
+        )
+    }
+
+    func testHLSLoopbackRelayRewritesSubPlaylistsKeysAndSegments() {
+        let playlist = """
+        #EXTM3U
+        #EXT-X-KEY:METHOD=AES-128,URI="enc.key"
+        #EXTINF:5.0,
+        seg000.ts?token=abc
+        #EXT-X-STREAM-INF:BANDWIDTH=800000
+        720p/index.m3u8
+        """
+        let baseURL = URL(string: "https://cdn11.okhuaren.com/204173/index.m3u8")!
+        let rewritten = HLSLoopbackRelayServer.rewriteM3U8(
+            playlist,
+            baseURL: baseURL,
+            originPrefix: "http://127.0.0.1:45678",
+            token: "tok1"
+        )
+        let lines = rewritten.components(separatedBy: "\n")
+        func decodeRelayTarget(_ urlString: String) -> String? {
+            guard let comps = URLComponents(string: urlString),
+                  let uValue = comps.queryItems?.first(where: { $0.name == "u" })?.value else {
+                return nil
+            }
+            var b64 = uValue.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+            let rem = b64.count % 4
+            if rem != 0 { b64 += String(repeating: "=", count: 4 - rem) }
+            guard let data = Data(base64Encoded: b64) else { return nil }
+            return String(data: data, encoding: .utf8)
+        }
+
+        XCTAssertTrue(lines[1].contains("URI=\"http://127.0.0.1:45678/segment?"))
+        let keyRangeStart = lines[1].range(of: "URI=\"")!.upperBound
+        let keyRangeEnd = lines[1][keyRangeStart...].firstIndex(of: "\"")!
+        XCTAssertEqual(
+            decodeRelayTarget(String(lines[1][keyRangeStart..<keyRangeEnd])),
+            "https://cdn11.okhuaren.com/204173/enc.key"
+        )
+        XCTAssertTrue(lines[3].hasPrefix("http://127.0.0.1:45678/segment?"))
+        XCTAssertEqual(
+            decodeRelayTarget(lines[3]),
+            "https://cdn11.okhuaren.com/204173/seg000.ts?token=abc"
+        )
+        XCTAssertTrue(lines[5].hasPrefix("http://127.0.0.1:45678/playlist?"))
+        XCTAssertEqual(
+            decodeRelayTarget(lines[5]),
+            "https://cdn11.okhuaren.com/204173/720p/index.m3u8"
+        )
+    }
 }

@@ -75,7 +75,6 @@ import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultHttpDataSource
 import com.aurorashelf.app.model.ContentSourceCatalog
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
@@ -85,9 +84,11 @@ import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.aurorashelf.app.R
-import com.aurorashelf.app.data.PlaybackResolver
 import com.aurorashelf.app.data.OfflineCacheManager
+import com.aurorashelf.app.data.PlaybackResolver
 import com.aurorashelf.app.data.VideoRepository
+import com.aurorashelf.app.data.playback.ResilientHttpDataSourceFactory
+import com.aurorashelf.app.data.playback.ResilientLoadErrorHandlingPolicy
 import com.aurorashelf.app.ui.theme.AuroraCoral
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -168,6 +169,7 @@ internal fun NativeSitePlayer(
     var hudState by remember(pageUrl) { mutableStateOf<PlayerHudData?>(null) }
     var shouldResume by rememberSaveable(pageUrl) { mutableStateOf(true) }
     var attempt by remember(pageUrl) { mutableIntStateOf(0) }
+    var recoveryStage by remember(pageUrl) { mutableIntStateOf(0) }
     var error by remember(pageUrl) { mutableStateOf<String?>(null) }
     var isLoading by remember(pageUrl) { mutableStateOf(true) }
     var lastKnownPortrait by remember(pageUrl) { mutableStateOf<Boolean?>(null) }
@@ -226,15 +228,17 @@ internal fun NativeSitePlayer(
         error = null
         try {
             val activeOffline = latestOfflineVideo
+            val resolver = PlaybackResolver()
+            val forceRefresh = recoveryStage > 0
+            val altLineIndex = (recoveryStage - 1).coerceAtLeast(0)
             val source = activeOffline?.mediaUrl?.let { cachedUrl ->
                 com.aurorashelf.app.data.PlaybackSource(cachedUrl, pageUrl)
-            } ?: PlaybackResolver().resolve(pageUrl)
-            Log.i(TAG, "source resolved type=${mediaType(source.url)} host=${runCatching { java.net.URI(source.url).host }.getOrNull()} refererHost=${runCatching { java.net.URI(source.referer).host }.getOrNull()}")
+            } ?: resolver.resolve(pageUrl, forceRefresh = forceRefresh, alternateLineIndex = altLineIndex)
+            Log.i(TAG, "source resolved type=${mediaType(source.url)} host=${runCatching { java.net.URI(source.url).host }.getOrNull()} refererHost=${runCatching { java.net.URI(source.referer).host }.getOrNull()} stage=$recoveryStage")
             Log.i(TAG, "timing source resolved ms=${android.os.SystemClock.elapsedRealtime() - loadStartedAtMs.longValue}")
-            val http = DefaultHttpDataSource.Factory().setUserAgent(VideoRepository.USER_AGENT)
-                .setConnectTimeoutMs(15_000).setReadTimeoutMs(20_000)
+            val http = ResilientHttpDataSourceFactory(VideoRepository.USER_AGENT)
                 .setDefaultRequestProperties(
-                    buildMap {
+                    mutableMapOf<String, String>().apply {
                         put("Referer", source.referer)
                         put("Origin", originOf(source.referer))
                         put("Accept", "*/*")
@@ -242,6 +246,7 @@ internal fun NativeSitePlayer(
                     },
                 )
             val cachedDataSource = cacheManager.playbackDataSourceFactory(http)
+            val loadErrorPolicy = ResilientLoadErrorHandlingPolicy()
             val item = MediaItem.Builder()
                 .setUri(source.url)
                 .apply {
@@ -251,9 +256,13 @@ internal fun NativeSitePlayer(
                 }
                 .build()
             val media: MediaSource = if (mediaType(source.url) == "hls") {
-                HlsMediaSource.Factory(cachedDataSource).createMediaSource(item)
+                HlsMediaSource.Factory(cachedDataSource)
+                    .setLoadErrorHandlingPolicy(loadErrorPolicy)
+                    .createMediaSource(item)
             } else {
-                DefaultMediaSourceFactory(cachedDataSource).createMediaSource(item)
+                DefaultMediaSourceFactory(cachedDataSource)
+                    .setLoadErrorHandlingPolicy(loadErrorPolicy)
+                    .createMediaSource(item)
             }
             player.setMediaSource(media, position)
             val isCurrentlyCasting = currentCastState is com.aurorashelf.app.cast.CastState.Connected
@@ -365,7 +374,18 @@ internal fun NativeSitePlayer(
                 }
             }
             override fun onPlayerError(failure: PlaybackException) {
-                Log.e(TAG, "player error code=${failure.errorCode} name=${failure.errorCodeName} cause=${failure.cause?.javaClass?.simpleName}: ${failure.cause?.message}", failure)
+                Log.e(TAG, "player error code=${failure.errorCode} name=${failure.errorCodeName} stage=$recoveryStage cause=${failure.cause?.javaClass?.simpleName}: ${failure.cause?.message}", failure)
+                if (latestOfflineVideo == null &&
+                    ResilientLoadErrorHandlingPolicy.isRecoverablePlayerErrorCode(failure.errorCode) &&
+                    recoveryStage < 2
+                ) {
+                    recoveryStage += 1
+                    isLoading = true
+                    error = null
+                    shouldResume = true
+                    attempt++
+                    return
+                }
                 isLoading = false
                 error = if (latestOfflineVideo != null) {
                     "离线缓存读取失败，请在设置中删除后重新缓存"
@@ -610,7 +630,11 @@ internal fun NativeSitePlayer(
             Column(Modifier.align(Alignment.Center).background(Color.Black).padding(24.dp)) {
                 Text(message, color = Color.White)
                 if (offlineVideo == null) {
-                    TextButton(onClick = { shouldResume = true; attempt++ }) { Text("重新解析并播放") }
+                    TextButton(onClick = {
+                        shouldResume = true
+                        recoveryStage = 1
+                        attempt++
+                    }) { Text("重新解析并播放") }
                 }
             }
         }

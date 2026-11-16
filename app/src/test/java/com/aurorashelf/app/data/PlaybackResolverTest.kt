@@ -1,5 +1,8 @@
 package com.aurorashelf.app.data
 
+import androidx.media3.common.PlaybackException
+import com.aurorashelf.app.data.playback.ResilientLoadErrorHandlingPolicy
+import com.aurorashelf.app.data.playback.ResilientOkHttpDataSource
 import java.io.IOException
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
@@ -456,5 +459,61 @@ class PlaybackResolverTest {
         assertEquals("急诊科：靠推演看穿生死绝症", resolver.cleanSynopsisText("急诊科：靠推演看穿生死绝症&"))
         assertEquals("内容测试", resolver.cleanSynopsisText("剧情简介：内容测试&hellip"))
         assertEquals("A & B", resolver.cleanSynopsisText("A &amp; B请记住本站永久域名 huavod.com。"))
+    }
+
+    @Test fun parseHuavodPlayLinesExtractsDistinctServerLinesForTargetEpisode() {
+        val html = """
+            <div>
+              <a href="/vodplay/204173-1-1.html">第01集</a>
+              <a href="/vodplay/204173-1-2.html">第02集</a>
+              <a data-url="/vodplay/204173-2-1.html">第01集</a>
+              <a data-url="/vodplay/204173-2-2.html">第02集</a>
+              <a href="/vodplay/204173-3-1.html">第01集</a>
+              <a href="/vodplay/999999-1-2.html">无关视频</a>
+            </div>
+        """.trimIndent()
+        val doc = Jsoup.parse(html, "https://huavod.com/voddetail/204173.html")
+        val lines = PlaybackResolver().parseHuavodPlayLines(doc, vodId = "204173", targetNid = 2)
+        assertEquals(
+            listOf(
+                "https://huavod.com/vodplay/204173-1-2.html",
+                "https://huavod.com/vodplay/204173-2-2.html",
+                "https://huavod.com/vodplay/204173-3-1.html",
+            ),
+            lines,
+        )
+    }
+
+    @Test fun resilientHttpRetryPolicyHandles428And2004ErrorsWithoutRetrying403Or404() {
+        assertTrue(ResilientOkHttpDataSource.isInlineRetryableHttpStatus(428))
+        assertTrue(ResilientOkHttpDataSource.isInlineRetryableHttpStatus(429))
+        assertTrue(ResilientOkHttpDataSource.isInlineRetryableHttpStatus(408))
+        assertTrue(ResilientOkHttpDataSource.isInlineRetryableHttpStatus(503))
+        assertFalse(ResilientOkHttpDataSource.isInlineRetryableHttpStatus(403))
+        assertFalse(ResilientOkHttpDataSource.isInlineRetryableHttpStatus(404))
+
+        assertTrue(ResilientLoadErrorHandlingPolicy.isPolicyRetryableHttpStatus(428))
+        assertTrue(ResilientLoadErrorHandlingPolicy.isPolicyRetryableHttpStatus(502))
+        assertFalse(ResilientLoadErrorHandlingPolicy.isPolicyRetryableHttpStatus(403))
+        assertFalse(ResilientLoadErrorHandlingPolicy.isPolicyRetryableHttpStatus(404))
+
+        assertTrue(ResilientLoadErrorHandlingPolicy.isRecoverablePlayerErrorCode(PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS))
+        assertTrue(ResilientLoadErrorHandlingPolicy.isRecoverablePlayerErrorCode(PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED))
+        assertTrue(ResilientLoadErrorHandlingPolicy.isRecoverablePlayerErrorCode(PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT))
+    }
+
+    @Test fun cachedValueTtlOverrideExpiresShortLivedPennyTokenBeforeDefaultTtl() {
+        var now = 1_000L
+        val cache = CachedValue<String>(ttlMs = 100_000L, maxEntries = 8, clock = { now })
+        cache.put("penny", "https://huavod.com/link/penny-1.m3u8", ttlOverrideMs = 5_000L)
+        cache.put("fast", "https://bfikuncdn.com/stream.m3u8")
+
+        now = 5_999L
+        assertEquals("https://huavod.com/link/penny-1.m3u8", cache.get("penny"))
+        assertEquals("https://bfikuncdn.com/stream.m3u8", cache.get("fast"))
+
+        now = 6_000L
+        assertNull(cache.get("penny"))
+        assertEquals("https://bfikuncdn.com/stream.m3u8", cache.get("fast"))
     }
 }

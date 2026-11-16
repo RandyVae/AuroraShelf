@@ -1,4 +1,22 @@
-## 最新交接：2026-11-16 — 全盘 Bug 与优化审计落地修复＋双端 Release 验证与 TestFlight 上传 · v2.16.36 (Build 262)
+## 最新交接：2026-11-16 — 华视部分视频 2004 与 .ts/TLS 分片加载失败根治＋双端 Release 实测与全通道发布 · v2.16.37 (Build 263)
+
+### 本次完成
+1. **华视 `2004` 与 `.ts`/TLS 失败根因确诊**：实探确认 `/link/penny-*.m3u8` 后段 `cdn*.okhuaren.com/*.ts` 在并发请求/预热 burst 下触发 BunnyCDN `HTTP 428 CDN-Limit: true`，而 Android `DefaultLoadErrorHandlingPolicy` 不重试 `428` 直接抛 `2004`；一次性 `mt` 令牌未销毁且短效 `penny-*` `.m3u8` 曾被缓存 2h；Android 缺 HTTP/2 池与 TLS 容错，iOS 缺 `.AVPlayerItemFailedToPlayToEndTime` 监听与回环重试中继。
+2. **Android 端弹性播放引擎与防并发重构**：
+   - 新增 [ResilientHttpDataSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/playback/ResilientHttpDataSource.kt)（`ResilientHttpDataSourceFactory` + `ResilientOkHttpDataSource` + `ResilientLoadErrorHandlingPolicy`），共享 HTTP/2 `ConnectionPool(8, 2m)`、`408/428/429/503` 内联重试、仅 `SSLException` 回落宽松 TLS、剥离第三方 GET 跨站 `Origin`、Media3 策略层 4 次退避重试；接入 [NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt)、[OfflineCacheManager.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/OfflineCacheManager.kt) 与 [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt)。
+   - [PlaybackResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PlaybackResolver.kt) 消费后即清 `mt`、`penny-*` 设 `90s` TTL、`resolve`/`resolveHuavod` 支持 `forceRefresh` 与备用线路 `parseHuavodPlayLines`；[AuroraViewModel.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AuroraViewModel.kt) 将启动预热减至 `.take(1)`；[NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt) 新增 2 阶段自动故障恢复及真实刷新重试按钮。
+3. **iOS / iPadOS 回环 HLS 中继与多线路恢复**：
+   - 新增 [HLSLoopbackRelayServer.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HLSLoopbackRelayServer.swift) 并在 `ios/project.yml` 执行 `xcodegen generate` 纳入工程。
+   - 更新 [VideoPreloadManager.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/VideoPreloadManager.swift)、[VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift) 与 [VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift)：收紧华视预热并发与 `90s` 短缓存、去跨站 `Origin`、统一 UA、监听 `.AVPlayerItemFailedToPlayToEndTime` 并在失败时自动经回环中继重解及切换华视备用线路。
+4. **全量核验与双端全渠道发布 (`v2.16.37 Build 263`)**：
+   - 单元测试：`PlaybackResolverTest.kt` (+3) 与 `VideoPreloadManagerTests.swift` (+2)；Android 离线 `269 项`（261 通/8 跳/0 失败）与在线 `269/269 全通`；`lintDebug` 0 error；iOS 离线 `190 项`（182 通/8 跳/0 失败）；iOS 在线专项华视 m3u8/`206` 切片、直播/漫画/X134 全通过，20 视频源 17/20 通过（3 外部上游失败：`javnoni`、`javsb` `-1005`、`eporner` `HTTP 502`），论坛 `fid=34` 外链图 `nsaimg.com` `-1005`。
+   - Release 实机模拟器走查：`emulator-5554` R8 APK、《你好星期六》`iPhone 18 Pro` Release 及《现在就出发第四季》`iPad Pro 13-inch (M5)` Release 均顺利起播、零 `2004`/TLS 错误。
+   - 分发发布：TestFlight `Build 263` 上传成功；OTA `bananarey.us` 原子覆盖上线（`2.16.37`，`137M` APK / `135M` IPA，HTTPS `200 OK`，`/` 剩 `11G`）；Git/GitHub Release `v2.16.37` 同步完成。
+
+### 交接提醒
+- 服务端待部署安全配置（上轮审计产物 `server/pocketbase/netgrey-auth-location.conf` 与 `scripts/server/ota_service.py`）与 PocketBase 首个管理员/SMTP 配置仍按计划待独立运维窗口部署，不阻塞当前双端客户端分发。
+
+## 历史交接：2026-11-16 — 全盘 Bug 与优化审计落地修复＋双端 Release 验证与 TestFlight 上传 · v2.16.36 (Build 262)
 
 ### 本次完成
 1. **审计报告与死资产瘦身**：产出全盘审计报告 `AUDIT_REPORT_2026-11-16.md`（158 项发现）；清理 123 个无引用废图与旧构建包（节省 60.53 MB），同步修正 `www/index.html` 看板图后缀并更新版本 `2.16.36 (Build 262)`，使 `Netgrey.apk` 降至 `137M`（`143,433,689` B）、`Netgrey.ipa` 降至 `134M`（`140,616,583` B）。

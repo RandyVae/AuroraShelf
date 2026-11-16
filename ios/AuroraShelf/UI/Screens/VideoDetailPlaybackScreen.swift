@@ -61,6 +61,8 @@ public struct VideoDetailPlaybackScreen: View {
     @State private var itemStatusObserver: NSKeyValueObservation?
     @State private var itemDurationObserver: NSKeyValueObservation?
     @State private var didPlayToEndObserverToken: NSObjectProtocol?
+    @State private var failedToPlayObserverToken: NSObjectProtocol?
+    @State private var recoveryStage: Int = 0
     @State private var isSwitchingNextEpisode: Bool = false
     @State private var activeResolveID = UUID()
     @State private var isViewDismissed: Bool = false
@@ -537,7 +539,16 @@ public struct VideoDetailPlaybackScreen: View {
                                 .buttonBorderShape(.capsule)
 
                                 Button("重试") {
-                                    Task { await startPlayback(for: currentVideo) }
+                                    let stage = max(recoveryStage, 1)
+                                    recoveryStage = stage
+                                    Task {
+                                        await startPlayback(
+                                            for: currentVideo,
+                                            forceFresh: true,
+                                            alternateLineIndex: max(stage - 1, 0),
+                                            useRelay: true
+                                        )
+                                    }
                                 }
                                 .buttonStyle(.glassProminent)
                                 .buttonBorderShape(.capsule)
@@ -1804,17 +1815,22 @@ public struct VideoDetailPlaybackScreen: View {
     
     // MARK: - 核心播放调度引擎（单一实例，零重新缓冲）
     
-    private func startPlayback(for video: VideoItem) async {
+    private func startPlayback(
+        for video: VideoItem,
+        forceFresh: Bool = false,
+        alternateLineIndex: Int = 0,
+        useRelay: Bool = false
+    ) async {
         guard !isViewDismissed, !Task.isCancelled else { return }
         cleanupPlayer(forceStopPlayer: false)
         let resolveID = UUID()
         activeResolveID = resolveID
         isResolving = true
         resolveError = nil
-        resolveStatus = "正在极速秒开…"
+        resolveStatus = alternateLineIndex > 0 ? "正在切换备用线路…" : (useRelay ? "正在切换防限流通道…" : "正在极速秒开…")
 
         // 若正从当前视频的画中画恢复，直接复用仍在播放且状态健康的 AVPlayer，零中断
-        if let retainedPlayer = PictureInPictureManager.shared.consumeRetainedPlayer(for: video) {
+        if !forceFresh, let retainedPlayer = PictureInPictureManager.shared.consumeRetainedPlayer(for: video) {
             if retainedPlayer.error == nil,
                let item = retainedPlayer.currentItem,
                item.status != .failed,
@@ -1847,9 +1863,21 @@ public struct VideoDetailPlaybackScreen: View {
         }
         
         do {
-            let result = try await VideoRepository.shared.resolvePlayback(video: video)
+            let result: PlaybackSourceResult
+            if forceFresh {
+                result = try await VideoPreloadManager.shared.resolveFresh(video: video, alternateLineIndex: alternateLineIndex)
+            } else {
+                result = try await VideoRepository.shared.resolvePlayback(video: video)
+            }
             guard activeResolveID == resolveID, !isViewDismissed, !Task.isCancelled else { return }
-            initPlayer(url: result.url, referer: result.referer, headers: result.headers)
+            let isHLS = result.url.path.lowercased().hasSuffix(".m3u8") || result.url.absoluteString.lowercased().contains(".m3u8")
+            if useRelay, isHLS,
+               let relayURL = await HLSLoopbackRelayServer.shared.relayURL(for: result.url, referer: result.referer, headers: result.headers) {
+                guard activeResolveID == resolveID, !isViewDismissed, !Task.isCancelled else { return }
+                initPlayer(url: relayURL, referer: nil, headers: [:])
+            } else {
+                initPlayer(url: result.url, referer: result.referer, headers: result.headers)
+            }
             isResolving = false
         } catch {
             guard activeResolveID == resolveID, !isViewDismissed, !Task.isCancelled else { return }
@@ -1866,16 +1894,24 @@ public struct VideoDetailPlaybackScreen: View {
         
         var assetOptions: [String: Any] = [:]
         var httpHeaders: [String: String] = [
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)"
+            "User-Agent": PlaybackSourceResult.defaultUserAgent
         ]
         if let ref = referer, let refURL = URL(string: ref) {
             httpHeaders["Referer"] = refURL.absoluteString
-            let origin = (refURL.scheme.map { "\($0)://" } ?? "") + (refURL.host ?? "")
-            if !origin.isEmpty {
-                httpHeaders["Origin"] = origin
+            if refURL.host?.lowercased() == url.host?.lowercased() {
+                let origin = (refURL.scheme.map { "\($0)://" } ?? "") + (refURL.host ?? "")
+                if !origin.isEmpty {
+                    httpHeaders["Origin"] = origin
+                }
             }
         }
         for (k, v) in headers {
+            if k.caseInsensitiveCompare("Origin") == .orderedSame,
+               let originHost = URL(string: v)?.host?.lowercased(),
+               let targetHost = url.host?.lowercased(),
+               originHost != targetHost {
+                continue
+            }
             httpHeaders[k] = v
         }
         assetOptions["AVURLAssetHTTPHeaderFieldsKey"] = httpHeaders
@@ -1941,12 +1977,24 @@ public struct VideoDetailPlaybackScreen: View {
                     UIApplication.shared.isIdleTimerDisabled = true
                     self.scheduleHideControls()
                 } else if status == .failed {
-                    self.isBuffering = false
-                    VideoPreloadManager.shared.invalidateCache(for: self.currentVideo.playbackUrl)
-                    self.player = nil
-                    self.resolveError = errorDesc ?? "播放器解码失败"
-                    UIApplication.shared.isIdleTimerDisabled = false
+                    self.handlePlaybackFailure(errorDescription: errorDesc)
                 }
+            }
+        }
+
+        if let oldFailedToken = failedToPlayObserverToken {
+            NotificationCenter.default.removeObserver(oldFailedToken)
+            failedToPlayObserverToken = nil
+        }
+        failedToPlayObserverToken = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime,
+            object: playerItem,
+            queue: .main
+        ) { [self] notification in
+            let errDesc = (notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)?.localizedDescription
+            Task { @MainActor in
+                guard !self.isViewDismissed, self.player === p, self.player?.currentItem === playerItem else { return }
+                self.handlePlaybackFailure(errorDescription: errDesc)
             }
         }
         
@@ -2155,6 +2203,10 @@ public struct VideoDetailPlaybackScreen: View {
             NotificationCenter.default.removeObserver(token)
             didPlayToEndObserverToken = nil
         }
+        if let token = failedToPlayObserverToken {
+            NotificationCenter.default.removeObserver(token)
+            failedToPlayObserverToken = nil
+        }
         if let token = timeObserverToken, let p = player {
             p.removeTimeObserver(token)
             timeObserverToken = nil
@@ -2216,8 +2268,32 @@ public struct VideoDetailPlaybackScreen: View {
         }
     }
     
+    private func handlePlaybackFailure(errorDescription: String?) {
+        self.isBuffering = false
+        VideoPreloadManager.shared.invalidateCache(for: self.currentVideo.playbackUrl)
+        guard !self.isViewDismissed else { return }
+        if self.recoveryStage < 2 {
+            self.recoveryStage += 1
+            let nextStage = self.recoveryStage
+            let targetVideo = self.currentVideo
+            Task { @MainActor in
+                await self.startPlayback(
+                    for: targetVideo,
+                    forceFresh: true,
+                    alternateLineIndex: max(nextStage - 1, 0),
+                    useRelay: true
+                )
+            }
+            return
+        }
+        self.player = nil
+        self.resolveError = errorDescription ?? "播放器解码失败"
+        UIApplication.shared.isIdleTimerDisabled = false
+    }
+
     private func switchEpisode(_ ep: PlaybackEpisode) {
         cleanupPlayer(forceStopPlayer: true)
+        recoveryStage = 0
         currentEpisode = ep
         let baseId = currentVideo.id.replacingOccurrences(of: #"-ep-\d+$"#, with: "", options: .regularExpression)
         let baseTitle = initialVideo.id.replacingOccurrences(of: #"-ep-\d+$"#, with: "", options: .regularExpression) == baseId
@@ -2252,6 +2328,7 @@ public struct VideoDetailPlaybackScreen: View {
         impact.impactOccurred()
         cleanupPlayer(forceStopPlayer: true)
         resolveError = nil
+        recoveryStage = 0
         currentVideo = newVideo
         currentEpisode = nil
         episodes = []

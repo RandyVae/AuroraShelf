@@ -20,6 +20,15 @@ public final class VideoPreloadManager: ObservableObject {
     private var streamCache: [String: CachedStream] = [:]
     private var inFlightTasks: [String: Task<PlaybackSourceResult, Error>] = [:]
     private let defaultTTL: TimeInterval = 7200 // 2小时有效期
+    private let pennyTokenTTL: TimeInterval = 90 // 华视一次性 /link/penny- 直链短 TTL（90秒）
+
+    private func effectiveTTL(for result: PlaybackSourceResult, requestedTTL: TimeInterval?) -> TimeInterval {
+        if let requestedTTL { return requestedTTL }
+        if result.url.absoluteString.lowercased().contains("/link/penny-") {
+            return pennyTokenTTL
+        }
+        return defaultTTL
+    }
     
     private init() {}
     
@@ -117,7 +126,7 @@ public final class VideoPreloadManager: ObservableObject {
             let entry = CachedStream(
                 result: resolved,
                 cachedAt: Date(),
-                expiresAt: Date().addingTimeInterval(self.defaultTTL)
+                expiresAt: Date().addingTimeInterval(effectiveTTL(for: resolved, requestedTTL: nil))
             )
             for k in keys {
                 self.streamCache[k] = entry
@@ -130,6 +139,21 @@ public final class VideoPreloadManager: ObservableObject {
             }
             throw error
         }
+    }
+
+    /// 清除旧缓存并以指定备用线路重新解析（用于 428/2004/TLS/TS 播放失败自愈）
+    public func resolveFresh(video: VideoItem, alternateLineIndex: Int = 0) async throws -> PlaybackSourceResult {
+        if !video.playbackUrl.isEmpty {
+            invalidateCache(for: video.playbackUrl)
+        }
+        let resolved = try await VideoRepository.shared.executeStreamResolution(
+            video: video,
+            alternateLineIndex: alternateLineIndex
+        )
+        if !video.playbackUrl.isEmpty, alternateLineIndex == 0 {
+            cache(result: resolved, for: video.playbackUrl)
+        }
+        return resolved
     }
 
     /// 智能预热单部视频：后台异步解析播放流并持久缓存在内存中
@@ -148,9 +172,10 @@ public final class VideoPreloadManager: ObservableObject {
         }
     }
     
-    /// 批量预热视频列表（例如首屏推荐前 4~6 部视频）
+    /// 批量预热视频列表（例如首屏推荐前 4~6 部视频；华视限首条以避免启动并发触发 CDN 428 限流）
     public func prewarmBatch(videos: [VideoItem], maxCount: Int = 6) {
-        let targets = videos.prefix(maxCount)
+        let effectiveMax = videos.first?.playbackUrl.contains("huavod.com") == true ? min(maxCount, 1) : maxCount
+        let targets = videos.prefix(effectiveMax)
         for video in targets {
             prewarm(video: video)
         }
@@ -195,12 +220,12 @@ public final class VideoPreloadManager: ObservableObject {
     }
 
     /// 手动存入解析结果（支持自动多别名同步存入）
-    public func cache(result: PlaybackSourceResult, for playbackUrl: String) {
+    public func cache(result: PlaybackSourceResult, for playbackUrl: String, ttl: TimeInterval? = nil) {
         let keys = Self.canonicalKeys(for: playbackUrl)
         let entry = CachedStream(
             result: result,
             cachedAt: Date(),
-            expiresAt: Date().addingTimeInterval(defaultTTL)
+            expiresAt: Date().addingTimeInterval(effectiveTTL(for: result, requestedTTL: ttl))
         )
         for k in keys {
             streamCache[k] = entry

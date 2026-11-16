@@ -1693,7 +1693,7 @@ public final class VideoRepository: ObservableObject {
     }
 
     /// 底层真实流媒体直链与鉴权头解析引擎（绝不自我 await inFlight，杜绝自身死锁）
-    public func executeStreamResolution(video: VideoItem) async throws -> PlaybackSourceResult {
+    public func executeStreamResolution(video: VideoItem, alternateLineIndex: Int = 0) async throws -> PlaybackSourceResult {
         let sourceID = Self.playbackSourceID(for: video)
         let result: PlaybackSourceResult
 
@@ -1707,7 +1707,7 @@ public final class VideoRepository: ObservableObject {
             // 3. 91视频（提取真实原画 MP4 直链）
             result = try await resolve91PornStream(pageUrl: video.playbackUrl, title: video.title)
         } else if sourceID == VideoSourceCatalog.huavod.id {
-            result = try await resolveHuavodStream(pageUrl: video.playbackUrl, title: video.title)
+            result = try await resolveHuavodStream(pageUrl: video.playbackUrl, title: video.title, alternateLineIndex: alternateLineIndex)
         } else {
             result = try await resolveOtherVideoStreams(sourceID: sourceID, video: video)
         }
@@ -1913,11 +1913,71 @@ public final class VideoRepository: ObservableObject {
         throw VideoFeedError.malformedResponse(source: "JAVSB")
     }
 
-    private func resolveHuavodStream(pageUrl: String, title: String) async throws -> PlaybackSourceResult {
-        guard let episode = Self.huavodEpisodeParam(from: pageUrl) else {
+    public nonisolated static func parseHuavodPlayLines(html: String, vodId: String, targetNid: Int) -> [String] {
+        guard !vodId.isEmpty else { return [] }
+        let pattern = #"/vodplay/(\d+)-(\d+)-(\d+)\.html"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let nsHtml = html as NSString
+        let matches = regex.matches(in: html, range: NSRange(location: 0, length: nsHtml.length))
+
+        var sidOrder: [String] = []
+        var bySid: [String: [(nid: Int, url: String)]] = [:]
+        for match in matches where match.numberOfRanges >= 4 {
+            let foundVodId = nsHtml.substring(with: match.range(at: 1))
+            guard foundVodId == vodId else { continue }
+            let sid = nsHtml.substring(with: match.range(at: 2))
+            let nid = Int(nsHtml.substring(with: match.range(at: 3))) ?? 1
+            let path = nsHtml.substring(with: match.range)
+            let fullURL = "https://huavod.com\(path)"
+            if bySid[sid] == nil {
+                sidOrder.append(sid)
+                bySid[sid] = []
+            }
+            bySid[sid]?.append((nid: nid, url: fullURL))
+        }
+
+        var lines: [String] = []
+        for sid in sidOrder {
+            guard let items = bySid[sid] else { continue }
+            if let chosen = items.first(where: { $0.nid == targetNid })?.url ?? items.first?.url,
+               !lines.contains(chosen) {
+                lines.append(chosen)
+            }
+        }
+        return lines
+    }
+
+    private func resolveHuavodStream(pageUrl: String, title: String, alternateLineIndex: Int = 0) async throws -> PlaybackSourceResult {
+        guard let initialEpisode = Self.huavodEpisodeParam(from: pageUrl) else {
             throw VideoFeedError.invalidURL(source: "华视影院")
         }
 
+        var targetEpisode = initialEpisode
+        if alternateLineIndex > 0 {
+            let parts = initialEpisode.split(separator: "-")
+            if parts.count >= 3 {
+                let vodId = String(parts[0])
+                let targetNid = Int(parts[2]) ?? 1
+                if let detailURL = URL(string: "https://huavod.com/voddetail/\(vodId).html") {
+                    var req = URLRequest(url: detailURL)
+                    req.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
+                    req.timeoutInterval = 10
+                    if let detailData = try? await requestFeedData(for: req, source: "华视影院"),
+                       let html = String(data: detailData, encoding: .utf8) {
+                        let lines = Self.parseHuavodPlayLines(html: html, vodId: vodId, targetNid: targetNid)
+                        if alternateLineIndex < lines.count,
+                           let altEp = Self.huavodEpisodeParam(from: lines[alternateLineIndex]) {
+                            targetEpisode = altEp
+                        }
+                    }
+                }
+            }
+        }
+
+        return try await resolveHuavodEpisode(episode: targetEpisode, title: title)
+    }
+
+    private func resolveHuavodEpisode(episode: String, title: String) async throws -> PlaybackSourceResult {
         guard let nextURL = URL(string: "https://huavod.com/Player/next?episode=\(episode)"),
               let resolveURL = URL(string: "https://huavod.com/Player/resolveUrl") else {
             throw VideoFeedError.invalidURL(source: "华视影院")

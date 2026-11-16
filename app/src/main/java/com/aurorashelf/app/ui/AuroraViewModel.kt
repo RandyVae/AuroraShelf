@@ -164,7 +164,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     private fun prefetchHuavodStreams(videos: List<VideoItem>) {
         val targets = videos.asSequence()
             .filter { ContentSourceCatalog.isHuavod(it.pageUrl) }
-            .take(4)
+            .take(1)
             .toList()
         if (targets.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
