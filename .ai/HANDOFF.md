@@ -12,8 +12,13 @@
    - 同步更新 `AGENTS.md`、`app/build.gradle.kts`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`；
    - 验证结果：`./scripts/publish_testflight.sh --check` PASS；`./scripts/publish_testflight.sh` 已使用 `Apple Distribution: YUDI WEI (U4MXHLA3GF)` 完成归档并成功上传 `v2.16.35 (Build 261)` 至 App Store Connect（`Upload succeeded` / `** EXPORT SUCCEEDED **`）；iOS `CategoryShelfTests` **9/9 通过**；Android `./gradlew testDebugUnitTest` **42 套件 266 项（258 通过 / 8 跳过 / 0 失败）**；`./scripts/publish_ota.sh Release` 成功同步覆盖至 `https://bananarey.us`（`Netgrey.apk` `206,909,327` bytes / `Netgrey.ipa` `202,755,543` bytes，`manifest.plist` `2.16.35` 均 `HTTP/1.1 200 OK`），且归档与 IPA 内确认包含 `PrivacyInfo.xcprivacy`、`MinimumOSVersion=26.0`、`ITSAppUsesNonExemptEncryption=false`。
 
+4. **TestFlight 邀请制全自动网页系统（`https://bananarey.us`）**：
+   - 新增 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py)（`ThreadingTCPServer` + `POST /api/testflight/invite` + `GET /api/testflight/status` + 20 秒后台轮询线程）：校验服务器 `/etc/netgrey-ota/testflight_invite_config.json` 口令与单 IP 限流后，自动调用 Apple 官方 `userInvitations`（`MARKETING` 仅限 `Netgrey`），待用户接受后自动调用 `betaTesters` / `betaGroups` 拉入 `Internal` 群组；
+   - 更新 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 在 iOS 面板增加「TestFlight 内部测试（邀请制）」卡片与状态自动轮询；已部署重启 `netgrey-ota.service`（`active`），实测 `403/400/404/200` 全通；
+   - 本地配置 `.appstore_credentials`（复用 `QAGFLU87T3`，已在 `.gitignore` 忽略），`./scripts/publish_testflight.sh --check` 全部 PASS。
+
 ### 交接提醒
-- `v2.16.35 (Build 261)` 已上传至 App Store Connect 并处于后台处理状态；待处理完成后在 App Store Connect -> TestFlight -> 内部测试 添加测试员即可安装。
+- 邀请口令配置在服务器 `/etc/netgrey-ota/testflight_invite_config.json`（权限 `600`，未入库）；朋友在 `https://bananarey.us` 提交口令与邮箱后，只需去邮箱点一次「Accept invitation」，后台会自动完成后续拉群。
 
 ## 历史交接：2026-11-15 — 全量 Bug 筛查与修复、华视搜索专向加固、论坛原图单张/批量下载、视频与漫画统一离线下载进度查询＋双端 Release 验证与 OTA 发布 · v2.16.34 (Build 260)
 
