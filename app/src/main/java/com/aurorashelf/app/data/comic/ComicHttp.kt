@@ -77,29 +77,47 @@ internal object ComicHttp {
         read: (HttpURLConnection) -> T,
     ): T {
         var currentUrl = url
+        var currentMethod = method
+        var currentBody = body
+        var currentHeaders = headers
         var redirectCount = 0
         val maxRedirects = 5
 
         while (true) {
             val connection = URL(currentUrl).openConnection() as HttpURLConnection
             try {
-                connection.requestMethod = method
+                connection.requestMethod = currentMethod
                 connection.connectTimeout = 12_000
                 connection.readTimeout = 15_000
-                connection.instanceFollowRedirects = true
+                connection.instanceFollowRedirects = false
                 connection.setRequestProperty("User-Agent", VideoRepository.USER_AGENT)
                 connection.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9")
-                headers.forEach(connection::setRequestProperty)
-                if (body != null && (method == "POST" || method == "PUT")) {
+                currentHeaders.forEach(connection::setRequestProperty)
+                if (currentBody != null && (currentMethod == "POST" || currentMethod == "PUT")) {
                     connection.doOutput = true
-                    connection.outputStream.bufferedWriter().use { it.write(body) }
+                    connection.outputStream.bufferedWriter().use { it.write(currentBody) }
                 }
                 val status = connection.responseCode
                 if (status in listOf(301, 302, 303, 307, 308) && redirectCount < maxRedirects) {
                     val location = connection.getHeaderField("Location")
                     if (!location.isNullOrBlank()) {
                         connection.disconnect()
-                        currentUrl = resolve(currentUrl, location) ?: location
+                        val nextUrl = resolve(currentUrl, location) ?: location
+                        val oldHost = runCatching { java.net.URI(currentUrl).host?.lowercase() }.getOrNull()
+                        val nextHost = runCatching { java.net.URI(nextUrl).host?.lowercase() }.getOrNull()
+                        if (oldHost != null && nextHost != null && oldHost != nextHost) {
+                            currentHeaders = currentHeaders.filterKeys { key ->
+                                !key.equals("authorization", ignoreCase = true) &&
+                                    !key.equals("cookie", ignoreCase = true) &&
+                                    !key.equals("token", ignoreCase = true) &&
+                                    !key.equals("signature", ignoreCase = true)
+                            }
+                        }
+                        if (status in listOf(301, 302, 303) && currentMethod != "GET" && currentMethod != "HEAD") {
+                            currentMethod = "GET"
+                            currentBody = null
+                        }
+                        currentUrl = nextUrl
                         redirectCount++
                         continue
                     }

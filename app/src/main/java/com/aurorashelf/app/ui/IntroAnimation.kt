@@ -86,6 +86,7 @@ internal fun BrandIntroOverlay(
     onFinished: () -> Unit,
 ) {
     val context = LocalContext.current
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     val appName = stringResourceAppName()
     val reduceMotion = remember { !ValueAnimator.areAnimatorsEnabled() }
     val overlayAlpha = remember { Animatable(1f) }
@@ -110,8 +111,19 @@ internal fun BrandIntroOverlay(
             }.getOrNull()
         }
     }
-    DisposableEffect(player) {
-        onDispose { runCatching { player?.release() } }
+    DisposableEffect(player, lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> player?.pause()
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> if (!finished) player?.play()
+                else -> Unit
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            runCatching { player?.release() }
+        }
     }
 
     LaunchedEffect(player, reduceMotion) {

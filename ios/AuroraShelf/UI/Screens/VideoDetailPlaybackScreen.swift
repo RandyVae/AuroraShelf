@@ -32,6 +32,9 @@ public struct VideoDetailPlaybackScreen: View {
     @State private var isShowingInSight: Bool = false
     @State private var isScrubbing: Bool = false
     @State private var isSeeking: Bool = false
+    @State private var seekGeneration: UInt64 = 0
+    @State private var isBuffering: Bool = false
+    @State private var autoAdvanceWorkItem: DispatchWorkItem? = nil
     @State private var subtitleSelectionGroup: AVMediaSelectionGroup? = nil
     @State private var audioSelectionGroup: AVMediaSelectionGroup? = nil
     @State private var lastSavedSecond: Int = -1
@@ -463,7 +466,8 @@ public struct VideoDetailPlaybackScreen: View {
         isRotated: Bool
     ) -> some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let needsTopOffset = !isFullScreen && (!isLandscape || isPad)
+        let isPhysicallyLandscape = screenSize.width > screenSize.height
+        let needsTopOffset = !isFullScreen && (!isPhysicallyLandscape || isPad)
         
         ZStack {
             Color.black
@@ -475,8 +479,8 @@ public struct VideoDetailPlaybackScreen: View {
                 }
 
                 ZStack {
-                    // 底层海报背景（加载或失败时垫底）
-                    if player == nil {
+                    // 底层海报背景（加载、缓冲或失败时垫底，消除缓冲期间黑屏）
+                    if player == nil || isBuffering {
                         AuroraCoverImage(
                             url: currentVideo.coverUrl,
                             title: currentVideo.title,
@@ -494,6 +498,7 @@ public struct VideoDetailPlaybackScreen: View {
                             player: activePlayer,
                             videoGravity: isFillMode ? .resizeAspectFill : .resizeAspect
                         )
+                        .opacity(isBuffering ? 0.01 : 1)
                         .onTapGesture(count: 2) { location in
                             handleDoubleTap(at: location.x, in: targetWidth)
                         }
@@ -509,7 +514,7 @@ public struct VideoDetailPlaybackScreen: View {
                         }
                     }
                     
-                    // 解析失败提示层
+                    // 解析失败提示层（始终提供返回与重试出口，杜绝失败后无返回按键）
                     if let error = resolveError {
                         VStack(spacing: 12) {
                             Image(systemName: "exclamationmark.triangle.fill")
@@ -520,11 +525,17 @@ public struct VideoDetailPlaybackScreen: View {
                                 .foregroundStyle(.white)
                             Text(error)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.white.opacity(0.75))
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 24)
                             
                             HStack(spacing: 12) {
+                                Button("返回") {
+                                    dismissView()
+                                }
+                                .buttonStyle(.glass)
+                                .buttonBorderShape(.capsule)
+
                                 Button("重试") {
                                     Task { await startPlayback(for: currentVideo) }
                                 }
@@ -534,13 +545,13 @@ public struct VideoDetailPlaybackScreen: View {
                             }
                         }
                         .padding()
-                    } else if isResolving {
-                        // 正在解析/预热加载层
+                    } else if isResolving || isBuffering {
+                        // 正在解析/预热缓冲层
                         VStack(spacing: 10) {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
                                 .scaleEffect(1.1)
-                            Text(resolveStatus)
+                            Text(isResolving ? resolveStatus : "正在缓冲视频…")
                                 .font(.caption.bold())
                                 .foregroundStyle(.white)
                                 .shadow(radius: 2)
@@ -594,10 +605,14 @@ public struct VideoDetailPlaybackScreen: View {
         }
         .frame(width: targetWidth, height: targetHeight)
         .rotationEffect(isRotated ? .degrees(90) : .zero)
+        .position(
+            x: (isFullScreen ? screenSize.width : containerWidth) / 2,
+            y: (isFullScreen ? screenSize.height : targetHeight) / 2
+        )
         .frame(
             width: isFullScreen ? screenSize.width : containerWidth,
             height: isFullScreen ? screenSize.height : targetHeight,
-            alignment: .top
+            alignment: .center
         )
         .clipped()
         .ignoresSafeArea()
@@ -723,7 +738,7 @@ public struct VideoDetailPlaybackScreen: View {
                 bottomControlBar
             }
             .environment(\.colorScheme, .dark)
-            .padding(.horizontal, isPad ? 24 : 14)
+            .padding(.horizontal, isPad ? 24 : (isRotated ? max(14, resolvedSafeTop(in: screenSize)) : 14))
             .padding(.top, topBarPadding)
             .padding(.bottom, isFullScreen ? max(16, resolvedSafeBottom) : (isPad ? 14 : 8))
         }
@@ -1868,6 +1883,7 @@ public struct VideoDetailPlaybackScreen: View {
         let playerItem = AVPlayerItem(asset: asset)
         
         let p = AVPlayer(playerItem: playerItem)
+        self.isBuffering = true
         self.player = p
         self.lastSavedSecond = -1
         attachObservers(to: p, applyResumeSeek: true)
@@ -1904,6 +1920,7 @@ public struct VideoDetailPlaybackScreen: View {
                     return
                 }
                 if status == .readyToPlay {
+                    self.isBuffering = false
                     self.isPlaying = true
                     self.loadMediaSelectionGroups(for: item)
                     // Apple TV Up Next 断点续播：若存在未完成的播放记录，自动跳转至上次观看进度
@@ -1924,7 +1941,9 @@ public struct VideoDetailPlaybackScreen: View {
                     UIApplication.shared.isIdleTimerDisabled = true
                     self.scheduleHideControls()
                 } else if status == .failed {
+                    self.isBuffering = false
                     VideoPreloadManager.shared.invalidateCache(for: self.currentVideo.playbackUrl)
+                    self.player = nil
                     self.resolveError = errorDesc ?? "播放器解码失败"
                     UIApplication.shared.isIdleTimerDisabled = false
                 }
@@ -2010,6 +2029,7 @@ public struct VideoDetailPlaybackScreen: View {
         if isPlaying {
             p.pause()
             isPlaying = false
+            UIApplication.shared.isIdleTimerDisabled = false
             hideControlsTask?.cancel()
         } else {
             p.play()
@@ -2017,6 +2037,7 @@ public struct VideoDetailPlaybackScreen: View {
                 p.rate = playbackRate
             }
             isPlaying = true
+            UIApplication.shared.isIdleTimerDisabled = true
             scheduleHideControls()
         }
     }
@@ -2036,12 +2057,17 @@ public struct VideoDetailPlaybackScreen: View {
     
     private func seekTo(time: Double) {
         guard let p = player else { return }
+        seekGeneration &+= 1
+        let gen = seekGeneration
         isSeeking = true
         currentTime = time
+        p.currentItem?.cancelPendingSeeks()
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         p.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { _ in
             DispatchQueue.main.async {
-                self.isSeeking = false
+                if self.seekGeneration == gen {
+                    self.isSeeking = false
+                }
             }
         }
     }
@@ -2107,6 +2133,9 @@ public struct VideoDetailPlaybackScreen: View {
         // 使任何仍在途的异步解析令牌立即失效，防止退出后回放启动幽灵音轨
         activeResolveID = UUID()
         isResolving = false
+        isBuffering = false
+        autoAdvanceWorkItem?.cancel()
+        autoAdvanceWorkItem = nil
         if player != nil, duration > 5.0, currentTime > 2.0, currentTime < duration - 1.0 {
             progressStore.updateProgress(
                 video: currentVideo,
@@ -2130,7 +2159,7 @@ public struct VideoDetailPlaybackScreen: View {
             p.removeTimeObserver(token)
             timeObserverToken = nil
         }
-        if !forceStopPlayer, !isViewDismissed, PictureInPictureManager.shared.isActive, let activePlayer = player {
+        if !forceStopPlayer, PictureInPictureManager.shared.isActive, let activePlayer = player {
             PictureInPictureManager.shared.retainPlayerForPiP(player: activePlayer, video: currentVideo)
         } else {
             if forceStopPlayer || isViewDismissed {
@@ -2141,7 +2170,7 @@ public struct VideoDetailPlaybackScreen: View {
                 existingPlayer.pause()
                 existingPlayer.replaceCurrentItem(with: nil)
             }
-            if forceStopPlayer || isViewDismissed {
+            if isViewDismissed {
                 Task.detached(priority: .utility) {
                     try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
                 }
@@ -2155,7 +2184,7 @@ public struct VideoDetailPlaybackScreen: View {
     }
     
     private func handleEpisodePlaybackEnded() {
-        guard !isSwitchingNextEpisode else { return }
+        guard !isSwitchingNextEpisode, !isViewDismissed else { return }
         progressStore.markCompleted(for: currentVideo)
         guard let currentEp = currentEpisode, !episodes.isEmpty else { return }
         if let nextEp = episodes.first(where: { $0.number == currentEp.number + 1 }) {
@@ -2166,12 +2195,19 @@ public struct VideoDetailPlaybackScreen: View {
             )
             let impact = UINotificationFeedbackGenerator()
             impact.notificationOccurred(.success)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                switchEpisode(nextEp)
+            autoAdvanceWorkItem?.cancel()
+            let item = DispatchWorkItem {
+                guard !self.isViewDismissed else {
+                    self.isSwitchingNextEpisode = false
+                    return
+                }
+                self.switchEpisode(nextEp)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     self.isSwitchingNextEpisode = false
                 }
             }
+            autoAdvanceWorkItem = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: item)
         } else {
             showHud(
                 icon: "checkmark.circle.fill",

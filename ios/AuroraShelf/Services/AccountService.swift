@@ -22,7 +22,7 @@ public final class AccountService: ObservableObject {
     private let baseURL = URL(string: "https://bananarey.us/auth-api")!
 
     private init() {
-        session = .permissiveShared
+        session = .shared
         token = KeychainTokenStore.load()
         if let data = UserDefaults.standard.data(forKey: Self.profileKey) {
             profile = try? JSONDecoder().decode(AccountProfile.self, from: data)
@@ -34,7 +34,7 @@ public final class AccountService: ObservableObject {
             message = "密码至少需要 8 位"
             return
         }
-        await perform(
+        let created = await perform(
             path: "/api/collections/users/records",
             body: [
                 "email": email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
@@ -45,7 +45,7 @@ public final class AccountService: ObservableObject {
             successMessage: nil,
             preserveSession: true,
         )
-        if profile != nil {
+        if created {
             await signIn(email: email, password: password)
             if token != nil {
                 message = "注册成功，请检查邮箱完成验证"
@@ -54,7 +54,7 @@ public final class AccountService: ObservableObject {
     }
 
     public func signIn(email: String, password: String) async {
-        await perform(
+        _ = await perform(
             path: "/api/collections/users/auth-with-password",
             body: ["identity": email, "password": password],
             successMessage: nil,
@@ -63,7 +63,7 @@ public final class AccountService: ObservableObject {
 
     public func requestVerification() async {
         guard let email = profile?.email else { return }
-        await perform(
+        _ = await perform(
             path: "/api/collections/users/request-verification",
             body: ["email": email],
             successMessage: "验证邮件已发送",
@@ -72,7 +72,7 @@ public final class AccountService: ObservableObject {
     }
 
     public func requestPasswordReset(email: String) async {
-        await perform(
+        _ = await perform(
             path: "/api/collections/users/request-password-reset",
             body: ["email": email],
             successMessage: "如果邮箱已注册，重置邮件将很快送达",
@@ -82,7 +82,7 @@ public final class AccountService: ObservableObject {
 
     public func refresh() async {
         guard token != nil else { return }
-        await perform(
+        _ = await perform(
             path: "/api/collections/users/auth-refresh",
             body: [:],
             successMessage: nil,
@@ -97,15 +97,16 @@ public final class AccountService: ObservableObject {
         UserDefaults.standard.removeObject(forKey: Self.profileKey)
     }
 
+    @discardableResult
     private func perform(
         path: String,
         body: [String: String],
         successMessage: String?,
         preserveSession: Bool = false,
-    ) async {
+    ) async -> Bool {
         guard let url = URL(string: baseURL.absoluteString + path) else {
             message = "账号服务地址无效"
-            return
+            return false
         }
         isLoading = true
         defer { isLoading = false }
@@ -119,31 +120,50 @@ public final class AccountService: ObservableObject {
             guard let http = response as? HTTPURLResponse else { throw AccountError.invalidResponse }
             let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] ?? [:]
             guard (200..<300).contains(http.statusCode) else {
+                if !preserveSession && (http.statusCode == 401 || http.statusCode == 403) {
+                    token = nil
+                    profile = nil
+                    KeychainTokenStore.remove()
+                    UserDefaults.standard.removeObject(forKey: Self.profileKey)
+                }
                 throw AccountError.server(json["message"] as? String ?? "账号请求失败（HTTP \(http.statusCode)）")
             }
+
+            var nextProfile: AccountProfile?
             if let record = json["record"] as? [String: Any] {
-                profile = AccountProfile(
+                nextProfile = AccountProfile(
                     id: record["id"] as? String ?? "",
                     email: record["email"] as? String ?? "",
                     displayName: (record["name"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? (record["email"] as? String ?? ""),
                     isVerified: record["verified"] as? Bool ?? false,
                     subscriptionStatus: (record["subscriptionStatus"] as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "free",
                 )
-                if let profile, let saved = try? JSONEncoder().encode(profile) {
+            }
+
+            let responseToken = json["token"] as? String
+            if !preserveSession && nextProfile != nil && (responseToken == nil || responseToken?.isEmpty == true) {
+                throw AccountError.invalidResponse
+            }
+
+            if let responseToken, !responseToken.isEmpty {
+                guard KeychainTokenStore.save(responseToken) else {
+                    throw AccountError.server("未能安全保存登录会话")
+                }
+                token = responseToken
+            }
+            if let nextProfile {
+                profile = nextProfile
+                if let saved = try? JSONEncoder().encode(nextProfile) {
                     UserDefaults.standard.set(saved, forKey: Self.profileKey)
                 }
             }
-            if let responseToken = json["token"] as? String, !responseToken.isEmpty {
-                token = responseToken
-                KeychainTokenStore.save(responseToken)
-            } else if !preserveSession && profile != nil {
-                throw AccountError.invalidResponse
-            }
             message = successMessage
+            return true
         } catch is CancellationError {
-            return
+            return false
         } catch {
             message = (error as? AccountError)?.localizedDescription ?? "账号服务暂时不可用"
+            return false
         }
     }
 

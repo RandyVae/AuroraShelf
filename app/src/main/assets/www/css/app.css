@@ -45,6 +45,7 @@
   --radius-s: 8px;
   --radius-m: 14px;
   --radius-l: 22px;
+  --radius-pill: 999px;
   --tap: 44px;
   --shadow-1: 0 2px 10px rgba(0, 0, 0, 0.35);
   --shadow-2: 0 14px 40px rgba(0, 0, 0, 0.55);

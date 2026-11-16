@@ -112,10 +112,15 @@ class StripchatLiveRepository {
 
         /** Asynchronously warms DNS and TLS connection for live stream hosts to eliminate handshake delay. */
         fun prefetchDns() {
-            java.util.concurrent.Executors.newSingleThreadExecutor().execute {
-                runCatching {
-                    val req = Request.Builder().url("$SITE_BASE/api/front/models?limit=1").head().build()
-                    okHttpClient.newCall(req).execute().close()
+            val pool = java.util.concurrent.Executors.newSingleThreadExecutor()
+            pool.execute {
+                try {
+                    runCatching {
+                        val req = Request.Builder().url("$SITE_BASE/api/front/models?limit=1").head().build()
+                        okHttpClient.newCall(req).execute().close()
+                    }
+                } finally {
+                    pool.shutdown()
                 }
             }
         }

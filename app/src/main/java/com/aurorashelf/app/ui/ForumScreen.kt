@@ -157,12 +157,14 @@ internal fun ForumScreen(
     }
 
     LaunchedEffect(Unit) { onEnsureLoaded() }
-    LaunchedEffect(listState, state.canLoadMore, state.isLoading, state.isLoadingMore) {
+    LaunchedEffect(listState, state.canLoadMore, state.isLoading, state.isLoadingMore, state.loadMoreError) {
         snapshotFlow {
             val layoutInfo = listState.layoutInfo
             val totalItems = layoutInfo.totalItemsCount
             val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            totalItems > 0 && lastVisible >= totalItems - 3 && !state.isLoading && !state.isLoadingMore && state.canLoadMore
+            totalItems > 0 && lastVisible >= totalItems - 3 &&
+                !state.isLoading && !state.isLoadingMore &&
+                state.canLoadMore && state.loadMoreError == null
         }.distinctUntilChanged().filter { it }.collect { onLoadMore() }
     }
 

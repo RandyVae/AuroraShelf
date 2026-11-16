@@ -27,8 +27,6 @@ internal class SsdpDiscovery(
     private val context: Context,
     private val okHttpClient: OkHttpClient = OkHttpClient.Builder().build(),
 ) {
-    private var multicastLock: WifiManager.MulticastLock? = null
-
     suspend fun discover(
         timeoutMs: Int = 3500,
         onDeviceFound: ((List<CastDevice>) -> Unit)? = null,
@@ -36,7 +34,7 @@ internal class SsdpDiscovery(
         val devices = ConcurrentHashMap<String, CastDevice>()
         val parseJobs = mutableListOf<Deferred<CastDevice?>>()
         var socket: DatagramSocket? = null
-        acquireMulticastLock()
+        val localLock = acquireMulticastLock()
 
         try {
             coroutineScope {
@@ -94,8 +92,11 @@ internal class SsdpDiscovery(
                 }
 
                 if (parseJobs.isNotEmpty()) {
-                    withTimeoutOrNull(2500L) {
+                    val completed = withTimeoutOrNull(2500L) {
                         parseJobs.awaitAll()
+                    }
+                    if (completed == null) {
+                        parseJobs.forEach { it.cancel() }
                     }
                 }
             }
@@ -105,7 +106,7 @@ internal class SsdpDiscovery(
             try {
                 socket?.close()
             } catch (_: Exception) {}
-            releaseMulticastLock()
+            releaseMulticastLock(localLock)
         }
 
         devices.values.toList()
@@ -223,25 +224,25 @@ internal class SsdpDiscovery(
         "MX: 3\r\n" +
         "ST: $target\r\n\r\n"
 
-    private fun acquireMulticastLock() {
-        try {
+    private fun acquireMulticastLock(): WifiManager.MulticastLock? {
+        return try {
             val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            multicastLock = wifiManager?.createMulticastLock("NetgreyCastMulticastLock")?.apply {
+            wifiManager?.createMulticastLock("NetgreyCastMulticastLock")?.apply {
                 setReferenceCounted(true)
                 acquire()
             }
         } catch (e: Exception) {
             Log.w(TAG, "Cannot acquire MulticastLock: ${e.message}")
+            null
         }
     }
 
-    private fun releaseMulticastLock() {
+    private fun releaseMulticastLock(lock: WifiManager.MulticastLock?) {
         try {
-            if (multicastLock?.isHeld == true) {
-                multicastLock?.release()
+            if (lock?.isHeld == true) {
+                lock.release()
             }
         } catch (_: Exception) {}
-        multicastLock = null
     }
 
     companion object {

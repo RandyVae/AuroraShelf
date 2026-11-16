@@ -72,7 +72,7 @@ class PlaybackResolver {
                 val parsed = parseEpisodes(pageDoc, detailUrl)
                 if (ContentSourceCatalog.is91Dongman(detailUrl)) {
                     parsed.firstOrNull()?.pageUrl?.let { ep1Url ->
-                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                        huavodScope.launch(Dispatchers.IO) {
                             runCatching { resolve(ep1Url) }
                         }
                     }
@@ -862,21 +862,33 @@ class PlaybackResolver {
             return@withContext cached
         }
 
-        // Single-flight deduplication: if already in-flight (e.g. from prewarm), join and await it
-        val inFlight = huavodInFlight[episodeParam]
-        if (inFlight != null && inFlight.isActive) {
+        // Single-flight deduplication: atomically coalesce concurrent resolution (e.g. prewarm + click)
+        val existing = huavodInFlight[episodeParam]
+        if (existing != null && existing.isActive) {
             Log.i(TAG, "huavod joining in-flight resolution for $episodeParam")
-            return@withContext inFlight.await().rememberHuavod(pageUrl, canonicalPlayUrl, startedAtMs)
+            return@withContext existing.await().rememberHuavod(pageUrl, canonicalPlayUrl, startedAtMs)
         }
 
-        val deferred = huavodScope.async(Dispatchers.IO) {
+        val created = huavodScope.async(Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) {
             executeHuavodResolution(pageUrl, canonicalPlayUrl, episodeParam, startedAtMs)
         }
-        huavodInFlight[episodeParam] = deferred
+        val active = huavodInFlight.putIfAbsent(episodeParam, created)
+        val targetDeferred = if (active != null && active.isActive) {
+            created.cancel()
+            active
+        } else {
+            if (active != null) {
+                huavodInFlight[episodeParam] = created
+            }
+            created.start()
+            created
+        }
         try {
-            deferred.await().rememberHuavod(pageUrl, canonicalPlayUrl, startedAtMs)
+            targetDeferred.await().rememberHuavod(pageUrl, canonicalPlayUrl, startedAtMs)
         } finally {
-            huavodInFlight.remove(episodeParam)
+            if (targetDeferred === created) {
+                huavodInFlight.remove(episodeParam, created)
+            }
         }
     }
 
@@ -923,16 +935,21 @@ class PlaybackResolver {
         }
 
         val resolveUrl = "https://huavod.com/Player/resolveUrl"
-        val resolveResp = Jsoup.connect(resolveUrl)
-            .userAgent(VideoRepository.USER_AGENT)
-            .header("Referer", "https://huavod.com/Player/ec?episode=$episodeParam")
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .data("token", token)
-            .ignoreContentType(true)
-            .timeout(15_000)
-            .method(org.jsoup.Connection.Method.POST)
-            .execute()
-            .body()
+        val resolveResp = try {
+            Jsoup.connect(resolveUrl)
+                .userAgent(VideoRepository.USER_AGENT)
+                .header("Referer", "https://huavod.com/Player/ec?episode=$episodeParam")
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .data("token", token)
+                .ignoreContentType(true)
+                .timeout(15_000)
+                .method(org.jsoup.Connection.Method.POST)
+                .execute()
+                .body()
+        } catch (e: Exception) {
+            huavodTokenCache.remove(episodeParam)
+            throw e
+        }
 
         val directUrl = Regex(""""url"\s*:\s*"([^"]+)"""").find(resolveResp)?.groupValues?.get(1)?.replace("\\/", "/")
             ?: run {
@@ -1033,10 +1050,10 @@ class PlaybackResolver {
         }
         private fun decodeJson(value: String): String = value
             .replace(Regex("\\\\u([0-9a-fA-F]{4})")) { it.groupValues[1].toInt(16).toChar().toString() }
-            .replace("\\\\&", "&")
-            .replace("\\\\/", "/")
-            .replace("\\\\\\\"", "\"")
-            .replace("\\\\\\\\", "\\\\")
+            .replace("\\&", "&")
+            .replace("\\/", "/")
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
     }
 }
 

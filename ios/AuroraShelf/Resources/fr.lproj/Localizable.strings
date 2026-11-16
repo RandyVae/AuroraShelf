@@ -54,6 +54,7 @@
 "live.couples" = "Couples";
 "live.trans" = "Trans";
 "live.loading" = "Chargement des streamers…";
+"live.empty" = "Aucun streamer en direct disponible";
 "live.viewers" = "%@ spectateurs";
 "live.online" = "En ligne";
 "live.offline" = "Hors ligne";

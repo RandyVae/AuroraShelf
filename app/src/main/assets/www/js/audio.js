@@ -32,8 +32,10 @@
     this.sfxVolume = 0.8;
     this.bgmVolume = 0.55;
     this.isMuted = false;
+    this.appMuted = false;
     this.unlocked = false;
     this.pool = new Map();
+    this.activeChannels = [];
   }
 
   AudioManager.prototype.unlock = function () {
@@ -45,14 +47,14 @@
       this.bgmEl.preload = 'auto';
       this.bgmEl.volume = 0;
     }
-    if (this.current) this.playBgm(this.current, true);
+    if (this.current && !this.appMuted) this.playBgm(this.current, true);
   };
 
   AudioManager.prototype.setVolumes = function (bgm, sfx) {
     this.bgmVolume = Math.max(0, Math.min(1, bgm));
     this.sfxVolume = Math.max(0, Math.min(1, sfx));
-    this.isMuted = (this.bgmVolume === 0 && this.sfxVolume === 0);
-    if (this.bgmEl) this.bgmEl.volume = this.bgmVolume;
+    this.isMuted = this.appMuted || (this.bgmVolume === 0 && this.sfxVolume === 0);
+    if (this.bgmEl) this.bgmEl.volume = this.appMuted ? 0 : this.bgmVolume;
   };
 
   AudioManager.prototype.stopBgm = function () {
@@ -66,8 +68,9 @@
     const src = BGM[name];
     if (!src) return;
     this.current = name;
-    this.isMuted = false;
-    if (!this.bgmEl) return;
+    if (this.appMuted) return;
+    this.isMuted = (this.bgmVolume === 0 && this.sfxVolume === 0);
+    if (!this.bgmEl || !this.bgmVolume) return;
     if (!force && this.bgmEl.dataset.src === src && !this.bgmEl.paused) return;
     this.bgmEl.dataset.src = src;
     this.bgmEl.src = src;
@@ -76,25 +79,52 @@
     if (p && p.catch) p.catch(() => {});
   };
 
+  AudioManager.prototype._acquireAudio = function (src) {
+    let el = this.pool.get(src);
+    if (el && (el.paused || el.ended)) {
+      try { el.currentTime = 0; } catch (e) {}
+      return el;
+    }
+    if (this.activeChannels.length >= 8) {
+      const oldest = this.activeChannels.shift();
+      if (oldest) {
+        try { oldest.pause(); oldest.currentTime = 0; } catch (e) {}
+        el = oldest;
+        el.src = src;
+        this.activeChannels.push(el);
+        return el;
+      }
+    }
+    el = new Audio(src);
+    this.pool.set(src, el);
+    this.activeChannels.push(el);
+    return el;
+  };
+
   AudioManager.prototype.playSfx = function (name) {
-    const list = SFX[name];
+    const resolved = name === 'tap' ? 'click' : name;
+    const list = SFX[resolved];
     if (!list || !list.length) return;
-    if (!this.sfxVolume || this.isMuted) return;
+    if (!this.sfxVolume || this.isMuted || this.appMuted) return;
     const src = list[Math.floor(Math.random() * list.length)];
     try {
-      const el = new Audio(src);
+      const el = this._acquireAudio(src);
       el.volume = this.sfxVolume;
       el.play().catch(() => {});
     } catch (e) { /* ignore */ }
   };
 
+  AudioManager.prototype.playSe = function (name) {
+    this.playSfx(name);
+  };
+
   AudioManager.prototype.playVoice = function (path) {
-    if (!path || !this.sfxVolume || this.isMuted) return;
+    if (!path || !this.sfxVolume || this.isMuted || this.appMuted) return;
     const src = (path.startsWith(A) || path.startsWith('/') || /^https?:/i.test(path))
       ? path
       : (A + path);
     try {
-      const el = new Audio(src);
+      const el = this._acquireAudio(src);
       el.volume = this.sfxVolume;
       el.play().catch(() => {});
     } catch (e) { /* ignore */ }

@@ -252,8 +252,8 @@ import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
-internal val LocalWindowLayout = staticCompositionLocalOf { WindowLayout.calculate(393f, 690f, false) }
-internal val LocalDockHeight = staticCompositionLocalOf { 112.dp }
+internal val LocalWindowLayout = androidx.compose.runtime.compositionLocalOf { WindowLayout.calculate(393f, 690f, false) }
+internal val LocalDockHeight = androidx.compose.runtime.compositionLocalOf { 112.dp }
 internal val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
 internal val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 
@@ -346,7 +346,7 @@ fun Modifier.applePressEffect(
         )
 }
 
-internal val LocalCastController = staticCompositionLocalOf { CastController() }
+internal val LocalCastController = androidx.compose.runtime.compositionLocalOf { CastController() }
 
 @Composable
 internal fun StatusBanner(message: String, onRefresh: () -> Unit) {

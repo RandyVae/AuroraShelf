@@ -54,6 +54,7 @@
 "live.couples" = "カップル";
 "live.trans" = "トランス";
 "live.loading" = "配信者一覧を読み込み中…";
+"live.empty" = "現在ライブ配信中のユーザーはいません";
 "live.viewers" = "視聴者 %@";
 "live.online" = "オンライン";
 "live.offline" = "オフライン";

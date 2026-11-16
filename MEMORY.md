@@ -23,32 +23,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `a9d82be`（2026-11-16），未提交 5 个文件
+- Git：`main` @ `4c3f9b9`（2026-11-16），未提交 215 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-16（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-16（今天）
-  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-15（今天）
-  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-15（今天）
-  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（21 天前）
+  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-16（今天）
+  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-16（今天）
+  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（22 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-16（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-16 10:51 by `sync.py`
+- 最后同步：2026-11-16 22:13 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-16 · Build 261 / v2.16.35）：已完成 TestFlight 内部测试工程合规改造、`v2.16.35 (Build 261)` 上传处理完成（`Internal` 群组已就绪），并已在 `https://bananarey.us` 上线 **「邀请口令门禁 + App Store Connect 官方 API 全自动拉群」** 网页自助邀请系统。(1) **网页端**：[index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) iOS 面板新增「TestFlight 内部测试（邀请制）」卡片（口令 + 邮箱输入、实时状态轮询与手动同步）；(2) **服务端全自动闭环**：[ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 改用 `ThreadingTCPServer`，新增 `POST /api/testflight/invite`（`hmac.compare_digest` 口令校验 + 单 IP 限流 + `POST /v1/userInvitations` 最小 `MARKETING` 权限发邀请）与 `GET /api/testflight/status` + 20 秒后台轮询线程（检测到受邀人接受团队邀请后自动调用 `POST /v1/betaTesters` / `betaGroups` 拉入 `Internal` 群组），已在日本服务器 `netgrey-ota.service` 部署并实测全部接口；(3) **本地无头上传凭据**：已配置本地 `.appstore_credentials`（复用 `QAGFLU87T3`），`./scripts/publish_testflight.sh --check` 检测到分发证书与 ASC API Key 均 PASS。
-- 进行中：等待 App Store Connect 后台完成 `v2.16.35 (Build 261)` 处理（约 5～15 分钟）后在 TestFlight 内部测试添加测试员；另持续跟踪 PocketBase 管理员/SMTP 与外部站点源可用性。
-- 下一步：在 App Store Connect -> TestFlight -> 内部测试创建群组并邀请测试员；后续按规划推进用户资料/收藏云同步。
-- 阻塞：外部第三方源 `JAVSB`（TLS EOF）与 `SpankBang`（HTTP 403）维持此前受限记录。
+- 当前阶段（2026-11-16 · Build 262 / v2.16.36）：已完成全盘 Bug 与优化审计（`AUDIT_REPORT_2026-11-16.md`，158 项发现）核心 P0/P1/P2 修复与构建验证，涵盖：清理 123 个未引用静态游戏资产（-60.53 MB，`dist/Netgrey.apk` 137M、`dist/Netgrey.ipa` 134M）；iOS 消除明文 `SourceSecrets.plist` 入包（改为 `scripts/generate_ios_source_secrets.py` 编译期生成 `GeneratedSourceSecrets.swift`）、补全 `PrivacyInfo.xcprivacy` 数据采集声明与 12 语言 `"live.empty"`、修复 `AccountService` TLS 与 401 自动登出、`GameContainerView` 弱代理与退出清理、`ComicDownloadManager` 队列取消/中断恢复/SHA-256 路径截断、`ComicPageImageLoader` 引用计数取消与后台降采样、`VideoDetailPlaybackScreen`/`LivePlayerView`/PiP 与 `ForumScreen`/`ComicsScreen` 卡片修复；Android 修复 `GameActivity` URL 域限制与多键存档隔离、`ComicDownloadManager` 原子写与中断恢复、`AccountRepository` KeyStore AES-GCM 加密、`PlaybackResolver` JSON 反转义与请求去重、4 源分页错误重试及 Compose 热路径 `compositionLocalOf`/生命周期/保持亮屏；服务端与脚本完成 `netgrey-auth-location.conf` 禁用 `/auth-api/_/`、`_superusers` 与请求体限制、`ota_service.py` 严格 CORS/限流/管理鉴权/ASC JWT 缓存及前端 `ota_web/index.html` 轮询清理；`./scripts/publish_testflight.sh` 已成功归档并上传 `v2.16.36 (Build 262)` 至 TestFlight。
+- 进行中：完成 Git 远程同步、标签 `v2.16.36` 与 GitHub Release 发布；待放行本机 SSH 22 端口后部署服务端代理安全配置、`ota_service.py` 与执行 `./scripts/publish_ota.sh Release` 同步网页 OTA。
+- 下一步：放行远端服务器 SSH 22 端口并执行服务端 Nginx/OTA 安全补丁部署与 `./scripts/publish_ota.sh Release`；继续跟进 PocketBase 管理员与 SMTP 配置。
+- 阻塞：(1) 本机代理虚拟网卡当前拦截出站 22 端口（`Connection closed`），导致暂时无法 SSH 登录 OTA 服务器完成 `configure_auth_proxy.sh`、`ota_service.py` 部署及 `publish_ota.sh Release` 上传；(2) 外部第三方源 `JAVSB`（TLS EOF）、`SpankBang`（HTTP 403）、`JAV-NONI` 详情页及论坛 `fid=34` 外链图床 `nsaimg.com` TLS `-9816` 维持受限记录。
 - 最近一次更新：2026-11-16 by Antigravity (Gemini)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-16（Antigravity）：全盘审计修复、`SourceSecrets.plist` 编译期注入与死资产清理（v2.16.36 Build 262）。(1) 在 [project.yml](file:///Users/itou/Documents/ChatGPT/91pron/ios/project.yml) 排除 `Resources/SourceSecrets.plist` 入包，新增 `preBuildScripts` 调用 [generate_ios_source_secrets.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/generate_ios_source_secrets.py) 编译期生成已忽略的 `GeneratedSourceSecrets.swift` 供 [ComicProtocolSecrets.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Comic/ComicProtocolSecrets.swift) 读取，消除协议密钥随 IPA 明文分发；(2) 彻底删除 123 个零引用废图与过期包（节省 60.53 MB），同步修补 `www/index.html` 看板图后缀并经 `verify_curated_assets.py`、`verify-game-logic.js` 与 `verify-fixes.js` 全绿校验；(3) 补齐 Android KeyStore token 加密、iOS/Android 下载管理器并发与原子恢复、Web/Native PiP 与直播生命周期、全站分页死锁及 Nginx/OTA 接口限流防爆；(4) 遵守双端同权校验与 Release 一致性：Android `testDebugUnitTest`（266 项：258 通/8 跳）+ `lintDebug`（0 error）+ 全量在线探针全绿，iOS `AuroraShelfTests`（188 项：180 通/8 跳）通过且双端 Release 模拟器（`iPhone 18 Pro`、`iPad Pro 13-inch M5`、`emulator-5554` R8 APK）实机走查正常，`./scripts/publish_testflight.sh` 成功上传 `Build 262` 至 App Store Connect；因当前出口网络阻断 TCP 22 端口，服务端安全配置上线与 `./scripts/publish_ota.sh Release` 待放行 22 端口后补发。
 
 - 2026-11-16（Antigravity）：TestFlight 内部测试工程合规改造与自动化上传链路落地（v2.16.35 Build 261）。(1) 用户明确选择走 **TestFlight 内部测试（Internal Testing）** 通道，故在不引入提审白壳隔离的前提下保留原有 `bananarey.us` OTA 签名脚本 [build_ios_signed.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/build_ios_signed.sh) 不变，新增独立的 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh) 生成 `method=app-store-connect`、`destination=upload` 配置，兼顾 Xcode 登录态与 `.appstore_credentials` API Key 两种认证上传；(2) 全量扫描 `ios/AuroraShelf/` 后将实际使用的 4 类 Required Reason API 准确声明至 [PrivacyInfo.xcprivacy](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/PrivacyInfo.xcprivacy)，在 [Info.plist](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/Info.plist) 声明 `ITSAppUsesNonExemptEncryption = false` 消除合规卡单，并将 `IPHONEOS_DEPLOYMENT_TARGET` 由 `26.4` 下调至 `26.0` 覆盖更多测试机型。
 

@@ -1,7 +1,6 @@
 import SwiftUI
 
 public struct MainContainerView: View {
-    @StateObject private var videoRepo = VideoRepository.shared
     @ObservedObject private var locManager = LocalizationManager.shared
     @State private var selectedTab: MainTab = .home
     @State private var playerCoordinator = PlayerCoordinator.shared
@@ -164,7 +163,7 @@ public struct MainContainerView: View {
                     for _ in 0..<25 {
                         try? await Task.sleep(nanoseconds: 200_000_000)
                         guard !Task.isCancelled else { return }
-                        if let realVideo = videoRepo.billboardVideo ?? videoRepo.feedVideos.first {
+                        if let realVideo = VideoRepository.shared.billboardVideo ?? VideoRepository.shared.feedVideos.first {
                             await MainActor.run {
                                 coordinator.play(realVideo)
                             }
@@ -192,6 +191,7 @@ public struct MainContainerView: View {
             },
             destinationContent: { route in
                 immersiveDestinationView(for: route, coordinator: coordinator)
+                    .id(route)
                     .tint(AuroraColor.brand)
                     .environment(\.locale, locManager.activeLocale)
             }

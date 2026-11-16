@@ -58,6 +58,24 @@ public struct PlaybackRecord: Codable, Identifiable, Equatable {
 public final class PlaybackProgressStore: ObservableObject {
     public static let shared = PlaybackProgressStore()
     private static let storageKey = "netgrey.playback_progress.v1"
+    private static let maxRecordCount = 200
+
+    private struct EmptyDecodable: Decodable {}
+    private struct LossyPlaybackRecordArray: Decodable {
+        let items: [PlaybackRecord]
+        init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            var decoded: [PlaybackRecord] = []
+            while !container.isAtEnd {
+                if let item = try? container.decode(PlaybackRecord.self) {
+                    decoded.append(item)
+                } else {
+                    _ = try? container.decode(EmptyDecodable.self)
+                }
+            }
+            self.items = decoded
+        }
+    }
 
     @Published public private(set) var records: [PlaybackRecord] = []
 
@@ -68,9 +86,9 @@ public final class PlaybackProgressStore: ObservableObject {
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         if let data = defaults.data(forKey: Self.storageKey) {
-            do {
-                self.records = try JSONDecoder().decode([PlaybackRecord].self, from: data)
-            } catch {
+            if let decoded = try? JSONDecoder().decode(LossyPlaybackRecordArray.self, from: data) {
+                self.records = Self.cappedRecords(decoded.items)
+            } else {
                 self.records = []
             }
         }
@@ -110,7 +128,7 @@ public final class PlaybackProgressStore: ObservableObject {
             list.insert(newRecord, at: 0)
         }
 
-        self.records = list
+        self.records = Self.cappedRecords(list)
         scheduleThrottledPersist()
     }
 
@@ -129,7 +147,12 @@ public final class PlaybackProgressStore: ObservableObject {
             )
             list.insert(record, at: 0)
         }
-        flushPendingPersist(with: list)
+        flushPendingPersist(with: Self.cappedRecords(list))
+    }
+
+    private static func cappedRecords(_ items: [PlaybackRecord]) -> [PlaybackRecord] {
+        guard items.count > maxRecordCount else { return items }
+        return Array(items.sorted { $0.lastUpdated > $1.lastUpdated }.prefix(maxRecordCount))
     }
 
     /// 从 Up Next 待播清单移除（即刻同步写盘）

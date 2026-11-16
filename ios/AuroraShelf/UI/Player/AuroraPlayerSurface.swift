@@ -5,17 +5,25 @@ import AVKit
 public struct AuroraPlayerSurface: UIViewRepresentable {
     public let player: AVPlayer
     public let videoGravity: AVLayerVideoGravity
+    public let allowsPictureInPicture: Bool
     
-    public init(player: AVPlayer, videoGravity: AVLayerVideoGravity = .resizeAspect) {
+    public init(
+        player: AVPlayer,
+        videoGravity: AVLayerVideoGravity = .resizeAspect,
+        allowsPictureInPicture: Bool = true
+    ) {
         self.player = player
         self.videoGravity = videoGravity
+        self.allowsPictureInPicture = allowsPictureInPicture
     }
     
     public func makeUIView(context: Context) -> PlayerUIView {
         let view = PlayerUIView()
         view.playerLayer.player = player
         view.playerLayer.videoGravity = videoGravity
-        PictureInPictureManager.shared.attach(playerLayer: view.playerLayer)
+        if allowsPictureInPicture {
+            PictureInPictureManager.shared.attach(playerLayer: view.playerLayer)
+        }
         view.backgroundColor = .black
         return view
     }
@@ -23,8 +31,10 @@ public struct AuroraPlayerSurface: UIViewRepresentable {
     public func updateUIView(_ uiView: PlayerUIView, context: Context) {
         if uiView.playerLayer.player !== player {
             uiView.playerLayer.player = player
+            if allowsPictureInPicture {
+                PictureInPictureManager.shared.attach(playerLayer: uiView.playerLayer)
+            }
         }
-        PictureInPictureManager.shared.attach(playerLayer: uiView.playerLayer)
         if uiView.playerLayer.videoGravity != videoGravity {
             CATransaction.begin()
             CATransaction.setAnimationDuration(0.3)

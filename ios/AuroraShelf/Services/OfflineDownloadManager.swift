@@ -470,7 +470,25 @@ public final class OfflineDownloadManager: ObservableObject {
 
     private func performDirectDownload(itemId: String, request: URLRequest) async throws -> (URL, URLResponse) {
         final class TaskBox: @unchecked Sendable {
-            var task: URLSessionDownloadTask?
+            private let lock = NSLock()
+            private var task: URLSessionDownloadTask?
+            private var isCancelled = false
+
+            func attach(_ downloadTask: URLSessionDownloadTask) -> Bool {
+                lock.lock()
+                defer { lock.unlock() }
+                if isCancelled { return false }
+                task = downloadTask
+                return true
+            }
+
+            func cancel() {
+                lock.lock()
+                isCancelled = true
+                let current = task
+                lock.unlock()
+                current?.cancel()
+            }
         }
         let box = TaskBox()
         let stableTempURL = fileManager.temporaryDirectory
@@ -478,7 +496,9 @@ public final class OfflineDownloadManager: ObservableObject {
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
+                var progressPollTask: Task<Void, Never>?
                 let downloadTask = URLSession.permissiveShared.downloadTask(with: request) { tempURL, response, error in
+                    progressPollTask?.cancel()
                     if let error = error {
                         continuation.resume(throwing: error)
                         return
@@ -501,10 +521,14 @@ public final class OfflineDownloadManager: ObservableObject {
                         continuation.resume(throwing: error)
                     }
                 }
-                box.task = downloadTask
+                guard box.attach(downloadTask) else {
+                    downloadTask.cancel()
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
 
-                Task { @MainActor [weak self] in
-                    while downloadTask.state == .running || downloadTask.state == .suspended {
+                progressPollTask = Task { @MainActor [weak self] in
+                    while !Task.isCancelled && (downloadTask.state == .running || downloadTask.state == .suspended) {
                         let received = max(Int64(0), downloadTask.countOfBytesReceived)
                         let expected = max(Int64(0), downloadTask.countOfBytesExpectedToReceive)
                         let fraction: Double = expected > 0
@@ -526,7 +550,7 @@ public final class OfflineDownloadManager: ObservableObject {
                 downloadTask.resume()
             }
         } onCancel: {
-            box.task?.cancel()
+            box.cancel()
         }
     }
 
@@ -803,25 +827,49 @@ private final class OfflineLocalHTTPServer: @unchecked Sendable {
         header += "Accept-Ranges: bytes\r\n"
         header += "Connection: close\r\n\r\n"
 
-        var payload = Data(header.utf8)
-        if method == "GET" && responseLength > 0 {
-            guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
-                sendSimple(status: "500 Internal Server Error", on: connection)
+        let headerData = Data(header.utf8)
+        guard method == "GET" && responseLength > 0 else {
+            connection.send(content: headerData, completion: .contentProcessed { _ in
+                connection.cancel()
+            })
+            return
+        }
+        guard let handle = try? FileHandle(forReadingFrom: fileURL) else {
+            sendSimple(status: "500 Internal Server Error", on: connection)
+            return
+        }
+        try? handle.seek(toOffset: UInt64(startOffset))
+
+        func sendNextChunk(remaining: Int) {
+            if remaining <= 0 {
+                try? handle.close()
+                connection.cancel()
                 return
             }
-            defer { try? handle.close() }
-            try? handle.seek(toOffset: UInt64(startOffset))
-            var remaining = Int(responseLength)
-            while remaining > 0 {
-                let chunkSize = min(remaining, 262_144)
-                guard let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty else { break }
-                payload.append(chunk)
-                remaining -= chunk.count
+            let chunkSize = min(remaining, 262_144)
+            guard let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty else {
+                try? handle.close()
+                connection.cancel()
+                return
             }
+            let nextRemaining = remaining - chunk.count
+            connection.send(content: chunk, completion: .contentProcessed { error in
+                if error != nil || nextRemaining <= 0 {
+                    try? handle.close()
+                    connection.cancel()
+                } else {
+                    sendNextChunk(remaining: nextRemaining)
+                }
+            })
         }
 
-        connection.send(content: payload, completion: .contentProcessed { _ in
-            connection.cancel()
+        connection.send(content: headerData, completion: .contentProcessed { error in
+            if error != nil {
+                try? handle.close()
+                connection.cancel()
+            } else {
+                sendNextChunk(remaining: Int(responseLength))
+            }
         })
     }
 

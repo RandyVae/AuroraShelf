@@ -466,7 +466,7 @@ public final class ForumRepository: ObservableObject {
             let newPosts = loaded.filter { !existingIDs.contains("\($0.fid):\($0.id)") }
             posts.append(contentsOf: newPosts)
             self.prefetchPostImages(for: newPosts)
-            hasMorePages = !newPosts.isEmpty
+            hasMorePages = !newPosts.isEmpty || !failures.isEmpty
             currentPage = nextPage
         } else if failures.isEmpty {
             hasMorePages = false
@@ -536,7 +536,7 @@ public final class ForumRepository: ObservableObject {
                 self.posts = loaded
                 self.prefetchPostImages(for: loaded)
             }
-            self.hasMorePages = !loaded.isEmpty
+            self.hasMorePages = !loaded.isEmpty || !failures.isEmpty
             self.errorMessage = failures.isEmpty ? nil : failures.joined(separator: "\n")
             self.isLoading = false
         }

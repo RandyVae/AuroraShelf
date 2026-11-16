@@ -1,6 +1,7 @@
 import Foundation
 import UIKit
 import Combine
+import CryptoKit
 
 /// 漫画离线下载状态枚举
 public enum ComicDownloadStatus: Codable, Sendable, Equatable {
@@ -67,7 +68,7 @@ public final class ComicDownloadManager: ObservableObject {
     private let fileManager = FileManager.default
     private let baseDir: URL
     private let metaFileURL: URL
-    private var inFlightTasks: [String: Task<Void, Never>] = [:]
+    private var inFlightTasks: [String: (id: UUID, task: Task<Void, Never>)] = [:]
     private var activeDownloadCount = 0
     private let maximumConcurrentDownloads = 2
 
@@ -126,13 +127,18 @@ public final class ComicDownloadManager: ObservableObject {
 
     /// 获取离线页面本地缓存文件 URL
     public func localPageURL(comicId: String, chapterId: String, pageIndex: Int) -> URL? {
-        let sanitizedComic = sanitize(comicId)
-        let sanitizedChapter = sanitize(chapterId)
-        let fileURL = baseDir
-            .appendingPathComponent(sanitizedComic)
-            .appendingPathComponent(sanitizedChapter)
+        let primaryURL = baseDir
+            .appendingPathComponent(sanitize(comicId))
+            .appendingPathComponent(sanitize(chapterId))
             .appendingPathComponent("page_\(pageIndex).jpg")
-        return fileManager.fileExists(atPath: fileURL.path) ? fileURL : nil
+        if fileManager.fileExists(atPath: primaryURL.path) {
+            return primaryURL
+        }
+        let legacyURL = baseDir
+            .appendingPathComponent(legacySanitize(comicId))
+            .appendingPathComponent(legacySanitize(chapterId))
+            .appendingPathComponent("page_\(pageIndex).jpg")
+        return fileManager.fileExists(atPath: legacyURL.path) ? legacyURL : nil
     }
 
     /// 从本地磁盘直接加载已解密的离线页面图片
@@ -151,7 +157,8 @@ public final class ComicDownloadManager: ObservableObject {
     public func startDownload(comic: ComicItem, chapter: ComicChapter) {
         let itemId = generateID(comicId: comic.id, chapterId: chapter.id)
 
-        if let existing = chapters.first(where: { $0.id == itemId }), existing.status.isCompleted {
+        if let existing = chapters.first(where: { $0.id == itemId }),
+           existing.status.isCompleted || existing.status.isDownloading {
             return
         }
 
@@ -176,10 +183,13 @@ public final class ComicDownloadManager: ObservableObject {
         }
         saveToDisk()
 
-        inFlightTasks[itemId]?.cancel()
-        inFlightTasks[itemId] = Task { [weak self] in
-            await self?.executeDownload(itemId: itemId, comic: comic, chapter: chapter)
+        inFlightTasks[itemId]?.task.cancel()
+        let taskToken = UUID()
+        let task = Task<Void, Never> { [weak self] in
+            guard let self else { return }
+            await self.executeDownload(itemId: itemId, taskToken: taskToken, comic: comic, chapter: chapter)
         }
+        inFlightTasks[itemId] = (id: taskToken, task: task)
     }
 
     /// 启动整本漫画批量下载
@@ -212,7 +222,7 @@ public final class ComicDownloadManager: ObservableObject {
 
     /// 删除指定章节下载
     public func removeDownload(id: String) {
-        inFlightTasks[id]?.cancel()
+        inFlightTasks[id]?.task.cancel()
         inFlightTasks[id] = nil
 
         if let item = chapters.first(where: { $0.id == id }) {
@@ -220,6 +230,12 @@ public final class ComicDownloadManager: ObservableObject {
                 .appendingPathComponent(sanitize(item.comicId))
                 .appendingPathComponent(sanitize(item.chapterId))
             try? fileManager.removeItem(at: chapterDir)
+            let legacyDir = baseDir
+                .appendingPathComponent(legacySanitize(item.comicId))
+                .appendingPathComponent(legacySanitize(item.chapterId))
+            if legacyDir != chapterDir {
+                try? fileManager.removeItem(at: legacyDir)
+            }
         }
 
         chapters.removeAll(where: { $0.id == id })
@@ -228,7 +244,7 @@ public final class ComicDownloadManager: ObservableObject {
 
     /// 清空所有离线漫画
     public func removeAll() {
-        for task in inFlightTasks.values { task.cancel() }
+        for entry in inFlightTasks.values { entry.task.cancel() }
         inFlightTasks.removeAll()
 
         try? fileManager.removeItem(at: baseDir)
@@ -239,10 +255,22 @@ public final class ComicDownloadManager: ObservableObject {
 
     // MARK: - 核心下载任务调度
 
-    private func executeDownload(itemId: String, comic: ComicItem, chapter: ComicChapter) async {
-        await waitForDownloadSlot()
+    private func executeDownload(itemId: String, taskToken: UUID, comic: ComicItem, chapter: ComicChapter) async {
+        do {
+            try await waitForDownloadSlot()
+        } catch {
+            if inFlightTasks[itemId]?.id == taskToken {
+                inFlightTasks[itemId] = nil
+            }
+            return
+        }
         activeDownloadCount += 1
-        defer { activeDownloadCount -= 1 }
+        defer {
+            activeDownloadCount = max(0, activeDownloadCount - 1)
+            if inFlightTasks[itemId]?.id == taskToken {
+                inFlightTasks[itemId] = nil
+            }
+        }
         updateItem(id: itemId) { $0.status = .resolving }
 
         do {
@@ -277,7 +305,7 @@ public final class ComicDownloadManager: ObservableObject {
                     guard let jpegData = image.jpegData(compressionQuality: 0.88) else {
                         throw NSError(domain: "ComicDownloadManager", code: -2, userInfo: [NSLocalizedDescriptionKey: "图片转码 JPEG 失败"])
                     }
-                    try jpegData.write(to: pageFileURL)
+                    try jpegData.write(to: pageFileURL, options: .atomic)
                     totalBytes += Int64(jpegData.count)
                 } else {
                     let attrs = try? fileManager.attributesOfItem(atPath: pageFileURL.path)
@@ -308,10 +336,12 @@ public final class ComicDownloadManager: ObservableObject {
         }
     }
 
-    private func waitForDownloadSlot() async {
+    private func waitForDownloadSlot() async throws {
         while activeDownloadCount >= maximumConcurrentDownloads {
-            try? await Task.sleep(for: .milliseconds(50))
+            try Task.checkCancellation()
+            try await Task.sleep(for: .milliseconds(50))
         }
+        try Task.checkCancellation()
     }
 
     private func updateItem(id: String, mutate: (inout DownloadedComicChapter) -> Void) {
@@ -326,8 +356,17 @@ public final class ComicDownloadManager: ObservableObject {
         "\(comicId)_\(chapterId)"
     }
 
-    private func sanitize(_ str: String) -> String {
+    private func legacySanitize(_ str: String) -> String {
         str.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? str
+    }
+
+    private func sanitize(_ str: String) -> String {
+        let encoded = legacySanitize(str)
+        if encoded.count <= 80 {
+            return encoded
+        }
+        let digest = SHA256.hash(data: Data(str.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
+        return "\(encoded.prefix(48))_\(digest)"
     }
 
     private func loadFromDisk() {
@@ -336,11 +375,22 @@ public final class ComicDownloadManager: ObservableObject {
               let decoded = try? JSONDecoder().decode([DownloadedComicChapter].self, from: data) else {
             return
         }
-        self.chapters = decoded
+        var needsPersist = false
+        self.chapters = decoded.map { item in
+            var copy = item
+            if copy.status.isDownloading {
+                copy.status = .failed(message: "下载已中断，点击重试")
+                needsPersist = true
+            }
+            return copy
+        }
+        if needsPersist {
+            saveToDisk()
+        }
     }
 
     private func saveToDisk() {
         guard let data = try? JSONEncoder().encode(chapters) else { return }
-        try? data.write(to: metaFileURL)
+        try? data.write(to: metaFileURL, options: .atomic)
     }
 }

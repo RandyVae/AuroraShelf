@@ -44,16 +44,23 @@ internal class T906ForumSource(
     }
 
     private suspend fun fetchPosts(baseUrl: String, page: Int): List<ForumPost> = coroutineScope {
-        val tasks = CORE_FIDS.map { fid ->
+        val results = CORE_FIDS.map { fid ->
             async(Dispatchers.IO) {
                 runCatching {
                     val url = "$baseUrl/forumdisplay.php?fid=$fid&page=$page"
                     val document = ForumHttp.fetchDocument(url)
                     parse(document, baseUrl)
-                }.getOrDefault(emptyList())
+                }
             }
+        }.map { it.await() }
+
+        val firstFailure = results.firstNotNullOfOrNull { it.exceptionOrNull() }
+        val successCount = results.count { it.isSuccess }
+        if (successCount == 0 && firstFailure != null) {
+            throw firstFailure
         }
-        val allPosts = tasks.flatMap { it.await() }
+
+        val allPosts = results.flatMap { it.getOrDefault(emptyList()) }
             .distinctBy { it.sourceId to it.id }
             .sortedWith(
                 compareByDescending<ForumPost> { it.updatedEpochSeconds }
@@ -99,7 +106,7 @@ internal class T906ForumSource(
                 ?: return@mapNotNull null
             val title = subject.text().trim()
             if (ForumNoiseFilter.isNoisePost(title)) return@mapNotNull null
-            val id = row.id().removePrefix("normalthread_").takeIf { it.all(Char::isDigit) } ?: return@mapNotNull null
+            val id = row.id().removePrefix("normalthread_").takeIf { it.isNotEmpty() && it.all(Char::isDigit) } ?: return@mapNotNull null
             val author = row.selectFirst("td.author cite a")?.text().orEmpty().ifBlank {
                 row.selectFirst("div.new_tr cite a")?.text().orEmpty().ifBlank { "匿名" }
             }

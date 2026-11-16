@@ -54,6 +54,7 @@
 "live.couples" = "커플 스트리머";
 "live.trans" = "트랜스";
 "live.loading" = "스트리머 목록 로드 중…";
+"live.empty" = "현재 방송 중인 스트리머가 없습니다";
 "live.viewers" = "시청자 %@";
 "live.online" = "온라인";
 "live.offline" = "오프라인";

@@ -115,9 +115,9 @@
 
   function readStorage(k) {
     const bridge = nativeBridge();
-    if (bridge && bridge.get) {
+    if (bridge) {
       try {
-        const v = bridge.get();
+        const v = bridge.getKey ? bridge.getKey(k) : (bridge.get && k === KEY ? bridge.get() : '');
         if (v) return v;
       } catch (e) { /* fall through */ }
     }
@@ -130,8 +130,11 @@
 
   function writeStorage(k, text) {
     const bridge = nativeBridge();
-    if (bridge && bridge.set) {
-      try { bridge.set(text); } catch (e) { /* fall through */ }
+    if (bridge) {
+      try {
+        if (bridge.setKey) bridge.setKey(k, text);
+        else if (bridge.set && k === KEY) bridge.set(text);
+      } catch (e) { /* fall through */ }
     }
     try {
       localStorage.setItem(k, text);

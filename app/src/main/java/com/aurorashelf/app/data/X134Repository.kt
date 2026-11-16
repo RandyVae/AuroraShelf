@@ -192,20 +192,27 @@ internal object X134Repository {
                         return@async tweetId to merged
                     }
                     semaphore.withPermit {
-                        val meta = withTimeoutOrNull(4_500L) {
-                            runCatching { fetchTweetMetadata(tweetId, listMp4) }.getOrNull()
-                        } ?: TweetMetadata(posterUrl = null, hlsUrl = null, mp4Url = listMp4)
-                        metaCache[tweetId] = meta
-                        tweetId to meta
+                        val meta = runCatching { fetchTweetMetadata(tweetId, listMp4, timeoutMs = 4_500L) }.getOrNull()
+                        if (meta != null) {
+                            metaCache[tweetId] = meta
+                            tweetId to meta
+                        } else {
+                            tweetId to TweetMetadata(posterUrl = null, hlsUrl = null, mp4Url = listMp4)
+                        }
                     }
                 }
             }.awaitAll().toMap()
         }
 
-    private fun fetchTweetMetadata(tweetId: String, fallbackMp4: String? = null): TweetMetadata? {
+    private fun fetchTweetMetadata(
+        tweetId: String,
+        fallbackMp4: String? = null,
+        timeoutMs: Long? = null,
+    ): TweetMetadata? {
         val result = callServerFnWithRefresh(
             fnSelector = { it.detail },
             data = mapOf("tweetId" to tweetId),
+            timeoutMs = timeoutMs,
         )
         val posterUrl = (result["posterUrl"] as? String)?.trim()?.takeIf { it.isNotBlank() }
         val hlsMap = asStringAnyMap(result["hlsUrls"])
@@ -255,24 +262,30 @@ internal object X134Repository {
     private fun callServerFnWithRefresh(
         fnSelector: (ServerFnHashes) -> String,
         data: Map<String, Any?>,
+        timeoutMs: Long? = null,
     ): Map<String, Any?> {
-        val currentHash = fnSelector(activeHashes)
+        val currentHashes = activeHashes
+        val currentHash = fnSelector(currentHashes)
         try {
-            return executeServerFn(currentHash, data)
+            return executeServerFn(currentHash, data, timeoutMs)
         } catch (firstError: HttpStatusFailure) {
             if (firstError.code != 404 && firstError.code != 400 && firstError.code != 500) {
                 throw firstError
             }
-            val refreshed = refreshServerFnHashes()
+            val refreshed = refreshServerFnHashes(failedHashes = currentHashes)
             val nextHash = refreshed?.let(fnSelector)
             if (nextHash == null || nextHash == currentHash) {
                 throw firstError
             }
-            return executeServerFn(nextHash, data)
+            return executeServerFn(nextHash, data, timeoutMs)
         }
     }
 
-    private fun executeServerFn(fnId: String, data: Map<String, Any?>): Map<String, Any?> {
+    private fun executeServerFn(
+        fnId: String,
+        data: Map<String, Any?>,
+        timeoutMs: Long? = null,
+    ): Map<String, Any?> {
         val payload = encodePayload(mapOf("data" to data))
         val encodedPayload = URLEncoder.encode(payload, StandardCharsets.UTF_8.name())
         val url = "$BASE_URL/_serverFn/$fnId?payload=$encodedPayload"
@@ -287,7 +300,12 @@ internal object X134Repository {
             .header("x-tsr-serverFn", "true")
             .build()
 
-        client.newCall(request).execute().use { response ->
+        val callClient = if (timeoutMs != null) {
+            client.newBuilder().callTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS).build()
+        } else {
+            client
+        }
+        callClient.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 throw HttpStatusFailure(response.code, "134X 接口请求失败 (HTTP ${response.code})")
@@ -304,7 +322,10 @@ internal object X134Repository {
         }
     }
 
-    private fun refreshServerFnHashes(): ServerFnHashes? = synchronized(hashRefreshLock) {
+    private fun refreshServerFnHashes(failedHashes: ServerFnHashes? = null): ServerFnHashes? = synchronized(hashRefreshLock) {
+        if (failedHashes != null && activeHashes != failedHashes) {
+            return@synchronized activeHashes
+        }
         return@synchronized runCatching {
             val homeReq = Request.Builder()
                 .url("$BASE_URL/")

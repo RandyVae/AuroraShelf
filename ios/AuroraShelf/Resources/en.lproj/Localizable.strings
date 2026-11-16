@@ -54,6 +54,7 @@
 "live.couples" = "Couples";
 "live.trans" = "Trans";
 "live.loading" = "Loading streamers...";
+"live.empty" = "No live streamers available";
 "live.viewers" = "%@ Viewers";
 "live.online" = "Online";
 "live.offline" = "Offline";

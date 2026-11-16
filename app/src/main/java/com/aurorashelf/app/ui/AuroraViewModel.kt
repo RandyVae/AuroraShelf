@@ -45,6 +45,7 @@ data class AuroraUiState(
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val canLoadMore: Boolean = true,
+    val loadMoreError: String? = null,
     val message: String? = null,
 )
 
@@ -327,7 +328,8 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            canLoadMore = false,
+                            canLoadMore = if (it.videos.isNotEmpty()) it.canLoadMore else false,
+                            loadMoreError = null,
                             message = VideoRepository.friendlyLoadErrorMessage(error, "内容加载失败，请稍后重试。"),
                         )
                     }
@@ -340,14 +342,14 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         if (snapshot.isLoading || snapshot.isLoadingMore || !snapshot.canLoadMore) return
         val requestedPage = nextPage
         feedJob = viewModelScope.launch {
-            _uiState.update { it.copy(isLoadingMore = true, message = null) }
+            _uiState.update { it.copy(isLoadingMore = true, loadMoreError = null, message = null) }
             runCatching {
                 repository.loadFeed(snapshot.sourceUrl, snapshot.category, page = requestedPage)
             }.onSuccess { pageVideos ->
                 prefetchCovers(pageVideos)
                 _uiState.update { current ->
                     if (pageVideos.isEmpty()) {
-                        return@update current.copy(isLoadingMore = false, canLoadMore = false, message = null)
+                        return@update current.copy(isLoadingMore = false, canLoadMore = false, loadMoreError = null, message = null)
                     }
                     // The site can repeat pinned videos across pages. Only new IDs extend the feed.
                     val newVideos = distinctNewVideos(current.videos, pageVideos)
@@ -357,6 +359,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                         allKnownVideos = (newVideos + current.allKnownVideos).distinctBy(VideoItem::id),
                         isLoadingMore = false,
                         canLoadMore = newVideos.isNotEmpty(),
+                        loadMoreError = null,
                     )
                 }
             }.onFailure { error ->
@@ -364,7 +367,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                 _uiState.update {
                     it.copy(
                         isLoadingMore = false,
-                        message = VideoRepository.friendlyLoadErrorMessage(error, "加载更多失败，请稍后重试。"),
+                        loadMoreError = VideoRepository.friendlyLoadErrorMessage(error, "加载更多失败，点击重试"),
                     )
                 }
             }

@@ -89,9 +89,9 @@
 		DA2ECD59515AD4C37AC17D2B /* VideoPreloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57E508008FB81FF7A5CC8B78 /* VideoPreloadManager.swift */; };
 		DD173ECB57D1B38AE42A4010 /* ComicsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39AE92C360678C2D65DED50F /* ComicsScreen.swift */; };
 		DE577D3DEB625ED0D4EE45A1 /* intro_film.mp4 in Resources */ = {isa = PBXBuildFile; fileRef = D9E292EDDA87816B50371992 /* intro_film.mp4 */; };
-		E373FABC3C08F6650B0292DB /* SourceSecrets.plist in Resources */ = {isa = PBXBuildFile; fileRef = 1DCD5AA5C221783195A2C2D9 /* SourceSecrets.plist */; };
 		E39336C05497D4E28953011D /* LiveDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F1035C23843FEE7FF56BDE6 /* LiveDetailView.swift */; };
 		E49E7E51BC4C1C10535A8532 /* ComicPageImageLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 958009DA2F9C05A45A2F8B5C /* ComicPageImageLoader.swift */; };
+		E528AF6512D63F4865E88FCA /* GeneratedSourceSecrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B51864BE807F9F923E64F77 /* GeneratedSourceSecrets.swift */; };
 		E7D88E0E821FC94B20F3906F /* ComicRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = A044AA1ACDFE914217128012 /* ComicRepository.swift */; };
 		EC3434186E66FED3EF73B4C4 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B6BF44CA367A3107302CCB2C /* Localizable.strings */; };
 		ED75CCED28F037937C0655E2 /* VideoRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 977FF6686D27110B08DB620B /* VideoRepository.swift */; };
@@ -129,7 +129,6 @@
 		13E4CD170412966E1A00AB2C /* www */ = {isa = PBXFileReference; lastKnownFileType = folder; name = www; path = AuroraShelf/Resources/www; sourceTree = SOURCE_ROOT; };
 		16000AA603AB5EDBF60EC0CC /* ComicRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComicRepositoryTests.swift; sourceTree = "<group>"; };
 		1B88B86089848A5A4D442D46 /* PlaybackProgressStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackProgressStore.swift; sourceTree = "<group>"; };
-		1DCD5AA5C221783195A2C2D9 /* SourceSecrets.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = SourceSecrets.plist; sourceTree = "<group>"; };
 		25B855A4F305436CD1A767ED /* AuroraShelfApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuroraShelfApp.swift; sourceTree = "<group>"; };
 		28EE478BBB114A0D104FAD90 /* CategoryShelfView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryShelfView.swift; sourceTree = "<group>"; };
 		30508D92E37F464A86E4F1B0 /* ChannelVisualSpecTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelVisualSpecTests.swift; sourceTree = "<group>"; };
@@ -138,6 +137,7 @@
 		35F0657D1E49DA9B55C8471B /* zh-Hant */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hant"; path = "zh-Hant.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		3933D72B16857E731FA931B4 /* MainContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainContainerView.swift; sourceTree = "<group>"; };
 		39AE92C360678C2D65DED50F /* ComicsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComicsScreen.swift; sourceTree = "<group>"; };
+		3B51864BE807F9F923E64F77 /* GeneratedSourceSecrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneratedSourceSecrets.swift; sourceTree = "<group>"; };
 		3B79C396CFD7CC837F361675 /* X134SourceServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = X134SourceServiceTests.swift; sourceTree = "<group>"; };
 		3E4BBBC7E16AD02B4EB949F0 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
 		3EA7BF7B28AF21767A84BE16 /* vi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = vi; path = vi.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -277,6 +277,7 @@
 				A044AA1ACDFE914217128012 /* ComicRepository.swift */,
 				5BD2A1C5C0222D072DEC2126 /* ComicSourceAdapter.swift */,
 				8EB9089AE90738649369BBE6 /* ComicSourceCatalog.swift */,
+				3B51864BE807F9F923E64F77 /* GeneratedSourceSecrets.swift */,
 				EF8049893611370D274210DF /* PicacgAuthStore.swift */,
 			);
 			path = Comic;
@@ -495,7 +496,6 @@
 				4A1E244170111677BECEE9FB /* Info.plist */,
 				D9E292EDDA87816B50371992 /* intro_film.mp4 */,
 				6453E4FE05FCE1DD14F9AA06 /* PrivacyInfo.xcprivacy */,
-				1DCD5AA5C221783195A2C2D9 /* SourceSecrets.plist */,
 				B6BF44CA367A3107302CCB2C /* Localizable.strings */,
 			);
 			path = Resources;
@@ -537,6 +537,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 10370F875E63B6DFE8187444 /* Build configuration list for PBXNativeTarget "AuroraShelf" */;
 			buildPhases = (
+				50186687C9A3CC397445BA42 /* Generate Source Secrets */,
 				F32D0B0C7C09C2870869FE0D /* Sources */,
 				8E17A8B71872D353C48FF6E5 /* Resources */,
 			);
@@ -623,13 +624,34 @@
 				C7C5B0CCCF577606DBAE0B3E /* Assets.xcassets in Resources */,
 				EC3434186E66FED3EF73B4C4 /* Localizable.strings in Resources */,
 				9693E6593227F6CDD8EBF09B /* PrivacyInfo.xcprivacy in Resources */,
-				E373FABC3C08F6650B0292DB /* SourceSecrets.plist in Resources */,
 				DE577D3DEB625ED0D4EE45A1 /* intro_film.mp4 in Resources */,
 				4FEE940CBCC8498A756873F8 /* www in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		50186687C9A3CC397445BA42 /* Generate Source Secrets */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Generate Source Secrets";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "python3 \"${SRCROOT}/../scripts/generate_ios_source_secrets.py\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		B589D0C2723632245B3D6AF6 /* Sources */ = {
@@ -692,6 +714,7 @@
 				5D5C4FF9088A3B125E97C393 /* ForumScreen.swift in Sources */,
 				0576FB7FB782FD4BD218C97D /* ForumSourceCatalog.swift in Sources */,
 				BCA49E85757EB2670186917F /* GameContainerView.swift in Sources */,
+				E528AF6512D63F4865E88FCA /* GeneratedSourceSecrets.swift in Sources */,
 				C97F2CA4F3F96D7CFCB887EE /* GlobalStartupPrefetchEngine.swift in Sources */,
 				5A28F539F95CD3BA136091C0 /* HTMLVideoSourceAdapter.swift in Sources */,
 				9852D95598FFF9309144A5E7 /* HeroBanner.swift in Sources */,
@@ -938,7 +961,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 261;
+				CURRENT_PROJECT_VERSION = 262;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -948,7 +971,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.35;
+				MARKETING_VERSION = 2.16.36;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
@@ -964,7 +987,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 261;
+				CURRENT_PROJECT_VERSION = 262;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -974,7 +997,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.16.35;
+				MARKETING_VERSION = 2.16.36;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;

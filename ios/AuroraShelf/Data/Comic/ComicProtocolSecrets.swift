@@ -3,6 +3,9 @@ import CommonCrypto
 
 enum ComicProtocolSecrets {
     private static let values: [String: String] = {
+        if !GeneratedSourceSecrets.values.isEmpty {
+            return GeneratedSourceSecrets.values
+        }
         if let url = Bundle.main.url(forResource: "SourceSecrets", withExtension: "plist"),
            let values = NSDictionary(contentsOf: url) as? [String: String], !values.isEmpty {
             return values

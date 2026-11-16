@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Netgrey · 跨平台官方无线安装与下载</title>
     <style>
         :root {
@@ -301,7 +301,7 @@
             color: rgba(255, 255, 255, 0.38);
         }
         .tf-input:focus {
-            border-color: var(--accent);
+            border-color: var(--brand-color);
             background: rgba(255, 255, 255, 0.10);
         }
         .tf-status-box {
@@ -400,7 +400,7 @@
         <!-- ==================== iOS / iPadOS 面板 ==================== -->
         <div id="panelIos" class="tab-panel active" role="tabpanel">
             <div class="app-meta">
-                <span>v2.16.35 (Build 261)</span>
+                <span>v2.16.36 (Build 262)</span>
                 <span class="badge">Universal 通用</span>
                 <span class="badge">Apple HIG</span>
             </div>
@@ -474,8 +474,8 @@
         <!-- ==================== Android 面板 ==================== -->
         <div id="panelAndroid" class="tab-panel" role="tabpanel">
             <div class="app-meta">
-                <span>v2.16.35 (Build 261)</span>
-                <span class="badge">197 MB</span>
+                <span>v2.16.36 (Build 262)</span>
+                <span class="badge">137 MB</span>
                 <span class="badge">Material You 3</span>
             </div>
 
@@ -517,20 +517,20 @@
                     <div class="step-desc">
                         单架构通用包（arm64-v8a / armeabi-v7a / x86_64），已内置完整音视频硬解引擎与本地离线游戏。
                     </div>
-                    <a class="action-btn android" href="/Netgrey.apk?v=2.16.35" download="Netgrey-v2.16.35.apk">
+                    <a class="action-btn android" href="/Netgrey.apk?v=2.16.36" download="Netgrey-v2.16.36.apk">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
                             <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
-                        立即下载 Android APK (197 MB)
+                        立即下载 Android APK (137 MB)
                     </a>
                 </div>
             </div>
 
             <div class="guide-box">
                 <strong>Android 安装提示：</strong><br>
-                • 点击上方按钮直接开始高速下载安装包（<code>Netgrey-v2.16.35.apk</code>）。<br>
+                • 点击上方按钮直接开始高速下载安装包（<code>Netgrey-v2.16.36.apk</code>）。<br>
                 • 若浏览器提示「此类型的文件可能对您的设备有害」或「未受信任的应用」，请点击 <strong>「仍然下载 / 继续安装」</strong>。<br>
                 • 安装时若提示权限限制，在系统设置中开启 <strong>「允许来自此来源的应用」</strong> 即可。
             </div>
@@ -577,8 +577,9 @@
             const udidParam = urlParams.get('udid');
             const modelParam = urlParams.get('model') || 'iPhone';
             const nameParam = urlParams.get('name') || '';
+            const regParam = urlParams.get('registered');
 
-            if (udidParam) {
+            if (udidParam && regParam !== 'false') {
                 localStorage.setItem('netgrey_udid', udidParam);
                 localStorage.setItem('netgrey_model', modelParam);
                 localStorage.setItem('netgrey_name', nameParam);
@@ -596,7 +597,9 @@
             const step2Badge = document.getElementById('step2Badge');
             const btnStep2 = document.getElementById('btnStep2');
 
-            if (savedUdid && statusPill) {
+            if (regParam === 'false' && statusText) {
+                statusText.innerText = '设备注册未完成，请重新授权或联系管理员';
+            } else if (savedUdid && statusPill) {
                 statusPill.classList.add('success');
                 const shortUdid = savedUdid.substring(0, 8) + '...' + savedUdid.substring(savedUdid.length - 4);
                 statusText.innerText = '已认证: ' + (savedName ? savedName : savedModel) + ' (' + shortUdid + ')';
@@ -620,6 +623,17 @@
         })();
 
         let tfPollTimer = null;
+        let tfPollCount = 0;
+        let tfPollInFlight = false;
+
+        function stopTfPolling() {
+            if (tfPollTimer) {
+                clearInterval(tfPollTimer);
+                tfPollTimer = null;
+            }
+            tfPollCount = 0;
+        }
+        window.addEventListener('pagehide', stopTfPolling);
 
         function setTfStatus(kind, text, showRefresh) {
             const box = document.getElementById('tfStatusBox');
@@ -648,10 +662,7 @@
                 return;
             }
 
-            if (tfPollTimer) {
-                clearInterval(tfPollTimer);
-                tfPollTimer = null;
-            }
+            stopTfPolling();
             btn.disabled = true;
             btn.innerText = '正在发送邀请…';
             setTfStatus('', '正在向 Apple 提交内部测试邀请…', false);
@@ -672,7 +683,14 @@
                     setTfStatus('ok', rec.message || '已加入 TestFlight Internal 群组，请打开 TestFlight App 安装。', false);
                 } else {
                     setTfStatus('', rec.message || '团队邀请已发送，请打开邮箱点击「Accept invitation」。', true);
-                    tfPollTimer = setInterval(() => pollTestFlightStatus(false), 5000);
+                    tfPollTimer = setInterval(() => {
+                        tfPollCount += 1;
+                        if (tfPollCount > 60) {
+                            stopTfPolling();
+                            return;
+                        }
+                        pollTestFlightStatus(false);
+                    }, 5000);
                 }
             } catch (e) {
                 setTfStatus('err', '网络请求失败，请检查网络连接后重试。', false);
@@ -683,12 +701,14 @@
         }
 
         async function pollTestFlightStatus(manual) {
+            if (tfPollInFlight && !manual) return;
             const codeEl = document.getElementById('tfInviteCode');
             const emailEl = document.getElementById('tfEmail');
             const inviteCode = (codeEl ? codeEl.value : '').trim();
             const email = (emailEl ? emailEl.value : '').trim().toLowerCase();
             if (!inviteCode || !email) return;
 
+            tfPollInFlight = true;
             try {
                 const url = '/api/testflight/status?email=' + encodeURIComponent(email) + '&invite_code=' + encodeURIComponent(inviteCode);
                 const resp = await fetch(url, { cache: 'no-store' });
@@ -699,18 +719,18 @@
                 }
                 const rec = data.record;
                 if (rec.status === 'added_to_group') {
-                    if (tfPollTimer) {
-                        clearInterval(tfPollTimer);
-                        tfPollTimer = null;
-                    }
+                    stopTfPolling();
                     setTfStatus('ok', rec.message || '已自动加入 TestFlight Internal 群组，请打开 TestFlight App 安装。', false);
                 } else if (rec.status === 'error') {
+                    stopTfPolling();
                     setTfStatus('err', rec.message || '加入群组失败', true);
                 } else {
                     setTfStatus('', rec.message || '等待邮箱点击确认…', true);
                 }
             } catch (e) {
                 if (manual) setTfStatus('err', '网络异常，请稍后重试。', true);
+            } finally {
+                tfPollInFlight = false;
             }
         }
     </script>

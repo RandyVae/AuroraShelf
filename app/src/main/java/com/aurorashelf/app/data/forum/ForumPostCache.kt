@@ -25,15 +25,7 @@ internal object ForumPostCache {
 
     private val lock = Any()
     private var currentBytes = 0
-    private val cache = object : LinkedHashMap<String, CachedPostHtml>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedPostHtml>?): Boolean {
-            val shouldRemove = currentBytes > MAX_CACHE_BYTES
-            if (shouldRemove && eldest != null) {
-                currentBytes -= (eldest.key.length + eldest.value.html.length) * 2
-            }
-            return shouldRemove
-        }
-    }
+    private val cache = LinkedHashMap<String, CachedPostHtml>(16, 0.75f, true)
     private val inFlight = mutableSetOf<String>()
 
     fun get(url: String): String? = synchronized(lock) {
@@ -55,6 +47,12 @@ internal object ForumPostCache {
                 currentBytes -= (url.length + old.html.length) * 2
             }
             currentBytes += entryBytes
+            val iter = cache.entries.iterator()
+            while (currentBytes > MAX_CACHE_BYTES && iter.hasNext()) {
+                val eldest = iter.next()
+                currentBytes -= (eldest.key.length + eldest.value.html.length) * 2
+                iter.remove()
+            }
         }
     }
 

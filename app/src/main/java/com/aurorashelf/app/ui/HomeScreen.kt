@@ -63,6 +63,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -145,13 +146,14 @@ internal fun HomeScreen(
         }
     }
 
-    LaunchedEffect(listState, state.videos.size, state.canLoadMore) {
+    LaunchedEffect(listState, state.videos.size, state.canLoadMore, state.isLoading, state.isLoadingMore, state.loadMoreError) {
         snapshotFlow {
             val layout = listState.layoutInfo
             val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
-            lastVisible to layout.totalItemsCount
-        }.map { (lastVisible, totalItems) ->
-            totalItems > 0 && lastVisible >= totalItems - 5
+            val totalItems = layout.totalItemsCount
+            totalItems > 0 && lastVisible >= totalItems - 5 &&
+                !state.isLoading && !state.isLoadingMore &&
+                state.canLoadMore && state.loadMoreError == null
         }.distinctUntilChanged().filter { it }.collect {
             onLoadMore()
         }
@@ -373,6 +375,19 @@ internal fun HomeScreen(
                                     color = Color(0xFFE50914),
                                     modifier = Modifier.size(28.dp),
                                 )
+                            }
+                        }
+                    } else if (state.loadMoreError != null && state.videos.isNotEmpty()) {
+                        item(key = "load-more-error") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                TextButton(onClick = onLoadMore) {
+                                    Text("${state.loadMoreError}（点击重试）")
+                                }
                             }
                         }
                     } else if (!state.canLoadMore && state.videos.isNotEmpty()) {
@@ -926,7 +941,7 @@ private fun NetflixTop10Card(
                 fontSize = 34.sp,
                 lineHeight = 34.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = 0.55f),
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
             )
         }
         Spacer(Modifier.width(8.dp))

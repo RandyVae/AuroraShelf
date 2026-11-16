@@ -149,10 +149,15 @@ class HornyStudentsLiveRepository {
         private val USERNAME_PATTERN = Regex("[A-Za-z0-9_-]{1,80}")
 
         fun prefetchDns() {
-            java.util.concurrent.Executors.newSingleThreadExecutor().execute {
-                runCatching {
-                    java.net.InetAddress.getAllByName("www.hornystudents.com")
-                    java.net.InetAddress.getAllByName("thumb.live.mmcdn.com")
+            val pool = java.util.concurrent.Executors.newSingleThreadExecutor()
+            pool.execute {
+                try {
+                    runCatching {
+                        java.net.InetAddress.getAllByName("www.hornystudents.com")
+                        java.net.InetAddress.getAllByName("thumb.live.mmcdn.com")
+                    }
+                } finally {
+                    pool.shutdown()
                 }
             }
         }

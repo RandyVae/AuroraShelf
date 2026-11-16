@@ -25,6 +25,8 @@ internal object LiveSessionCache {
 
     private var retainedUrl: String? = null
     private var retainedReady = false
+    private var preparedUrl: String? = null
+    private var preparedSession: CachedLiveSession? = null
 
     fun retain(webView: WebView, url: String, ready: Boolean) {
         release()
@@ -38,31 +40,58 @@ internal object LiveSessionCache {
         retainedReady = ready
     }
 
-    /** Takes the retained view when it belongs to [expectedUrl]; null means a fresh load is needed. */
-    fun take(expectedUrl: String): CachedLiveSession? {
-        val view = retained ?: return null
-        if (retainedUrl != expectedUrl) return null
-        retained = null
-        retainedUrl = null
-        (view.parent as? ViewGroup)?.removeView(view)
-        runCatching { view.onResume() }
-        return CachedLiveSession(view, retainedReady)
+    /** Moves any matching retained WebView out of snapshot state before entering player composition. */
+    fun prepareFor(expectedUrl: String) {
+        val view = retained
+        if (view != null && retainedUrl == expectedUrl) {
+            retained = null
+            retainedUrl = null
+            val ready = retainedReady
+            retainedReady = false
+            (view.parent as? ViewGroup)?.removeView(view)
+            runCatching { view.onResume() }
+            preparedUrl = expectedUrl
+            preparedSession = CachedLiveSession(view, ready)
+        } else {
+            release()
+        }
+    }
+
+    /** Pure non-snapshot read during composition; falls back only if already prepared. */
+    fun consumePrepared(expectedUrl: String): CachedLiveSession? {
+        val session = preparedSession ?: return null
+        if (preparedUrl != expectedUrl) return null
+        preparedSession = null
+        preparedUrl = null
+        return session
     }
 
     fun releaseIfNot(url: String) {
-        if (retainedUrl != url) release()
+        if (retainedUrl != url) {
+            retained?.let { view ->
+                runCatching { view.evaluateJavascript(PAUSE_AND_MUTE, null) }
+                (view.parent as? ViewGroup)?.removeView(view)
+                view.stopLoading()
+                view.destroy()
+            }
+            retained = null
+            retainedUrl = null
+            retainedReady = false
+        }
+        if (preparedUrl != url) {
+            preparedSession?.webView?.let { view ->
+                runCatching { view.evaluateJavascript(PAUSE_AND_MUTE, null) }
+                (view.parent as? ViewGroup)?.removeView(view)
+                view.stopLoading()
+                view.destroy()
+            }
+            preparedSession = null
+            preparedUrl = null
+        }
     }
 
     fun release() {
-        retained?.let { view ->
-            runCatching { view.evaluateJavascript(PAUSE_AND_MUTE, null) }
-            (view.parent as? ViewGroup)?.removeView(view)
-            view.stopLoading()
-            view.destroy()
-        }
-        retained = null
-        retainedUrl = null
-        retainedReady = false
+        releaseIfNot("")
     }
 
     private const val PAUSE_AND_MUTE =

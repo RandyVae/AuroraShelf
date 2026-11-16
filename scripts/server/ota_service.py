@@ -5,6 +5,8 @@ import json
 import os
 import time
 import hmac
+import plistlib
+import tempfile
 import threading
 import urllib.parse
 import urllib.request
@@ -17,16 +19,24 @@ DEVICES_FILE = '/var/www/netgrey/registered_devices.json'
 INVITES_FILE = '/var/www/netgrey/testflight_invites.json'
 CONFIG_FILE = '/etc/netgrey-ota/api_config.json'
 TF_CONFIG_FILE = '/etc/netgrey-ota/testflight_invite_config.json'
+ALLOWED_ORIGIN = 'https://bananarey.us'
 
 EMAIL_RE = re.compile(r'^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$')
+UDID_RE = re.compile(r'^(?:[0-9A-Fa-f]{40}|[0-9A-Fa-f]{8}-[0-9A-Fa-f]{16})$')
 STATE_LOCK = threading.Lock()
+SYNC_LOCK = threading.Lock()
+LAST_SYNC_AT = 0.0
 RATE_LIMIT_LOCK = threading.Lock()
 RATE_LIMIT_BUCKETS = {}
+RATE_LIMIT_MAX_BUCKETS = 4096
+APPLE_JWT_LOCK = threading.Lock()
+APPLE_JWT_CACHE = {'token': None, 'exp': 0}
 
 
 class ThreadingTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
     daemon_threads = True
+    request_queue_size = 64
 
 
 def load_json_file(path, default):
@@ -40,43 +50,61 @@ def load_json_file(path, default):
 
 
 def save_json_file(path, data):
-    tmp_path = f'{path}.tmp'
-    with open(tmp_path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, path)
+    target_dir = os.path.dirname(path) or '.'
+    fd, tmp_path = tempfile.mkstemp(prefix='.tmp_', suffix='.json', dir=target_dir)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        os.chmod(tmp_path, 0o644)
+        os.replace(tmp_path, path)
+    except Exception:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
 
 
 def get_apple_token():
     if not os.path.exists(CONFIG_FILE):
         return None
-    try:
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            cfg = json.load(f)
-        with open(cfg['private_key_path'], 'r', encoding='utf-8') as f:
-            key_data = f.read()
+    now = int(time.time())
+    with APPLE_JWT_LOCK:
+        cached = APPLE_JWT_CACHE['token']
+        if cached and now + 300 < APPLE_JWT_CACHE['exp']:
+            return cached
+        try:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                cfg = json.load(f)
+            with open(cfg['private_key_path'], 'r', encoding='utf-8') as f:
+                key_data = f.read()
 
-        now = int(time.time())
-        payload = {
-            'iss': cfg['issuer_id'],
-            'exp': now + 1200,
-            'aud': 'appstoreconnect-v1'
-        }
-        headers = {
-            'kid': cfg['key_id'],
-            'alg': 'ES256',
-            'typ': 'JWT'
-        }
-        return jwt.encode(payload, key_data, algorithm='ES256', headers=headers)
-    except Exception as e:
-        print('[Apple API Token Error]:', e)
-        return None
+            exp = now + 1200
+            payload = {
+                'iss': cfg['issuer_id'],
+                'exp': exp,
+                'aud': 'appstoreconnect-v1'
+            }
+            headers = {
+                'kid': cfg['key_id'],
+                'alg': 'ES256',
+                'typ': 'JWT'
+            }
+            token = jwt.encode(payload, key_data, algorithm='ES256', headers=headers)
+            APPLE_JWT_CACHE['token'] = token
+            APPLE_JWT_CACHE['exp'] = exp
+            return token
+        except Exception as e:
+            print('[Apple API Token Error]:', e)
+            return None
 
 
 def asc_request(method, path, payload=None):
     token = get_apple_token()
     if not token:
         return 500, {'error': 'Apple API token unavailable'}
-    url = f'https://api.appstoreconnect.apple.com{path}'
+    if path.startswith('http://') or path.startswith('https://'):
+        url = path
+    else:
+        url = f'https://api.appstoreconnect.apple.com{path}'
     body = json.dumps(payload).encode('utf-8') if payload is not None else None
     headers = {
         'Authorization': f'Bearer {token}',
@@ -97,6 +125,21 @@ def asc_request(method, path, payload=None):
         return 500, {'error': str(e)}
 
 
+def asc_list_all_users():
+    users = []
+    next_path = '/v1/users?limit=200'
+    pages = 0
+    while next_path and pages < 20:
+        pages += 1
+        status, data = asc_request('GET', next_path)
+        if status != 200 or not isinstance(data, dict):
+            return status, data, users
+        users.extend(data.get('data', []))
+        next_link = (data.get('links') or {}).get('next')
+        next_path = next_link if (isinstance(next_link, str) and next_link.startswith('https://api.appstoreconnect.apple.com/')) else None
+    return 200, {}, users
+
+
 def extract_asc_error(data):
     if isinstance(data, dict):
         errors = data.get('errors')
@@ -107,20 +150,36 @@ def extract_asc_error(data):
     return str(data)
 
 
-def is_rate_limited(client_ip, limit=10, window_seconds=600):
+def is_rate_limited(client_key, limit=10, window_seconds=600):
     now = time.time()
     with RATE_LIMIT_LOCK:
-        history = [ts for ts in RATE_LIMIT_BUCKETS.get(client_ip, []) if now - ts < window_seconds]
+        # 周期性清理过期桶，防止恶意请求导致内存无限增长
+        if len(RATE_LIMIT_BUCKETS) > RATE_LIMIT_MAX_BUCKETS:
+            stale = [
+                k for k, vals in RATE_LIMIT_BUCKETS.items()
+                if not any(now - ts < window_seconds for ts in vals)
+            ]
+            for k in stale:
+                del RATE_LIMIT_BUCKETS[k]
+            if len(RATE_LIMIT_BUCKETS) > RATE_LIMIT_MAX_BUCKETS:
+                for k in list(RATE_LIMIT_BUCKETS.keys())[:len(RATE_LIMIT_BUCKETS) // 2]:
+                    del RATE_LIMIT_BUCKETS[k]
+
+        history = [ts for ts in RATE_LIMIT_BUCKETS.get(client_key, []) if now - ts < window_seconds]
         if len(history) >= limit:
-            RATE_LIMIT_BUCKETS[client_ip] = history
+            RATE_LIMIT_BUCKETS[client_key] = history
             return True
         history.append(now)
-        RATE_LIMIT_BUCKETS[client_ip] = history
+        RATE_LIMIT_BUCKETS[client_key] = history
         return False
 
 
+def get_tf_config():
+    return load_json_file(TF_CONFIG_FILE, {})
+
+
 def verify_invite_code(code):
-    cfg = load_json_file(TF_CONFIG_FILE, {})
+    cfg = get_tf_config()
     codes = cfg.get('invite_codes') or []
     candidate = (code or '').strip()
     if not candidate or not codes:
@@ -128,8 +187,14 @@ def verify_invite_code(code):
     return any(hmac.compare_digest(candidate, str(valid).strip()) for valid in codes)
 
 
-def get_tf_config():
-    return load_json_file(TF_CONFIG_FILE, {})
+def verify_admin_token(candidate):
+    token = (candidate or '').strip()
+    if not token:
+        return False
+    expected = (os.environ.get('OTA_ADMIN_TOKEN') or get_tf_config().get('admin_token') or '').strip()
+    if not expected:
+        return False
+    return hmac.compare_digest(token, expected)
 
 
 def ensure_user_in_beta_group(email, first_name, last_name, beta_group_id):
@@ -212,12 +277,11 @@ def process_testflight_invite(email):
     first_name = 'Tester'
     last_name = re.sub(r'[^A-Za-z0-9_.\-]', '', email.split('@')[0])[:20] or 'User'
 
-    # 1. 检查当前团队成员（是否已接受邀请或满员）
-    u_status, u_data = asc_request('GET', '/v1/users?limit=200')
+    # 1. 检查当前团队成员（支持分页，判断是否已接受邀请或满员）
+    u_status, u_data, users = asc_list_all_users()
     if u_status != 200:
         return 502, {'ok': False, 'error': f'查询团队成员失败: {extract_asc_error(u_data)}'}
 
-    users = u_data.get('data', [])
     matched_user = next(
         (u for u in users if (u.get('attributes', {}).get('username') or '').strip().lower() == email),
         None
@@ -275,41 +339,49 @@ def process_testflight_invite(email):
     return 502, {'ok': False, 'error': err_msg, 'record': rec}
 
 
-def sync_pending_invites_once():
-    cfg = get_tf_config()
-    beta_group_id = cfg.get('beta_group_id')
-    if not beta_group_id:
-        return
+def sync_pending_invites_once(force=False):
+    global LAST_SYNC_AT
+    with SYNC_LOCK:
+        now = time.time()
+        if not force and (now - LAST_SYNC_AT) < 10.0:
+            return
+        cfg = get_tf_config()
+        beta_group_id = cfg.get('beta_group_id')
+        if not beta_group_id:
+            return
 
-    with STATE_LOCK:
-        records = load_json_file(INVITES_FILE, [])
-        pending = [r for r in records if r.get('status') in ('invited', 'accepted_pending_group')]
+        with STATE_LOCK:
+            records = load_json_file(INVITES_FILE, [])
+            pending = [r for r in records if r.get('status') in ('invited', 'accepted_pending_group')]
 
-    if not pending:
-        return
+        if not pending:
+            LAST_SYNC_AT = time.time()
+            return
 
-    u_status, u_data = asc_request('GET', '/v1/users?limit=200')
-    if u_status != 200:
-        return
+        u_status, _, users = asc_list_all_users()
+        if u_status != 200:
+            return
 
-    usernames = {
-        (u.get('attributes', {}).get('username') or '').strip().lower()
-        for u in u_data.get('data', [])
-    }
+        usernames = {
+            (u.get('attributes', {}).get('username') or '').strip().lower()
+            for u in users
+        }
 
-    for entry in pending:
-        email = (entry.get('email') or '').strip().lower()
-        if email in usernames:
-            last_name = re.sub(r'[^A-Za-z0-9_.\-]', '', email.split('@')[0])[:20] or 'User'
-            ok, tf_status, msg = ensure_user_in_beta_group(email, 'Tester', last_name, beta_group_id)
-            upsert_invite_record(email, tf_status, msg)
-            print(f'[TestFlight Poller] {email} -> {tf_status} (ok={ok})')
+        for entry in pending:
+            email = (entry.get('email') or '').strip().lower()
+            if email in usernames:
+                last_name = re.sub(r'[^A-Za-z0-9_.\-]', '', email.split('@')[0])[:20] or 'User'
+                ok, tf_status, msg = ensure_user_in_beta_group(email, 'Tester', last_name, beta_group_id)
+                upsert_invite_record(email, tf_status, msg)
+                print(f'[TestFlight Poller] {email} -> {tf_status} (ok={ok})')
+
+        LAST_SYNC_AT = time.time()
 
 
 def testflight_poller_loop():
     while True:
         try:
-            sync_pending_invites_once()
+            sync_pending_invites_once(force=True)
         except Exception as e:
             print('[TestFlight Poller Error]:', e)
         time.sleep(20)
@@ -342,7 +414,7 @@ def register_device_with_apple(udid, device_name):
         method='POST'
     )
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=20) as resp:
             if resp.status in (200, 201):
                 print(f'[Apple API] SUCCESS: Registered device {udid} ({device_name}) to Apple Developer Portal')
                 return True
@@ -359,12 +431,13 @@ def register_device_with_apple(udid, device_name):
 
 
 def load_devices():
-    return load_json_file(DEVICES_FILE, [])
+    with STATE_LOCK:
+        return list(load_json_file(DEVICES_FILE, []))
 
 
 def save_device(udid, product, name, version, apple_registered=False):
     with STATE_LOCK:
-        devices = load_devices()
+        devices = load_json_file(DEVICES_FILE, [])
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         existing = next((d for d in devices if d['udid'] == udid), None)
         if existing:
@@ -387,51 +460,106 @@ def save_device(udid, product, name, version, apple_registered=False):
         save_json_file(DEVICES_FILE, devices)
 
 
+def extract_plist_fields(raw_body):
+    # iOS MDM/ota mobileconfig 回传为 CMS 签名包，内部包含 <plist>...</plist> 明文 XML
+    xml_match = re.search(rb'<\?xml[\s\S]*?</plist>|<plist[\s\S]*?</plist>', raw_body)
+    if xml_match:
+        try:
+            parsed = plistlib.loads(xml_match.group(0))
+            if isinstance(parsed, dict):
+                return (
+                    str(parsed.get('UDID') or '').strip(),
+                    str(parsed.get('PRODUCT') or 'iPhone').strip(),
+                    str(parsed.get('DEVICE_NAME') or 'iOS Device').strip(),
+                    str(parsed.get('VERSION') or '').strip(),
+                )
+        except Exception:
+            pass
+    body_text = raw_body.decode('utf-8', errors='ignore')
+    udid_match = re.search(r'<key>UDID</key>\s*<string>([^<]+)</string>', body_text)
+    product_match = re.search(r'<key>PRODUCT</key>\s*<string>([^<]+)</string>', body_text)
+    name_match = re.search(r'<key>DEVICE_NAME</key>\s*<string>([^<]+)</string>', body_text)
+    version_match = re.search(r'<key>VERSION</key>\s*<string>([^<]+)</string>', body_text)
+    return (
+        udid_match.group(1).strip() if udid_match else '',
+        product_match.group(1).strip() if product_match else 'iPhone',
+        name_match.group(1).strip() if name_match else 'iOS Device',
+        version_match.group(1).strip() if version_match else '',
+    )
+
+
 class OTAHandler(http.server.BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.request.settimeout(25)
+
     def get_client_ip(self):
+        real_ip = (self.headers.get('X-Real-IP') or '').strip()
+        if real_ip:
+            return real_ip
         forwarded = self.headers.get('X-Forwarded-For', '')
         if forwarded:
-            return forwarded.split(',')[0].strip()
-        return self.headers.get('X-Real-IP') or self.client_address[0]
+            return forwarded.split(',')[-1].strip()
+        return self.client_address[0]
+
+    def read_bounded_body(self, max_bytes):
+        raw_len = self.headers.get('Content-Length')
+        if raw_len is None:
+            return 200, b''
+        try:
+            content_length = int(raw_len)
+        except ValueError:
+            return 400, None
+        if content_length < 0:
+            return 400, None
+        if content_length > max_bytes:
+            return 413, None
+        if content_length == 0:
+            return 200, b''
+        return 200, self.rfile.read(content_length)
 
     def send_json(self, status_code, payload):
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
         self.send_response(status_code)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Cache-Control', 'no-store')
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
+        self.send_header('Vary', 'Origin')
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
     def do_OPTIONS(self):
         self.send_response(204)
-        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Token')
+        self.send_header('Vary', 'Origin')
         self.end_headers()
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
+        client_ip = self.get_client_ip()
+
         if parsed.path == '/api/receive-udid':
-            content_length = int(self.headers.get('Content-Length', 0))
-            raw_body = self.rfile.read(content_length)
-            body_text = raw_body.decode('utf-8', errors='ignore')
+            if is_rate_limited(f'udid:{client_ip}', limit=15, window_seconds=600):
+                self.send_json(429, {'ok': False, 'error': '请求过于频繁，请稍后再试'})
+                return
+            status, raw_body = self.read_bounded_body(262144)
+            if status == 413:
+                self.send_json(413, {'ok': False, 'error': 'Payload too large'})
+                return
+            if status != 200 or raw_body is None:
+                self.send_json(400, {'ok': False, 'error': 'Invalid Content-Length'})
+                return
 
-            udid_match = re.search(r'<key>UDID</key>\s*<string>([^<]+)</string>', body_text)
-            product_match = re.search(r'<key>PRODUCT</key>\s*<string>([^<]+)</string>', body_text)
-            name_match = re.search(r'<key>DEVICE_NAME</key>\s*<string>([^<]+)</string>', body_text)
-            version_match = re.search(r'<key>VERSION</key>\s*<string>([^<]+)</string>', body_text)
-
-            udid = udid_match.group(1).strip() if udid_match else ''
-            product = product_match.group(1).strip() if product_match else 'iPhone'
-            device_name = name_match.group(1).strip() if name_match else 'iOS Device'
-            version = version_match.group(1).strip() if version_match else ''
-
+            udid, product, device_name, version = extract_plist_fields(raw_body)
             apple_reg = False
-            if udid:
+            if udid and UDID_RE.match(udid):
                 apple_reg = register_device_with_apple(udid, device_name)
                 save_device(udid, product, device_name, version, apple_registered=apple_reg)
+            else:
+                udid = ''
 
             redirect_params = urllib.parse.urlencode({
                 'udid': udid,
@@ -448,13 +576,18 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
             return
 
         if parsed.path == '/api/testflight/invite':
-            client_ip = self.get_client_ip()
-            if is_rate_limited(client_ip):
+            if is_rate_limited(f'tf_invite:{client_ip}', limit=10, window_seconds=600):
                 self.send_json(429, {'ok': False, 'error': '请求过于频繁，请 10 分钟后再试'})
                 return
 
-            content_length = min(int(self.headers.get('Content-Length', 0)), 16384)
-            raw_body = self.rfile.read(content_length)
+            status, raw_body = self.read_bounded_body(16384)
+            if status == 413:
+                self.send_json(413, {'ok': False, 'error': '请求体过大'})
+                return
+            if status != 200 or raw_body is None:
+                self.send_json(400, {'ok': False, 'error': '无效的 Content-Length'})
+                return
+
             try:
                 body = json.loads(raw_body.decode('utf-8'))
             except Exception:
@@ -481,14 +614,27 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        client_ip = self.get_client_ip()
+
         if parsed.path == '/api/devices':
+            if not verify_admin_token(self.headers.get('X-Admin-Token')):
+                self.send_json(403, {'ok': False, 'error': 'Forbidden'})
+                return
             self.send_json(200, load_devices())
             return
+
         if parsed.path == '/api/latest-udid':
+            if not verify_admin_token(self.headers.get('X-Admin-Token')):
+                self.send_json(403, {'ok': False, 'error': 'Forbidden'})
+                return
             devices = load_devices()
             self.send_json(200, devices[-1] if devices else {})
             return
+
         if parsed.path == '/api/testflight/status':
+            if is_rate_limited(f'tf_status:{client_ip}', limit=30, window_seconds=300):
+                self.send_json(429, {'ok': False, 'error': '查询过于频繁，请稍后再试'})
+                return
             qs = urllib.parse.parse_qs(parsed.query)
             email = (qs.get('email', [''])[0] or '').strip().lower()
             invite_code = (qs.get('invite_code', [''])[0] or '').strip()
@@ -498,15 +644,17 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
             if not EMAIL_RE.match(email):
                 self.send_json(400, {'ok': False, 'error': '邮箱格式无效'})
                 return
-            # 触发一次即时同步检查，避免用户点完邮件还要等 20 秒轮询
-            try:
-                sync_pending_invites_once()
-            except Exception as e:
-                print('[TestFlight On-Demand Sync Error]:', e)
             rec = get_invite_record(email)
             if not rec:
                 self.send_json(404, {'ok': False, 'error': '未找到该邮箱的邀请记录'})
                 return
+            # 仅当当前邮箱仍处于待确认状态时才尝试同步（受 SYNC_LOCK 与 10 秒冷却保护）
+            if rec.get('status') in ('invited', 'accepted_pending_group'):
+                try:
+                    sync_pending_invites_once(force=False)
+                except Exception as e:
+                    print('[TestFlight On-Demand Sync Error]:', e)
+                rec = get_invite_record(email) or rec
             self.send_json(200, {'ok': True, 'record': rec})
             return
 

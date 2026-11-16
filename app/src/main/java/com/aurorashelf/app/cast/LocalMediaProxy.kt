@@ -213,44 +213,48 @@ internal class LocalMediaProxy(
         // 1. Try Media3 SimpleCache / OfflineCacheStreamOpener first when a cacheKey is present
         val opener = cacheStreamOpener
         if (!cacheKey.isNullOrBlank() && opener != null && !DlnaSoap.isHlsUrl(targetUrl)) {
-            val (reqStart, reqEnd) = parseByteRange(rangeHeader)
+            val isSuffixRange = rangeHeader?.trim()?.startsWith("bytes=-") == true
+            val (reqStart, reqEnd) = if (isSuffixRange) 0L to null else parseByteRange(rangeHeader)
             val slice = runCatching {
                 opener.open(cacheKey, targetUrl, referer, reqStart, reqEnd)
             }.getOrNull()
             if (slice != null) {
                 try {
-                    val isRange = !rangeHeader.isNullOrBlank() && reqStart >= 0
-                    val contentLength = slice.contentLength
                     val totalLength = slice.totalLength
-                    val endByte = if (totalLength > 0) (reqStart + contentLength - 1).coerceAtLeast(reqStart) else -1L
-                    val headers = StringBuilder()
-                    if (isRange && totalLength > 0) {
-                        headers.append("HTTP/1.1 206 Partial Content\r\n")
-                        headers.append("Content-Range: bytes $reqStart-$endByte/$totalLength\r\n")
-                    } else {
-                        headers.append("HTTP/1.1 200 OK\r\n")
-                    }
-                    headers.append("Content-Type: video/mp4\r\n")
-                    if (contentLength >= 0) {
-                        headers.append("Content-Length: $contentLength\r\n")
-                    }
-                    headers.append("Accept-Ranges: bytes\r\n")
-                    headers.append("Connection: close\r\n\r\n")
-                    output.write(headers.toString().toByteArray(StandardCharsets.UTF_8))
-                    output.flush()
-                    if (!isHead) {
-                        val buffer = ByteArray(32 * 1024)
-                        var remaining = if (contentLength >= 0) contentLength else Long.MAX_VALUE
-                        while (remaining > 0) {
-                            val toRead = minOf(remaining, buffer.size.toLong()).toInt()
-                            val read = slice.read(buffer, 0, toRead)
-                            if (read <= 0) break
-                            output.write(buffer, 0, read)
-                            if (contentLength >= 0) remaining -= read
+                    if (isSuffixRange && totalLength > 0) {
+                        slice.close()
+                        val suffixLen = rangeHeader.removePrefix("bytes=-").trim().toLongOrNull()?.coerceAtLeast(1L)
+                        if (suffixLen != null) {
+                            val suffixStart = (totalLength - suffixLen).coerceAtLeast(0L)
+                            val suffixSlice = runCatching {
+                                opener.open(cacheKey, targetUrl, referer, suffixStart, totalLength - 1)
+                            }.getOrNull()
+                            if (suffixSlice != null) {
+                                try {
+                                    writeCachedSlice(suffixSlice, isRange = true, reqStart = suffixStart, isHead = isHead, output = output)
+                                    return
+                                } finally {
+                                    runCatching { suffixSlice.close() }
+                                }
+                            }
                         }
-                        output.flush()
+                    } else if (!rangeHeader.isNullOrBlank() && totalLength <= 0 && reqStart > 0) {
+                        // Length unknown: fall back to streaming from offset 0 with 200 OK instead of mismatched offset
+                        slice.close()
+                        val fullSlice = runCatching { opener.open(cacheKey, targetUrl, referer, 0L, null) }.getOrNull()
+                        if (fullSlice != null) {
+                            try {
+                                writeCachedSlice(fullSlice, isRange = false, reqStart = 0L, isHead = isHead, output = output)
+                                return
+                            } finally {
+                                runCatching { fullSlice.close() }
+                            }
+                        }
+                    } else {
+                        val isRange = !rangeHeader.isNullOrBlank() && reqStart >= 0 && totalLength > 0
+                        writeCachedSlice(slice, isRange = isRange, reqStart = reqStart, isHead = isHead, output = output)
+                        return
                     }
-                    return
                 } finally {
                     runCatching { slice.close() }
                 }
@@ -344,8 +348,12 @@ internal class LocalMediaProxy(
         val totalLength = file.length()
         if (totalLength <= 0L) return send404(output)
 
-        val (parsedStart, parsedEnd) = parseByteRange(rangeHeader)
+        val (parsedStart, parsedEnd) = resolveByteRange(rangeHeader, totalLength)
         val isRange = !rangeHeader.isNullOrBlank() && rangeHeader.startsWith("bytes=")
+        if (isRange && (parsedStart < 0 || parsedStart >= totalLength || (parsedEnd != null && parsedEnd < parsedStart))) {
+            send416(totalLength, output)
+            return
+        }
         val start = parsedStart.coerceIn(0L, totalLength - 1)
         val end = (parsedEnd ?: (totalLength - 1)).coerceIn(start, totalLength - 1)
 
@@ -394,13 +402,72 @@ internal class LocalMediaProxy(
         }
     }
 
+    private fun writeCachedSlice(
+        slice: CachedStreamSlice,
+        isRange: Boolean,
+        reqStart: Long,
+        isHead: Boolean,
+        output: OutputStream,
+    ) {
+        val contentLength = slice.contentLength
+        val totalLength = slice.totalLength
+        val endByte = if (totalLength > 0 && contentLength > 0) (reqStart + contentLength - 1).coerceAtLeast(reqStart) else -1L
+        val headers = StringBuilder()
+        if (isRange && totalLength > 0 && endByte >= reqStart) {
+            headers.append("HTTP/1.1 206 Partial Content\r\n")
+            headers.append("Content-Range: bytes $reqStart-$endByte/$totalLength\r\n")
+        } else {
+            headers.append("HTTP/1.1 200 OK\r\n")
+        }
+        headers.append("Content-Type: video/mp4\r\n")
+        if (contentLength >= 0) {
+            headers.append("Content-Length: $contentLength\r\n")
+        }
+        headers.append("Accept-Ranges: bytes\r\n")
+        headers.append("Connection: close\r\n\r\n")
+        output.write(headers.toString().toByteArray(StandardCharsets.UTF_8))
+        output.flush()
+        if (!isHead) {
+            val buffer = ByteArray(32 * 1024)
+            var remaining = if (contentLength >= 0) contentLength else Long.MAX_VALUE
+            while (remaining > 0) {
+                val toRead = minOf(remaining, buffer.size.toLong()).toInt()
+                val read = slice.read(buffer, 0, toRead)
+                if (read <= 0) break
+                output.write(buffer, 0, read)
+                if (contentLength >= 0) remaining -= read
+            }
+            output.flush()
+        }
+    }
+
     private fun parseByteRange(rangeHeader: String?): Pair<Long, Long?> {
         if (rangeHeader.isNullOrBlank() || !rangeHeader.startsWith("bytes=")) return 0L to null
         val rangeVal = rangeHeader.removePrefix("bytes=").trim()
-        val rangeParts = rangeVal.split("-")
+        val rangeParts = rangeVal.split("-", limit = 2)
         val start = rangeParts.getOrNull(0)?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
         val end = rangeParts.getOrNull(1)?.takeIf { it.isNotBlank() }?.toLongOrNull()
         return start to end
+    }
+
+    private fun resolveByteRange(rangeHeader: String?, totalLength: Long): Pair<Long, Long?> {
+        if (rangeHeader.isNullOrBlank() || !rangeHeader.startsWith("bytes=")) return 0L to null
+        val rangeVal = rangeHeader.removePrefix("bytes=").trim()
+        if (rangeVal.startsWith("-")) {
+            val suffix = rangeVal.removePrefix("-").toLongOrNull()?.coerceAtLeast(1L) ?: return -1L to null
+            val start = (totalLength - suffix).coerceAtLeast(0L)
+            return start to (totalLength - 1)
+        }
+        val rangeParts = rangeVal.split("-", limit = 2)
+        val start = rangeParts.getOrNull(0)?.toLongOrNull() ?: return -1L to null
+        val end = rangeParts.getOrNull(1)?.takeIf { it.isNotBlank() }?.toLongOrNull()
+        return start to end
+    }
+
+    private fun send416(totalLength: Long, output: OutputStream) {
+        val msg = "HTTP/1.1 416 Range Not Satisfiable\r\nContent-Range: bytes */$totalLength\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        output.write(msg.toByteArray(StandardCharsets.UTF_8))
+        output.flush()
     }
 
     private fun send403(output: OutputStream) {
@@ -430,6 +497,7 @@ internal class LocalMediaProxy(
             val b = input.read()
             if (b == -1) return if (sb.isEmpty()) null else sb.toString()
             if (b == '\n'.code) return sb.toString().trimEnd('\r')
+            if (sb.length >= 8192) throw java.io.IOException("HTTP header line too long")
             sb.append(b.toChar())
         }
     }

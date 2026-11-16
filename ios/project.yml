@@ -12,16 +12,22 @@ targets:
       - path: AuroraShelf
         excludes:
           - "Resources/www"
+          - "Resources/SourceSecrets.plist"
       - path: AuroraShelf/Resources/www
         type: folder
         buildPhase: resources
+    preBuildScripts:
+      - name: Generate Source Secrets
+        script: |
+          python3 "${SRCROOT}/../scripts/generate_ios_source_secrets.py"
+        basedOnDependencyAnalysis: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.aurorashelf.app
         INFOPLIST_FILE: AuroraShelf/Resources/Info.plist
         SWIFT_VERSION: "6.0"
-        CURRENT_PROJECT_VERSION: 261
-        MARKETING_VERSION: "2.16.35"
+        CURRENT_PROJECT_VERSION: 262
+        MARKETING_VERSION: "2.16.36"
         DEVELOPMENT_TEAM: "U4MXHLA3GF"
         CODE_SIGN_STYLE: "Automatic"
         CODE_SIGNING_REQUIRED: "YES"

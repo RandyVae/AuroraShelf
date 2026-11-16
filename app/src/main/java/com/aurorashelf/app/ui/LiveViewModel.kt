@@ -78,7 +78,9 @@ class LiveViewModel(
                 selectedSourceId = sourceId,
                 items = emptyList(),
                 page = 0,
+                canLoadMore = true,
                 isLoading = true,
+                isLoadingMore = false,
                 error = null,
             )
         }
@@ -91,8 +93,11 @@ class LiveViewModel(
         mutableUiState.update {
             it.copy(
                 selectedCategory = category,
-                items = cached?.items ?: it.items,
+                items = cached?.items.orEmpty(),
+                page = if (cached != null && cached.items.isNotEmpty()) 1 else 0,
+                canLoadMore = true,
                 isLoading = true,
+                isLoadingMore = false,
                 error = null,
             )
         }
@@ -129,7 +134,8 @@ class LiveViewModel(
                         stripchatRepository.load(category, page)
                     } catch (primaryErr: Exception) {
                         if (primaryErr is CancellationException) throw primaryErr
-                        // Stripchat 连接失败时自动降级到备用源 HornyStudents
+                        if (!replace || page != 1) throw primaryErr
+                        // 仅在首屏加载 Stripchat 失败时自动降级到备用源 HornyStudents
                         activeSourceId = LiveSourceCatalog.HORNYSTUDENTS.id
                         hornyStudentsRepository.load(category, page)
                     }
@@ -165,7 +171,7 @@ class LiveViewModel(
                         items = fallbackItems,
                         isLoading = false,
                         isLoadingMore = false,
-                        error = if (fallbackItems.isNotEmpty()) null else failure.userMessage(),
+                        error = if (replace && fallbackItems.isNotEmpty()) null else failure.userMessage(),
                     )
                 }
             }

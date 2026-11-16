@@ -263,20 +263,22 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                     notifySwift('error', { message: '主播当前正在进行私密秀（需付费观看）' });
                     return;
                 }
-                var docHtml = document.documentElement ? document.documentElement.innerHTML : '';
-                if (docHtml.indexOf('\\u0022room_status\\u0022: \\u0022offline\\u0022') !== -1 ||
-                    docHtml.indexOf('\\u0022room_status\\u0022:\\u0022offline\\u0022') !== -1 ||
-                    docHtml.indexOf('"room_status":"offline"') !== -1 ||
-                    docHtml.indexOf('"room_status": "offline"') !== -1) {
-                    notifySwift('error', { message: '主播当前已离线或暂未开播' });
-                    return;
-                }
-                if (docHtml.indexOf('\\u0022room_status\\u0022: \\u0022private\\u0022') !== -1 ||
-                    docHtml.indexOf('\\u0022room_status\\u0022:\\u0022private\\u0022') !== -1 ||
-                    docHtml.indexOf('"room_status":"private"') !== -1 ||
-                    docHtml.indexOf('"room_status": "private"') !== -1) {
-                    notifySwift('error', { message: '主播当前正在进行私密秀（需付费观看）' });
-                    return;
+                if (!window.__auroraPlayingReported) {
+                    var docHtml = document.documentElement ? document.documentElement.innerHTML : '';
+                    if (docHtml.indexOf('\\u0022room_status\\u0022: \\u0022offline\\u0022') !== -1 ||
+                        docHtml.indexOf('\\u0022room_status\\u0022:\\u0022offline\\u0022') !== -1 ||
+                        docHtml.indexOf('"room_status":"offline"') !== -1 ||
+                        docHtml.indexOf('"room_status": "offline"') !== -1) {
+                        notifySwift('error', { message: '主播当前已离线或暂未开播' });
+                        return;
+                    }
+                    if (docHtml.indexOf('\\u0022room_status\\u0022: \\u0022private\\u0022') !== -1 ||
+                        docHtml.indexOf('\\u0022room_status\\u0022:\\u0022private\\u0022') !== -1 ||
+                        docHtml.indexOf('"room_status":"private"') !== -1 ||
+                        docHtml.indexOf('"room_status": "private"') !== -1) {
+                        notifySwift('error', { message: '主播当前正在进行私密秀（需付费观看）' });
+                        return;
+                    }
                 }
 
                 // 4. 确保主推流全屏自适应，撑开所有祖先容器
@@ -327,38 +329,64 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                         mainVideo.setAttribute('webkit-playsinline', '');
 
                         var notifyPlay = function() {
-                            notifySwift('playing', { width: mainVideo.videoWidth, height: mainVideo.videoHeight });
+                            var dim = (mainVideo.videoWidth || 0) + 'x' + (mainVideo.videoHeight || 0);
+                            if (!window.__auroraPlayingReported || (dim !== '0x0' && window.__auroraLastDim !== dim)) {
+                                window.__auroraPlayingReported = true;
+                                if (dim !== '0x0') window.__auroraLastDim = dim;
+                                notifySwift('playing', { width: mainVideo.videoWidth, height: mainVideo.videoHeight });
+                            }
                         };
-                        mainVideo.addEventListener('playing', notifyPlay);
+                        mainVideo.addEventListener('playing', function() {
+                            window.__auroraPlayingReported = false;
+                            notifyPlay();
+                        });
                         mainVideo.addEventListener('loadeddata', notifyPlay);
                         mainVideo.addEventListener('canplay', notifyPlay);
                         mainVideo.addEventListener('timeupdate', function() {
-                            if (mainVideo.currentTime > 0 && !mainVideo.paused) {
+                            if (mainVideo.currentTime > 0 && !mainVideo.paused && !window.__auroraPlayingReported) {
                                 notifyPlay();
                             }
                         });
                         mainVideo.addEventListener('waiting', function() {
-                            notifySwift('buffering');
+                            if (window.__auroraPlayingReported) {
+                                window.__auroraPlayingReported = false;
+                                notifySwift('buffering');
+                            }
                         });
                         mainVideo.addEventListener('error', function() {
+                            window.__auroraPlayingReported = false;
                             notifySwift('error', { message: '视频解码或网络异常' });
                         });
                     }
 
-                    if ((mainVideo.readyState >= 2 || mainVideo.currentTime > 0 || mainVideo.videoWidth > 0) && !mainVideo.paused) {
+                    if ((mainVideo.readyState >= 2 || mainVideo.currentTime > 0 || mainVideo.videoWidth > 0) && !mainVideo.paused && !window.__auroraPlayingReported) {
+                        window.__auroraPlayingReported = true;
+                        if (mainVideo.videoWidth > 0 && mainVideo.videoHeight > 0) {
+                            window.__auroraLastDim = mainVideo.videoWidth + 'x' + mainVideo.videoHeight;
+                        }
                         notifySwift('playing', { width: mainVideo.videoWidth, height: mainVideo.videoHeight });
                     }
                     if (mainVideo.videoWidth > 0 && mainVideo.videoHeight > 0) {
-                        notifySwift('dimension', { width: mainVideo.videoWidth, height: mainVideo.videoHeight });
+                        var dimNow = mainVideo.videoWidth + 'x' + mainVideo.videoHeight;
+                        if (window.__auroraLastDim !== dimNow) {
+                            window.__auroraLastDim = dimNow;
+                            notifySwift('dimension', { width: mainVideo.videoWidth, height: mainVideo.videoHeight });
+                        }
                     }
 
                     if (mainVideo.paused) {
                         mainVideo.play().then(function() {
-                            notifySwift('playing', { width: mainVideo.videoWidth, height: mainVideo.videoHeight });
+                            if (!window.__auroraPlayingReported) {
+                                window.__auroraPlayingReported = true;
+                                notifySwift('playing', { width: mainVideo.videoWidth, height: mainVideo.videoHeight });
+                            }
                         }).catch(function() {
                             mainVideo.muted = true;
                             mainVideo.play().then(function() {
-                                notifySwift('playing', { width: mainVideo.videoWidth, height: mainVideo.videoHeight });
+                                if (!window.__auroraPlayingReported) {
+                                    window.__auroraPlayingReported = true;
+                                    notifySwift('playing', { width: mainVideo.videoWidth, height: mainVideo.videoHeight });
+                                }
                             }).catch(function() {});
                         });
                     }
@@ -496,6 +524,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         weak var webView: WKWebView?
         var requestedURL: URL?
         var currentFillMode: Bool = false
+        var lastReportedDimension: CGSize?
         var playTimeoutTask: DispatchWorkItem?
 
         init(_ parent: StripchatLiveWebView) {
@@ -530,21 +559,31 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                 case "playing":
                     self.playTimeoutTask?.cancel()
                     self.playTimeoutTask = nil
-                    withAnimation(AuroraMotion.smooth) {
-                        self.parent.isLoading = false
-                        self.parent.isPlaying = true
-                        self.parent.errorMessage = nil
+                    if !self.parent.isPlaying || self.parent.isLoading || self.parent.errorMessage != nil {
+                        withAnimation(AuroraMotion.smooth) {
+                            self.parent.isLoading = false
+                            self.parent.isPlaying = true
+                            self.parent.errorMessage = nil
+                        }
                     }
                     if let w = body["width"] as? CGFloat, let h = body["height"] as? CGFloat, w > 0, h > 0 {
-                        self.parent.onVideoDimension?(CGSize(width: w, height: h))
+                        let size = CGSize(width: w, height: h)
+                        if self.lastReportedDimension != size {
+                            self.lastReportedDimension = size
+                            self.parent.onVideoDimension?(size)
+                        }
                     }
                 case "buffering":
-                    if !self.parent.isPlaying && self.parent.errorMessage == nil {
+                    if !self.parent.isPlaying && self.parent.errorMessage == nil && !self.parent.isLoading {
                         self.parent.isLoading = true
                     }
                 case "dimension":
                     if let w = body["width"] as? CGFloat, let h = body["height"] as? CGFloat, w > 0, h > 0 {
-                        self.parent.onVideoDimension?(CGSize(width: w, height: h))
+                        let size = CGSize(width: w, height: h)
+                        if self.lastReportedDimension != size {
+                            self.lastReportedDimension = size
+                            self.parent.onVideoDimension?(size)
+                        }
                     }
                 case "error":
                     self.playTimeoutTask?.cancel()

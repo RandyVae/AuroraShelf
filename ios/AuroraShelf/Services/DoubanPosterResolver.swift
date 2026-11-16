@@ -186,7 +186,11 @@ public actor DoubanPosterResolver {
         Self.sanitizeTitle(raw)
     }
 
+    private static let diskCacheLock = NSLock()
+
     private static func persistDiskCache(cacheFile: URL, key: String, value: String) {
+        diskCacheLock.lock()
+        defer { diskCacheLock.unlock() }
         var existing: [String: String] = [:]
         if let data = try? Data(contentsOf: cacheFile),
            let dict = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
@@ -194,7 +198,7 @@ public actor DoubanPosterResolver {
         }
         existing[key] = value
         if let data = try? JSONSerialization.data(withJSONObject: existing, options: .fragmentsAllowed) {
-            try? data.write(to: cacheFile)
+            try? data.write(to: cacheFile, options: .atomic)
         }
     }
 }

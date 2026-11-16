@@ -21,9 +21,9 @@ struct GameWebViewRepresentable: UIViewRepresentable {
         // 允许读取本地 HTML 与跨目录 WebGL/Spine 资源
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
 
-        // 注入原生 Bridge 代理，建立双向通信通道
+        // 注入原生 Bridge 代理，使用弱引用代理避免强引用环
         let contentController = WKUserContentController()
-        contentController.add(context.coordinator, name: "NativeBridge")
+        contentController.add(WeakGameScriptMessageHandler(delegate: context.coordinator), name: "NativeBridge")
         config.userContentController = contentController
 
         let webView = WKWebView(frame: .zero, configuration: config)
@@ -68,6 +68,7 @@ struct GameWebViewRepresentable: UIViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, UIScrollViewDelegate {
         weak var webView: WKWebView?
         var lastReloadToken: UUID?
+        var lastMuted: Bool?
         let onExitRequest: () -> Void
         let onGameMessage: (String) -> Void
 
@@ -213,11 +214,34 @@ struct GameWebViewRepresentable: UIViewRepresentable {
     func updateUIView(_ uiView: WKWebView, context: Context) {
         if context.coordinator.lastReloadToken != reloadToken {
             context.coordinator.lastReloadToken = reloadToken
+            context.coordinator.lastMuted = nil
             uiView.reload()
         }
-        // 同步静音状态到前端
-        let jsMute = isMuted ? "true" : "false"
-        uiView.evaluateJavaScript("if (window.setAppMuted) { window.setAppMuted(\(jsMute)); }")
+        if context.coordinator.lastMuted != isMuted {
+            context.coordinator.lastMuted = isMuted
+            let jsMute = isMuted ? "true" : "false"
+            uiView.evaluateJavaScript("if (window.setAppMuted) { window.setAppMuted(\(jsMute)); }")
+        }
+    }
+
+    static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
+        uiView.stopLoading()
+        uiView.navigationDelegate = nil
+        uiView.scrollView.delegate = nil
+        uiView.configuration.userContentController.removeScriptMessageHandler(forName: "NativeBridge")
+        uiView.loadHTMLString("", baseURL: nil)
+    }
+}
+
+private final class WeakGameScriptMessageHandler: NSObject, WKScriptMessageHandler {
+    private weak var delegate: WKScriptMessageHandler?
+
+    init(delegate: WKScriptMessageHandler) {
+        self.delegate = delegate
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        delegate?.userContentController(userContentController, didReceive: message)
     }
 }
 

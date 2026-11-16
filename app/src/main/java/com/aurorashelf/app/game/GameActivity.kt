@@ -84,12 +84,24 @@ class GameActivity : ComponentActivity() {
         val wv = WebView(this).also { webView = it }
         wv.setBackgroundColor(Color.rgb(7, 9, 15))
 
+        var activeAssetPort = -1
+        var url = "file:///android_asset/www/index.html"
+        try {
+            val server = GameAssetServer(applicationContext).also { assetServer = it }
+            val port = server.start()
+            activeAssetPort = port
+            url = "http://127.0.0.1:$port/index.html"
+        } catch (e: Exception) {
+            assetServer = null
+        }
+
         val s = wv.settings
         s.javaScriptEnabled = true
         s.domStorageEnabled = true
         s.databaseEnabled = true
-        s.allowFileAccess = true
-        s.allowContentAccess = true
+        val usingLocalHttp = activeAssetPort > 0
+        s.allowFileAccess = !usingLocalHttp
+        s.allowContentAccess = !usingLocalHttp
         s.loadsImagesAutomatically = true
         s.mediaPlaybackRequiresUserGesture = false
         s.cacheMode = WebSettings.LOAD_NO_CACHE
@@ -106,7 +118,20 @@ class GameActivity : ComponentActivity() {
 
         wv.addJavascriptInterface(GameSaveBridge(applicationContext), "AndroidSave")
         wv.addJavascriptInterface(GameNativeBridge(this), "AndroidNative")
-        wv.webViewClient = WebViewClient()
+        wv.webViewClient = object : android.webkit.WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?,
+            ): Boolean {
+                val target = request?.url ?: return true
+                val allowed = if (usingLocalHttp) {
+                    target.scheme == "http" && target.host == "127.0.0.1" && target.port == activeAssetPort
+                } else {
+                    target.scheme == "file" && (target.path?.startsWith("/android_asset/www/") == true)
+                }
+                return !allowed
+            }
+        }
         wv.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(m: ConsoleMessage): Boolean {
                 val tag = "NetgreyGameWeb"
@@ -118,15 +143,6 @@ class GameActivity : ComponentActivity() {
                 }
                 return true
             }
-        }
-
-        var url = "file:///android_asset/www/index.html"
-        try {
-            val server = GameAssetServer(applicationContext).also { assetServer = it }
-            val port = server.start()
-            url = "http://127.0.0.1:$port/index.html"
-        } catch (e: Exception) {
-            assetServer = null
         }
 
         wv.isFocusable = true

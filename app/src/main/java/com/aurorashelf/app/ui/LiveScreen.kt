@@ -242,7 +242,10 @@ internal fun LiveScreen(
                 onSearch = onSearch,
                 onRefresh = onRefresh,
                 onLoadMore = onLoadMore,
-                onOpen = onOpen,
+                onOpen = { item ->
+                    LiveSessionCache.prepareFor(item.playerUrl)
+                    onOpen(item)
+                },
                 onSettings = onSettings,
             )
             // Keep the last opened room's WebView alive so re-entering it is instant.
@@ -292,13 +295,14 @@ private fun LiveFeed(
             CoverPrefetcher.prefetchLive(prefetchContext, state.items, limit = LIVE_COVER_PREFETCH_LIMIT)
         }
     }
-    LaunchedEffect(gridState, state.items.size, state.canLoadMore) {
+    LaunchedEffect(gridState, state.items.size, state.canLoadMore, state.isLoading, state.isLoadingMore, state.error) {
         snapshotFlow {
             val layout = gridState.layoutInfo
             val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
-            lastVisible to layout.totalItemsCount
-        }.map { (lastVisible, totalItems) ->
-            totalItems > 0 && lastVisible >= totalItems - 5
+            val totalItems = layout.totalItemsCount
+            totalItems > 0 && lastVisible >= totalItems - 5 &&
+                !state.isLoading && !state.isLoadingMore &&
+                state.canLoadMore && state.error == null
         }.distinctUntilChanged().filter { it }.collect {
             onLoadMore()
         }
@@ -1162,10 +1166,8 @@ private fun LivePlayerScreen(
             if (w > 0 && h > 0) w.toFloat() / h.toFloat() else null
         } ?: if (item.playerUrl.contains("hornystudents.com")) (4f / 3f) else (16f / 9f)
     }
-    val cachedSession = remember(item.playerUrl) { LiveSessionCache.take(item.playerUrl) }
-    if (cachedSession == null) {
-        LaunchedEffect(item.playerUrl) { LiveSessionCache.releaseIfNot(item.playerUrl) }
-    }
+    val cachedSession = remember(item.playerUrl) { LiveSessionCache.consumePrepared(item.playerUrl) }
+    LaunchedEffect(item.playerUrl) { LiveSessionCache.releaseIfNot(item.playerUrl) }
     val openInBrowser: () -> Unit = remember(item.playerUrl, context) {
         {
             runCatching {
@@ -1207,7 +1209,7 @@ private fun LivePlayerScreen(
             videoAspectRatio < 1.0f -> Modifier
                 .fillMaxWidth()
                 .heightIn(max = 420.dp)
-                .aspectRatio(videoAspectRatio)
+                .aspectRatio(videoAspectRatio, matchHeightConstraintsFirst = true)
             else -> Modifier
                 .fillMaxWidth()
                 .heightIn(max = 420.dp)
@@ -1503,7 +1505,7 @@ private fun NativeLivePlayer(
         val mediaSource = DefaultMediaSourceFactory(http).createMediaSource(mediaItem)
         player.setMediaSource(mediaSource)
         player.prepare()
-        player.playWhenReady = true
+        player.playWhenReady = !isPaused && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
     }
 
     LaunchedEffect(controlsVisible, isFullscreen, isPaused) {
@@ -1530,12 +1532,13 @@ private fun NativeLivePlayer(
                 PlayerView(viewContext).apply {
                     this.player = player
                     useController = false
-                    keepScreenOn = true
+                    keepScreenOn = !isPaused
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 }
             },
             update = { playerView ->
                 if (playerView.player !== player) playerView.player = player
+                playerView.keepScreenOn = !isPaused && errorMessage == null
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -2384,8 +2387,8 @@ private fun EmbeddedLivePlayer(
         }
     }
 
-    LaunchedEffect(webView, url, isPlayerReady, lifecycle) {
-        if (!isPlayerReady) return@LaunchedEffect
+    LaunchedEffect(webView, url, isPlayerReady, isFullscreen, isDanmakuEnabled, lifecycle) {
+        if (!isPlayerReady || (isFullscreen && !isDanmakuEnabled)) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 webView.evaluateJavascript(LIVE_COMMENTS_SCRIPT) { result ->
@@ -2461,33 +2464,14 @@ private fun EmbeddedLivePlayer(
                 null,
             )
         }
-        if (isPlayerReady) {
-            for (i in 0 until 8) {
-                delay(1000L)
-                webView.evaluateJavascript(
-                    """
-                    (function() {
-                      const v = document.querySelector('$LIVE_VIDEO_SELECTOR');
-                      if (v && v.videoWidth > 0 && v.videoHeight > 0) {
-                        if (window.AuroraLiveBridge && window.AuroraLiveBridge.onVideoSize) {
-                          try { window.AuroraLiveBridge.onVideoSize(v.videoWidth, v.videoHeight); } catch(e) {}
-                        }
-                        return v.videoHeight > v.videoWidth ? 'portrait' : 'landscape';
-                      }
-                      return null;
-                    })()
-                    """.trimIndent(),
-                ) { res ->
-                    val orient = res?.trim()?.trim('"')
-                    if (orient == "portrait") onVideoOrientationChange(true)
-                    else if (orient == "landscape") onVideoOrientationChange(false)
-                }
-            }
-        }
     }
 
     Box(modifier.background(AuroraImmersiveBackground)) {
-        AndroidView(factory = { webView }, modifier = Modifier.fillMaxSize())
+        AndroidView(
+            factory = { webView },
+            update = { view -> view.keepScreenOn = isPlayerReady && !isPaused },
+            modifier = Modifier.fillMaxSize(),
+        )
         if (roomStatus == LiveRoomStatus.CONNECTING) {
             Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground)) {
                 posterUrl?.let { poster ->

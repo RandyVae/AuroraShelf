@@ -44,7 +44,12 @@ class CastManager private constructor(context: Context) {
 
     internal val localMediaProxy = LocalMediaProxy(
         okHttpClient = okHttpClient,
-        allowedDirs = listOfNotNull(appContext.cacheDir, appContext.filesDir, appContext.externalCacheDir),
+        allowedDirs = listOfNotNull(
+            java.io.File(appContext.filesDir, "offline_media"),
+            java.io.File(appContext.filesDir, "OfflineComics"),
+            appContext.cacheDir,
+            appContext.externalCacheDir,
+        ),
         cacheStreamOpener = { cacheKey, sourceUrl, referer, start, endInclusive ->
             openOfflineCachedStream(cacheKey, sourceUrl, referer, start, endInclusive)
         },
@@ -71,6 +76,7 @@ class CastManager private constructor(context: Context) {
         }
 
     private var discoveryJob: Job? = null
+    private var castJob: Job? = null
     private var syncJob: Job? = null
 
     fun selectDevice(device: CastDevice?) {
@@ -112,10 +118,11 @@ class CastManager private constructor(context: Context) {
         initialPositionMs: Long = 0L,
     ) {
         syncJob?.cancel()
+        castJob?.cancel()
         _selectedDevice.value = device
         _castState.value = CastState.Connecting(device)
 
-        scope.launch(Dispatchers.IO) {
+        castJob = scope.launch(Dispatchers.IO) {
             try {
                 // Determine the stream URL for the TV:
                 val streamUrl = when {
@@ -242,7 +249,10 @@ class CastManager private constructor(context: Context) {
             try {
                 executeSoapAction(connected.device.avTransportUrl, "Play", DlnaSoap.buildPlayXml())
                 withContext(Dispatchers.Main) {
-                    _castState.value = connected.copy(isPlaying = true)
+                    val current = _castState.value as? CastState.Connected
+                    if (current != null && current.device.id == connected.device.id && current.mediaUrl == connected.mediaUrl) {
+                        _castState.value = current.copy(isPlaying = true)
+                    }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Play error: ${e.message}")
@@ -256,7 +266,10 @@ class CastManager private constructor(context: Context) {
             try {
                 executeSoapAction(connected.device.avTransportUrl, "Pause", DlnaSoap.buildPauseXml())
                 withContext(Dispatchers.Main) {
-                    _castState.value = connected.copy(isPlaying = false)
+                    val current = _castState.value as? CastState.Connected
+                    if (current != null && current.device.id == connected.device.id && current.mediaUrl == connected.mediaUrl) {
+                        _castState.value = current.copy(isPlaying = false)
+                    }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Pause error: ${e.message}")
@@ -270,7 +283,10 @@ class CastManager private constructor(context: Context) {
             try {
                 executeSoapAction(connected.device.avTransportUrl, "Seek", DlnaSoap.buildSeekXml(positionMs))
                 withContext(Dispatchers.Main) {
-                    _castState.value = connected.copy(positionMs = positionMs)
+                    val current = _castState.value as? CastState.Connected
+                    if (current != null && current.device.id == connected.device.id && current.mediaUrl == connected.mediaUrl) {
+                        _castState.value = current.copy(positionMs = positionMs)
+                    }
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Seek error: ${e.message}")
@@ -280,6 +296,8 @@ class CastManager private constructor(context: Context) {
 
     fun stop() {
         val connected = _castState.value as? CastState.Connected
+        castJob?.cancel()
+        castJob = null
         syncJob?.cancel()
         syncJob = null
         _castState.value = CastState.Idle

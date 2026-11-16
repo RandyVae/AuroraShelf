@@ -111,5 +111,22 @@
     this.raf = 0;
   };
 
+  SpineStage.prototype.destroy = function () {
+    this.stop();
+    window.removeEventListener('resize', this.resize);
+    if (this.field) {
+      try {
+        if (this.field.clear) this.field.clear();
+        if (this.field.gl) {
+          const loseExt = this.field.gl.getExtension('WEBGL_lose_context');
+          if (loseExt) loseExt.loseContext();
+        }
+      } catch (_) {}
+      this.field = null;
+    }
+    this.view = null;
+    this.unitName = null;
+  };
+
   window.SpineStage = SpineStage;
 })();

@@ -2098,6 +2098,10 @@ public final class VideoRepository: ObservableObject {
             }
             var collected: [[VideoItem]?] = []
             for await result in group {
+                guard self.currentSearchToken == token, !Task.isCancelled else {
+                    group.cancelAll()
+                    return collected
+                }
                 collected.append(result)
                 let visible = Self.sortSearchResults(
                     collected.compactMap { $0 }.flatMap { $0 },

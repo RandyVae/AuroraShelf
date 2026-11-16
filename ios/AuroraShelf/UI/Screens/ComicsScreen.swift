@@ -373,16 +373,20 @@ public struct ComicHeroBanner: View {
 
     public var body: some View {
         ZStack(alignment: .bottom) {
-            AuroraCoverImage(
-                url: comic.coverUrl,
-                title: comic.title,
-                sourceBaseURL: comic.coverBaseURL,
-                aspectRatio: isWideAspect ? 16 / 9 : 4 / 5,
-                contentMode: .fill,
-                cornerRadius: 0
-            )
-            .frame(maxWidth: .infinity, maxHeight: heroHeight)
-            .clipped()
+            Color.clear
+                .overlay(
+                    AuroraCoverImage(
+                        url: comic.coverUrl,
+                        title: comic.title,
+                        sourceBaseURL: comic.coverBaseURL,
+                        aspectRatio: nil,
+                        contentMode: .fill,
+                        cornerRadius: 0
+                    )
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: heroHeight)
+                .clipped()
 
             VStack(spacing: 0) {
                 LinearGradient(

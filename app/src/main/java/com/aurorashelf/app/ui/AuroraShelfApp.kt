@@ -313,8 +313,9 @@ fun AuroraShelfApp(
 
     BackHandler(
         enabled = state.selectedVideo != null || state.isSearchOpen || state.destination != AppDestination.HOME ||
-            comicState.reader != null || comicState.details != null || comicState.isDetailsLoading ||
-            comicState.detailsError != null || forumState.selectedPost != null || liveState.selectedItem != null,
+            (state.destination == AppDestination.COMICS && (comicState.reader != null || comicState.details != null || comicState.isDetailsLoading || comicState.detailsError != null)) ||
+            (state.destination == AppDestination.FORUM && forumState.selectedPost != null) ||
+            (state.destination == AppDestination.LIVE && liveState.selectedItem != null),
     ) {
         when {
             state.selectedVideo != null && isPlayerFullscreen -> isPlayerFullscreen = false
@@ -364,13 +365,20 @@ fun AuroraShelfApp(
             LocalBackdrop provides liquidBackdrop,
             LocalCastController provides castController,
         ) {
+        val showNavigation = state.selectedVideo == null &&
+            !state.isSearchOpen &&
+            comicState.reader == null &&
+            forumState.selectedPost == null &&
+            liveState.selectedItem == null &&
+            !isLiveFullscreen &&
+            !(state.destination == AppDestination.ME && personalRoute == PersonalRoute.ACCOUNT)
+
         AnimatedContent(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxSize()
-                .layerBackdrop(liquidBackdrop)
-                .hazeSource(state = hazeState)
-                .then(if (windowLayout.compactDock && !isAnyFullscreen) Modifier.padding(start = 80.dp) else Modifier)
+                .then(if (showNavigation) Modifier.layerBackdrop(liquidBackdrop).hazeSource(state = hazeState) else Modifier)
+                .then(if (windowLayout.compactDock && showNavigation) Modifier.padding(start = 80.dp) else Modifier)
                 .then(
                 if (state.isSearchOpen || state.selectedVideo != null) {
                 Modifier.clearAndSetSemantics { }
@@ -516,14 +524,6 @@ fun AuroraShelfApp(
                 )
             }
         }
-
-        val showNavigation = state.selectedVideo == null &&
-            !state.isSearchOpen &&
-            comicState.reader == null &&
-            forumState.selectedPost == null &&
-            liveState.selectedItem == null &&
-            !isLiveFullscreen &&
-            !(state.destination == AppDestination.ME && personalRoute == PersonalRoute.ACCOUNT)
 
         if (windowLayout.compactDock) {
             AnimatedVisibility(

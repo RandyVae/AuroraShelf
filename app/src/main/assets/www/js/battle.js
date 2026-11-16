@@ -835,14 +835,17 @@
             if (this.spine && this.spine.squash) this.spine.squash(u.view, 1.16, 0.88, 0.18);
           }
           
+          let deferredRangedDamage = false;
           if (window.LGVFX && !this.skipping) {
             const sp = this.spine.project(u.x, u.footY);
             const tp = this.spine.project(target.x, target.footY);
             const sNorm = { x: (sp.x / this.W) * 100, y: (1 - sp.y / this.H) * 100 };
             const tNorm = { x: (tp.x / this.W) * 100, y: (1 - tp.y / this.H) * 100 };
             if (isRanged) {
+              deferredRangedDamage = true;
               const boltColor = u.side === 'ally' ? '#38bdf8' : '#f43f5e';
               window.LGVFX.projectile(sNorm, tNorm, boltColor, () => {
+                if (!this.running || this.ended || this.stopped || !u.alive || !target.alive) return;
                 this.damage(u, target, u.atk * mult);
                 // Regina Signature: Heavy Cannon 35% splash damage to adjacent lane enemies
                 if (u.key === 'regina') {
@@ -856,23 +859,24 @@
                 }
                 this.trySkills(u, 'on_attack', target);
               });
-              continue;
             } else {
               window.LGVFX.slash(tNorm, false, { side: u.side });
             }
           }
-          this.damage(u, target, u.atk * mult);
-          // Regina Signature: Heavy Cannon 35% splash damage to adjacent lane enemies
-          if (u.key === 'regina') {
-            const foes = this.enemiesOf(u);
-            const splashFoes = foes.filter((f) => f.alive && f !== target && Math.abs(f.lane - target.lane) === 1);
-            if (splashFoes.length) {
-              const splashDmg = Math.round(u.atk * 0.35 * mult);
-              splashFoes.forEach((sf) => this.damage(u, sf, splashDmg, { raw: true, silent: true }));
-              this.float(u, '重砲溅射', '');
+          if (!deferredRangedDamage) {
+            this.damage(u, target, u.atk * mult);
+            // Regina Signature: Heavy Cannon 35% splash damage to adjacent lane enemies
+            if (u.key === 'regina') {
+              const foes = this.enemiesOf(u);
+              const splashFoes = foes.filter((f) => f.alive && f !== target && Math.abs(f.lane - target.lane) === 1);
+              if (splashFoes.length) {
+                const splashDmg = Math.round(u.atk * 0.35 * mult);
+                splashFoes.forEach((sf) => this.damage(u, sf, splashDmg, { raw: true, silent: true }));
+                this.float(u, '重砲溅射', '');
+              }
             }
+            this.trySkills(u, 'on_attack', target);
           }
-          this.trySkills(u, 'on_attack', target);
         }
       }
       u.x = clamp(u.x, this.W * 0.03, this.W * 0.97);
@@ -1172,6 +1176,9 @@
     if (this.tags) this.tags.clear();
     if (this.shadows) this.shadows.clear();
     if (this.deployedWaves) this.deployedWaves.clear();
+    if (window.LGVFX && window.LGVFX.clearAll) {
+      window.LGVFX.clearAll();
+    }
   };
 
   window.Battle = Battle;

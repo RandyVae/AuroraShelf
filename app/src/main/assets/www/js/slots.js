@@ -258,6 +258,7 @@
       return this.ctx;
     },
     isMuted() {
+      if (window.LGAudio && (LGAudio.isMuted || LGAudio.appMuted)) return true;
       if (window.APP && APP.state && APP.state.settings) {
         if (APP.state.settings.sfx === false || APP.state.settings.sfxVol === 0) return true;
       }
@@ -1070,16 +1071,25 @@
       if (closeFeature) closeFeature.onclick = () => this.hideFeature();
 
       // Keyboard spacebar spin shortcut
-      window.addEventListener('keydown', (e) => {
+      if (this._keydownHandler) {
+        window.removeEventListener('keydown', this._keydownHandler);
+      }
+      this._keydownHandler = (e) => {
         if (e.code === 'Space' && !e.repeat && document.getElementById('screen-slots')?.classList.contains('active')) {
           const pt = document.getElementById('slots-paytable');
           const ft = document.getElementById('slots-feature');
-          if ((!pt || pt.hidden) && (!ft || ft.hidden)) {
+          const bo = document.getElementById('modal-slots-bailout');
+          const rc = document.getElementById('modal-slots-recharge');
+          const anyModalOpen = (pt && !pt.hidden) || (ft && !ft.hidden) ||
+            (bo && (bo.classList.contains('open') || !bo.hidden)) ||
+            (rc && (rc.classList.contains('open') || !rc.hidden));
+          if (!anyModalOpen) {
             e.preventDefault();
             this.playSpin();
           }
         }
-      });
+      };
+      window.addEventListener('keydown', this._keydownHandler);
     },
 
     pullLever() {
@@ -1135,6 +1145,10 @@
 
     destroy() {
       this.stopAutoSpin();
+      if (this._keydownHandler) {
+        window.removeEventListener('keydown', this._keydownHandler);
+        this._keydownHandler = null;
+      }
       if (this.mascotStage && typeof this.mascotStage.stop === 'function') {
         this.mascotStage.stop();
       }
@@ -1502,7 +1516,11 @@
         if (this.autoSpinsLeft <= 0 || (state.gold || 0) < this.bet) {
           this.stopAutoSpin();
         } else {
-          setTimeout(() => { if (this.autoSpin) this.playSpin(); }, 600);
+          if (this._autoSpinTimer) clearTimeout(this._autoSpinTimer);
+          this._autoSpinTimer = setTimeout(() => {
+            this._autoSpinTimer = null;
+            if (this.autoSpin) this.playSpin();
+          }, 600);
         }
       }
     },
@@ -1717,18 +1735,32 @@
       overlay.hidden = false;
       video.src = source;
       video.currentTime = 0;
-      const finish = () => { video.pause(); overlay.hidden = true; video.onended = null; };
-      video.onended = finish;
-      const skip = document.getElementById('btn-cg-skip');
-      if (skip) skip.onclick = finish;
-      if (this.isReduceMotion()) { finish(); return; }
+      if (this.isReduceMotion()) {
+        video.pause();
+        overlay.hidden = true;
+        return;
+      }
       await video.play().catch(() => {});
       await new Promise((resolve) => {
-        const done = () => { resolve(); };
-        video.addEventListener('ended', done, { once: true });
-        setTimeout(done, 4200);
+        let settled = false;
+        let timer = null;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          if (timer) clearTimeout(timer);
+          video.onended = null;
+          video.onerror = null;
+          if (skip && skip.onclick === finish) skip.onclick = null;
+          video.pause();
+          overlay.hidden = true;
+          resolve();
+        };
+        const skip = document.getElementById('btn-cg-skip');
+        if (skip) skip.onclick = finish;
+        video.onended = finish;
+        video.onerror = finish;
+        timer = setTimeout(finish, 4200);
       });
-      finish();
     },
   };
 

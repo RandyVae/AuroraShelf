@@ -64,12 +64,46 @@
 
   window.setAppMuted = function (muted) {
     if (window.LGAudio) {
-      if (muted) LGAudio.stopBgm();
-      else if (APP && APP.screen) {
-        const bgm = { title: 'title', hub: 'hub', campaign: 'campaign', story: 'story', battle: 'battle', gacha: 'gacha', slots: 'gacha' }[APP.screen];
-        if (bgm) LGAudio.playBgm(bgm);
+      LGAudio.appMuted = !!muted;
+      if (muted) {
+        LGAudio.stopBgm();
+      } else {
+        LGAudio.isMuted = (LGAudio.bgmVolume === 0 && LGAudio.sfxVolume === 0);
+        if (!LGAudio.isMuted && APP && APP.screen) {
+          const bgm = { title: 'title', hub: 'hub', campaign: 'campaign', story: 'story', battle: 'battle', gacha: 'gacha', slots: 'gacha' }[APP.screen];
+          if (bgm) LGAudio.playBgm(bgm);
+        }
       }
     }
+  };
+
+  window.handleAppBack = function () {
+    const openSelectors = [
+      '#cg-cinema-overlay', '#modal-battle-revive', '#slots-paytable', '#slots-feature',
+      '#modal-slots-bailout', '#modal-slots-recharge', '#detail-sheet', '#mission-sheet',
+      '#story-sheet', '#settings-sheet', '#squad-sheet',
+    ];
+    for (let i = 0; i < openSelectors.length; i++) {
+      const el = document.querySelector(openSelectors[i]);
+      if (el && !el.hidden && (el.classList.contains('open') || el.style.display !== 'none')) {
+        if (openSelectors[i] === '#cg-cinema-overlay') {
+          const skip = document.getElementById('btn-cg-skip');
+          if (skip && skip.onclick) skip.onclick();
+          else el.hidden = true;
+          return true;
+        }
+        el.classList.remove('open');
+        el.hidden = true;
+        return true;
+      }
+    }
+    if (APP && APP.screen && APP.screen !== 'hub' && APP.screen !== 'title' && APP.screen !== 'boot') {
+      if (APP.battle && APP.battle.running) APP.battle.stop();
+      if (window.SlotsUI && SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
+      APP.show('hub');
+      return true;
+    }
+    return false;
   };
 
   // 检测宿主是否为原生 iOS/Android App，若是则隐藏网页内置胶囊以避免双重渲染
@@ -119,14 +153,10 @@
     if (name !== 'battle' && APP.battle && APP.battle.running) APP.battle.stop();
     if (name !== 'slots' && window.SlotsUI && SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
     if (APP.stages && name !== 'hub' && APP.stages.hub) APP.stages.hub.stop();
-    if (name !== 'battle' && APP.battle && APP.battle.running) {
-      APP.battle.stop();
-    }
     if (name === 'slots' && window.SlotsUI && SlotsUI.resumeMascot) {
       SlotsUI.resumeMascot();
-    } else if (name !== 'slots' && window.SlotsUI) {
-      if (SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
-      if (SlotsUI.pauseMascot) SlotsUI.pauseMascot();
+    } else if (name !== 'slots' && window.SlotsUI && SlotsUI.pauseMascot) {
+      SlotsUI.pauseMascot();
     }
     const bgm = { title: 'title', hub: 'hub', campaign: 'campaign', story: 'story', battle: 'battle', gacha: 'gacha', slots: 'gacha' }[name];
     if (bgm) LGAudio.playBgm(bgm);
@@ -565,18 +595,27 @@
       }, 1200);
     }
 
-    cancelAnimationFrame(APP.raf);
-    let last = performance.now();
-    const loop = (now) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-      const scaled = dt * (b.speed || 1);
-      if (!APP.gamePaused) b.step(scaled);
-      b.spine.update(scaled);
-      b.spine.draw();
-      if (!b.ended) APP.raf = requestAnimationFrame(loop);
-    };
-    APP.raf = requestAnimationFrame(loop);
+    function startBattleLoop(battleInst) {
+      cancelAnimationFrame(APP.raf);
+      let last = performance.now();
+      const loop = (now) => {
+        const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+        last = now;
+        const scaled = dt * (battleInst.speed || 1);
+        if (!APP.gamePaused) battleInst.step(scaled);
+        if (battleInst.spine) {
+          battleInst.spine.update(scaled);
+          battleInst.spine.draw();
+        }
+        if (!battleInst.ended && !battleInst.stopped) {
+          APP.raf = requestAnimationFrame(loop);
+        } else {
+          battleInst._reviving = false;
+        }
+      };
+      APP.raf = requestAnimationFrame(loop);
+    }
+    startBattleLoop(b);
 
     $('#btn-battle-speed').onclick = () => {
       b.speed = b.speed >= 3 ? 1 : b.speed + 1;
@@ -711,14 +750,7 @@
               APP.battle.running = true;
               APP.battle._reviveUsed = true;
               APP.battle.triggerReviveProtocol();
-              APP.raf = requestAnimationFrame(function loop() {
-                if (APP.battle && APP.battle.running) {
-                  APP.battle.step(0.016);
-                  APP.raf = requestAnimationFrame(loop);
-                } else if (APP.battle) {
-                  APP.battle._reviving = false;
-                }
-              });
+              startBattleLoop(APP.battle);
             }
           };
           $('#btn-battle-revive-cancel').onclick = () => {

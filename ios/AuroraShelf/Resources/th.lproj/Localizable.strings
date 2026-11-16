@@ -54,6 +54,7 @@
 "live.couples" = "คู่รัก";
 "live.trans" = "ทรานส์";
 "live.loading" = "กำลังโหลดรายการสตรีมเมอร์…";
+"live.empty" = "ยังไม่มีสตรีมเมอร์ที่กำลังไลฟ์อยู่";
 "live.viewers" = "ผู้ชม %@";
 "live.online" = "ออนไลน์";
 "live.offline" = "ออฟไลน์";

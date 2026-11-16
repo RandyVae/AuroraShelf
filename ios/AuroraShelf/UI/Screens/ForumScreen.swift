@@ -334,15 +334,19 @@ public struct ForumHeroBillboard: View {
         ZStack(alignment: .bottom) {
             // 背景封面或板块光晕
             if let preview = post.previewImageUrl, !preview.isEmpty {
-                AuroraCoverImage(
-                    url: preview,
-                    title: post.title,
-                    aspectRatio: isWideAspect ? 16 / 9 : 4 / 3,
-                    contentMode: .fill,
-                    cornerRadius: 0
-                )
-                .frame(maxWidth: .infinity, maxHeight: heroHeight)
-                .clipped()
+                Color.clear
+                    .overlay(
+                        AuroraCoverImage(
+                            url: preview,
+                            title: post.title,
+                            aspectRatio: nil,
+                            contentMode: .fill,
+                            cornerRadius: 0
+                        )
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: heroHeight)
+                    .clipped()
             } else {
                 let spec = ForumBoardVisualSpec.forBoard(post.fid)
                 ZStack {
@@ -569,7 +573,9 @@ public struct ForumScreen: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 LazyHStack(alignment: .top, spacing: AuroraMetrics.spacingM) {
                                     ForEach(top10Posts) { post in
-                                        NavigationLink(value: post) {
+                                        Button {
+                                            PlayerCoordinator.shared.openForumPost(post)
+                                        } label: {
                                             ForumFeaturedCard(post: post)
                                         }
                                         .buttonStyle(AppleSpringCardButtonStyle())

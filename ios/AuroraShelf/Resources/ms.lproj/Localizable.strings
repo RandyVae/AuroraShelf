@@ -54,6 +54,7 @@
 "live.couples" = "Pasangan";
 "live.trans" = "Trans";
 "live.loading" = "Memuatkan strimer…";
+"live.empty" = "Tiada strimer siaran langsung tersedia";
 "live.viewers" = "%@ Penonton";
 "live.online" = "Dalam talian";
 "live.offline" = "Luar talian";

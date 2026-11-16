@@ -3,6 +3,7 @@
 local.properties
 source-secrets.properties
 ios/AuroraShelf/Resources/SourceSecrets.plist
+ios/AuroraShelf/Data/Comic/GeneratedSourceSecrets.swift
 **/build/
 build.nosync/
 *.iml

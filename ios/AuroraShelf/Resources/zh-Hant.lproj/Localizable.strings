@@ -54,6 +54,7 @@
 "live.couples" = "情侶雙人";
 "live.trans" = "跨性別";
 "live.loading" = "正在加載主播列表…";
+"live.empty" = "暫無正在直播的主播";
 "live.viewers" = "觀眾 %@";
 "live.online" = "在線";
 "live.offline" = "離線";

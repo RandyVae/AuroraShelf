@@ -54,6 +54,7 @@
 "live.couples" = "Parejas";
 "live.trans" = "Trans";
 "live.loading" = "Cargando transmisiones…";
+"live.empty" = "No hay transmisiones en vivo disponibles";
 "live.viewers" = "%@ espectadores";
 "live.online" = "En directo";
 "live.offline" = "Desconectado";

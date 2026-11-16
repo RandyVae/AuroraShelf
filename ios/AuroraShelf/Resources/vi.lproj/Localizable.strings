@@ -54,6 +54,7 @@
 "live.couples" = "Cặp đôi";
 "live.trans" = "Chuyển giới";
 "live.loading" = "Đang tải danh sách streamer…";
+"live.empty" = "Hiện chưa có streamer nào đang phát trực tiếp";
 "live.viewers" = "%@ Người xem";
 "live.online" = "Trực tuyến";
 "live.offline" = "Ngoại tuyến";

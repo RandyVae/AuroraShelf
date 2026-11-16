@@ -350,11 +350,22 @@ private fun ComicLibrary(
     val selectedSource = state.sources.find { it.id == state.selectedSourceId }
     // snapshotFlow keeps firing when the next page grows the list, unlike a derivedStateOf
     // boolean that can stay latched at true and never request the following page.
-    LaunchedEffect(gridState, state.selectedSourceId, state.selectedCategoryId, state.activeQuery) {
+    LaunchedEffect(
+        gridState,
+        state.selectedSourceId,
+        state.selectedCategoryId,
+        state.activeQuery,
+        state.canLoadMore,
+        state.isLoading,
+        state.isLoadingMore,
+        state.loadMoreError,
+    ) {
         snapshotFlow {
             val info = gridState.layoutInfo
             val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
-            info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - 5
+            info.totalItemsCount > 0 && lastVisible >= info.totalItemsCount - 5 &&
+                !state.isLoading && !state.isLoadingMore &&
+                state.canLoadMore && state.loadMoreError == null
         }
             .distinctUntilChanged()
             .filter { it }
@@ -370,6 +381,7 @@ private fun ComicLibrary(
         }
     }
 
+    val bottomInset = LocalDockHeight.current + 24.dp
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -380,7 +392,7 @@ private fun ComicLibrary(
             // collapses the covers to a single column instead of squeezing the text.
             columns = GridCells.Adaptive(minSize = scaledAdaptiveMinSize(154.dp, fontScale)),
             state = gridState,
-            contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 126.dp),
+            contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = bottomInset),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.fillMaxSize().testTag("comic-library-grid"),
@@ -466,15 +478,12 @@ private fun ComicLibrary(
                     }
                 }
             }
-            state.error?.let { message ->
+            (state.loadMoreError ?: state.error)?.let { message ->
                 if (state.comics.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            message,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        )
+                        TextButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
+                            Text("$message（点击重试）")
+                        }
                     }
                 }
             }

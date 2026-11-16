@@ -60,7 +60,7 @@ class AppPreferences(context: Context) {
     fun cachedComicFeed(sourceId: String, categoryId: String): CachedComic? = runCatching {
         decodeComicCache(preferences.getString(KEY_COMIC_CACHE, "").orEmpty())
     }.getOrNull()?.takeIf {
-        it.sourceId == sourceId && (categoryId.isBlank() || it.categoryId == categoryId) && isComicCacheFresh(it.savedAtMillis)
+        it.sourceId == sourceId && it.categoryId == categoryId && isComicCacheFresh(it.savedAtMillis)
     }
 
     fun saveComicFeed(sourceId: String, categoryId: String, comics: List<ComicSummary>) {

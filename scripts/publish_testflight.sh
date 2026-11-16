@@ -231,7 +231,7 @@ if ! xcodebuild archive \
   CODE_SIGN_STYLE=Automatic \
   CODE_SIGNING_ALLOWED=YES \
   CODE_SIGNING_REQUIRED=YES \
-  "${AUTH_ARGS[@]}"; then
+  ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}; then
   echo "错误: xcodebuild archive 失败。"
   print_next_steps
   exit 1
@@ -242,7 +242,7 @@ if ! xcodebuild -exportArchive \
   -exportPath "${OUTPUT_DIR}" \
   -exportOptionsPlist "${EXPORT_OPTIONS}" \
   -allowProvisioningUpdates \
-  "${AUTH_ARGS[@]}"; then
+  ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}; then
   echo "错误: xcodebuild -exportArchive 失败（通常因缺少 Apple Distribution 证书、App Store 描述文件或 App Store Connect 登录态）。"
   print_next_steps
   exit 1

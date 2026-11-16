@@ -533,11 +533,13 @@
       clearTimeout(this.typingTimer);
 
       if (this.spineStage) {
-        this.spineStage.stop();
+        if (this.spineStage.destroy) this.spineStage.destroy();
+        else this.spineStage.stop();
         this.spineStage = null;
       }
       if (this.enemySpineStage) {
-        this.enemySpineStage.stop();
+        if (this.enemySpineStage.destroy) this.enemySpineStage.destroy();
+        else this.enemySpineStage.stop();
         this.enemySpineStage = null;
       }
 

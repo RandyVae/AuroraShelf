@@ -262,7 +262,8 @@ internal fun NativeSitePlayer(
                 player.pause()
             } else {
                 player.prepare()
-                player.playWhenReady = shouldResume && !isCurrentlyCasting
+                val canAutoStart = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                player.playWhenReady = shouldResume && !isCurrentlyCasting && canAutoStart
             }
             Log.i(TAG, "player prepared playWhenReady=${player.playWhenReady}")
             Log.i(TAG, "timing prepared ms=${android.os.SystemClock.elapsedRealtime() - loadStartedAtMs.longValue}")
@@ -282,8 +283,9 @@ internal fun NativeSitePlayer(
             player.clearMediaItems()
         }
     }
-    LaunchedEffect(player) {
+    LaunchedEffect(player, isPlaying, isScrubbing, suppressPlayback) {
         while (true) {
+            val state = player.playbackState
             val current = player.currentPosition.coerceAtLeast(0L)
             val dur = player.duration.coerceAtLeast(0L)
             val buf = player.bufferedPosition.coerceAtLeast(0L)
@@ -293,10 +295,16 @@ internal fun NativeSitePlayer(
             durationMs = dur
             bufferedPositionMs = buf
             isPlaying = player.isPlaying
-            position = current
-            positionChange(current)
+            if (!suppressPlayback && (state == Player.STATE_READY || state == Player.STATE_BUFFERING)) {
+                position = current
+                positionChange(current)
+            }
             durationChange(dur)
-            delay(200)
+            if (!player.isPlaying && !isScrubbing && state != Player.STATE_BUFFERING) {
+                delay(500)
+            } else {
+                delay(200)
+            }
         }
     }
     DisposableEffect(player, lifecycle) {
@@ -369,10 +377,12 @@ internal fun NativeSitePlayer(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_PAUSE -> {
-                    val current = player.currentPosition.coerceAtLeast(0L)
-                    position = current
-                    positionChange(current)
-                    shouldResume = player.playWhenReady
+                    if (player.playbackState != Player.STATE_IDLE) {
+                        val current = player.currentPosition.coerceAtLeast(0L)
+                        position = current
+                        positionChange(current)
+                        shouldResume = player.playWhenReady
+                    }
                     player.pause()
                 }
                 Lifecycle.Event.ON_RESUME -> {
@@ -560,7 +570,7 @@ internal fun NativeSitePlayer(
                     id = R.id.native_player
                     this.player = player
                     useController = false
-                    keepScreenOn = true
+                    keepScreenOn = isPlaying && currentCastState !is com.aurorashelf.app.cast.CastState.Connected
                     resizeMode = if (isFillMode) {
                         AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                     } else {
@@ -571,6 +581,7 @@ internal fun NativeSitePlayer(
             update = { playerView ->
                 if (playerView.player !== player) playerView.player = player
                 playerView.useController = false
+                playerView.keepScreenOn = isPlaying && currentCastState !is com.aurorashelf.app.cast.CastState.Connected
                 playerView.resizeMode = if (isFillMode) {
                     AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                 } else {

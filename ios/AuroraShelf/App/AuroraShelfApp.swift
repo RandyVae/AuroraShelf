@@ -3,13 +3,8 @@ import SwiftUI
 @main
 struct AuroraShelfApp: App {
     init() {
-        // 支持命令行参数指定初始视频源（便于自动化回归与验收截图）
-        let args = ProcessInfo.processInfo.arguments
-        if let idx = args.firstIndex(of: "--video-source"), idx + 1 < args.count {
-            let srcId = args[idx + 1]
-            let src = VideoSourceCatalog.find(by: srcId)
-            VideoRepository.shared.switchSource(to: src)
-        }
+        // 确保 VideoRepository 单例按启动参数（如 --video-source）完成一次初始化
+        _ = VideoRepository.shared
         // 启动全平台全面预热系统（涵盖视频、论坛与漫画，实现即点即看）
         GlobalStartupPrefetchEngine.shared.startGlobalWarmup()
     }

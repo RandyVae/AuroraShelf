@@ -119,11 +119,12 @@ internal class ForumImageSaver(
     }
 
     private fun saveRemoteImage(request: ForumImageRequest): Uri {
+        val safeCookies = request.cookies?.takeIf { it.isNotBlank() && shouldForwardCookies(request.imageUrl, request.pageUrl) }
         val networkRequest = Request.Builder()
             .url(request.imageUrl)
             .header("User-Agent", request.userAgent)
             .header("Referer", request.pageUrl)
-            .apply { request.cookies?.takeIf(String::isNotBlank)?.let { header("Cookie", it) } }
+            .apply { safeCookies?.let { header("Cookie", it) } }
             .build()
 
         return client.newCall(networkRequest).execute().use { response ->
@@ -234,6 +235,8 @@ internal class ForumImageSaver(
                 ?: throw IOException("服务器返回的内容不是图片")
         }
 
+        private val FILE_SEQUENCE = java.util.concurrent.atomic.AtomicInteger(0)
+
         internal fun createDisplayName(mimeType: String, timestamp: Long = System.currentTimeMillis()): String {
             val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
                 ?: when (mimeType.lowercase()) {
@@ -241,7 +244,8 @@ internal class ForumImageSaver(
                     "image/svg+xml" -> "svg"
                     else -> "img"
                 }
-            return "AuroraShelf_${timestamp}.$extension"
+            val seq = FILE_SEQUENCE.incrementAndGet() and 0xFFFF
+            return "AuroraShelf_${timestamp}_${seq}.$extension"
         }
     }
 }

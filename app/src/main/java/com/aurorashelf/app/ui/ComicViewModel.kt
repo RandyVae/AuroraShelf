@@ -44,6 +44,7 @@ data class ComicUiState(
     val isLoading: Boolean = false,
     val isLoadingMore: Boolean = false,
     val error: String? = null,
+    val loadMoreError: String? = null,
     val details: ComicDetails? = null,
     val isDetailsLoading: Boolean = false,
     val detailsError: String? = null,
@@ -172,8 +173,10 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                 selectedCategoryId = categoryId,
                 query = "",
                 activeQuery = "",
-                comics = cached?.comics ?: it.comics,
-                page = if (cached != null) 1 else 0,
+                comics = cached?.comics.orEmpty(),
+                page = if (cached != null && cached.comics.isNotEmpty()) 1 else 0,
+                canLoadMore = true,
+                loadMoreError = null,
                 details = null,
                 isDetailsLoading = false,
                 detailsError = null,
@@ -217,7 +220,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         if (state.isLoading || state.isLoadingMore || !state.canLoadMore || state.page == 0) return
         val nextPage = state.page + 1
         listJob = viewModelScope.launch {
-            mutableUiState.update { it.copy(isLoadingMore = true, error = null) }
+            mutableUiState.update { it.copy(isLoadingMore = true, error = null, loadMoreError = null) }
             runCatching { load(state.selectedSourceId, state.selectedCategoryId, state.activeQuery, nextPage) }
                 .onSuccess { result ->
                     mutableUiState.update {
@@ -231,12 +234,13 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                             page = nextPage,
                             canLoadMore = result.isNotEmpty(),
                             isLoadingMore = false,
+                            loadMoreError = null,
                         )
                     }
                 }
                 .onFailure { failure ->
                     if (failure is CancellationException) return@onFailure
-                    mutableUiState.update { it.copy(isLoadingMore = false, error = failure.userMessage()) }
+                    mutableUiState.update { it.copy(isLoadingMore = false, loadMoreError = failure.userMessage()) }
                 }
         }
     }

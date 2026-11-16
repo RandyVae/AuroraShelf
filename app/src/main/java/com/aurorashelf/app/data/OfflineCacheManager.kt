@@ -81,6 +81,7 @@ internal data class OfflineMetadata(
     val pageUrl: String,
     val thumbnailUrl: String?,
     val referer: String? = null,
+    val extraHeaders: Map<String, String> = emptyMap(),
 )
 
 /**
@@ -97,10 +98,28 @@ internal object OfflineMetadataCodec {
         put("pageUrl", metadata.pageUrl)
         put("thumbnailUrl", metadata.thumbnailUrl.orEmpty())
         put("referer", metadata.referer.orEmpty())
+        if (metadata.extraHeaders.isNotEmpty()) {
+            put("extraHeaders", JSONObject(metadata.extraHeaders))
+        }
     }.toString().toByteArray(Charsets.UTF_8)
 
     fun decode(bytes: ByteArray): OfflineMetadata? = runCatching {
         val json = JSONObject(bytes.toString(Charsets.UTF_8))
+        val headersObj = json.optJSONObject("extraHeaders")
+        val decodedHeaders = if (headersObj == null) {
+            emptyMap()
+        } else {
+            buildMap {
+                val keys = headersObj.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val value = headersObj.optString(key)
+                    if (key.isNotBlank() && value.isNotBlank()) {
+                        put(key, value)
+                    }
+                }
+            }
+        }
         OfflineMetadata(
             videoId = json.optString("videoId"),
             title = json.optString("title", DEFAULT_TITLE),
@@ -108,6 +127,7 @@ internal object OfflineMetadataCodec {
             pageUrl = json.optString("pageUrl"),
             thumbnailUrl = json.optString("thumbnailUrl").takeIf(String::isNotBlank),
             referer = json.optString("referer").takeIf(String::isNotBlank),
+            extraHeaders = decodedHeaders,
         )
     }.getOrNull()
 }
@@ -124,15 +144,25 @@ class OfflineCacheManager private constructor(context: Context) {
     )
     private val refererByUri = ConcurrentHashMap<String, String>()
     private val refererByHost = ConcurrentHashMap<String, String>()
+    private val headersByUri = ConcurrentHashMap<String, Map<String, String>>()
+    private val headersByHost = ConcurrentHashMap<String, Map<String, String>>()
 
-    private fun registerReferer(mediaUrl: String?, referer: String?) {
-        val ref = referer?.takeIf { it.isNotBlank() } ?: return
+    private fun registerRequestHeaders(
+        mediaUrl: String?,
+        referer: String?,
+        extraHeaders: Map<String, String> = emptyMap(),
+    ) {
         val url = mediaUrl?.takeIf { it.isNotBlank() } ?: return
-        refererByUri[url] = ref
-        runCatching { url.toUri().host?.lowercase() }
-            .getOrNull()
-            ?.takeIf { it.isNotBlank() }
-            ?.let { host -> refererByHost[host] = ref }
+        val host = runCatching { url.toUri().host?.lowercase() }.getOrNull()?.takeIf { it.isNotBlank() }
+        val ref = referer?.takeIf { it.isNotBlank() }
+        if (ref != null) {
+            refererByUri[url] = ref
+            if (host != null) refererByHost[host] = ref
+        }
+        if (extraHeaders.isNotEmpty()) {
+            headersByUri[url] = extraHeaders
+            if (host != null) headersByHost[host] = extraHeaders
+        }
     }
 
     private val upstreamFactory = DefaultHttpDataSource.Factory()
@@ -145,20 +175,26 @@ class OfflineCacheManager private constructor(context: Context) {
         val uriStr = dataSpec.uri.toString()
         val host = dataSpec.uri.host?.lowercase()
         val ref = refererByUri[uriStr] ?: host?.let { refererByHost[it] }
-        if (ref.isNullOrBlank()) {
+        val extra = headersByUri[uriStr] ?: host?.let { headersByHost[it] } ?: emptyMap()
+        if (ref.isNullOrBlank() && extra.isEmpty()) {
             dataSpec
         } else {
-            val origin = runCatching {
-                val parsed = ref.toUri()
-                if (!parsed.scheme.isNullOrBlank() && !parsed.host.isNullOrBlank()) {
-                    "${parsed.scheme}://${parsed.host}"
-                } else {
-                    null
-                }
-            }.getOrNull()
+            val origin = ref?.let { r ->
+                runCatching {
+                    val parsed = r.toUri()
+                    if (!parsed.scheme.isNullOrBlank() && !parsed.host.isNullOrBlank()) {
+                        "${parsed.scheme}://${parsed.host}"
+                    } else {
+                        null
+                    }
+                }.getOrNull()
+            }
             val merged = buildMap {
                 putAll(dataSpec.httpRequestHeaders)
-                putIfAbsent("Referer", ref)
+                extra.forEach { (k, v) -> putIfAbsent(k, v) }
+                if (!ref.isNullOrBlank()) {
+                    putIfAbsent("Referer", ref)
+                }
                 if (origin != null) {
                     putIfAbsent("Origin", origin)
                 }
@@ -195,17 +231,25 @@ class OfflineCacheManager private constructor(context: Context) {
                 download: Download,
                 finalException: Exception?,
             ) {
-                transientEntries.remove(download.request.id)
+                val currentTransient = transientEntries[download.request.id]
+                if (currentTransient == null || currentTransient.state != OfflineCacheState.RESOLVING) {
+                    transientEntries.remove(download.request.id)
+                }
                 requestRefresh()
             }
 
             override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
-                transientEntries.remove(download.request.id)
+                val currentTransient = transientEntries[download.request.id]
+                if (currentTransient == null || currentTransient.state != OfflineCacheState.RESOLVING) {
+                    transientEntries.remove(download.request.id)
+                }
                 requestRefresh()
             }
         })
+        val initialEntries = readIndexedEntries()
+        _entries.value = initialEntries
+            .sortedByDescending { it.state == OfflineCacheState.DOWNLOADING || it.state == OfflineCacheState.RESOLVING }
         downloadManager.resumeDownloads()
-        requestRefresh()
         scope.launch {
             while (isActive) {
                 if (_entries.value.any { it.state == OfflineCacheState.DOWNLOADING }) requestRefresh()
@@ -271,8 +315,10 @@ class OfflineCacheManager private constructor(context: Context) {
                             pageUrl = pageUrl,
                             thumbnailUrl = video.thumbnailUrl,
                             referer = source.referer,
+                            extraHeaders = source.extraHeaders,
                         )
-                        registerReferer(source.url, metadata.referer)
+                        registerRequestHeaders(source.url, metadata.referer, metadata.extraHeaders)
+                        transientEntries.remove(id)
                         val request = DownloadRequest.Builder(id, source.url.toUri())
                             .setMimeType(mimeType(source.url))
                             .setData(OfflineMetadataCodec.encode(metadata))
@@ -378,9 +424,10 @@ class OfflineCacheManager private constructor(context: Context) {
     private fun Download.toOfflineVideo(): OfflineVideo {
         // Corrupt metadata must only lose the descriptive fields, never the whole entry.
         val metadata = OfflineMetadataCodec.decode(request.data)
-        registerReferer(
+        registerRequestHeaders(
             mediaUrl = request.uri.toString(),
             referer = metadata?.referer ?: metadata?.pageUrl,
+            extraHeaders = metadata?.extraHeaders.orEmpty(),
         )
         return OfflineVideo(
             id = request.id,

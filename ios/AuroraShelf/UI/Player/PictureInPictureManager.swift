@@ -110,8 +110,12 @@ extension PictureInPictureManager: @preconcurrency AVPictureInPictureControllerD
         // Release retained background player if PiP was closed rather than restored into UI.
         if let player = retainedPlayer {
             player.pause()
+            player.replaceCurrentItem(with: nil)
             retainedPlayer = nil
             activePiPVideo = nil
+            Task.detached(priority: .utility) {
+                try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+            }
         }
     }
 

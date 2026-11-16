@@ -25,7 +25,7 @@ internal class T66yForumSource(
             val subject = row.selectFirst("td.tal h3 a[id^=t]") ?: return@mapNotNull null
             val title = subject.text().trim()
             if (ForumNoiseFilter.isNoisePost(title)) return@mapNotNull null
-            val id = subject.id().removePrefix("t").takeIf { it.all(Char::isDigit) } ?: return@mapNotNull null
+            val id = subject.id().removePrefix("t").takeIf { it.isNotEmpty() && it.all(Char::isDigit) } ?: return@mapNotNull null
             val cells = row.children()
             val author = cells.getOrNull(2)?.selectFirst("a.bl")?.text().orEmpty().ifBlank { "匿名" }
             val replies = cells.getOrNull(3)?.text()?.filter(Char::isDigit)?.toIntOrNull() ?: 0

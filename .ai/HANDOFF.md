@@ -1,4 +1,22 @@
-## 最新交接：2026-11-16 — TestFlight 内部测试工程合规改造、自动化预检上传脚本与双端同步发布 · v2.16.35 (Build 261)
+## 最新交接：2026-11-16 — 全盘 Bug 与优化审计落地修复＋双端 Release 验证与 TestFlight 上传 · v2.16.36 (Build 262)
+
+### 本次完成
+1. **审计报告与死资产瘦身**：产出全盘审计报告 `AUDIT_REPORT_2026-11-16.md`（158 项发现）；清理 123 个无引用废图与旧构建包（节省 60.53 MB），同步修正 `www/index.html` 看板图后缀并更新版本 `2.16.36 (Build 262)`，使 `Netgrey.apk` 降至 `137M`（`143,433,689` B）、`Netgrey.ipa` 降至 `134M`（`140,616,583` B）。
+2. **Android 全栈加固**：修复 `GameActivity` 本地端口作用域与 `GameSaveBridge` 多键存档、[AccountRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/AccountRepository.kt) KeyStore AES-GCM 加密与 401/403 登出、[ComicDownloadManager.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/comic/ComicDownloadManager.kt) 并发上限与中断恢复、[PlaybackResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PlaybackResolver.kt) / [X134Repository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/X134Repository.kt) / 直播 / 论坛 / `cast` 并发安全与异常处理、以及四端列表分页失败重试、[NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt) 生命周期与屏幕常亮。
+3. **iOS 全栈加固与保密注入**：新增 [generate_ios_source_secrets.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/generate_ios_source_secrets.py) 在编译期注入 `GeneratedSourceSecrets.swift`（IPA 内已验证无明文 `SourceSecrets.plist`），补齐 [PrivacyInfo.xcprivacy](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/PrivacyInfo.xcprivacy) 数据声明及 12 国语言 `"live.empty"`；修复 [AccountService.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/AccountService.swift)、[GameContainerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Game/GameContainerView.swift)、[ForumScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/ForumScreen.swift)、[ComicsScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/ComicsScreen.swift)、PiP/视频/直播/下载/图像降采样/历史持久化与磁容后台统计。
+4. **Web Game 与服务端脚本修复**：重构 `battle.js`/`audio.js`/`slots.js`/`spinestage.js`/`app.js`，并完成 [netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf)、[ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py)、[ota_web/index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html)、[publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 与 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh) 安全加固。
+5. **实测与发布状态**：
+   - TestFlight：`./scripts/publish_testflight.sh` 已归档并上传 `v2.16.36 (Build 262)` 至 App Store Connect（`Upload succeeded`）。
+   - GitHub：推送 commit、`v2.16.36` tag 及 GitHub Release（挂 `Netgrey.apk` 与 `Netgrey.ipa`）。
+   - 双端验证：Web 资产/逻辑校验全绿；Android 266 项单测（258 通/8 跳）、`lintDebug` 0 error、Android 在线全探针全绿、`emulator-5554` R8 APK 截图核验；iOS 188 项单测（180 通/8 跳）及 `iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 实机截图通过；iOS 在线探针 17/20 视频（`javsb`、`spankbang`、`javnoni` 受限于上游/代理）+ 9/9 漫画 + 2/2 直播 + 7/7 论坛翻页（`fid=34` 置顶贴外链图 TLS `-9816`）。
+
+### 交接提醒（未竟事项）
+- **SSH 22 端口阻断待服务端补发**：当前 Mac 网络出口代理（`utun8`）断开所有出站 TCP 22 连接（`github.com` 与 OTA 服务器均在握手前断连）。待用户放行 OTA 服务器 22 端口直连后，请立即执行：
+  1. `./scripts/configure_auth_proxy.sh`（更新 Nginx 屏蔽 `/auth-api/_/` 管理面板）；
+  2. 将本地更新后的 `scripts/server/ota_service.py` 部署至服务器 OTA 守护进程并重启 `netgrey-ota.service`；
+  3. 执行 `./scripts/publish_ota.sh Release` 将 `137M` APK、`134M` IPA、`v2.16.36` `index.html` 与 `manifest.plist` 原子覆盖上线至 `https://bananarey.us`。
+
+## 历史交接：2026-11-16 — TestFlight 内部测试工程合规改造、自动化预检上传脚本与双端同步发布 · v2.16.35 (Build 261)
 
 ### 本次完成
 1. **TestFlight 合规文件与清单补齐**：

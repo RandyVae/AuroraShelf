@@ -55,7 +55,8 @@ public struct LiveStreamItem: Identifiable, Hashable, Sendable {
     }
 }
 
-public final class LiveRepository: ObservableObject, @unchecked Sendable {
+@MainActor
+public final class LiveRepository: ObservableObject {
     public static let shared = LiveRepository()
     
     @Published public var liveStreams: [LiveStreamItem] = []
@@ -109,26 +110,23 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
             guard let self else { return }
 
             let outcome = await self.fetchSelectedSources(selectedSourceID: selectedSourceID, selectedGender: selectedGender)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, self.activeRequestID == requestID else { return }
 
-            await MainActor.run {
-                guard self.activeRequestID == requestID else { return }
-                switch outcome {
-                case .loaded(let streams, let warnings):
-                    self.liveStreams = streams
-                    self.loadErrorMessage = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
-                case .failed(let message):
-                    self.loadErrorMessage = message
-                }
-                self.isLoading = false
-                self.currentLoadTask = nil
+            switch outcome {
+            case .loaded(let streams, let warnings):
+                self.liveStreams = streams
+                self.loadErrorMessage = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
+            case .failed(let message):
+                self.loadErrorMessage = message
             }
+            self.isLoading = false
+            self.currentLoadTask = nil
         }
         currentLoadTask = task
         return task
     }
 
-    private func fetchSelectedSources(selectedSourceID: String, selectedGender: String) async -> LiveFeedOutcome {
+    private nonisolated func fetchSelectedSources(selectedSourceID: String, selectedGender: String) async -> LiveFeedOutcome {
         if selectedSourceID == LiveSourceCatalog.allSourcesID {
             async let hsFeed = runCatchingStreams { try await self.fetchRealHornyStudentsFeed() }
             async let scFeed = runCatchingStreams { try await self.fetchRealStripchatFeed(gender: selectedGender) }
@@ -166,7 +164,7 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
         }
     }
 
-    private func runCatchingStreams(_ block: @escaping () async throws -> [LiveStreamItem]) async -> Result<[LiveStreamItem], Error> {
+    private nonisolated func runCatchingStreams(_ block: @Sendable @escaping () async throws -> [LiveStreamItem]) async -> Result<[LiveStreamItem], Error> {
         do {
             let res = try await block()
             return .success(res)
@@ -177,7 +175,7 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
 
     // MARK: - 真实请求 HornyStudents RSS 2.0 在线主播流
 
-    private func fetchRealHornyStudentsFeed() async throws -> [LiveStreamItem] {
+    private nonisolated func fetchRealHornyStudentsFeed() async throws -> [LiveStreamItem] {
         guard let url = URL(string: "https://www.hornystudents.com/feed/latest/") else {
             throw LiveFeedError.invalidURL
         }
@@ -196,7 +194,7 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
         return try parseRssXml(xmlString)
     }
 
-    private func fetchRealStripchatFeed(gender: String) async throws -> [LiveStreamItem] {
+    private nonisolated func fetchRealStripchatFeed(gender: String) async throws -> [LiveStreamItem] {
         let primaryTags: [String]
         switch gender {
         case "女性主播": primaryTags = ["girls"]
@@ -206,21 +204,38 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
         default: primaryTags = ["girls", "couples"]
         }
 
-        return try await withThrowingTaskGroup(of: [LiveStreamItem].self) { group in
+        let (deduped, lastError): ([LiveStreamItem], Error?) = await withTaskGroup(of: Result<[LiveStreamItem], Error>.self) { group in
             for tag in primaryTags {
                 group.addTask {
-                    try await self.fetchStripchatFeed(primaryTag: tag)
+                    do {
+                        return .success(try await self.fetchStripchatFeed(primaryTag: tag))
+                    } catch {
+                        return .failure(error)
+                    }
                 }
             }
             var allStreams: [LiveStreamItem] = []
-            while let streams = try await group.next() {
-                allStreams.append(contentsOf: streams)
+            var capturedError: Error?
+            for await result in group {
+                switch result {
+                case .success(let streams):
+                    allStreams.append(contentsOf: streams)
+                case .failure(let error):
+                    capturedError = error
+                }
             }
-            return allStreams.uniqued(by: \.id)
+            return (allStreams.uniqued(by: \.id), capturedError)
         }
+        if !deduped.isEmpty {
+            return deduped
+        }
+        if let lastError {
+            throw lastError
+        }
+        return []
     }
 
-    private func fetchStripchatFeed(primaryTag: String) async throws -> [LiveStreamItem] {
+    private nonisolated func fetchStripchatFeed(primaryTag: String) async throws -> [LiveStreamItem] {
         let hosts = ["https://zh.stripchat.com", "https://stripchat.com"]
         var lastError: Error = LiveFeedError.invalidURL
         for host in hosts {
@@ -242,7 +257,7 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
         throw lastError
     }
     
-    private func parseRssXml(_ xml: String) throws -> [LiveStreamItem] {
+    private nonisolated func parseRssXml(_ xml: String) throws -> [LiveStreamItem] {
         guard xml.range(of: #"<rss(?:\s|>)"#, options: [.regularExpression, .caseInsensitive]) != nil else {
             throw LiveFeedError.malformedXML
         }
@@ -313,7 +328,7 @@ public final class LiveRepository: ObservableObject, @unchecked Sendable {
         return items
     }
     
-    private func extractTag(from text: String, tag: String) -> String? {
+    private nonisolated func extractTag(from text: String, tag: String) -> String? {
         let pattern = "<\(tag)>([^<]*?)</\(tag)>"
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
         let ns = text as NSString
@@ -328,7 +343,10 @@ enum LiveSourceAdapter {
     static func stripchatFeedURL(page: Int, primaryTag: String? = nil, base: String = "https://zh.stripchat.com") -> URL {
         let offset = (max(page, 1) - 1) * 30
         let endpoint = "\(base)/api/front/models"
-        var components = URLComponents(string: endpoint)!
+        let fallbackURL = URL(string: "https://zh.stripchat.com/api/front/models")
+        guard var components = URLComponents(string: endpoint) else {
+            return fallbackURL ?? URL(fileURLWithPath: "/")
+        }
         var queryItems = [
             URLQueryItem(name: "improveTs", value: "false"),
             URLQueryItem(name: "removeShows", value: "true"),
@@ -340,10 +358,10 @@ enum LiveSourceAdapter {
             URLQueryItem(name: "prxCnGr", value: "false"),
             URLQueryItem(name: "nic", value: "false")
         ]
-        let tag = (primaryTag?.isEmpty == false) ? primaryTag! : "girls"
+        let tag = (primaryTag.flatMap { $0.isEmpty ? nil : $0 }) ?? "girls"
         queryItems.insert(URLQueryItem(name: "primaryTag", value: tag), at: 2)
         components.queryItems = queryItems
-        return components.url!
+        return components.url ?? fallbackURL ?? URL(fileURLWithPath: "/")
     }
 
     static func parseStripchat(data: Data) throws -> [LiveStreamItem] {

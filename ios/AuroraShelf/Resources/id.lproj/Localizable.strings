@@ -54,6 +54,7 @@
 "live.couples" = "Pasangan";
 "live.trans" = "Trans";
 "live.loading" = "Memuat penyiar…";
+"live.empty" = "Tidak ada penyiar siaran langsung";
 "live.viewers" = "%@ Penonton";
 "live.online" = "Online";
 "live.offline" = "Offline";

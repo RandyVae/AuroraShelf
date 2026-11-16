@@ -1,13 +1,20 @@
 import Foundation
 import UIKit
+import ImageIO
 import CommonCrypto
 
 actor ComicPageImageLoader {
     static let shared = ComicPageImageLoader()
 
+    private struct InFlightEntry {
+        let id: UUID
+        var waiterIds: Set<UUID>
+        let task: Task<UIImage, Error>
+    }
+
     private let session: URLSession
     private let cache = NSCache<NSString, UIImage>()
-    private var inFlightTasks: [String: (id: UUID, task: Task<UIImage, Error>)] = [:]
+    private var inFlightTasks: [String: InFlightEntry] = [:]
 
     private init() {
         let configuration = URLSessionConfiguration.default
@@ -34,9 +41,12 @@ actor ComicPageImageLoader {
     func load(_ page: ComicPage) async throws -> UIImage {
         try Task.checkCancellation()
         if let image = cache.object(forKey: page.id as NSString) { return image }
+        let waiterId = UUID()
         let taskToken: UUID
         let task: Task<UIImage, Error>
-        if let ongoing = inFlightTasks[page.id], !ongoing.task.isCancelled {
+        if var ongoing = inFlightTasks[page.id], !ongoing.task.isCancelled {
+            ongoing.waiterIds.insert(waiterId)
+            inFlightTasks[page.id] = ongoing
             taskToken = ongoing.id
             task = ongoing.task
         } else {
@@ -44,31 +54,37 @@ actor ComicPageImageLoader {
             let created = Task<UIImage, Error> {
                 try await self.performLoad(page)
             }
-            inFlightTasks[page.id] = (id: newToken, task: created)
+            inFlightTasks[page.id] = InFlightEntry(id: newToken, waiterIds: [waiterId], task: created)
             taskToken = newToken
             task = created
         }
 
         defer {
-            if inFlightTasks[page.id]?.id == taskToken {
-                inFlightTasks[page.id] = nil
-            }
+            releaseWaiter(pageId: page.id, taskToken: taskToken, waiterId: waiterId, cancelIfLast: false)
         }
 
-        do {
-            let result = try await withTaskCancellationHandler {
-                try await task.value
-            } onCancel: {
-                task.cancel()
+        let result = try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            Task {
+                await self.releaseWaiter(pageId: page.id, taskToken: taskToken, waiterId: waiterId, cancelIfLast: true)
             }
-            let cost = result.cgImage.map { $0.bytesPerRow * $0.height } ?? 1024
-            cache.setObject(result, forKey: page.id as NSString, cost: cost)
-            return result
-        } catch {
-            if inFlightTasks[page.id]?.id == taskToken {
-                inFlightTasks[page.id] = nil
+        }
+        let cost = result.cgImage.map { $0.bytesPerRow * $0.height } ?? 1024
+        cache.setObject(result, forKey: page.id as NSString, cost: cost)
+        return result
+    }
+
+    private func releaseWaiter(pageId: String, taskToken: UUID, waiterId: UUID, cancelIfLast: Bool) {
+        guard var entry = inFlightTasks[pageId], entry.id == taskToken else { return }
+        entry.waiterIds.remove(waiterId)
+        if entry.waiterIds.isEmpty {
+            if cancelIfLast {
+                entry.task.cancel()
             }
-            throw error
+            inFlightTasks[pageId] = nil
+        } else {
+            inFlightTasks[pageId] = entry
         }
     }
 
@@ -138,9 +154,27 @@ actor ComicPageImageLoader {
                 throw error
             }
         }
-        let image = UIImage(data: data) ?? decryptEncryptedPage(data, url: imageURL)
+        let image = decodeImage(from: data, allowDownsample: page.verticalSegments <= 1) ?? decryptEncryptedPage(data, url: imageURL)
         guard let image else { throw ComicImageError.decodeFailed }
         return page.verticalSegments > 1 ? unscramble(image, segments: page.verticalSegments) : image
+    }
+
+    private func decodeImage(from data: Data, allowDownsample: Bool) -> UIImage? {
+        guard allowDownsample,
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              CGImageSourceGetCount(source) == 1 else {
+            return UIImage(data: data)
+        }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: 2400,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        if let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) {
+            return UIImage(cgImage: cgImage)
+        }
+        return UIImage(data: data)
     }
 
     private func request(url: URL, headers: [String: String], referer: String?) async throws -> (data: Data, response: HTTPURLResponse) {

@@ -152,23 +152,33 @@ public struct StorageUsageBarView: View {
     }
     
     private func refreshStorageMetrics() {
-        // 读取系统真实磁盘容量
-        if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()) {
-            if let total = attrs[.systemSize] as? NSNumber {
-                totalBytes = total.int64Value
+        Task.detached(priority: .utility) {
+            var resolvedTotal: Int64 = 0
+            var resolvedFree: Int64 = 0
+            var resolvedCache: Int64 = 0
+
+            if let attrs = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()) {
+                if let total = attrs[.systemSize] as? NSNumber {
+                    resolvedTotal = total.int64Value
+                }
+                if let free = attrs[.systemFreeSize] as? NSNumber {
+                    resolvedFree = free.int64Value
+                }
             }
-            if let free = attrs[.systemFreeSize] as? NSNumber {
-                freeBytes = free.int64Value
+
+            if let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+                resolvedCache = Self.folderSize(at: cachesURL)
             }
-        }
-        
-        // 读取 Caches 目录估算缓存
-        if let cachesURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
-            cacheBytes = folderSize(at: cachesURL)
+
+            await MainActor.run {
+                if resolvedTotal > 0 { totalBytes = resolvedTotal }
+                if resolvedFree > 0 { freeBytes = resolvedFree }
+                cacheBytes = resolvedCache
+            }
         }
     }
-    
-    private func folderSize(at url: URL) -> Int64 {
+
+    private nonisolated static func folderSize(at url: URL) -> Int64 {
         guard let files = try? FileManager.default.subpathsOfDirectory(atPath: url.path) else { return 0 }
         var total: Int64 = 0
         for file in files {

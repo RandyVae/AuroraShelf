@@ -780,6 +780,25 @@ Evidence:
 - Android: `./gradlew testDebugUnitTest lintDebug assembleRelease` `BUILD SUCCESSFUL` (`2m 15s`, Release APK `197M`); non-live `testDebugUnitTest` **42 suites, 262 tests: 254 passed, 8 skipped, 0 failed, 0 errors**; `RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1 --tests "com.aurorashelf.app.data.*"` **25 suites, 159/159 passed** (including all 5 live probe classes **20/20**); `emulator-5554` R8 signed Release APK visual QA across tablet Portrait <-> Landscape (`PlayerScreen` 62%/38% split and `LiveScreen` `mirabrunette` 2-pane split).
 - Probe & OTA: `node scripts/probe_all_sources.mjs` (**33/35 passed**; `JAVSB` `CONNECT_FAIL`, `禁漫天堂` `code=401`); `https://bananarey.us` serves `v2.16.33 (Build 259)` (`index.html` `21,658` bytes, `manifest.plist` `2.16.33`, `Netgrey.apk` `206,892,939` bytes / `198M`, `Netgrey.ipa` `202,679,105` bytes / `194M`, `HTTP/1.1 200 OK`), remote SSH check confirmed `chmod 644`, zero `.tmp/.old/.bak/*~` files, and `11G` free (`29%` used) on `/`.
 
+## Full-project bug & optimization audit fixes and compile-time iOS secret injection (v2.16.36 Build 262)
+
+Date: 2026-11-16
+
+Status: Fixes implemented, dual-platform Release artifacts built & simulator-verified, TestFlight Build 262 uploaded, Git/GitHub Release synced; remote Nginx/`ota_service.py` deployment and `./scripts/publish_ota.sh Release` pending SSH port 22 network access.
+
+Decision:
+1. Replace runtime bundling of plaintext `ios/AuroraShelf/Resources/SourceSecrets.plist` with a compile-time `preBuildScripts` step in `ios/project.yml` running `scripts/generate_ios_source_secrets.py`, producing gitignored `ios/AuroraShelf/Data/Comic/GeneratedSourceSecrets.swift` consumed first by `ComicProtocolSecrets.swift`. Release `.app` and `.ipa` archives exclude `SourceSecrets.plist` completely while preserving offline/TestFlight JM and Picacg protocol support.
+2. Delete 123 verified unreferenced image/archive files (-60.53 MB), fix `cabinet_marquee.png -> .webp` in `www/index.html`, and isolate Web Game saves (`save.js` / `GameSaveBridge.kt`), projectile/loop lifetimes (`battle.js` / `spinestage.js` / `app.js`), and bounded audio/keyboard handlers (`audio.js` / `slots.js`).
+3. Harden Android token storage (KeyStore AES-GCM + `authMutex`/`authGeneration` + 401/403 logout in `AccountRepository.kt`), `GameActivity.kt` origin lockdown, download durability (`ComicDownloadManager.kt` / `OfflineCacheManager.kt`), JSON unescape/dedup (`PlaybackResolver.kt` / `X134Repository.kt`), cast/local proxy bounds, and Compose `compositionLocalOf` + pagination error-retry + lifecycle-aware `NativeSitePlayer.kt` / `LiveScreen.kt`.
+4. Harden iOS `AccountService.swift` (strict TLS + 401/403 session wipe), `GameContainerView.swift` weak handler/teardown, PiP/idle-timer/fullscreen safe-area handling (`VideoDetailPlaybackScreen.swift`, `PictureInPictureManager.swift`, `LivePlayerView.swift`), `StripchatLiveWebView.swift` bridge deduplication, `@MainActor` `LiveRepository`, ref-counted/downsampled `ComicPageImageLoader.swift`, durable `ComicDownloadManager.swift` (SHA-256 segment dirs + interrupted recovery), `PrivacyInfo.xcprivacy` data declarations, and 12-locale `"live.empty"` keys.
+5. Lock down `server/pocketbase/netgrey-auth-location.conf` (404 `/auth-api/_/`, `_superusers`, `/api/admins`, 1MB body limit) and rewrite `scripts/server/ota_service.py` (strict CORS, bounded reads, rate limits, admin token on device listing, cached ASC JWT, atomic writes).
+
+Evidence:
+- Web Game: `node --check app/src/main/assets/www/js/*.js`, `python3 game/tools/verify_curated_assets.py` (62 heroes, 168 enemies, 0 errors), `node scripts/verify-game-logic.js`, and `node scripts/verify-fixes.js` all passed.
+- Android: `./gradlew testDebugUnitTest lintDebug assembleRelease` passed (266 unit tests: 258 passed, 8 skipped, 0 failed; lint 0 errors, 21 warnings; Release APK `143,433,689` bytes / `137M`); `RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` passed `SourceProbeTest`, `FullSystemSourceProbeTest`, `ForumSourcesTest` (10/10), `ComicSourceProbeTest`, and `X134RepositoryTest` (5/5); `emulator-5554` R8 Release APK verified across Home, Comics, Live, Forum, Account, and Web Game hub.
+- iOS: `AuroraShelfTests` passed offline (188 tests: 180 passed, 8 skipped, 0 failed); `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1` passed Live (2/2 + Stripchat DOM), Comics (9/9 unauth), X134 (3/3), Forum boards/pagination (7/7; external `fid=34` sticky image host `nsaimg.com` failed TLS `-9816`), and Video (17/20; external `javsb` TLS EOF, `spankbang` HTTP 403, `javnoni` playback read error); `Release` simulator build + `iPhone 18 Pro` / `iPad Pro 13-inch (M5)` visual verification passed; `./scripts/publish_testflight.sh` uploaded `v2.16.36 (Build 262)` to App Store Connect (`** EXPORT SUCCEEDED **`); `./scripts/build_ios_signed.sh Release` produced `dist/Netgrey.ipa` (`140,616,583` bytes / `134M`, verified `SourceSecrets.plist` absent via `unzip -l`).
+
+
 
 
 

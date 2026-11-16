@@ -69,31 +69,41 @@ public struct LivePlayerView: View {
                         if let player = player {
                             AuroraPlayerSurface(
                                 player: player,
-                                videoGravity: isFillMode ? .resizeAspectFill : .resizeAspect
+                                videoGravity: isFillMode ? .resizeAspectFill : .resizeAspect,
+                                allowsPictureInPicture: false
                             )
                         } else if isWebFallbackActive && liveError == nil {
                             // 纯净无头 WebRTC 视口（原生 AVPlayer 403 握手受限自动平滑降级，或平台专属推流）
-                            let defaultRoomUrl: URL = {
+                            let fallbackURL: URL? = {
                                 if let url = URL(string: stream.roomUrl), !stream.roomUrl.isEmpty { return url }
+                                let encodedUser = stream.username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ""
+                                guard !encodedUser.isEmpty else { return nil }
                                 if stream.sourceID == LiveSourceCatalog.stripchatID {
-                                    return URL(string: "https://zh.stripchat.com/\(stream.username)")!
+                                    return URL(string: "https://zh.stripchat.com/\(encodedUser)")
                                 } else {
-                                    return URL(string: "https://www.hornystudents.com/\(stream.username)/")!
+                                    return URL(string: "https://www.hornystudents.com/\(encodedUser)/")
                                 }
                             }()
-                            StripchatLiveWebView(
-                                roomURL: defaultRoomUrl,
-                                isFillMode: isFillMode,
-                                isPlaying: $isPlaying,
-                                isLoading: $isLoadingLive,
-                                errorMessage: $liveError,
-                                onComment: onComment,
-                                onVideoDimension: { size in
-                                    if size.width > 0 && size.height > 0 {
-                                        isPortraitStream = (size.height > size.width)
+                            if let defaultRoomUrl = fallbackURL {
+                                StripchatLiveWebView(
+                                    roomURL: defaultRoomUrl,
+                                    isFillMode: isFillMode,
+                                    isPlaying: $isPlaying,
+                                    isLoading: $isLoadingLive,
+                                    errorMessage: $liveError,
+                                    onComment: onComment,
+                                    onVideoDimension: { size in
+                                        if size.width > 0 && size.height > 0 {
+                                            isPortraitStream = (size.height > size.width)
+                                        }
                                     }
+                                )
+                            } else {
+                                Color.clear.onAppear {
+                                    isLoadingLive = false
+                                    liveError = "直播间地址无效"
                                 }
-                            )
+                            }
                         }
 
                         // 原生手势感知层（双击切换画幅、单击唤出控制栏）
@@ -190,6 +200,9 @@ public struct LivePlayerView: View {
         .clipped()
         .onAppear {
             fetchAndStartLiveStream()
+        }
+        .onChange(of: isPlaying) { _, playing in
+            UIApplication.shared.isIdleTimerDisabled = playing
         }
         .onDisappear {
             cleanupLivePlayer()
@@ -642,6 +655,12 @@ public struct LivePlayerView: View {
                     self.scheduleHideControls()
                 } else if item.status == .failed {
                     // 原生直链解码失败或 MMCDN 403 握手受限时，全量平滑降级至纯净 WebRTC 视口起播
+                    self.itemStatusObserver?.invalidate()
+                    self.itemStatusObserver = nil
+                    self.presentationSizeObserver?.invalidate()
+                    self.presentationSizeObserver = nil
+                    avPlayer.pause()
+                    avPlayer.replaceCurrentItem(with: nil)
                     self.player = nil
                     self.isLoadingLive = false
                     if self.liveError == nil {
@@ -674,7 +693,13 @@ public struct LivePlayerView: View {
         presentationSizeObserver?.invalidate()
         presentationSizeObserver = nil
         player?.pause()
+        player?.replaceCurrentItem(with: nil)
         player = nil
         isPlaying = false
+        if cancelRequest {
+            Task.detached(priority: .utility) {
+                try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
+            }
+        }
     }
 }
