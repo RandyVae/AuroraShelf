@@ -15,10 +15,8 @@ public struct HeroBanner: View {
     @ObservedObject private var watchlist = WatchlistStore.shared
     @State private var currentIndex: Int = 0
     @State private var watchlistError: String?
-    @State private var loadedHeroImages: [String: UIImage] = [:]
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @Environment(\.displayScale) private var displayScale
 
     private var formFactor: DeviceFormFactor {
         DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
@@ -113,101 +111,25 @@ public struct HeroBanner: View {
     }
 
     public static func presentationStyle(imagePixelSize: CGSize, containerSize: CGSize) -> PresentationStyle {
-        guard imagePixelSize.width > 0, imagePixelSize.height > 0,
-              containerSize.width > 0, containerSize.height > 0 else {
-            return .fullBleed
-        }
-        let imgAspect = imagePixelSize.width / imagePixelSize.height
-        let boxAspect = containerSize.width / containerSize.height
-        let fillScale = max(containerSize.width / imagePixelSize.width, containerSize.height / imagePixelSize.height)
-        if imgAspect / boxAspect > 1.65 {
-            return .cinemaStage
-        }
-        if boxAspect < 1.15 && imgAspect >= 1.25 {
-            return .cinemaStage
-        }
-        if min(imagePixelSize.width, imagePixelSize.height) < 560 && fillScale > 1.65 {
-            return .cinemaStage
-        }
+        // 顶部 Hero 海报统一全幅铺满（与 .fill 居中裁切一致），避免横图退化为局部小卡片
         return .fullBleed
     }
 
     @ViewBuilder
     private func heroSlide(for videoItem: VideoItem, pull: CGFloat) -> some View {
         let targetUrl = videoItem.heroCoverUrl ?? videoItem.coverUrl
-        let loadedImg = loadedHeroImages[targetUrl]
         ZStack(alignment: .bottom) {
-            // 背景封面海报：沉浸式充满视口；若横幅超宽（如 2560×650）或原图尺寸较小，自动切换 Cinema Stage（环境虚化铺底 + 居中无裁切高清前景舞台）防止拉伸模糊
+            // 背景封面海报：所有横图/竖图统一全幅铺满顶部视口（居中 .fill 裁切，边缘无留白）
             Color.clear
                 .overlay(
-                    GeometryReader { geo in
-                        let containerPx = CGSize(
-                            width: geo.size.width * displayScale,
-                            height: geo.size.height * displayScale
-                        )
-                        let imgPx = loadedImg.map {
-                            CGSize(width: $0.size.width * $0.scale, height: $0.size.height * $0.scale)
-                        } ?? .zero
-                        let style = Self.presentationStyle(imagePixelSize: imgPx, containerSize: containerPx)
-
-                        ZStack {
-                            AuroraCoverImage(
-                                url: targetUrl,
-                                title: videoItem.title,
-                                sourceBaseURL: videoItem.coverBaseURL,
-                                aspectRatio: nil,
-                                contentMode: .fill,
-                                cornerRadius: 0,
-                                onImageLoaded: { img in
-                                    loadedHeroImages[targetUrl] = img
-                                }
-                            )
-                            .frame(width: geo.size.width, height: geo.size.height)
-                            .clipped()
-                            .opacity(style == .cinemaStage && loadedImg != nil ? 0 : 1)
-
-                            if style == .cinemaStage, let uiImage = loadedImg {
-                                // 环境氛围背景层（高半径柔和模糊）
-                                Color.clear
-                                    .overlay(
-                                        Image(uiImage: uiImage)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                            .scaleEffect(1.12)
-                                            .blur(radius: 28)
-                                    )
-                                    .frame(width: geo.size.width, height: geo.size.height)
-                                    .clipped()
-                                    .opacity(0.62)
-
-                                // 前景高清无裁切视觉舞台（严格居中限定在可用透明区内，避免低分辨卡图或超宽横幅被过度拉伸或挤压）
-                                let maxCardW = max(120, geo.size.width - (isWideAspect ? 72 : 32))
-                                let topClear: CGFloat = isWideAspect ? 78 : 96
-                                let bottomClear: CGFloat = formFactor == .duoFolded ? 132 : (isWideAspect ? 164 : 152)
-                                let availH = max(100, geo.size.height - topClear - bottomClear)
-                                let maxNaturalUpscale: CGFloat = min(imgPx.width, imgPx.height) < 560 ? 1.45 : 1.85
-                                let cappedW = imgPx.width > 0 ? min(maxCardW, (imgPx.width / displayScale) * maxNaturalUpscale) : maxCardW
-                                let cappedH = imgPx.height > 0 ? min(availH, (imgPx.height / displayScale) * maxNaturalUpscale) : availH
-
-                                Image(uiImage: uiImage)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(maxWidth: cappedW, maxHeight: cappedH)
-                                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                            .stroke(Color.white.opacity(0.20), lineWidth: 0.75)
-                                    )
-                                    .shadow(color: .black.opacity(0.45), radius: 18, x: 0, y: 10)
-                                    .frame(width: maxCardW, height: availH, alignment: .center)
-                                    .padding(.top, topClear)
-                                    .padding(.bottom, bottomClear)
-                                    .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
-                            }
-                        }
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .clipped()
-                    }
+                    AuroraCoverImage(
+                        url: targetUrl,
+                        title: videoItem.title,
+                        sourceBaseURL: videoItem.coverBaseURL,
+                        aspectRatio: nil,
+                        contentMode: .fill,
+                        cornerRadius: 0
+                    )
                 )
                 .frame(height: heroHeight + pull)
                 .frame(maxWidth: .infinity)

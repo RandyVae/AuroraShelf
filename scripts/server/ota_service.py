@@ -265,7 +265,7 @@ def get_invite_record(email):
         return dict(existing) if existing else None
 
 
-def process_testflight_invite(email):
+def process_testflight_invite(email, resend=False):
     cfg = get_tf_config()
     app_id = cfg.get('app_id')
     beta_group_id = cfg.get('beta_group_id')
@@ -295,16 +295,23 @@ def process_testflight_invite(email):
     if len(users) >= max_users:
         return 409, {'ok': False, 'error': f'内部测试团队名额已满（{len(users)}/{max_users}）'}
 
-    # 2. 检查是否已在待接受邀请列表
+    # 2. 检查是否已在待接受邀请列表；若请求重发则先撤销旧邀请再重新发送以触发 Apple 新发邮件
     q_email = urllib.parse.quote(email)
     inv_status, inv_data = asc_request('GET', f'/v1/userInvitations?filter[email]={q_email}')
-    if inv_status == 200 and inv_data.get('data'):
-        rec = upsert_invite_record(
-            email,
-            'invited',
-            '团队邀请已发出，请前往邮箱点击「Accept invitation」，系统确认后将自动拉入 TestFlight 群组。'
-        )
-        return 200, {'ok': True, 'record': rec}
+    existing_invs = inv_data.get('data', []) if inv_status == 200 and isinstance(inv_data, dict) else []
+    if existing_invs:
+        if resend:
+            for item in existing_invs:
+                inv_id = item.get('id')
+                if inv_id:
+                    asc_request('DELETE', f'/v1/userInvitations/{inv_id}')
+        else:
+            rec = upsert_invite_record(
+                email,
+                'invited',
+                'Apple 团队邀请已处于待接受状态。若未在收件箱看到（163/QQ 邮箱较易拦截），请检查「垃圾邮件/广告箱」，或点击下方「重发团队邀请邮件」。'
+            )
+            return 200, {'ok': True, 'record': rec}
 
     # 3. 发送 App Store Connect 团队邀请（最小 MARKETING 权限，仅限 Netgrey）
     invite_payload = {
@@ -327,10 +334,11 @@ def process_testflight_invite(email):
     }
     post_status, post_data = asc_request('POST', '/v1/userInvitations', invite_payload)
     if post_status in (200, 201, 409):
+        action_word = '重新发送' if resend else '发送'
         rec = upsert_invite_record(
             email,
             'invited',
-            '第 1 步团队邀请邮件已发送，请打开邮箱点击「Accept invitation」并用 Apple ID 登录确认；系统会自动拉你进 TestFlight 群组。'
+            f'第 1 步团队邀请邮件已{action_word}（发件人 no_reply@email.apple.com）。请查收邮箱并检查「垃圾邮件/广告箱」，点击「Accept invitation」确认后系统会自动拉群。'
         )
         return 200, {'ok': True, 'record': rec}
 
@@ -596,6 +604,7 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
 
             email = (body.get('email') or '').strip().lower()
             invite_code = (body.get('invite_code') or '').strip()
+            resend = bool(body.get('resend', False))
 
             if not verify_invite_code(invite_code):
                 self.send_json(403, {'ok': False, 'error': '邀请口令无效，请向管理员索取'})
@@ -605,7 +614,7 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json(400, {'ok': False, 'error': '请输入有效的 Apple ID 邮箱地址'})
                 return
 
-            code, result = process_testflight_invite(email)
+            code, result = process_testflight_invite(email, resend=resend)
             self.send_json(code, result)
             return
 

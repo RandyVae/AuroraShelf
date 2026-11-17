@@ -73,13 +73,17 @@ class ForumUiStateTest {
     }
 
     @Test
-    fun heroPresentationStyleProtectsUltrawideAndLowResCoversFromBlurStretch() {
+    fun heroPresentationStyleAlwaysUsesFullBleedAcrossAspectRatios() {
         assertEquals(
-            HeroPresentationStyle.CINEMA_STAGE,
+            HeroPresentationStyle.FULL_BLEED,
             resolveHeroPresentationStyle(2560, 650, 1080, 1208),
         )
         assertEquals(
-            HeroPresentationStyle.CINEMA_STAGE,
+            HeroPresentationStyle.FULL_BLEED,
+            resolveHeroPresentationStyle(1280, 720, 1080, 1208),
+        )
+        assertEquals(
+            HeroPresentationStyle.FULL_BLEED,
             resolveHeroPresentationStyle(362, 678, 1080, 1208),
         )
         assertEquals(

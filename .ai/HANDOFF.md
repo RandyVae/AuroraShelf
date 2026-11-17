@@ -1,4 +1,21 @@
-## 最新交接：2026-11-16 — 华视部分视频 2004 与 .ts/TLS 分片加载失败根治＋双端 Release 实测与全通道发布 · v2.16.37 (Build 263)
+## 最新交接：2026-11-17 — 双端顶部 Hero 海报全幅铺满＋TestFlight 邮件邀请排查与重发功能＋双端 Release 验证与全通道发布 · v2.16.38 (Build 264)
+
+### 本次完成
+1. **TestFlight 邀请邮件未收到核查与服务端重发支持**：
+   - 核实服务器记录及 Apple `GET /v1/userInvitations`：`17371253934@163.com` 的邀请已于 `2026-11-16 18:18:21` 成功下发至 Apple（ID `9531fe62-6480-4fcd-9d13-04c16fcf539a`，有效至 `2026-11-19`），未在收件箱看到系 `163` 邮箱拦截/归类 `no_reply@email.apple.com` 所致。
+   - 在 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 扩展 `resend` 参数（撤销旧 `userInvitations` 并立即重建以触发 Apple 重新发信），并在 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 新增「没收到邮件？重发团队邀请邮件」按钮及 `163/QQ` 垃圾箱提示，部署重启 `netgrey-ota.service`。
+2. **iOS / iPadOS / Android 顶部 Hero 海报统一全幅铺满**：
+   - 修改 [HeroBanner.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/HeroBanner.swift) 与 [HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt)，移除将 16:9 横图降级为 `cinemaStage` 居中悬浮卡片的分支，全部海报统一采用 `.fullBleed` / `FULL_BLEED`（`.fill` / `ContentScale.Crop`）铺满顶部视口；同步更新 [VideoPreloadManagerTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/VideoPreloadManagerTests.swift) 与 [ForumUiStateTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/ui/ForumUiStateTest.kt)。
+3. **双端测试、Release 模拟器检查与同步发布 (`v2.16.38 Build 264`)**：
+   - 版本号递增同步至 `v2.16.38 (Build 264)`。
+   - Android 离线 269 项（261 通/8 跳）、`lintDebug` 通过、`RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` 数据源 **166/166 全通**；`emulator-5554` R8 APK 实测首页横向《你好星期六》铺满顶部、漫画/直播/论坛/我的与内置游戏正常。
+   - iOS 离线 **190 项（182 通/8 跳/0 失败）**；在线专项漫画 30/30、直播 5/5、华视 206 分片通过、视频 17/20（`91porn`/`javnoni`/`javsb` 外部受限）、论坛 7/7 版块列表与翻页均 `200`（`fid=34` 外链图 `-1005`）；`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 实测横向《你好星期六》《现在就出发第四季》全幅铺满顶部；游戏逻辑 `verify-game-logic.js` / `verify-fixes.js` 与 Node 探针 33/35 通过。
+   - 已同步发布至网页 OTA `https://bananarey.us`（`Netgrey.ipa` `140,637,037` B、`Netgrey.apk` `143,433,689` B、`manifest.plist` `2.16.38` 均 `HTTP/1.1 200 OK`，`/` 可用 `11G`）与 TestFlight **`v2.16.38 (Build 264)`**（`Upload succeeded`）。
+
+### 交接提醒
+- 外部受限记录：`91porn`（iOS 列表解析空）、`javnoni`、`javsb`（`-1005` 断连）与 `fid=34` 置顶贴外链图（`-1005`）属第三方上游/网络限制。
+
+## 历史交接：2026-11-16 — 华视部分视频 2004 与 .ts/TLS 分片加载失败根治＋双端 Release 实测与全通道发布 · v2.16.37 (Build 263)
 
 ### 本次完成
 1. **华视 `2004` 与 `.ts`/TLS 失败根因确诊**：实探确认 `/link/penny-*.m3u8` 后段 `cdn*.okhuaren.com/*.ts` 在并发请求/预热 burst 下触发 BunnyCDN `HTTP 428 CDN-Limit: true`，而 Android `DefaultLoadErrorHandlingPolicy` 不重试 `428` 直接抛 `2004`；一次性 `mt` 令牌未销毁且短效 `penny-*` `.m3u8` 曾被缓存 2h；Android 缺 HTTP/2 池与 TLS 容错，iOS 缺 `.AVPlayerItemFailedToPlayToEndTime` 监听与回环重试中继。

@@ -23,32 +23,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `8e5cbe8`（2026-11-16），未提交 3 个文件
+- Git：`main` @ `1a134c5`（2026-11-16），未提交 17 个文件
 - 权威记忆文件：
-  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-16（今天）
-  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-16（今天）
+  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-17（今天）
+  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-17（今天）
   - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-16（今天）
   - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-16（今天）
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（22 天前）
-  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-16（今天）
+  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-17（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-16 23:13 by `sync.py`
+- 最后同步：2026-11-17 10:41 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-16 · Build 263 / v2.16.37）：彻底根治「华视影院部分视频播放失败（错误 2004）及部分视频 `.ts` / TLS 分片加载失败」。实测排查确认三大根因：(1) 华视 `/Player/resolveUrl` 下发 `/link/penny-*.m3u8` 指向 BunnyCDN `cdn*.okhuaren.com/*.ts`，并发预加载/HTTP 1.1 并发连接冲击单 IP 频发触发 BunnyCDN `HTTP 428 CDN-Limit: true` 且 Media3 默认不重试 `428` 致直接抛出 `2004`；(2) 单次消费 `mt` 令牌未销毁且单次签发/IP 绑定的 `penny-*` `.m3u8` 被误缓存 2 小时（实效短且过期/IP 变化返 `403`/`404`）；(3) Android `DefaultHttpDataSource` 缺少 HTTP/2 连接池、跨协议跳转与 TLS 容错（`:65` CDN）且向第三方 `.ts` 透传 `Origin: https://huavod.com`，iOS 缺少 `AVPlayerItemFailedToPlayToEndTime` 监听与宽松 TLS + `428` 重试回环中继。双端落地 `ResilientHttpDataSourceFactory` / `ResilientLoadErrorHandlingPolicy`、`HLSLoopbackRelayServer`（`NWListener` + `URLSession.permissive` 4 次退避重试与 M3U8 重写）、消费后即清 `mt`、`penny-*` 90s 短 TTL、自动失活重解并切换多线路（`-2-1`/`-3-1`）及预热并发收口；Android（269/269 全通 + R8 Release APK 实测 `现在就出发第四季` 出画）与 iOS（190 离线全过，实时 17/20 视频含华视 m3u8/`206` 切片全通，iPhone 18 Pro & iPad Pro 13-inch M5 Release 实测《你好星期六》/《现在就出发第四季》流畅播放）核验通过；已同步升级并发布至 TestFlight Build 263、OTA `bananarey.us`（137M APK / 135M IPA）、Git 与 GitHub Release `v2.16.37`。
-- 进行中：无核心代码阻塞；持续跟进外部第三方上游站及可选服务器安全代理补丁部署。
-- 下一步：按需在 OTA 主机放行维护窗口后应用已备好的 Nginx `/auth-api/_/` 屏蔽与 `ota_service.py` 加固补丁，并完成 PocketBase 首个管理员与 SMTP 配置。
-- 阻塞：外部第三方源实时探针中 `JAV-NONI`、`JAVSB`（代理 503/-1005）、`EPORNER`（HTTP 502）与论坛 `fid=34` 置顶贴外链图床 `nsaimg.com`（-1005）受限于上游站自身状态。
-- 最近一次更新：2026-11-16 by Antigravity
+- 当前阶段（2026-11-17 · Build 264 / v2.16.38）：完成两项交付：(1) **排查 TestFlight 邀请未收件问题并上线网页重发功能**：核实服务器 `2026-11-16 18:18:21` 已成功为 `17371253934@163.com` 调用 Apple `userInvitations`（ID `9531fe62-6480-4fcd-9d13-04c16fcf539a`，有效期至 `2026-11-19`），未收件系 `163` 邮箱拦截/归类 Apple `no_reply@email.apple.com` 系统邮件所致；已在 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 新增 `resend`（`DELETE` 旧邀请后立即重建触发重发），并在 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 补齐「没收到邮件？重发团队邀请邮件」按钮及 `163/QQ` 垃圾箱提示；(2) **双端顶部 Hero 海报统一全幅铺满**：修复 iOS [HeroBanner.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/HeroBanner.swift) 与 Android [HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt) 因横向图触发 `cinemaStage` 导致顶部缩进为局部圆角卡片的问题，统一为 `.fullBleed` / `FULL_BLEED` 居中 `.fill` / `Crop` 铺满顶部视口，并更新 [VideoPreloadManagerTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/VideoPreloadManagerTests.swift) 与 [ForumUiStateTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/ui/ForumUiStateTest.kt)；(3) **双端全规模验证与同步上线（v2.16.38 / Build 264）**：Android 离线 269 项（261 通/8 跳）+ `lintDebug` + `RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` 数据源 25 套件 **166/166 全通**、iOS 离线 190 项（182 通/8 跳）、iOS 在线漫画 30/30 / 直播 5/5 / 华视 206 切片 / 17/20 视频 / 7/7 论坛板翻页通过（外部受限：`91porn`、`javnoni`、`javsb` `-1005` 及 `fid=34` 外链图 `-1005`）、Node 探针 33/35、游戏脚本全通；`iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 与 `emulator-5554` R8 APK 实测确认横向《你好星期六》《现在就出发第四季》完整铺满顶部及各板块/内置游戏正常；已同步发布至网页 OTA `https://bananarey.us`（137M APK / 135M IPA）、TestFlight Build 264、Git 与 GitHub Release `v2.16.38`。
+- 进行中：等待受邀邮箱在收件箱/垃圾箱点确认团队邀请后自动入群；持续跟进外部第三方上游站可用性与 PocketBase 管理员/SMTP 配置。
+- 下一步：按需完成 PocketBase 首个管理员与 SMTP 配置及云端收藏同步。
+- 阻塞：外部第三方源实时探针中 `91porn`（iOS 列表解析空）、`JAV-NONI`、`JAVSB`（`-1005` 断连）与论坛 `fid=34` 置顶贴外链图（`-1005`）受限于上游站与网络环境。
+- 最近一次更新：2026-11-17 by Antigravity
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-17（Antigravity）：统一双端首页顶部 Hero 海报为全幅铺满（`.fullBleed` / `FULL_BLEED`）并增强 TestFlight 网页重发能力（v2.16.38 Build 264）。响应用户反馈「前两张横图海报未铺满顶部而第三张竖图铺满」，将 iOS [HeroBanner.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/HeroBanner.swift) 与 Android [HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt) 原本针对 `16:9` / 超宽图退化为居中悬浮卡片的 `cinemaStage` 逻辑全部收敛为 `.fullBleed` / `FULL_BLEED`（居中 `.fill` / `ContentScale.Crop` 铺满顶部视口）；同时在 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 与 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 补齐 `resend` 撤销重建重发能力与 `163/QQ` 邮箱垃圾箱提示，双端 Release 模拟器实测全幅铺满后同步发布至 OTA 与 TestFlight Build 264。
 
 - 2026-11-16（Antigravity / 用户 Randy 指令）：确立「发布前双端模拟器全规模检查硬门槛」全局强制规范。正式写入全局规则（`~/.gemini/config/plugins/agent-memory/rules/AGENTS.md` 第 `2.8` 节、`~/.codex/AGENTS.md` 第 `十四` 节、`~/.claude/CLAUDE.md`）与项目 [AGENTS.md](file:///Users/itou/Documents/ChatGPT/91pron/AGENTS.md)：今后每次发布新版本（TestFlight / 网页 OTA / GitHub Release）前，必须在 **iOS 模拟器**与 **Android 模拟器**中分别采用与交付包一致的 Release 构建执行全规模检查，覆盖全部视频源（含短剧与直播播放出画）、全部论坛源、全部图片/漫画源与游戏功能；全部通过后才允许发布，严禁未测或未全过即随意发布。
 

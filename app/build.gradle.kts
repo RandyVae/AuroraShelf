@@ -22,8 +22,8 @@ android {
         applicationId = "com.aurorashelf.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 263
-        versionName = "2.16.37"
+        versionCode = 264
+        versionName = "2.16.38"
         buildConfigField("String", "AUTH_API_BASE_URL", "\"https://bananarey.us/auth-api\"")
 
         buildConfigField("String", "PICACG_API_KEY", sourceSecret("PICACG_API_KEY").asBuildConfigString())

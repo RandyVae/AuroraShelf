@@ -193,19 +193,19 @@ final class VideoPreloadManagerTests: XCTestCase {
         XCTAssertNil(pip.activePiPVideo, "恢复播放器后必须清空 activePiPVideo，防止再次退出残余错乱状态")
     }
 
-    func testHeroPresentationStyleSelectsCinemaStageForUltrawideAndSmallAssets() {
+    func testHeroPresentationStyleAlwaysUsesFullBleedForAllPosters() {
         let phoneHero = CGSize(width: 1179, height: 1485)
         XCTAssertEqual(
             HeroBanner.presentationStyle(imagePixelSize: CGSize(width: 2560, height: 650), containerSize: phoneHero),
-            .cinemaStage
+            .fullBleed
         )
         XCTAssertEqual(
             HeroBanner.presentationStyle(imagePixelSize: CGSize(width: 1280, height: 720), containerSize: phoneHero),
-            .cinemaStage
+            .fullBleed
         )
         XCTAssertEqual(
             HeroBanner.presentationStyle(imagePixelSize: CGSize(width: 362, height: 678), containerSize: phoneHero),
-            .cinemaStage
+            .fullBleed
         )
         XCTAssertEqual(
             HeroBanner.presentationStyle(imagePixelSize: CGSize(width: 1080, height: 1512), containerSize: phoneHero),

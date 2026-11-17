@@ -549,24 +549,7 @@ internal fun resolveHeroPresentationStyle(
     containerWidthPx: Int,
     containerHeightPx: Int,
 ): HeroPresentationStyle {
-    if (imageWidthPx <= 0 || imageHeightPx <= 0 || containerWidthPx <= 0 || containerHeightPx <= 0) {
-        return HeroPresentationStyle.FULL_BLEED
-    }
-    val imgAspect = imageWidthPx.toFloat() / imageHeightPx.toFloat()
-    val boxAspect = containerWidthPx.toFloat() / containerHeightPx.toFloat()
-    val fillScale = max(
-        containerWidthPx.toFloat() / imageWidthPx.toFloat(),
-        containerHeightPx.toFloat() / imageHeightPx.toFloat(),
-    )
-    if (imgAspect / boxAspect > 1.65f) {
-        return HeroPresentationStyle.CINEMA_STAGE
-    }
-    if (boxAspect < 1.15f && imgAspect >= 1.25f) {
-        return HeroPresentationStyle.CINEMA_STAGE
-    }
-    if (min(imageWidthPx, imageHeightPx) < 560 && fillScale > 1.65f) {
-        return HeroPresentationStyle.CINEMA_STAGE
-    }
+    // 顶部 Hero 海报统一全幅铺满（ContentScale.Crop），避免横图退化为局部悬浮卡片
     return HeroPresentationStyle.FULL_BLEED
 }
 

@@ -400,7 +400,7 @@
         <!-- ==================== iOS / iPadOS 面板 ==================== -->
         <div id="panelIos" class="tab-panel active" role="tabpanel">
             <div class="app-meta">
-                <span>v2.16.37 (Build 263)</span>
+                <span>v2.16.38 (Build 264)</span>
                 <span class="badge">Universal 通用</span>
                 <span class="badge">Apple HIG</span>
             </div>
@@ -449,16 +449,19 @@
                         <div class="step-name">TestFlight 内部测试（邀请制）</div>
                     </div>
                     <div class="step-desc" style="margin-left: 0;">
-                        无需开开发者模式，90 天稳定不掉签。输入邀请口令与你的 Apple ID 邮箱提交后，先去邮箱点「Accept invitation」确认加入，系统会自动拉你进 TestFlight 群组。
+                        无需开开发者模式，90 天稳定不掉签。建议优先填 iCloud / Gmail / Outlook 邮箱；若使用 163 / QQ 邮箱未收到，请检查「垃圾邮件/广告箱」（发件人 no_reply@email.apple.com）。
                     </div>
                     <input id="tfInviteCode" class="tf-input" type="text" autocomplete="off" placeholder="请输入邀请口令">
                     <input id="tfEmail" class="tf-input" type="email" autocomplete="email" inputmode="email" placeholder="请输入 Apple ID 邮箱（如 name@icloud.com）">
-                    <button id="btnTfInvite" class="action-btn primary" type="button" onclick="submitTestFlightInvite()">
+                    <button id="btnTfInvite" class="action-btn primary" type="button" onclick="submitTestFlightInvite(false)">
                         申请 TestFlight 内部测试
                     </button>
                     <div id="tfStatusBox" class="tf-status-box" role="status" aria-live="polite"></div>
                     <button id="btnTfRefresh" class="action-btn" type="button" style="display:none; height:42px; font-size:14px; background:rgba(255,255,255,0.08); color:var(--text-primary);" onclick="pollTestFlightStatus(true)">
                         我已点完邮件确认，立即同步状态
+                    </button>
+                    <button id="btnTfResend" class="action-btn" type="button" style="display:none; height:42px; font-size:14px; background:rgba(255,255,255,0.06); color:var(--text-muted); border:1px solid rgba(255,255,255,0.12);" onclick="submitTestFlightInvite(true)">
+                        没收到邮件？重发团队邀请邮件
                     </button>
                 </div>
             </div>
@@ -474,7 +477,7 @@
         <!-- ==================== Android 面板 ==================== -->
         <div id="panelAndroid" class="tab-panel" role="tabpanel">
             <div class="app-meta">
-                <span>v2.16.37 (Build 263)</span>
+                <span>v2.16.38 (Build 264)</span>
                 <span class="badge">137 MB</span>
                 <span class="badge">Material You 3</span>
             </div>
@@ -517,7 +520,7 @@
                     <div class="step-desc">
                         单架构通用包（arm64-v8a / armeabi-v7a / x86_64），已内置完整音视频硬解引擎与本地离线游戏。
                     </div>
-                    <a class="action-btn android" href="/Netgrey.apk?v=2.16.37" download="Netgrey-v2.16.37.apk">
+                    <a class="action-btn android" href="/Netgrey.apk?v=2.16.38" download="Netgrey-v2.16.38.apk">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
@@ -530,7 +533,7 @@
 
             <div class="guide-box">
                 <strong>Android 安装提示：</strong><br>
-                • 点击上方按钮直接开始高速下载安装包（<code>Netgrey-v2.16.37.apk</code>）。<br>
+                • 点击上方按钮直接开始高速下载安装包（<code>Netgrey-v2.16.38.apk</code>）。<br>
                 • 若浏览器提示「此类型的文件可能对您的设备有害」或「未受信任的应用」，请点击 <strong>「仍然下载 / 继续安装」</strong>。<br>
                 • 安装时若提示权限限制，在系统设置中开启 <strong>「允许来自此来源的应用」</strong> 即可。
             </div>
@@ -635,54 +638,60 @@
         }
         window.addEventListener('pagehide', stopTfPolling);
 
-        function setTfStatus(kind, text, showRefresh) {
+        function setTfStatus(kind, text, showRefresh, showResend) {
             const box = document.getElementById('tfStatusBox');
             const refreshBtn = document.getElementById('btnTfRefresh');
+            const resendBtn = document.getElementById('btnTfResend');
             if (!box) return;
             box.className = 'tf-status-box visible' + (kind ? ' ' + kind : '');
             box.innerText = text;
             if (refreshBtn) {
                 refreshBtn.style.display = showRefresh ? 'flex' : 'none';
             }
+            if (resendBtn) {
+                resendBtn.style.display = showResend ? 'flex' : 'none';
+            }
         }
 
-        async function submitTestFlightInvite() {
+        async function submitTestFlightInvite(resend) {
             const codeEl = document.getElementById('tfInviteCode');
             const emailEl = document.getElementById('tfEmail');
             const btn = document.getElementById('btnTfInvite');
+            const resendBtn = document.getElementById('btnTfResend');
             const inviteCode = (codeEl ? codeEl.value : '').trim();
             const email = (emailEl ? emailEl.value : '').trim().toLowerCase();
 
             if (!inviteCode) {
-                setTfStatus('err', '请输入管理员提供的邀请口令。', false);
+                setTfStatus('err', '请输入管理员提供的邀请口令。', false, false);
                 return;
             }
             if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-                setTfStatus('err', '请输入有效的 Apple ID 邮箱地址。', false);
+                setTfStatus('err', '请输入有效的 Apple ID 邮箱地址。', false, false);
                 return;
             }
 
             stopTfPolling();
             btn.disabled = true;
-            btn.innerText = '正在发送邀请…';
-            setTfStatus('', '正在向 Apple 提交内部测试邀请…', false);
+            if (resendBtn) resendBtn.disabled = true;
+            btn.innerText = resend ? '正在重发邀请…' : '正在发送邀请…';
+            setTfStatus('', resend ? '正在重新触发 Apple 发送团队邀请邮件…' : '正在向 Apple 提交内部测试邀请…', false, false);
 
             try {
                 const resp = await fetch('/api/testflight/invite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: email, invite_code: inviteCode })
+                    body: JSON.stringify({ email: email, invite_code: inviteCode, resend: !!resend })
                 });
                 const data = await resp.json();
                 if (!resp.ok || !data.ok) {
-                    setTfStatus('err', data.error || '发送邀请失败，请稍后重试。', false);
+                    setTfStatus('err', data.error || '发送邀请失败，请稍后重试。', false, false);
                     return;
                 }
                 const rec = data.record || {};
                 if (rec.status === 'added_to_group') {
-                    setTfStatus('ok', rec.message || '已加入 TestFlight Internal 群组，请打开 TestFlight App 安装。', false);
+                    setTfStatus('ok', rec.message || '已加入 TestFlight Internal 群组，请打开 TestFlight App 安装。', false, false);
                 } else {
-                    setTfStatus('', rec.message || '团队邀请已发送，请打开邮箱点击「Accept invitation」。', true);
+                    setTfStatus('', rec.message || '团队邀请已发送，请打开邮箱点击「Accept invitation」。', true, true);
                     tfPollTimer = setInterval(() => {
                         tfPollCount += 1;
                         if (tfPollCount > 60) {
@@ -693,9 +702,10 @@
                     }, 5000);
                 }
             } catch (e) {
-                setTfStatus('err', '网络请求失败，请检查网络连接后重试。', false);
+                setTfStatus('err', '网络请求失败，请检查网络连接后重试。', false, false);
             } finally {
                 btn.disabled = false;
+                if (resendBtn) resendBtn.disabled = false;
                 btn.innerText = '申请 TestFlight 内部测试';
             }
         }
@@ -714,21 +724,21 @@
                 const resp = await fetch(url, { cache: 'no-store' });
                 const data = await resp.json();
                 if (!resp.ok || !data.ok || !data.record) {
-                    if (manual) setTfStatus('err', data.error || '状态查询失败', true);
+                    if (manual) setTfStatus('err', data.error || '状态查询失败', true, false);
                     return;
                 }
                 const rec = data.record;
                 if (rec.status === 'added_to_group') {
                     stopTfPolling();
-                    setTfStatus('ok', rec.message || '已自动加入 TestFlight Internal 群组，请打开 TestFlight App 安装。', false);
+                    setTfStatus('ok', rec.message || '已自动加入 TestFlight Internal 群组，请打开 TestFlight App 安装。', false, false);
                 } else if (rec.status === 'error') {
                     stopTfPolling();
-                    setTfStatus('err', rec.message || '加入群组失败', true);
+                    setTfStatus('err', rec.message || '加入群组失败', true, true);
                 } else {
-                    setTfStatus('', rec.message || '等待邮箱点击确认…', true);
+                    setTfStatus('', rec.message || '等待邮箱点击确认…', true, true);
                 }
             } catch (e) {
-                if (manual) setTfStatus('err', '网络异常，请稍后重试。', true);
+                if (manual) setTfStatus('err', '网络异常，请稍后重试。', true, true);
             } finally {
                 tfPollInFlight = false;
             }

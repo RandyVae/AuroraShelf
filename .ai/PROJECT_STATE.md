@@ -1,6 +1,21 @@
 # Project State
 
-## 最新工作状态（2026年11月16日 · 华视部分视频 2004 与 .ts/TLS 分片加载失败根治＋双端 Release 实测与全通道发布 · v2.16.37 Build 263）
+## 最新工作状态（2026年11月17日 · 双端顶部 Hero 海报统一全幅铺满＋TestFlight 邮件邀请排查与重发功能＋双端 Release 验证与全通道发布 · v2.16.38 Build 264）
+
+- **版本号全链路同步至 `v2.16.38 (Build 264)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`。
+- **TestFlight 邀请未收件核查与网页重发补齐**：
+  - 实查服务器 `/var/www/netgrey/testflight_invites.json`、`journalctl -u netgrey-ota.service` 与 App Store Connect API 确认：`2026-11-16 18:18:21` 已成功向 Apple 提交 `17371253934@163.com` 的 `MARKETING` 团队邀请（`id: 9531fe62-6480-4fcd-9d13-04c16fcf539a`，有效至 `2026-11-19`），`163` 邮箱较易将 `no_reply@email.apple.com` 邮件归入垃圾/广告箱或拦截。
+  - 在 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 的 `POST /api/testflight/invite` 新增 `resend` 参数（发现待接受记录时先 `DELETE /v1/userInvitations/{id}` 再重建以触发 Apple 重新发信），并在 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 补齐「没收到邮件？重发团队邀请邮件」按钮及 `163/QQ` 垃圾箱提示，已部署重启 `netgrey-ota.service`。
+- **双端顶部 Hero 海报统一全幅铺满（iOS + iPad + Android）**：
+  - 定位根因：iOS [HeroBanner.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/HeroBanner.swift) 与 Android [HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt) 原先在 `boxAspect < 1.15 && imgAspect >= 1.25`（如 16:9 横图《谷雨》《现在就出发第四季》）时切换至 `cinemaStage`（隐去全幅底图并改渲染居中圆角小卡片），而竖图（如《折月亮》）走 `fullBleed` 铺满顶部。
+  - 双端统一移除 `cinemaStage` 退化渲染，使 `presentationStyle` / `resolveHeroPresentationStyle` 始终返回 `.fullBleed` / `HeroPresentationStyle.FULL_BLEED`，统一以 `.fill` / `ContentScale.Crop` 铺满顶部视口；同步更新 [VideoPreloadManagerTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/VideoPreloadManagerTests.swift) 与 [ForumUiStateTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/ui/ForumUiStateTest.kt)。
+- **验证与双通道上线结果（v2.16.38 Build 264）**：
+  - Android：`./gradlew testDebugUnitTest lintDebug assembleRelease` 通过（离线 42 套件 269 项：261 通 / 8 跳 / 0 失败）；`RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` 专项 `com.aurorashelf.app.data.*` 25 套件 **166/166 全通**；`emulator-5554` R8 APK（`143,433,689` bytes / `137M`）实测首页横向《你好星期六》全幅铺满顶部、漫画/直播/论坛/我的及内置游戏（`Lust Goddess` 大厅与招募）全过。
+  - iOS：`AuroraShelfTests` 离线 **190 项（182 通 / 8 跳 / 0 失败）**；`TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1` 下 `ComicRepositoryTests`（30/30）、`LiveSourceAdapterTests`（5/5）、`testHuavodDetailedLivePlaybackAndSegmentDownload`（`status=206`）全通过，视频 17/20（外部受限：`91porn`、`javnoni`、`javsb` `-1005`），论坛 7/7 版块列表/详情/翻页均 `200`（`fid=34` 置顶贴外链图 `-1005`）；`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 实测横向《你好星期六》《现在就出发第四季》完整铺满顶部无留白。
+  - Node 探针 & 游戏脚本：`probe_all_sources.mjs` 33/35 可达；`verify-game-logic.js` 与 `verify-fixes.js` 全通；`./scripts/publish_testflight.sh --check` 全 PASS。
+  - 双通道同步发布：`./scripts/publish_ota.sh` 上传至 `https://bananarey.us`（`Netgrey.ipa` `140,637,037` bytes / `135M`、`Netgrey.apk` `143,433,689` bytes / `137M`、`manifest.plist` `2.16.38`、`index.html` 均 `HTTP/1.1 200 OK`，`/` 可用 `11G`）；`./scripts/publish_testflight.sh` 成功上传 **`v2.16.38 (Build 264)`** 至 App Store Connect / TestFlight（`Upload succeeded`）。
+
+## 历史工作状态（2026年11月16日 · 华视部分视频 2004 与 .ts/TLS 分片加载失败根治＋双端 Release 实测与全通道发布 · v2.16.37 Build 263）
 
 - **版本号全链路同步至 `v2.16.37 (Build 263)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`。
 - **实测根因定位（`huavod.com` / BunnyCDN）**：
