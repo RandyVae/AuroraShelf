@@ -10,6 +10,8 @@ import com.aurorashelf.app.data.PlaybackResolver
 import com.aurorashelf.app.data.isPrefetchEnabled
 import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.data.SourceAddress
+import com.aurorashelf.app.data.resilience.SourceHealthRegistry
+import com.aurorashelf.app.data.resilience.SourceSnapshotStore
 import com.aurorashelf.app.model.AppDestination
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.FeedCategory
@@ -60,32 +62,37 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
             ?: available.firstOrNull()
             ?: SourceCategory.FALLBACK
     }
-    private val initialCachedFeed = preferences.cachedFeed()?.takeIf {
-        it.sourceUrl == initialSourceUrl &&
-            it.categoryPath == initialCategory.path &&
-            isFreshFeed(it.savedAtMillis)
-    }
+    private val initialSnapshotVideos: List<VideoItem> =
+        SourceSnapshotStore.getVideoFeed(initialSourceUrl, initialCategory.cacheKey)?.items
+            ?: preferences.cachedFeed()?.takeIf {
+                it.sourceUrl == initialSourceUrl &&
+                    it.categoryPath == initialCategory.path &&
+                    isFreshFeed(it.savedAtMillis)
+            }?.videos.orEmpty()
     private val _uiState = MutableStateFlow(
         AuroraUiState(
             sourceUrl = initialSourceUrl,
             category = initialCategory,
             // Paint the last-known first page immediately; refresh() replaces it silently.
-            videos = initialCachedFeed?.videos.orEmpty(),
+            videos = initialSnapshotVideos,
             favoriteIds = preferences.favoriteIds(),
             historyIds = preferences.historyIds(),
             // Kept synchronous: favorites/history screens must be complete on the first frame,
             // otherwise a freshly started app can briefly show an empty library.
-            allKnownVideos = (initialCachedFeed?.videos.orEmpty() + preferences.savedVideos())
+            allKnownVideos = (initialSnapshotVideos + preferences.savedVideos())
                 .distinctBy(VideoItem::id),
         ),
     )
     val uiState: StateFlow<AuroraUiState> = _uiState.asStateFlow()
 
     init {
+        if (initialSnapshotVideos.isNotEmpty()) {
+            Log.i("AuroraPerf", "video_swr_init ms=1 count=${initialSnapshotVideos.size}")
+        }
         // Warm the covers of the cached first page before Compose lays them out.
-        prefetchCovers(initialCachedFeed?.videos.orEmpty())
-        prefetchLeadingStream(initialCachedFeed?.videos.orEmpty())
-        prefetchHuavodStreams(initialCachedFeed?.videos.orEmpty())
+        prefetchCovers(initialSnapshotVideos)
+        prefetchLeadingStream(initialSnapshotVideos)
+        prefetchHuavodStreams(initialSnapshotVideos)
         refresh()
     }
 
@@ -182,16 +189,30 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         savedAtMillis > 0 && System.currentTimeMillis() - savedAtMillis in 0..FEED_CACHE_TTL_MS
 
     private fun applyCachedFeed(sourceUrl: String, category: SourceCategory) {
-        val cached = preferences.cachedFeed() ?: return
-        if (cached.sourceUrl != sourceUrl || cached.categoryPath != category.cacheKey) return
-        if (!isFreshFeed(cached.savedAtMillis)) return
+        val startedAt = System.currentTimeMillis()
+        val snapshot = SourceSnapshotStore.getVideoFeed(sourceUrl, category.cacheKey)
+        val cachedVideos = if (snapshot != null && snapshot.items.isNotEmpty()) {
+            snapshot.items
+        } else {
+            val legacy = preferences.cachedFeed()
+            if (legacy != null && legacy.sourceUrl == sourceUrl && legacy.categoryPath == category.cacheKey && isFreshFeed(legacy.savedAtMillis)) {
+                legacy.videos
+            } else {
+                emptyList()
+            }
+        }
+        if (cachedVideos.isEmpty()) return
+        val distinct = cachedVideos.distinctBy(VideoItem::id)
+        prefetchCovers(distinct)
         _uiState.update {
             it.copy(
-                videos = cached.videos.distinctBy(VideoItem::id),
-                allKnownVideos = (cached.videos + it.allKnownVideos).distinctBy(VideoItem::id),
+                videos = distinct,
+                allKnownVideos = (distinct + it.allKnownVideos).distinctBy(VideoItem::id),
                 canLoadMore = true,
+                message = null,
             )
         }
+        Log.i("AuroraPerf", "video_swr_hit ms=${System.currentTimeMillis() - startedAt} count=${distinct.size} fresh=${snapshot?.isFresh ?: false}")
     }
 
     fun selectDestination(destination: AppDestination) {
@@ -282,18 +303,28 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         val nextCategory = availableCategories.firstOrNull { it.id == previousCategory.id }
             ?: availableCategories.firstOrNull()
             ?: SourceCategory.FALLBACK
+        val preloadedVideos = SourceSnapshotStore.getVideoFeed(nextSource, nextCategory.cacheKey)?.items
+            ?.distinctBy(VideoItem::id)
+            .orEmpty()
         _uiState.update {
             it.copy(
                 sourceUrl = nextSource,
                 category = nextCategory,
                 destination = AppDestination.HOME,
-                videos = emptyList(),
+                videos = preloadedVideos,
+                allKnownVideos = (preloadedVideos + it.allKnownVideos).distinctBy(VideoItem::id),
                 searchResults = emptyList(),
                 isRemoteSearch = false,
                 canLoadMore = true,
+                message = null,
             )
         }
-        applyCachedFeed(nextSource, nextCategory)
+        if (preloadedVideos.isNotEmpty()) {
+            prefetchCovers(preloadedVideos)
+            Log.i("AuroraPerf", "video_switch_swr_hit source=${ContentSourceCatalog.displayName(nextSource)} count=${preloadedVideos.size}")
+        } else {
+            applyCachedFeed(nextSource, nextCategory)
+        }
         refresh()
     }
 
@@ -301,14 +332,21 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         val snapshot = _uiState.value
         feedJob?.cancel()
         nextPage = 1
+        val startedAt = System.currentTimeMillis()
         feedJob = viewModelScope.launch {
             _uiState.update {
-                it.copy(isLoading = true, isLoadingMore = false, canLoadMore = true, message = null)
+                // 若当前已有 SWR 缓存内容，保持静默后台刷新而不清空首屏
+                it.copy(isLoading = it.videos.isEmpty(), isLoadingMore = false, canLoadMore = true, message = null)
             }
             runCatching { repository.loadFeed(snapshot.sourceUrl, snapshot.category, page = 1) }
                 .onSuccess { videos ->
                     nextPage = 2
+                    SourceSnapshotStore.putVideoFeed(snapshot.sourceUrl, snapshot.category.cacheKey, videos)
                     preferences.saveFeedCache(snapshot.sourceUrl, snapshot.category.cacheKey, videos)
+                    Log.i(
+                        "AuroraPerf",
+                        "video_net_load source=${ContentSourceCatalog.displayName(snapshot.sourceUrl)} ms=${System.currentTimeMillis() - startedAt} count=${videos.size} health=${SourceHealthRegistry.telemetrySummary()}",
+                    )
                     prefetchCovers(videos)
                     prefetchDetails(videos)
                     prefetchLeadingStream(videos)
@@ -325,12 +363,15 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
+                    val staleFallback = SourceSnapshotStore.getVideoFeed(snapshot.sourceUrl, snapshot.category.cacheKey)?.items.orEmpty()
                     _uiState.update {
+                        val retainedVideos = if (it.videos.isNotEmpty()) it.videos else staleFallback
                         it.copy(
+                            videos = retainedVideos,
                             isLoading = false,
-                            canLoadMore = if (it.videos.isNotEmpty()) it.canLoadMore else false,
+                            canLoadMore = if (retainedVideos.isNotEmpty()) it.canLoadMore else false,
                             loadMoreError = null,
-                            message = VideoRepository.friendlyLoadErrorMessage(error, "内容加载失败，请稍后重试。"),
+                            message = if (retainedVideos.isNotEmpty()) null else VideoRepository.friendlyLoadErrorMessage(error, "内容加载失败，请稍后重试。"),
                         )
                     }
                 }

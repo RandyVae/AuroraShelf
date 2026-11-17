@@ -22,7 +22,19 @@ public final class GlobalStartupPrefetchEngine: ObservableObject {
         guard !hasStarted else { return }
         hasStarted = true
         isWarmingUp = true
-        
+
+        // 启动零单点故障远端自愈配置异步同步（3秒短超时，不阻塞首屏），并预热核心源 TCP/TLS 连接池
+        RemoteSourceManifest.shared.syncInBackground()
+        let warmURLs = [
+            "https://huavod.com/",
+            "https://huangguoai.com/",
+            "https://91dongman.net/",
+            "https://h1014.sol148.com/",
+            "https://api.mangacopy.com/",
+            "https://cn.webmota.com/"
+        ].compactMap(URL.init(string:))
+        AuroraNetworkEngine.shared.prewarmOrigins(warmURLs)
+
         warmupTask = Task.detached(priority: .utility) { [weak self] in
             // 1. 视频模块全货架预热
             await self?.warmupVideoModule()

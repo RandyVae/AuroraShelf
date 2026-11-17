@@ -1,5 +1,8 @@
 package com.aurorashelf.app.data
 
+import com.aurorashelf.app.data.resilience.AdaptiveHtmlFallbackParser
+import com.aurorashelf.app.data.resilience.AuroraHttpClient
+import com.aurorashelf.app.data.resilience.SourceHealthRegistry
 import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.SourceCategory
@@ -95,7 +98,12 @@ class VideoRepository {
                 }
                 doc to emptyList()
             }
-            val records = parseDocument(document, baseUrl)
+            val rawRecords = parseDocument(document, baseUrl)
+            val records = if (rawRecords.isNotEmpty() || document.html().length < 1_024) {
+                rawRecords
+            } else {
+                AdaptiveHtmlFallbackParser.extractFallbackVideoItems(document, document.location().ifBlank { baseUrl })
+            }
             if (page == 1 && records.isEmpty()) {
                 throw IOException("页面已打开，但没有识别到视频条目。请检查站点地址或页面结构。")
             }
@@ -483,27 +491,42 @@ class VideoRepository {
             .toList()
     }
 
-    private fun fetchDocument(requestUrl: String, baseUrl: String): Document {
-        fun request(): Document {
-            val connection = Jsoup.connect(requestUrl)
-                .userAgent(USER_AGENT)
-                .header("Accept-Language", if (ContentSourceCatalog.isMissAv(baseUrl)) "ja,en-US;q=0.8,en;q=0.6" else "zh-CN,zh;q=0.9")
-                .timeout(REQUEST_TIMEOUT_MS)
-                .followRedirects(true)
-            if (ContentSourceCatalog.is91(baseUrl)) {
-                connection
-                    .cookie("language", "cn_CN")
-                    .cookie("watch_times", "1")
+    private suspend fun fetchDocument(requestUrl: String, baseUrl: String): Document {
+        val sourceKey = SourceHealthRegistry.sourceKeyForUrl(baseUrl) ?: SourceHealthRegistry.sourceKeyForUrl(requestUrl)
+        val candidateUrls = SourceHealthRegistry.expandCandidateUrls(sourceKey, requestUrl)
+        val acceptLang = if (ContentSourceCatalog.isMissAv(baseUrl)) "ja,en-US;q=0.8,en;q=0.6" else "zh-CN,zh;q=0.9"
+        val is91 = ContentSourceCatalog.is91(baseUrl)
+
+        val headersBuilder: (String) -> Map<String, String> = { target ->
+            buildMap {
+                put("User-Agent", USER_AGENT)
+                put("Accept-Language", acceptLang)
+                runCatching { URI(target) }.getOrNull()?.let { u ->
+                    put("Referer", "${u.scheme ?: "https"}://${u.authority}/")
+                }
+                if (is91) {
+                    put("Cookie", "language=cn_CN; watch_times=1")
+                }
             }
-            return connection.get()
         }
 
-        return try {
-            request()
-        } catch (failure: IOException) {
-            if (!failure.isTransientTransportFailure()) throw failure
-            request()
+        val result = if (candidateUrls.size > 1) {
+            AuroraHttpClient.fetchHedgedText(
+                sourceKey = sourceKey,
+                candidateUrls = candidateUrls,
+                headersBuilder = headersBuilder,
+                timeoutMs = REQUEST_TIMEOUT_MS.toLong(),
+            )
+        } else {
+            val single = candidateUrls.first()
+            AuroraHttpClient.fetchText(
+                url = single,
+                sourceKey = sourceKey,
+                headers = headersBuilder(single),
+                timeoutMs = REQUEST_TIMEOUT_MS.toLong(),
+            )
         }
+        return Jsoup.parse(result.body, result.finalUrl)
     }
 
     private fun Element.toMissAvVideoItem(baseUrl: String): VideoItem? {
@@ -637,7 +660,7 @@ class VideoRepository {
         val bannerUrl: String,
     )
 
-    private fun loadHuavodHeroSlidesCached(baseUrl: String): List<HuavodHeroSlide> {
+    private suspend fun loadHuavodHeroSlidesCached(baseUrl: String): List<HuavodHeroSlide> {
         val now = System.currentTimeMillis()
         val cached = huavodHeroCache
         if (cached != null && now - cached.first < HUAVOD_HERO_CACHE_TTL_MS && cached.second.isNotEmpty()) {
@@ -966,13 +989,16 @@ class VideoRepository {
     }
 
     private fun fetchJson(requestUrl: String): String {
-        return Jsoup.connect(requestUrl)
-            .userAgent(USER_AGENT)
-            .header("Accept", "application/json, text/plain, */*")
-            .ignoreContentType(true)
-            .timeout(REQUEST_TIMEOUT_MS)
-            .execute()
-            .body()
+        return AuroraHttpClient.fetchText(
+            url = requestUrl,
+            sourceKey = SourceHealthRegistry.sourceKeyForUrl(requestUrl),
+            headers = mapOf(
+                "User-Agent" to USER_AGENT,
+                "Accept" to "application/json, text/plain, */*",
+            ),
+            timeoutMs = REQUEST_TIMEOUT_MS.toLong(),
+            learnRedirectMirror = false,
+        ).body
     }
 
     companion object {

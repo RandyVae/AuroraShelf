@@ -82,12 +82,7 @@ public final class VideoRepository: ObservableObject {
     private var currentSearchToken = UUID()
 
     private init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.httpAdditionalHeaders = [
-            "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
-        ]
-        self.session = URLSession.permissive(configuration: config)
+        self.session = AuroraNetworkEngine.shared.session
 
         let args = ProcessInfo.processInfo.arguments
         if let idx = args.firstIndex(of: "--video-source"), idx + 1 < args.count {
@@ -101,96 +96,129 @@ public final class VideoRepository: ObservableObject {
 
     public func switchCategory(to category: String) {
         self.currentCategory = category
-        self.feedVideos = []
-        self.billboardVideo = nil
-        self.top10Videos = []
-        self.categoryShelves = []
         self.feedError = nil
         self.currentPage = 1
         self.canLoadMore = true
         self.isLoadingNextPage = false
-        self.isLoading = true
+        if let snapshot = SourceSnapshotStore.shared.getVideoFeed(sourceId: self.currentSource.id, category: category),
+           !snapshot.items.isEmpty {
+            applyFeedItems(snapshot.items, source: self.currentSource)
+            self.isLoading = false
+            print("[AuroraPerf] video_swr_hit source=\(self.currentSource.id) category=\(category) count=\(snapshot.items.count) fresh=\(snapshot.isFresh)")
+        } else {
+            self.feedVideos = []
+            self.billboardVideo = nil
+            self.top10Videos = []
+            self.categoryShelves = []
+            self.isLoading = true
+        }
         self.loadFeed(for: self.currentSource, category: category)
     }
 
     public func switchSource(to source: VideoSourceDefinition) {
         self.currentSource = source
-        self.currentCategory = source.categories.first ?? "全部"
-        self.feedVideos = []
-        self.billboardVideo = nil
-        self.top10Videos = []
-        let shelfCategories = source.categories.filter { $0 != "全部" }
-        self.categoryShelves = shelfCategories.isEmpty ? [CategoryShelf(category: "精选推荐", videos: [], isLoading: true)] : shelfCategories.map { CategoryShelf(category: $0, videos: [], isLoading: true) }
+        let initialCategory = source.categories.first ?? "全部"
+        self.currentCategory = initialCategory
         self.feedError = nil
         self.currentPage = 1
         self.canLoadMore = true
         self.isLoadingNextPage = false
-        self.isLoading = true
-        self.loadFeed(for: source, category: self.currentCategory)
+        if let snapshot = SourceSnapshotStore.shared.getVideoFeed(sourceId: source.id, category: initialCategory),
+           !snapshot.items.isEmpty {
+            applyFeedItems(snapshot.items, source: source)
+            self.isLoading = false
+            print("[AuroraPerf] video_switch_swr_hit source=\(source.id) count=\(snapshot.items.count) fresh=\(snapshot.isFresh)")
+        } else {
+            self.feedVideos = []
+            self.billboardVideo = nil
+            self.top10Videos = []
+            let shelfCategories = source.categories.filter { $0 != "全部" }
+            self.categoryShelves = shelfCategories.isEmpty ? [CategoryShelf(category: "精选推荐", videos: [], isLoading: true)] : shelfCategories.map { CategoryShelf(category: $0, videos: [], isLoading: true) }
+            self.isLoading = true
+        }
+        self.loadFeed(for: source, category: initialCategory)
+    }
+
+    private func applyFeedItems(_ videos: [VideoItem], source: VideoSourceDefinition) {
+        var seenIDs = Set<String>()
+        var uniqueVideos: [VideoItem] = []
+        for v in videos {
+            if seenIDs.insert(v.id).inserted {
+                uniqueVideos.append(v)
+            }
+        }
+        self.feedVideos = uniqueVideos
+        self.billboardVideo = uniqueVideos.first
+        self.top10Videos = uniqueVideos.count > 1 ? Array(uniqueVideos.dropFirst().prefix(10)) : uniqueVideos
+        self.canLoadMore = !uniqueVideos.isEmpty
+        self.currentPage = 1
+
+        let shelfCategories = source.categories.filter { $0 != "全部" }
+        if shelfCategories.isEmpty {
+            self.categoryShelves = [CategoryShelf(category: "精选推荐", videos: Array(uniqueVideos.prefix(10)), isLoading: false)]
+        } else {
+            var remainingVideos = uniqueVideos
+            var shelves: [CategoryShelf] = []
+            let targetCategories = Array(shelfCategories.prefix(5))
+            let targetCount = max(targetCategories.count, 1)
+            let chunkLimit = max(3, min(8, uniqueVideos.count / targetCount))
+            for cat in targetCategories {
+                let matching = remainingVideos.filter { v in
+                    v.tags.contains(where: { $0.localizedCaseInsensitiveContains(cat) }) ||
+                    v.category.localizedCaseInsensitiveContains(cat) ||
+                    v.title.localizedCaseInsensitiveContains(cat)
+                }
+                let shelfVids: [VideoItem]
+                if matching.count >= 3 {
+                    shelfVids = Array(matching.prefix(chunkLimit))
+                    remainingVideos.removeAll { v in shelfVids.contains(where: { $0.id == v.id }) }
+                } else {
+                    shelfVids = Array(remainingVideos.prefix(chunkLimit))
+                    remainingVideos = Array(remainingVideos.dropFirst(shelfVids.count))
+                }
+                if !shelfVids.isEmpty {
+                    shelves.append(CategoryShelf(category: cat, videos: shelfVids, isLoading: false))
+                }
+            }
+            if shelves.isEmpty {
+                shelves = [CategoryShelf(category: "精选推荐", videos: Array(uniqueVideos.prefix(10)), isLoading: false)]
+            }
+            self.categoryShelves = shelves
+        }
     }
 
     public func loadFeed(for source: VideoSourceDefinition, category: String = "全部") {
         currentLoadTask?.cancel()
-        self.isLoading = true
+        if self.feedVideos.isEmpty,
+           let snapshot = SourceSnapshotStore.shared.getVideoFeed(sourceId: source.id, category: category),
+           !snapshot.items.isEmpty {
+            applyFeedItems(snapshot.items, source: source)
+            print("[AuroraPerf] video_swr_hit source=\(source.id) category=\(category) count=\(snapshot.items.count) fresh=\(snapshot.isFresh)")
+        }
+        self.isLoading = self.feedVideos.isEmpty
         self.feedError = nil
         self.currentPage = 1
         self.canLoadMore = true
         self.isLoadingNextPage = false
         let targetSource = source
+        let startedAt = Date()
         currentLoadTask = Task {
             do {
                 let videos = try await fetchVideosForSource(targetSource, category: category, page: 1)
                 guard !Task.isCancelled else { return }
                 guard self.currentSource.id == targetSource.id && self.currentCategory == category else { return }
-                var seenIDs = Set<String>()
-                var uniqueVideos: [VideoItem] = []
-                for v in videos {
-                    if !seenIDs.contains(v.id) {
-                        seenIDs.insert(v.id)
-                        uniqueVideos.append(v)
-                    }
+                self.applyFeedItems(videos, source: targetSource)
+                if !self.feedVideos.isEmpty {
+                    SourceSnapshotStore.shared.putVideoFeed(sourceId: targetSource.id, category: category, items: self.feedVideos)
                 }
-                self.feedVideos = uniqueVideos
-                self.billboardVideo = uniqueVideos.first
-                self.top10Videos = uniqueVideos.count > 1 ? Array(uniqueVideos.dropFirst().prefix(10)) : uniqueVideos
+                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                print("[AuroraPerf] video_net_load source=\(targetSource.id) ms=\(elapsedMs) count=\(self.feedVideos.count) \(SourceHealthRegistry.shared.telemetrySummary())")
                 self.isLoading = false
-                self.canLoadMore = !uniqueVideos.isEmpty
-                self.currentPage = 1
-
-                // 构建 Apple TV 风格的横向分类货架流（优先从首屏优质列表中智能分流，零网络阻塞秒开）
-                let shelfCategories = targetSource.categories.filter { $0 != "全部" }
-                if shelfCategories.isEmpty {
-                    self.categoryShelves = [CategoryShelf(category: "精选推荐", videos: Array(uniqueVideos.prefix(10)), isLoading: false)]
-                } else {
-                    var remainingVideos = uniqueVideos
-                    var shelves: [CategoryShelf] = []
-                    for cat in shelfCategories.prefix(4) {
-                        let matching = remainingVideos.filter { v in
-                            v.tags.contains(where: { $0.localizedCaseInsensitiveContains(cat) }) ||
-                            v.category.localizedCaseInsensitiveContains(cat) ||
-                            v.title.localizedCaseInsensitiveContains(cat)
-                        }
-                        let shelfVids: [VideoItem]
-                        if matching.count >= 3 {
-                            shelfVids = Array(matching.prefix(10))
-                            remainingVideos.removeAll { v in shelfVids.contains(where: { $0.id == v.id }) }
-                        } else {
-                            shelfVids = Array(remainingVideos.prefix(8))
-                            remainingVideos = Array(remainingVideos.dropFirst(shelfVids.count))
-                        }
-                        if !shelfVids.isEmpty {
-                            shelves.append(CategoryShelf(category: cat, videos: shelfVids, isLoading: false))
-                        }
-                    }
-                    if shelves.isEmpty {
-                        shelves = [CategoryShelf(category: "精选推荐", videos: Array(uniqueVideos.prefix(10)), isLoading: false)]
-                    }
-                    self.categoryShelves = shelves
-                }
+                self.feedError = nil
 
                 // 重点源（如华视影院 22s 广告倒计时锁）前置异步静默预热前 3 部视频播放流
                 if targetSource.id == VideoSourceCatalog.huavod.id {
-                    for video in uniqueVideos.prefix(3) {
+                    for video in self.feedVideos.prefix(3) {
                         VideoPreloadManager.shared.prewarm(video: video)
                     }
                 }
@@ -199,8 +227,13 @@ public final class VideoRepository: ObservableObject {
             } catch {
                 guard !Task.isCancelled else { return }
                 guard self.currentSource.id == targetSource.id && self.currentCategory == category else { return }
-                self.feedError = error.localizedDescription
-                self.categoryShelves = []
+                // Stale-If-Error：若已有本地缓存快照展示，不销毁当前画架，维持无缝可读
+                if self.feedVideos.isEmpty {
+                    self.feedError = error.localizedDescription
+                    self.categoryShelves = []
+                } else {
+                    self.feedError = nil
+                }
                 self.isLoading = false
             }
         }
@@ -307,30 +340,76 @@ public final class VideoRepository: ObservableObject {
             request.setValue("age_verified=1; has_access=1; accessAgeDisclaimerPH=1; platform=mobile; bs=000000000000000022522ffa8ac94dcd; cookieConsent=3;", forHTTPHeaderField: "Cookie")
             request.setValue("ja,en-US;q=0.8,en;q=0.6", forHTTPHeaderField: "Accept-Language")
         }
-        let data = try await requestFeedData(for: request, source: source.name)
+        let response = try await requestFeedHedged(for: request, source: source.name, sourceKey: source.id)
 
         if source.id == VideoSourceCatalog.eporner.id {
-            return try UniversalVideoEngine.decodeEPORNERFeed(data: data, statusCode: 200, category: category)
+            return try UniversalVideoEngine.decodeEPORNERFeed(data: response.data, statusCode: 200, category: category)
         }
-        guard let html = String(data: data, encoding: .utf8) else {
+        guard let html = decodeHTML(response.data) else {
             throw VideoFeedError.malformedResponse(source: source.name)
         }
-        let videos = HTMLVideoSourceAdapter.parseHTMLFeed(html, source: source, category: category, baseURL: HTMLVideoSourceAdapter.baseURL(for: source))
+        let resolvedBase = response.finalURL.scheme.flatMap { scheme in
+            response.finalURL.host.map { "\(scheme)://\($0)" }
+        } ?? HTMLVideoSourceAdapter.baseURL(for: source)
+        var videos = HTMLVideoSourceAdapter.parseHTMLFeed(html, source: source, category: category, baseURL: resolvedBase)
+        if videos.isEmpty && html.count > 1_024 {
+            videos = AdaptiveHTMLFallbackParser.extractFallbackVideoItems(
+                html: html,
+                baseURL: resolvedBase,
+                sourceName: source.name,
+                category: category
+            )
+        }
         guard !videos.isEmpty else {
             throw VideoFeedError.malformedResponse(source: source.name)
         }
         return videos
     }
 
-    private func requestFeedData(for request: URLRequest, source: String) async throws -> Data {
-        let (data, response) = try await session.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse else {
+    private func requestFeedResponse(for request: URLRequest, source: String, sourceKey: String? = nil) async throws -> AuroraNetworkResponse {
+        guard let url = request.url else { throw VideoFeedError.invalidURL(source: source) }
+        do {
+            return try await AuroraNetworkEngine.shared.fetch(
+                url: url,
+                sourceKey: sourceKey ?? SourceHealthRegistry.sourceKey(for: url),
+                method: request.httpMethod ?? "GET",
+                body: request.httpBody,
+                headers: request.allHTTPHeaderFields ?? [:]
+            )
+        } catch let error as AuroraNetworkError {
+            if case .httpStatus(let code, _) = error {
+                throw VideoFeedError.httpStatus(source: source, statusCode: code)
+            }
             throw VideoFeedError.invalidResponse(source: source)
         }
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw VideoFeedError.httpStatus(source: source, statusCode: httpResponse.statusCode)
+    }
+
+    private func requestFeedHedged(for request: URLRequest, source: String, sourceKey: String?) async throws -> AuroraNetworkResponse {
+        guard let url = request.url else { throw VideoFeedError.invalidURL(source: source) }
+        let candidates = SourceHealthRegistry.shared.expandCandidateURLs(sourceKey: sourceKey, requestURL: url)
+        let baseHeaders = request.allHTTPHeaderFields ?? [:]
+        do {
+            return try await AuroraNetworkEngine.shared.fetchHedged(
+                sourceKey: sourceKey,
+                candidateURLs: candidates,
+                headersBuilder: { target in
+                    var hdrs = baseHeaders
+                    if let scheme = target.scheme, let host = target.host {
+                        hdrs["Referer"] = "\(scheme)://\(host)/"
+                    }
+                    return hdrs
+                }
+            )
+        } catch let error as AuroraNetworkError {
+            if case .httpStatus(let code, _) = error {
+                throw VideoFeedError.httpStatus(source: source, statusCode: code)
+            }
+            throw VideoFeedError.invalidResponse(source: source)
         }
-        return data
+    }
+
+    private func requestFeedData(for request: URLRequest, source: String) async throws -> Data {
+        try await requestFeedResponse(for: request, source: source).data
     }
 
     // MARK: - 真实请求 91动漫 列表（实测 918ms 秒开）
@@ -1054,14 +1133,24 @@ public final class VideoRepository: ObservableObject {
         request.setValue("https://h1014.sol148.com/", forHTTPHeaderField: "Referer")
         request.setValue("language=cn_CN; watch_times=1", forHTTPHeaderField: "Cookie")
         request.setValue("zh-CN,zh;q=0.9", forHTTPHeaderField: "Accept-Language")
-        let data = try await requestFeedData(for: request, source: "91视频")
-        guard let html = decodeHTML(data) else {
+        let response = try await requestFeedHedged(for: request, source: "91视频", sourceKey: "91porn")
+        guard let html = decodeHTML(response.data) else {
             throw VideoFeedError.malformedResponse(source: "91视频")
         }
-        return parse91PornHtml(html, category: category)
+        let resolvedOrigin = response.finalURL.scheme.flatMap { s in response.finalURL.host.map { "\(s)://\($0)" } } ?? "https://h1014.sol148.com"
+        let parsed = parse91PornHtml(html, category: category, baseOrigin: resolvedOrigin)
+        if !parsed.isEmpty || html.count <= 1_024 {
+            return parsed
+        }
+        return AdaptiveHTMLFallbackParser.extractFallbackVideoItems(
+            html: html,
+            baseURL: resolvedOrigin,
+            sourceName: "91视频",
+            category: category
+        )
     }
 
-    nonisolated func parse91PornHtml(_ html: String, category: String) -> [VideoItem] {
+    nonisolated func parse91PornHtml(_ html: String, category: String, baseOrigin: String = "https://h1014.sol148.com") -> [VideoItem] {
         var videos: [VideoItem] = []
         var seenViewkeys = Set<String>()
         let cardMarkerPattern = #"<(?:article|div)\b[^>]*class\s*=\s*["'][^"']*\b(?:vitem\s+well-sm|well\s+well-sm)\b[^"']*["'][^>]*>"#
@@ -1147,7 +1236,8 @@ public final class VideoRepository: ObservableObject {
             }
             guard !title.isEmpty else { continue }
 
-            let fullPageUrl = "https://h1014.sol148.com/view_video.php?viewkey=\(viewkey)"
+            let cleanOrigin = baseOrigin.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            let fullPageUrl = "\(cleanOrigin)/view_video.php?viewkey=\(viewkey)"
 
             videos.append(VideoItem(
                 id: "91p-\(viewkey)",
@@ -1232,20 +1322,21 @@ public final class VideoRepository: ObservableObject {
             throw NSError(domain: "VideoRepository", code: 400, userInfo: [NSLocalizedDescriptionKey: "无效 91视频 链接"])
         }
 
+        let resolvedOrigin = url.scheme.flatMap { s in url.host.map { "\(s)://\($0)" } } ?? "https://h1014.sol148.com"
         var request = URLRequest(url: url)
-        request.setValue("https://h1014.sol148.com/", forHTTPHeaderField: "Referer")
+        request.setValue("\(resolvedOrigin)/", forHTTPHeaderField: "Referer")
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
         request.setValue("language=cn_CN; watch_times=1", forHTTPHeaderField: "Cookie")
         request.setValue("zh-CN,zh;q=0.9", forHTTPHeaderField: "Accept-Language")
 
-        let (data, response) = try await session.data(for: request)
-        guard let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
-              let html = decodeHTML(data) else {
+        let networkResp = try await requestFeedHedged(for: request, source: "91视频", sourceKey: "91porn")
+        guard let html = decodeHTML(networkResp.data) else {
             throw NSError(domain: "VideoRepository", code: 502, userInfo: [NSLocalizedDescriptionKey: "无法加载 91视频 播放页"])
         }
+        let winningOrigin = networkResp.finalURL.scheme.flatMap { s in networkResp.finalURL.host.map { "\(s)://\($0)" } } ?? resolvedOrigin
 
         let headers: [String: String] = [
-            "Referer": "https://h1014.sol148.com/",
+            "Referer": "\(winningOrigin)/",
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1"
         ]
 
@@ -1870,6 +1961,9 @@ public final class VideoRepository: ObservableObject {
         }
         if let mediaURL = HTMLVideoSourceAdapter.extractMediaURL(from: html, pageURL: pageURL) {
             return PlaybackSourceResult(url: mediaURL, referer: pageURL.absoluteString, title: title)
+        }
+        if let fallbackURL = AdaptiveHTMLFallbackParser.extractFallbackStreamURL(from: html) {
+            return PlaybackSourceResult(url: fallbackURL, referer: pageURL.absoluteString, title: title)
         }
         if depth < 2 {
             let playerPages = HTMLVideoSourceAdapter.playerFrameURLs(from: html, pageURL: pageURL, source: source)

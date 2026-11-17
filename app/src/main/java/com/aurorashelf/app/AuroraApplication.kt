@@ -8,7 +8,9 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.aurorashelf.app.data.OfflineCacheManager
-import com.aurorashelf.app.data.comic.EhentaiDns
+import com.aurorashelf.app.data.resilience.ResilientDns
+import com.aurorashelf.app.data.resilience.SourceHealthRegistry
+import com.aurorashelf.app.data.resilience.SourceResilienceBootstrap
 import com.aurorashelf.app.ui.CoverImageLoader
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -28,6 +30,8 @@ private const val MEMORY_CACHE_HEAP_DIVISOR = 4L
 class AuroraApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
+        // 初始化全链路端侧自愈与网络预热基础设施（SWR 多槽位快照 / TUN-Safe DNS / 镜像健康度注册中心）
+        SourceResilienceBootstrap.initialize(this)
         // Install the process-wide cover memory/disk cache before any cover request can start.
         CoverImageLoader.initialize(this)
         // Recreate Media3's persistent download manager as soon as the app process starts, but
@@ -50,7 +54,7 @@ class AuroraApplication : Application(), SingletonImageLoader.Factory {
         }
         val client = OkHttpClient.Builder()
             .dispatcher(dispatcher)
-            .dns(EhentaiDns)
+            .dns(ResilientDns)
             .connectTimeout(12, TimeUnit.SECONDS)
             .readTimeout(18, TimeUnit.SECONDS)
             .addInterceptor(comicPageInterceptor())
@@ -80,47 +84,90 @@ class AuroraApplication : Application(), SingletonImageLoader.Factory {
         val request = chain.request()
         val urlString = request.url.toString()
         val referer = request.header("Referer").orEmpty()
-        var response: Response = chain.proceed(request)
+        val rawHost = request.url.host.lowercase()
+        val cdnPoolKey = when {
+            rawHost.endsWith("bzcdn.net") || rawHost.endsWith("baozicdn.com") || rawHost.contains("baozimh") -> "baozi-cdn"
+            rawHost.contains("jmapiproxy") || rawHost.contains("jmapinode") -> "jm-cdn"
+            else -> null
+        }
 
-        val host = request.url.host.lowercase()
-        if (!response.isSuccessful && host.endsWith("bzcdn.net")) {
-            val fallbackHosts = listOf("static-tw.baozimh.com", "s1.bzcdn.net", "s2.bzcdn.net")
-                .filterNot { it.equals(host, ignoreCase = true) }
-            for (candidateHost in fallbackHosts) {
-                val fallbackUrl = request.url.newBuilder().host(candidateHost).build()
-                val fallbackReferer = if (candidateHost.contains("baozimh")) {
-                    "https://cn.twbzmg.com/"
-                } else {
-                    referer.ifBlank { "https://cn.webmota.com/" }
+        // 若初始图片 CDN 已处于熔断状态，直接提前切换至健康度最高的候选 CDN，避免逐页等待超时
+        var activeRequest = request
+        var activeHost = rawHost
+        if (cdnPoolKey != null && SourceHealthRegistry.isCircuitOpen(rawHost)) {
+            val bestOrigin = SourceHealthRegistry.resolveOrigins(cdnPoolKey).firstOrNull()
+            val bestHost = bestOrigin?.let { runCatching { java.net.URI(it).host?.lowercase() }.getOrNull() }
+            if (!bestHost.isNullOrBlank() && bestHost != rawHost) {
+                val reroutedUrl = request.url.newBuilder().host(bestHost).build()
+                val reroutedReferer = when {
+                    bestHost.contains("baozimh") -> "https://cn.twbzmg.com/"
+                    cdnPoolKey == "baozi-cdn" -> referer.ifBlank { "https://cn.webmota.com/" }
+                    else -> referer
                 }
-                val fallbackRequest = request.newBuilder()
-                    .url(fallbackUrl)
-                    .header("Referer", fallbackReferer)
+                activeRequest = request.newBuilder()
+                    .url(reroutedUrl)
+                    .apply { if (reroutedReferer.isNotBlank()) header("Referer", reroutedReferer) }
                     .build()
-                val candidateResponse = runCatching { chain.proceed(fallbackRequest) }.getOrNull()
-                if (candidateResponse != null) {
-                    if (candidateResponse.isSuccessful) {
-                        response.close()
-                        response = candidateResponse
-                        break
+                activeHost = bestHost
+            }
+        }
+
+        val startedAt = System.currentTimeMillis()
+        var response: Response? = runCatching { chain.proceed(activeRequest) }.getOrNull()
+        if (response != null && response.isSuccessful) {
+            if (cdnPoolKey != null) {
+                SourceHealthRegistry.recordSuccess(cdnPoolKey, activeHost, System.currentTimeMillis() - startedAt)
+            }
+        } else {
+            val statusCode = response?.code ?: 0
+            if (cdnPoolKey != null) {
+                SourceHealthRegistry.recordFailure(cdnPoolKey, activeHost, statusCode = statusCode, isHardBlock = statusCode == 0 || statusCode >= 500)
+                val backupHosts = SourceHealthRegistry.resolveOrigins(cdnPoolKey)
+                    .mapNotNull { runCatching { java.net.URI(it).host?.lowercase() }.getOrNull() }
+                    .filterNot { it.equals(activeHost, ignoreCase = true) || it.equals(rawHost, ignoreCase = true) }
+                for (candidateHost in backupHosts) {
+                    val fallbackUrl = request.url.newBuilder().host(candidateHost).build()
+                    val fallbackReferer = when {
+                        candidateHost.contains("baozimh") -> "https://cn.twbzmg.com/"
+                        cdnPoolKey == "baozi-cdn" -> referer.ifBlank { "https://cn.webmota.com/" }
+                        else -> referer
+                    }
+                    val fallbackRequest = request.newBuilder()
+                        .url(fallbackUrl)
+                        .apply { if (fallbackReferer.isNotBlank()) header("Referer", fallbackReferer) }
+                        .build()
+                    val hopStarted = System.currentTimeMillis()
+                    val candidateResponse = runCatching { chain.proceed(fallbackRequest) }.getOrNull()
+                    if (candidateResponse != null) {
+                        if (candidateResponse.isSuccessful) {
+                            SourceHealthRegistry.recordSuccess(cdnPoolKey, candidateHost, System.currentTimeMillis() - hopStarted)
+                            response?.close()
+                            response = candidateResponse
+                            break
+                        } else {
+                            SourceHealthRegistry.recordFailure(cdnPoolKey, candidateHost, statusCode = candidateResponse.code)
+                            candidateResponse.close()
+                        }
                     } else {
-                        candidateResponse.close()
+                        SourceHealthRegistry.recordFailure(cdnPoolKey, candidateHost, statusCode = 0, isHardBlock = true)
                     }
                 }
             }
         }
 
-        if (response.isSuccessful && CoverImageLoader.isEncryptedCover(urlString, referer)) {
-            val mediaType = response.body?.contentType() ?: "image/jpeg".toMediaType()
-            val rawBytes = response.body?.bytes()
+        val finalResponse = response ?: chain.proceed(request)
+
+        if (finalResponse.isSuccessful && CoverImageLoader.isEncryptedCover(urlString, referer)) {
+            val mediaType = finalResponse.body?.contentType() ?: "image/jpeg".toMediaType()
+            val rawBytes = finalResponse.body?.bytes()
             if (rawBytes != null) {
                 val decoded = CoverImageLoader.decryptPayloadIfNeeded(rawBytes, urlString, referer)
-                return@Interceptor response.newBuilder()
+                return@Interceptor finalResponse.newBuilder()
                     .body(decoded.toResponseBody(mediaType))
                     .build()
             }
         }
 
-        response
+        finalResponse
     }
 }

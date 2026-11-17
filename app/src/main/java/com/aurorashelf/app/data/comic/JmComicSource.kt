@@ -3,6 +3,9 @@ package com.aurorashelf.app.data.comic
 import android.annotation.SuppressLint
 import android.util.Base64
 import com.aurorashelf.app.BuildConfig
+import com.aurorashelf.app.data.resilience.AuroraHttpClient
+import com.aurorashelf.app.data.resilience.HttpTextResult
+import com.aurorashelf.app.data.resilience.SourceHealthRegistry
 import com.aurorashelf.app.model.ComicCategory
 import com.aurorashelf.app.model.ComicChapter
 import com.aurorashelf.app.model.ComicDetails
@@ -75,12 +78,19 @@ internal class JmComicSource : ComicSource {
         val photoId = item.optString("id").ifBlank { chapterId }
         val images = item.optJSONArray("images") ?: JSONArray()
         val scrambleId = requestScrambleId(photoId)
+        val rankedImageHosts = SourceHealthRegistry.resolveOrigins("jm-cdn", IMAGE_DOMAINS.map { "https://$it" })
+            .mapNotNull { runCatching { java.net.URI(it).host }.getOrNull() }
+            .ifEmpty { IMAGE_DOMAINS }
+        val activeApiReferer = SourceHealthRegistry.resolveOrigins("jm", API_DOMAINS.map { "https://$it" })
+            .firstOrNull()
+            ?.let { "${it.trimEnd('/')}/" }
+            ?: "https://${API_DOMAINS.first()}/"
         List(images.length()) { index ->
             val filename = images.optString(index)
-            val url = "https://${IMAGE_DOMAINS[index % IMAGE_DOMAINS.size]}/media/photos/$photoId/$filename"
+            val url = "https://${rankedImageHosts[index % rankedImageHosts.size]}/media/photos/$photoId/$filename"
             ComicPage(
                 imageUrl = url,
-                referer = "https://${API_DOMAINS.first()}/",
+                referer = activeApiReferer,
                 verticalSegments = JmImageScrambler.segmentCount(scrambleId, photoId, filename),
             )
         }.filter { it.imageUrl.substringAfterLast('/').isNotBlank() }
@@ -106,37 +116,67 @@ internal class JmComicSource : ComicSource {
         }.filterNotNull()
     }
 
-    private fun request(path: String): JSONObject {
+    private suspend fun request(path: String): JSONObject {
         ensureProtocolConfigured()
-        var lastFailure: Throwable? = null
-        API_DOMAINS.forEach { domain ->
-            runCatching {
-                val timestamp = (System.currentTimeMillis() / 1_000L).toString()
-                val response = ComicHttp.getResponse("https://$domain/$path", headers(timestamp, BuildConfig.JM_TOKEN_SECRET))
-                check(response.status == 200) { "HTTP ${response.status}" }
-                val outer = JSONObject(response.body)
-                check(outer.optInt("code") == 200) { outer.optString("errorMsg").ifBlank { "code ${outer.optInt("code")}" } }
-                val encrypted = outer.optString("data")
-                check(encrypted.isNotBlank()) { "响应内容为空" }
-                return JSONObject(decrypt(encrypted, timestamp))
-            }.onFailure { lastFailure = it }
+        val origins = SourceHealthRegistry.resolveOrigins("jm", API_DOMAINS.map { "https://$it" })
+        val candidateUrls = origins.map { "${it.trimEnd('/')}/$path" }
+        val decryptedByUrl = java.util.concurrent.ConcurrentHashMap<String, JSONObject>()
+
+        val result = try {
+            AuroraHttpClient.fetchHedgedText(
+                sourceKey = "jm",
+                candidateUrls = candidateUrls,
+                headersBuilder = {
+                    val timestamp = (System.currentTimeMillis() / 1_000L).toString()
+                    headers(timestamp, BuildConfig.JM_TOKEN_SECRET) + ("X-JM-TS" to timestamp)
+                },
+                timeoutMs = 8_000L,
+                executor = { targetUrl, hdrs ->
+                    val ts = hdrs["X-JM-TS"] ?: (System.currentTimeMillis() / 1_000L).toString()
+                    val cleanHdrs = hdrs.filterKeys { it != "X-JM-TS" }
+                    val res = AuroraHttpClient.fetchText(
+                        url = targetUrl,
+                        sourceKey = "jm",
+                        headers = cleanHdrs,
+                        timeoutMs = 8_000L,
+                    )
+                    val outer = JSONObject(res.body)
+                    check(outer.optInt("code") == 200) {
+                        outer.optString("errorMsg").ifBlank { "code ${outer.optInt("code")}" }
+                    }
+                    val encrypted = outer.optString("data")
+                    check(encrypted.isNotBlank()) { "响应内容为空" }
+                    decryptedByUrl[targetUrl] = JSONObject(decrypt(encrypted, ts))
+                    res
+                },
+            )
+        } catch (err: Throwable) {
+            error("禁漫接口连接失败：${err.message.orEmpty()}")
         }
-        error("禁漫接口连接失败：${lastFailure?.message.orEmpty()}")
+        return decryptedByUrl[result.finalUrl]
+            ?: decryptedByUrl.values.firstOrNull()
+            ?: error("禁漫接口响应解码异常")
     }
 
-    private fun requestScrambleId(photoId: String): Int {
+    private suspend fun requestScrambleId(photoId: String): Int {
         val path = "chapter_view_template?id=${ComicHttp.encode(photoId)}&mode=vertical&page=0&app_img_shunt=1&express=off"
-        var lastFailure: Throwable? = null
-        API_DOMAINS.forEach { domain ->
-            runCatching {
-                val timestamp = (System.currentTimeMillis() / 1_000L).toString()
-                val response = ComicHttp.getResponse("https://$domain/$path", headers(timestamp, BuildConfig.JM_TOKEN_SECRET_2))
-                check(response.status == 200) { "HTTP ${response.status}" }
-                return SCRAMBLE_PATTERN.find(response.body)?.groupValues?.get(1)?.toInt()
-                    ?: DEFAULT_SCRAMBLE_ID
-            }.onFailure { lastFailure = it }
+        val origins = SourceHealthRegistry.resolveOrigins("jm", API_DOMAINS.map { "https://$it" })
+        val candidateUrls = origins.map { "${it.trimEnd('/')}/$path" }
+        val result = try {
+            AuroraHttpClient.fetchHedgedText(
+                sourceKey = "jm",
+                candidateUrls = candidateUrls,
+                headersBuilder = {
+                    val timestamp = (System.currentTimeMillis() / 1_000L).toString()
+                    headers(timestamp, BuildConfig.JM_TOKEN_SECRET_2)
+                },
+                timeoutMs = 7_000L,
+            )
+        } catch (err: Throwable) {
+            error("禁漫图片参数获取失败：${err.message.orEmpty()}")
         }
-        error("禁漫图片参数获取失败：${lastFailure?.message.orEmpty()}")
+        return SCRAMBLE_PATTERN.find(result.body)?.groupValues?.get(1)?.toInt()
+            ?: DEFAULT_SCRAMBLE_ID
     }
 
     private fun headers(timestamp: String, secret: String) = mapOf(

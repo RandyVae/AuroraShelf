@@ -10,6 +10,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
 import android.util.Log
+import com.aurorashelf.app.data.resilience.AuroraHttpClient
+import com.aurorashelf.app.data.resilience.SourceHealthRegistry
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.VideoDetailMetadata
 import com.aurorashelf.app.model.VideoItem
@@ -1074,13 +1076,21 @@ class PlaybackResolver {
     private fun fetch(url: String): Document {
         val startedAtMs = System.currentTimeMillis()
         var fetched = false
+        val headers = buildMap {
+            put("User-Agent", VideoRepository.USER_AGENT)
+            if (ContentSourceCatalog.is91(url)) {
+                put("Cookie", "language=cn_CN; watch_times=1")
+                put("Accept-Language", "zh-CN,zh;q=0.9")
+            }
+        }
         val document = pageCache.get(url) {
             fetched = true
-            Jsoup.connect(url)
-                .userAgent(VideoRepository.USER_AGENT)
-                .timeout(20_000)
-                .followRedirects(true)
-                .get()
+            AuroraHttpClient.fetchDocument(
+                url = url,
+                sourceKey = SourceHealthRegistry.sourceKeyForUrl(url),
+                headers = headers,
+                timeoutMs = 15_000L,
+            )
         }
         Log.i(
             TAG,

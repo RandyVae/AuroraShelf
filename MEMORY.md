@@ -23,32 +23,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `e4a8522`（2026-11-17），未提交 28 个文件
+- Git：`main` @ `ddd9a85`（2026-11-17），未提交 44 个文件
 - 权威记忆文件：
-  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-17（今天）
-  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-17（今天）
-  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-16（今天）
-  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-16（今天）
+  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-18（今天）
+  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-18（今天）
+  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-16（1 天前）
+  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-18（今天）
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（23 天前）
-  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-17（今天）
+  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-18（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-17 12:07 by `sync.py`
+- 最后同步：2026-11-18 02:59 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-17 · Build 265 / v2.16.39）：完成双端源清理与 `91视频` 彻底修复：(1) **双端彻底移除 `JAVSB` 与 `JAV-NONI`**：移除 iOS [VideoSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoSourceCatalog.swift)（20 → 18 源）、[VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift)（`resolveJavSbStream`/`JavSbSignature`）、[HTMLVideoSourceAdapter.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HTMLVideoSourceAdapter.swift)、[CoverImageLoader.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/CoverImageLoader.swift) 与 [ChannelsShelf.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/ChannelsShelf.swift)，Android [ContentSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/ContentSource.kt) 过滤 `JAV-NONI`/`JAVSB` 及清理 [PipePipeDownloader.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PipePipeDownloader.kt)，并更新 `probe_all_sources.mjs`、`diagnose_sources.swift` 与双端单测/UI 审计；(2) **双端 `91视频` 深度修复**：iOS [VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift) 更新 `parse91PornHtml` 同时兼容 PC `.video-title`、移动端 `.vname` / `.vcap .vci` 及站端动态轮换类名兜底、HTML 实体反转义与 `viewkey` 去重，并统一附加 `language=cn_CN; watch_times=1` Cookie 与 `zh-CN` 语系；Android 修复 [AppPreferences.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/AppPreferences.kt) 将 `https://h1014.sol148.com` 静默回切 `DEFAULT_SOURCE` 的历史劫持缺陷，并在 [VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt) 剥离 `.thumb-overlay`/`.duration`/角标实现纯净中文标题解析；(3) **双端全规模测试、Release 实测与全通道同步上线（v2.16.39 / Build 265）**：Android `testDebugUnitTest lintDebug assembleRelease` 及 `RUN_LIVE_SOURCE_TESTS=1` 全通；iOS 187/188 通过且在线全源 `LiveVideoSourceAuditTests` 18/18 视频（`91porn items=24`）及 9/9 非鉴权漫画、全部直播、7/7 论坛板翻页全通（仅 `fid=34` 置顶贴外链 `nsaimg.com` 自身停服）；`iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 与 `emulator-5554` R8 APK 均实测 `91视频` 列表与出画正常、`18` 源无 `JAVSB`/`JAV-NONI`；同步上线至 `https://bananarey.us`（137M APK / 135M IPA，`/` 剩 `11G`）、TestFlight Build 265、Git 与 GitHub Release `v2.16.39`。
-- 进行中：持续观察第三方上游源（`85po` / `SpankBang` 防护及 `fid=34` 外部旧图床）波动。
-- 下一步：按需完成 PocketBase 首个管理员与 SMTP 配置及云端收藏同步。
-- 阻塞：论坛 `fid=34` 置顶贴 `417968` 2021 年外链图床 `www.nsaimg.com` 停服（不阻塞实际帖子与其它版块浏览）；`禁漫天堂` 需端内HMAC密钥，无密钥 Node 探测报 `401`。
-- 最近一次更新：2026-11-17 by Antigravity (gemini-3.1-pro)
+- 当前阶段（2026-11-18 · Build 266 / v2.16.40）：完成「全端五层端侧自治容灾与极速加载引擎（`AuroraResilience`）」研发论证、三端 Release 模拟器实测全绿与同步上线：(1) **架构与核心实现**：Android 新增 [SourceHealthRegistry.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/resilience/SourceHealthRegistry.kt)、[ResilientDns.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/resilience/ResilientDns.kt)、[AuroraHttpClient.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/resilience/AuroraHttpClient.kt)、[SourceSnapshotStore.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/resilience/SourceSnapshotStore.kt)、[RemoteSourceManifest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/resilience/RemoteSourceManifest.kt)、[AdaptiveHtmlFallbackParser.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/resilience/AdaptiveHtmlFallbackParser.kt) 与 [SourceResilienceBootstrap.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/resilience/SourceResilienceBootstrap.kt)；iOS / iPadOS 新增 [SourceHealthRegistry.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/Resilience/SourceHealthRegistry.swift)、[AuroraNetworkEngine.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/Resilience/AuroraNetworkEngine.swift)、[SourceSnapshotStore.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/Resilience/SourceSnapshotStore.swift)、[RemoteSourceManifest.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/Resilience/RemoteSourceManifest.swift) 与 [AdaptiveHTMLFallbackParser.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/Resilience/AdaptiveHTMLFallbackParser.swift)，配合零单点远端热更清单 [source-manifest.json](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/source-manifest.json)，打通 L0（32–36 槽 90s/72h SWR+Stale-If-Error）→ L1（3s 异步清单+门户反查）→ L2（600ms DNS 竞速+TUN `198.18.0.0/15` Fake-IP 透传+DoH）→ L3（HTTP/2 池+1100ms 阶梯对冲+EWMA 指数熔断 `30s->240s`）→ L4（DOM 类名突变启发式自愈）全链路，并顺带修复 [ComicScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ComicScreen.kt)「下载全本」截断及 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh) 针对 Apple `/v1/apps` 500 超时的本地导出+`altool` 自动降级上传；(2) **全规模双端实测与报告**：Android 离线单测 + `lintDebug` + `assembleRelease` 与 `FullSystemSourceProbeTest`（18/18 视频 + 9/9 免登漫画 + `ForumSourcesTest` 论坛）全绿，R8 模拟器实测 `TotalTime: 553ms`、`video_swr_init ms=1 count=24`、`PlaybackResolver ms=0 cache=hit`、死镜像熔断与 `Lust Goddess` 大厅正常；iOS 离线 **194 项（9 跳 / 0 失败）** 且在线实探 **18/18** 视频（61.086s，含 `SpankBang` 恢复 `79` 项与华视 `HTTP 206` 分片）、**9/9** 免登漫画（全解码 `decoded=true`）、**7/7** 论坛版块（275 贴 + 图文详情）与 **340** 路直播全绿，`iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 走查全通；产出香港繁体报告 [SOURCE_SELF_HEALING_REPORT_zh-HK.md](file:///Users/itou/Documents/ChatGPT/91pron/docs/architecture/SOURCE_SELF_HEALING_REPORT_zh-HK.md)；(3) **双通道上线（v2.16.40 Build 266）**：网页 OTA（`https://bananarey.us`：`Netgrey.apk` `137M`、`Netgrey.ipa` `135M`、`manifest.plist` `2.16.40`、`source-manifest.json` 均 `HTTP 200`，`/` 剩 `11G`）与 TestFlight Build `266`（`UPLOAD SUCCEEDED`，`143,784,082` B）同步上线。
+- 进行中：持续观测各第三方上游 CDN 延迟权重（EWMA）及 TestFlight Apple 后台构建处理状态。
+- 下一步：按需配置 PocketBase 首个管理员与 SMTP，或扩展 `source-manifest.json` 远端动态选择器规则。
+- 阻塞：无代码或发布阻塞；合规红线严禁自动绕过 Cloudflare Turnstile/CAPTCHA，遇短暂挑战时依赖端侧指数熔断与 `Stale-If-Error` 保底。
+- 最近一次更新：2026-11-18 by Antigravity (gemini-3.1-pro)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-18（Antigravity）：确立并全端落地「五层端侧自治容灾与极速加载引擎」（`v2.16.40 Build 266`）。经对比代理中转（存在单点故障与 IP 连坐风险）、全量镜像并发广播（触发 CDN 428/429 限流）与全端 WebView 渲染抓取（百 MB 级内存占用），最终选用端侧五层架构：L0 32–36 槽 90s/72h SWR+`Stale-If-Error`、L1 `RemoteSourceManifest` 3s 异步清单+门户动态发现、L2 `ResilientDns` 600ms 竞速+`198.18.0.0/15` TUN Fake-IP 原样放行+DoH、L3 HTTP/2 池+`1100ms` 阶梯对冲竞速+`SourceHealthRegistry` EWMA 指数熔断、L4 `AdaptiveHtmlFallbackParser` DOM 启发式自愈；同步将 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh) 补齐针对 Apple `/v1/apps` 500 超时的 `destination=export` + `altool --use-old-altool` 自动降级上传，产出香港繁体技术报告 [SOURCE_SELF_HEALING_REPORT_zh-HK.md](file:///Users/itou/Documents/ChatGPT/91pron/docs/architecture/SOURCE_SELF_HEALING_REPORT_zh-HK.md)。
 
 - 2026-11-17（Antigravity）：双端移除 `JAVSB`/`JAV-NONI` 并彻底修复 `91视频` 站端动态类名与 Android 偏好劫持（v2.16.39 Build 265）。经真机级 Release 模拟器排查，确认两处隐藏根因：(1) `h1014.sol148.com` 会动态轮换视频卡片标题类名（`.vname` 与 `.vcap > .vci` 等），双端新增多选择器并加入剥离 `.thumb-overlay`/`.duration`/角标后的纯结构兜底＋`language=cn_CN` Cookie；(2) Android `AppPreferences.kt` 旧版迁移逻辑 `raw == "https://h1014.sol148.com"` 劫持用户切换到 `91视频` 的选择并回切默认源，移除后双端 Release 实测加载与起播全部恢复；全通道（网页 OTA、TestFlight、Git & GitHub Release）已同步发布 `v2.16.39 (Build 265)`。
 
@@ -412,6 +414,7 @@
 - 2026-11-15：JVM 单例缓存跨在线/离线单元测试串扰陷阱：当实时测试与离线单元测试共用进程级单例（如 `X134Repository.metaCache`）时，若离线单元测试夹具使用线上真实存在的 ID（如真实推文 ID），在开启 `RUN_LIVE_SOURCE_TESTS=1` 同进程先后执行时，实时测试写入的线上元数据会命中单元测试期望 fallback 的分支；单元测试夹具 ID 必须使用合成隔离 ID。
 - 2026-11-15（2）：iOS 27.2 SwiftUI `View.body` 内同步访问 `UIWindow.safeAreaInsets` 引发 `AttributeGraph: Cycle detected through attribute` 冻结陷阱：在播控/详情界面频繁重绘期间，若布局属性在 `body` 内同步读取底层 `UIWindow.safeAreaInsets` 或将顶层安全区与全屏忽略容器互相引用，会导致 iOS 27.2 AttributeGraph 触发循环依赖死锁——表现为播放器音频继续正常解码发声，但视频图层与界面 UI 完全停滞卡死（「有声音无画面」）。做法是用带锁缓存 + 节流异步主线程采集（`SafeAreaCache`）配合外层非忽略安全区 `onGeometryChange(for: EdgeInsets.self)` 测量边距，并确保多元素横向骨架也使用 `ScrollView(.horizontal)` 避免 `508.0pt` 类宽度撑破视口。
 - 2026-11-15（3）：运行 `LiveVideoSourceAuditTests` 须前置环境变量 `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1 xcodebuild test ...`（无检查进仓库的共享 `.xcscheme` 时，不能用 `RUN_IOS_LIVE_SOURCE_AUDIT=1` 或将其作为 build setting），否则在线源审计测试会被 `XCTSkip` 跳过。
+- 2026-11-18：SWR 异步刷新链路不能裁剪固定子分类货架数，且代理环境下系统 DNS 若返回 `198.18.0.0/15` TUN Fake-IP 严禁用 DoH 真实 IP 覆盖。此外 Apple App Store Connect REST `/v1/apps` 出现间歇 HTTP 500 导致 `xcodebuild -exportArchive (destination=upload)` 超时时，可先以 `destination=export` 本地导出再调用 `xcrun altool --use-old-altool --upload-package` 绑定 App ID（见私有凭据配置）完成 TestFlight 上传。
 
 ## 权威来源（细节以这些文件为准）
 

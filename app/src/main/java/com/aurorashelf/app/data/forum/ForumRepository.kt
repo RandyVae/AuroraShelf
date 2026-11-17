@@ -2,6 +2,7 @@ package com.aurorashelf.app.data.forum
 
 import android.util.Log
 import com.aurorashelf.app.data.VideoRepository
+import com.aurorashelf.app.data.resilience.AuroraHttpClient
 import com.aurorashelf.app.model.ForumPage
 import com.aurorashelf.app.model.ForumPost
 import java.io.IOException
@@ -126,11 +127,9 @@ class ForumRepository internal constructor(
  */
 internal object ForumHttp {
     internal val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
+        AuroraHttpClient.standardClient.newBuilder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(20, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .connectionPool(ConnectionPool(8, 5, TimeUnit.MINUTES))
             .build()
     }
 

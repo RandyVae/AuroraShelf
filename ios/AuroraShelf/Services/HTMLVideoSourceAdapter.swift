@@ -489,6 +489,10 @@ enum HTMLVideoSourceAdapter {
         let candidate = candidateHost.hasPrefix("www.") ? String(candidateHost.dropFirst(4)) : candidateHost
         let expected = sourceHost.hasPrefix("www.") ? String(sourceHost.dropFirst(4)) : sourceHost
         if candidate == expected { return true }
+        let dynamicHosts = SourceHealthRegistry.shared.knownHosts(for: source.id)
+        if dynamicHosts.contains(candidateHost) || dynamicHosts.contains(candidate) {
+            return true
+        }
         if source.id == "missav" && candidate.contains("missav") {
             return true
         }

@@ -1180,7 +1180,7 @@ private fun ComicDetailsScreen(
                                 }
                             }
                             if (details.chapters.isNotEmpty()) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                                     Button(
                                         onClick = { onChapter(0) },
                                         shape = RoundedCornerShape(4.dp),
@@ -1188,12 +1188,12 @@ private fun ComicDetailsScreen(
                                             containerColor = AuroraCoral,
                                             contentColor = Color.White,
                                         ),
-                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
-                                        modifier = Modifier.height(38.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                        modifier = if (onDownloadAll != null) Modifier.weight(1f).height(38.dp) else Modifier.height(38.dp),
                                     ) {
-                                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("开始阅读", fontWeight = FontWeight.Bold)
+                                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("开始阅读", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                                     }
 
                                     if (onDownloadAll != null) {
@@ -1202,13 +1202,14 @@ private fun ComicDetailsScreen(
                                             shape = RoundedCornerShape(4.dp),
                                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 0.dp),
-                                            modifier = Modifier.height(38.dp),
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                            modifier = Modifier.weight(1f).height(38.dp),
                                         ) {
-                                            Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(18.dp))
+                                            Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
                                             Spacer(Modifier.width(4.dp))
                                             Text(
                                                 text = "下载全本",
+                                                fontSize = 13.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 maxLines = 1,
                                                 softWrap = false,

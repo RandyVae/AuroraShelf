@@ -1,7 +1,7 @@
 package com.aurorashelf.app.data.comic
 
+import com.aurorashelf.app.data.resilience.ResilientDns
 import java.net.InetAddress
-import java.net.UnknownHostException
 import java.util.concurrent.TimeUnit
 import okhttp3.Dns
 import okhttp3.OkHttpClient
@@ -9,27 +9,12 @@ import okhttp3.Protocol
 import okhttp3.Request
 
 /** Keeps E-Hentai image delivery usable when a device DNS result is slow or unreachable. */
-internal object EhentaiDns : Dns {
-    private val preferredAddresses = mapOf(
-        "ehgt.org" to listOf("81.171.14.118", "109.236.85.28"),
-        "ul.ehgt.org" to listOf("94.100.24.82"),
-    )
-
-    override fun lookup(hostname: String): List<InetAddress> {
-        val preferred = preferredAddresses[hostname].orEmpty().mapNotNull { address ->
-            runCatching { InetAddress.getByName(address) }.getOrNull()
-        }
-        val system = runCatching { Dns.SYSTEM.lookup(hostname) }.getOrDefault(emptyList())
-        return (preferred + system).distinctBy(InetAddress::getHostAddress).ifEmpty {
-            throw UnknownHostException(hostname)
-        }
-    }
-}
+internal object EhentaiDns : Dns by ResilientDns
 
 /** Shared connection pool for E-Hentai metadata and image-page resolution. */
 internal object EhentaiHttp {
     private val client = OkHttpClient.Builder()
-        .dns(EhentaiDns)
+        .dns(ResilientDns)
         // Some E-Hentai edge nodes intermittently abort Android's HTTP/2 TLS session.
         // HTTP/1.1 keeps full certificate validation and avoids that transport failure.
         .protocols(listOf(Protocol.HTTP_1_1))

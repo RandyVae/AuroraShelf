@@ -1,5 +1,7 @@
 package com.aurorashelf.app.data.comic
 
+import com.aurorashelf.app.data.resilience.AuroraHttpClient
+import com.aurorashelf.app.data.resilience.SourceHealthRegistry
 import com.aurorashelf.app.model.ComicChapter
 import com.aurorashelf.app.model.ComicCategory
 import com.aurorashelf.app.model.ComicDetails
@@ -8,6 +10,8 @@ import com.aurorashelf.app.model.ComicSourceInfo
 import com.aurorashelf.app.model.ComicSummary
 import java.net.URLEncoder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -27,38 +31,45 @@ internal class CopyComicSource : ComicSource {
 
     override suspend fun browse(categoryId: String, page: Int): List<ComicSummary> = withContext(Dispatchers.IO) {
         val offset = (page - 1) * PAGE_SIZE
-        loadList("$API/comics?limit=$PAGE_SIZE&offset=$offset&ordering=-datetime_updated&theme=$categoryId&top=&platform=3")
+        loadList("/comics?limit=$PAGE_SIZE&offset=$offset&ordering=-datetime_updated&theme=$categoryId&top=&platform=3")
     }
 
     override suspend fun search(query: String, page: Int): List<ComicSummary> = withContext(Dispatchers.IO) {
         val offset = (page - 1) * PAGE_SIZE
         val keyword = URLEncoder.encode(query, Charsets.UTF_8.name())
-        loadList("$API/search/comic?limit=$PAGE_SIZE&offset=$offset&q=$keyword&q_type=&platform=3")
+        loadList("/search/comic?limit=$PAGE_SIZE&offset=$offset&q=$keyword&q_type=&platform=3")
     }
 
     override suspend fun details(comic: ComicSummary): ComicDetails = withContext(Dispatchers.IO) {
-        val comicResult = JSONObject(ComicHttp.get("$API/comic2/${comic.id}?platform=3", HEADERS))
-            .getJSONObject("results").getJSONObject("comic")
-        val chapterResult = JSONObject(
-            ComicHttp.get("$API/comic/${comic.id}/group/default/chapters?limit=500&offset=0&platform=3", HEADERS),
-        ).getJSONObject("results").getJSONArray("list")
-        val authors = comicResult.optJSONArray("author").namesFromObjects("name")
-        val tags = comicResult.optJSONArray("theme").namesFromObjects("name")
-        // CopyManga selects the chapter API version from comic.reclass, not chapter.type.
-        val chapterApiVersion = if (comicResult.has("reclass") && !comicResult.isNull("reclass")) 1 else 2
-        ComicDetails(
-            comic = comic.copy(
-                title = comicResult.optString("name").ifBlank { comic.title },
-                subtitle = authors.firstOrNull().orEmpty().ifBlank { comic.subtitle },
-                coverUrl = comicResult.optString("cover").takeIf(String::isNotBlank) ?: comic.coverUrl,
-                tags = tags,
-            ),
-            description = comicResult.optString("brief"),
-            chapters = List(chapterResult.length()) { index ->
-                val chapter = chapterResult.getJSONObject(index)
-                ComicChapter("$chapterApiVersion:${chapter.getString("uuid")}", chapter.optString("name").ifBlank { "第 ${index + 1} 话" })
-            },
-        )
+        coroutineScope {
+            val detailDeferred = async {
+                JSONObject(fetchHedgedApi("/comic2/${comic.id}?platform=3"))
+                    .getJSONObject("results").getJSONObject("comic")
+            }
+            val chaptersDeferred = async {
+                JSONObject(fetchHedgedApi("/comic/${comic.id}/group/default/chapters?limit=500&offset=0&platform=3"))
+                    .getJSONObject("results").getJSONArray("list")
+            }
+            val comicResult = detailDeferred.await()
+            val chapterResult = chaptersDeferred.await()
+            val authors = comicResult.optJSONArray("author").namesFromObjects("name")
+            val tags = comicResult.optJSONArray("theme").namesFromObjects("name")
+            // CopyManga selects the chapter API version from comic.reclass, not chapter.type.
+            val chapterApiVersion = if (comicResult.has("reclass") && !comicResult.isNull("reclass")) 1 else 2
+            ComicDetails(
+                comic = comic.copy(
+                    title = comicResult.optString("name").ifBlank { comic.title },
+                    subtitle = authors.firstOrNull().orEmpty().ifBlank { comic.subtitle },
+                    coverUrl = comicResult.optString("cover").takeIf(String::isNotBlank) ?: comic.coverUrl,
+                    tags = tags,
+                ),
+                description = comicResult.optString("brief"),
+                chapters = List(chapterResult.length()) { index ->
+                    val chapter = chapterResult.getJSONObject(index)
+                    ComicChapter("$chapterApiVersion:${chapter.getString("uuid")}", chapter.optString("name").ifBlank { "第 ${index + 1} 话" })
+                },
+            )
+        }
     }
 
     override suspend fun chapter(comic: ComicSummary, chapterId: String): List<ComicPage> = withContext(Dispatchers.IO) {
@@ -66,7 +77,7 @@ internal class CopyComicSource : ComicSource {
         val uuid = chapterId.substringAfter(':')
         val versionSuffix = version.takeIf { it >= 2 }?.toString().orEmpty()
         val chapter = JSONObject(
-            ComicHttp.get("$API/comic/${comic.id}/chapter$versionSuffix/$uuid?platform=3", HEADERS),
+            fetchHedgedApi("/comic/${comic.id}/chapter$versionSuffix/$uuid?platform=3"),
         ).getJSONObject("results").getJSONObject("chapter")
         val contents = chapter.getJSONArray("contents")
         val words = chapter.optJSONArray("words")
@@ -80,8 +91,20 @@ internal class CopyComicSource : ComicSource {
         ordered.mapNotNull { it?.takeIf(String::isNotBlank)?.let { url -> ComicPage(url, referer) } }
     }
 
-    private fun loadList(url: String): List<ComicSummary> {
-        val list = JSONObject(ComicHttp.get(url, HEADERS)).getJSONObject("results").getJSONArray("list")
+    private suspend fun fetchHedgedApi(apiPath: String): String {
+        val origins = SourceHealthRegistry.resolveOrigins("copy", API_ORIGINS)
+        val candidateUrls = origins.map { "${it.trimEnd('/')}/api/v3$apiPath" }
+        val result = AuroraHttpClient.fetchHedgedText(
+            sourceKey = "copy",
+            candidateUrls = candidateUrls,
+            headersBuilder = { HEADERS },
+            validator = { res -> res.body.contains("\"results\"") },
+        )
+        return result.body
+    }
+
+    private suspend fun loadList(apiPath: String): List<ComicSummary> {
+        val list = JSONObject(fetchHedgedApi(apiPath)).getJSONObject("results").getJSONArray("list")
         return List(list.length()) { index -> parseSummary(list.getJSONObject(index)) }
     }
 
@@ -103,8 +126,8 @@ internal class CopyComicSource : ComicSource {
     }
 
     private companion object {
-        // The maintained client uses this API host; the previous host fails TLS.
-        const val API = "https://api.2024manga.com/api/v3"
+        // 实测 api.mangacopy.com (~312ms) 比 api.2024manga.com (~1011ms) 快 3.2 倍，同时支持双 API 对冲热备
+        val API_ORIGINS = listOf("https://api.mangacopy.com", "https://api.2024manga.com")
         const val PAGE_SIZE = 24
         val HEADERS = mapOf(
             "User-Agent" to "COPY/2.2.0",

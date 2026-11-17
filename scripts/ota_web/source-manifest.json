@@ -1,0 +1,82 @@
+{
+  "version": "2.16.40",
+  "updatedAt": "2026-11-18T01:45:00+08:00",
+  "mirrors": {
+    "copy": [
+      "https://api.mangacopy.com",
+      "https://api.2024manga.com"
+    ],
+    "91porn": [
+      "https://h1014.sol148.com",
+      "https://91porn.com"
+    ],
+    "pornhub": [
+      "https://cn.pornhub.com",
+      "https://jp.pornhub.com",
+      "https://www.pornhub.com"
+    ],
+    "missav": [
+      "https://missav.media",
+      "https://missav123.com",
+      "https://missav.ws",
+      "https://missav.ai"
+    ],
+    "jm": [
+      "https://www.cdnhjk.net",
+      "https://www.cdngwc.net",
+      "https://www.cdngwc.club",
+      "https://www.cdngwc.cc"
+    ],
+    "t906": [
+      "https://t924.sol140.com",
+      "https://t925.sol140.com",
+      "https://t906.abc2507.cc"
+    ],
+    "baozi": [
+      "https://cn.webmota.com",
+      "https://cn.twbzmg.com",
+      "https://www.baozimh.com"
+    ],
+    "baozi-cdn": [
+      "https://s1.baozicdn.com",
+      "https://s2.baozicdn.com",
+      "https://static-tw.baozimh.com",
+      "https://s1.bzcdn.net",
+      "https://s2.bzcdn.net"
+    ],
+    "jm-cdn": [
+      "https://cdn-msp.jmapiproxy2.cc",
+      "https://cdn-msp2.jmapiproxy2.cc",
+      "https://cdn-msp3.jmapiproxy2.cc",
+      "https://cdn-msp.jmapinodeudzn.net",
+      "https://cdn-msp.jmapiproxy1.cc"
+    ],
+    "huavod": [
+      "https://huavod.com"
+    ],
+    "huangguo": [
+      "https://huangguoai.com"
+    ],
+    "91dongman": [
+      "https://91dongman.net"
+    ]
+  },
+  "cardSelectors": {
+    "91porn": [
+      ".vitem.well-sm",
+      ".well.well-sm"
+    ],
+    "huavod": [
+      ".public-list-box",
+      ".module-item"
+    ],
+    "huangguo": [
+      ".hg-drama-card",
+      ".hg-rank-item"
+    ],
+    "91dongman": [
+      ".dm-card",
+      ".dm-comic-card"
+    ]
+  }
+}

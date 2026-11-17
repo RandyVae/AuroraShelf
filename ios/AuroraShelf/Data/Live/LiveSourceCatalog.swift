@@ -1,6 +1,6 @@
 import Foundation
 
-public struct LiveViewerCount: Hashable, Sendable, CustomStringConvertible {
+public struct LiveViewerCount: Hashable, Codable, Sendable, CustomStringConvertible {
     public let value: Int?
 
     public init(value: Int?) {
@@ -12,7 +12,7 @@ public struct LiveViewerCount: Hashable, Sendable, CustomStringConvertible {
     }
 }
 
-public struct LiveStreamItem: Identifiable, Hashable, Sendable {
+public struct LiveStreamItem: Identifiable, Hashable, Codable, Sendable {
     public let id: String
     public let sourceID: String
     public let username: String
@@ -89,7 +89,13 @@ public final class LiveRepository: ObservableObject {
     public func selectSource(_ sourceID: String) {
         guard LiveSourceCatalog.validSourceIDs.contains(sourceID), selectedSourceID != sourceID else { return }
         selectedSourceID = sourceID
-        liveStreams = []
+        if let snapshot = SourceSnapshotStore.shared.getLiveFeed(sourceId: sourceID, gender: selectedGender),
+           !snapshot.items.isEmpty {
+            liveStreams = snapshot.items
+            loadErrorMessage = nil
+        } else {
+            liveStreams = []
+        }
         _ = startLoading()
     }
 
@@ -103,7 +109,12 @@ public final class LiveRepository: ObservableObject {
         activeRequestID = requestID
         let selectedSourceID = self.selectedSourceID
         let selectedGender = self.selectedGender
-        self.isLoading = true
+        if self.liveStreams.isEmpty,
+           let snapshot = SourceSnapshotStore.shared.getLiveFeed(sourceId: selectedSourceID, gender: selectedGender),
+           !snapshot.items.isEmpty {
+            self.liveStreams = snapshot.items
+        }
+        self.isLoading = self.liveStreams.isEmpty
         self.loadErrorMessage = nil
 
         let task = Task { [weak self] in
@@ -114,10 +125,18 @@ public final class LiveRepository: ObservableObject {
 
             switch outcome {
             case .loaded(let streams, let warnings):
+                if !streams.isEmpty {
+                    SourceSnapshotStore.shared.putLiveFeed(sourceId: selectedSourceID, gender: selectedGender, items: streams)
+                }
                 self.liveStreams = streams
                 self.loadErrorMessage = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
             case .failed(let message):
-                self.loadErrorMessage = message
+                // Stale-If-Error：若已有缓存快照在屏幕展示，不覆盖成整屏报错
+                if self.liveStreams.isEmpty {
+                    self.loadErrorMessage = message
+                } else {
+                    self.loadErrorMessage = nil
+                }
             }
             self.isLoading = false
             self.currentLoadTask = nil

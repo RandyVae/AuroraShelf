@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ComicChapter: Identifiable, Hashable, Sendable {
+public struct ComicChapter: Identifiable, Hashable, Codable, Sendable {
     public let id: String
     public let title: String
     public let pageCount: Int
@@ -44,7 +44,7 @@ public struct ComicPage: Identifiable, Hashable, Sendable {
     }
 }
 
-public struct ComicItem: Identifiable, Hashable, Sendable {
+public struct ComicItem: Identifiable, Hashable, Codable, Sendable {
     public let id: String
     public let sourceId: String
     public let title: String

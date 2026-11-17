@@ -26,8 +26,10 @@ CONFIGURATION="${TESTFLIGHT_CONFIGURATION:-Release}"
 ASC_KEY_ID="${ASC_KEY_ID:-}"
 ASC_ISSUER_ID="${ASC_ISSUER_ID:-}"
 ASC_KEY_PATH="${ASC_KEY_PATH:-}"
+ASC_APP_ID="${ASC_APP_ID:-6835272581}"
 
 MODE="upload"
+SKIP_ARCHIVE=0
 for arg in "$@"; do
   case "${arg}" in
     --check)
@@ -36,13 +38,16 @@ for arg in "$@"; do
     --export-only)
       MODE="export"
       ;;
+    --skip-archive)
+      SKIP_ARCHIVE=1
+      ;;
     -h|--help)
-      echo "用法: $0 [--check | --export-only]"
+      echo "用法: $0 [--check | --export-only | --skip-archive]"
       exit 0
       ;;
     *)
       echo "未知参数: ${arg}"
-      echo "用法: $0 [--check | --export-only]"
+      echo "用法: $0 [--check | --export-only | --skip-archive]"
       exit 1
       ;;
   esac
@@ -147,7 +152,7 @@ cat <<EOF > "${EXPORT_OPTIONS}"
 	<key>uploadSymbols</key>
 	<true/>
 	<key>manageAppVersionAndBuildNumber</key>
-	<true/>
+	<false/>
 </dict>
 </plist>
 EOF
@@ -220,21 +225,25 @@ if [ "${HAS_ASC_API_KEY}" -eq 1 ]; then
 fi
 
 echo "[3/3] 正在执行 Xcode Archive 归档与导出/上传 (${EXPORT_DEST})..."
-if ! xcodebuild archive \
-  -project "${IOS_DIR}/AuroraShelf.xcodeproj" \
-  -scheme AuroraShelf \
-  -configuration "${CONFIGURATION}" \
-  -destination "generic/platform=iOS" \
-  -archivePath "${ARCHIVE_PATH}" \
-  -allowProvisioningUpdates \
-  DEVELOPMENT_TEAM="${TEAM_ID}" \
-  CODE_SIGN_STYLE=Automatic \
-  CODE_SIGNING_ALLOWED=YES \
-  CODE_SIGNING_REQUIRED=YES \
-  ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}; then
-  echo "错误: xcodebuild archive 失败。"
-  print_next_steps
-  exit 1
+if [ "${SKIP_ARCHIVE}" -eq 0 ] || [ ! -d "${ARCHIVE_PATH}" ]; then
+  if ! xcodebuild archive \
+    -project "${IOS_DIR}/AuroraShelf.xcodeproj" \
+    -scheme AuroraShelf \
+    -configuration "${CONFIGURATION}" \
+    -destination "generic/platform=iOS" \
+    -archivePath "${ARCHIVE_PATH}" \
+    -allowProvisioningUpdates \
+    DEVELOPMENT_TEAM="${TEAM_ID}" \
+    CODE_SIGN_STYLE=Automatic \
+    CODE_SIGNING_ALLOWED=YES \
+    CODE_SIGNING_REQUIRED=YES \
+    ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}; then
+    echo "错误: xcodebuild archive 失败。"
+    print_next_steps
+    exit 1
+  fi
+else
+  echo "  [INFO] 已按 --skip-archive 复用现有归档: ${ARCHIVE_PATH}"
 fi
 
 if ! xcodebuild -exportArchive \
@@ -243,9 +252,64 @@ if ! xcodebuild -exportArchive \
   -exportOptionsPlist "${EXPORT_OPTIONS}" \
   -allowProvisioningUpdates \
   ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}; then
-  echo "错误: xcodebuild -exportArchive 失败（通常因缺少 Apple Distribution 证书、App Store 描述文件或 App Store Connect 登录态）。"
-  print_next_steps
-  exit 1
+  if [ "${MODE}" = "upload" ] && [ "${HAS_ASC_API_KEY}" -eq 1 ]; then
+    echo "警告: xcodebuild 直接上传失败（常见于 Apple /v1/apps 上游 500 超时），正在自动降级为本地导出 + altool 上传..."
+    FALLBACK_OPTIONS="${BUILD_DIR}/ExportOptions-TestFlight-Local.plist"
+    cat <<EOF > "${FALLBACK_OPTIONS}"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>export</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>teamID</key>
+	<string>${TEAM_ID}</string>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>
+EOF
+    rm -rf "${OUTPUT_DIR}"/*.ipa
+    if ! xcodebuild -exportArchive \
+      -archivePath "${ARCHIVE_PATH}" \
+      -exportPath "${OUTPUT_DIR}" \
+      -exportOptionsPlist "${FALLBACK_OPTIONS}" \
+      -allowProvisioningUpdates \
+      ${AUTH_ARGS[@]+"${AUTH_ARGS[@]}"}; then
+      echo "错误: TestFlight 本地 IPA 导出失败。"
+      print_next_steps
+      exit 1
+    fi
+    IPA_FILE=$(find "${OUTPUT_DIR}" -maxdepth 1 -name "*.ipa" | head -n 1 || true)
+    if [ -z "${IPA_FILE}" ] || [ ! -f "${IPA_FILE}" ]; then
+      echo "错误: 未在 ${OUTPUT_DIR} 找到导出的 IPA 安装包。"
+      exit 1
+    fi
+    echo "正在通过 xcrun altool --use-old-altool 上传 ${IPA_FILE} (App ID: ${ASC_APP_ID}, v${SHORT_VERSION} Build ${BUILD_NUMBER})..."
+    if ! API_PRIVATE_KEYS_DIR="$(dirname "${ASC_KEY_PATH}")" xcrun altool --use-old-altool \
+      --upload-package "${IPA_FILE}" \
+      --type ios \
+      --asc-public-id "${ASC_ISSUER_ID}" \
+      --apple-id "${ASC_APP_ID}" \
+      --bundle-version "${BUILD_NUMBER}" \
+      --bundle-short-version-string "${SHORT_VERSION}" \
+      --bundle-id "com.aurorashelf.app" \
+      --apiKey "${ASC_KEY_ID}" \
+      --apiIssuer "${ASC_ISSUER_ID}"; then
+      echo "错误: altool 上传 TestFlight 失败。"
+      exit 1
+    fi
+  else
+    echo "错误: xcodebuild -exportArchive 失败（通常因缺少 Apple Distribution 证书、App Store 描述文件或 App Store Connect 登录态）。"
+    print_next_steps
+    exit 1
+  fi
 fi
 
 echo "=========================================="

@@ -1,6 +1,20 @@
 # Project State
 
-## 最新工作状态（2026年11月17日 · 双端移除 JAVSB/JAV-NONI＋91视频深度修复＋全规模模拟器验收与全通道上线 · v2.16.39 Build 265）
+## 最新工作状态（2026年11月18日 · 五层端侧自治容灾与极速加载引擎研发论证＋三端 Release 模拟器全绿验收＋香港繁体正式报告与全通道上线 · v2.16.40 Build 266）
+
+- **版本号全链路同步至 `v2.16.40 (Build 266)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与新增远程清单 [source-manifest.json](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/source-manifest.json)。
+- **Android 5 层容灾引擎全面落地**：
+  - 新增 `app/src/main/java/com/aurorashelf/app/data/resilience/` 7 份核心组件：`SourceHealthRegistry.kt`（EWMA 延迟与 `30s->240s` 指数熔断）、`ResilientDns.kt`（600ms 系统 DNS 竞速 + `198.18.0.0/15` TUN Fake-IP 原样放行 + `1.1.1.1`/`223.5.5.5` DoH）、`AuroraHttpClient.kt`（HTTP/2 池 + TLS/H1 自动降级 + `1100ms` 阶梯对冲竞速）、`SourceSnapshotStore.kt`（32 槽 L1+L2 90s/72h SWR + `Stale-If-Error`）、`RemoteSourceManifest.kt`、`AdaptiveHtmlFallbackParser.kt` 与 `SourceResilienceBootstrap.kt`，并接入 `AuroraApplication`、Video/Comic/Forum/Live 全模块及 4 个 ViewModel；同时修复 [ComicScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ComicScreen.kt) 详情页「下载全本」按钮窄屏截断。
+- **iOS / iPadOS 5 层容灾引擎全面落地**：
+  - 新增 `ios/AuroraShelf/Services/Resilience/` 5 份核心组件：`SourceHealthRegistry.swift`、`AuroraNetworkEngine.swift`、`SourceSnapshotStore.swift`（36 槽 90s/72h SWR + `Stale-If-Error`）、`RemoteSourceManifest.swift` 与 `AdaptiveHTMLFallbackParser.swift`，全量接入 `GlobalStartupPrefetchEngine`、`VideoRepository`（修复 SWR 5 分类货架上限保持华视 5 货架）、`HTMLVideoSourceAdapter`、`ComicRepository`（CopyManga 竞速与并行预取）、`ComicPageImageLoader`、`ForumSourceCatalog`（门户动态发现）与 `LiveSourceCatalog`。
+- **TestFlight 上传降级加固**：更新 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh) 新增 `--skip-archive` 与针对 Apple `/v1/apps` 上游 HTTP 500 超时的自动 `destination=export` + `xcrun altool --use-old-altool --upload-package` 降级上传链路；更新 [publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 启用 SSH `ControlMaster` 复用及原子发布 `source-manifest.json`。
+- **双端测试、Release 模拟器实测、香港繁体报告与同步上线**：
+  - Android：`testDebugUnitTest lintDebug` PASS（53s）、`assembleRelease` PASS（54s）、`FullSystemSourceProbeTest`（18/18 视频 + 9/9 免登漫画，30.38s）与 `ForumSourcesTest`（3s）全通；`emulator-5554` R8 APK 实测 `TotalTime: 553ms`、`video_swr_init ms=1 count=24`、`PlaybackResolver ms=0 cache=hit`、死镜像熔断与 `Lust Goddess` Version 2.16.40 正常。
+  - iOS：离线全量 XCTest **194 项（9 跳 / 0 失败，5.212s）**，`CategoryShelfTests` 9/9 通过；在线专项 **18/18** 视频（61.086s，含 `SpankBang` 冷却后恢复 79 项及华视 `HTTP 206` 分片）、**9/9** 免登漫画（全解码 `decoded=true`）、**7/7** 论坛版块（275 贴 + 详情）与 **340** 路直播（867ms）全通；`iPhone 18 Pro` & `iPad Pro 13-inch (M5)` Release 视觉走查全绿；CopyManga 镜像实测 `api.mangacopy.com` `0.189s` vs `api.2024manga.com` `0.949s`（**5.02x 提速**）。
+  - 正式报告（香港繁體）：[SOURCE_SELF_HEALING_REPORT_zh-HK.md](file:///Users/itou/Documents/ChatGPT/91pron/docs/architecture/SOURCE_SELF_HEALING_REPORT_zh-HK.md)。
+  - 双端同步上线：OTA `https://bananarey.us`（`137M` APK / `135M` IPA / `manifest.plist` `2.16.40` / `source-manifest.json` 均 `HTTP 200`，`/` 剩 `11G`）；TestFlight `v2.16.40 (Build 266)` 上传成功（`UPLOAD SUCCEEDED`，`143,784,082` bytes）。
+
+## 历史工作状态（2026年11月17日 · 双端移除 JAVSB/JAV-NONI＋91视频深度修复＋全规模模拟器验收与全通道上线 · v2.16.39 Build 265）
 
 - **版本号全链路同步至 `v2.16.39 (Build 265)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`。
 - **双端彻底移除 `JAVSB` 与 `JAV-NONI`（20 → 18 视频源）**：

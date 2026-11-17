@@ -1,12 +1,15 @@
 package com.aurorashelf.app.data.comic
 
 import com.aurorashelf.app.data.VideoRepository
+import com.aurorashelf.app.data.resilience.AuroraHttpClient
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URLEncoder
-import java.net.URL
 import java.nio.charset.StandardCharsets
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 
 internal data class ComicHttpResponse(
     val status: Int,
@@ -49,8 +52,9 @@ internal object ComicHttp {
         method: String,
         headers: Map<String, String>,
         body: String? = null,
-    ): String = open(url, method, headers, body) { connection ->
-        connection.inputStream.bufferedReader().use { it.readText() }
+    ): String {
+        val resp = response(url, method, headers, body, acceptErrors = false)
+        return resp.body
     }
 
     private fun response(
@@ -58,53 +62,72 @@ internal object ComicHttp {
         method: String,
         headers: Map<String, String>,
         body: String? = null,
-    ): ComicHttpResponse = open(url, method, headers, body, acceptErrors = true) { connection ->
-        val status = connection.responseCode
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        ComicHttpResponse(
-            status = status,
-            body = stream?.bufferedReader()?.use { it.readText() }.orEmpty(),
-            finalUrl = connection.url.toString(),
-        )
-    }
+        acceptErrors: Boolean = true,
+    ): ComicHttpResponse = openWithPooledClient(url, method, headers, body, acceptErrors)
 
-    private fun <T> open(
+    private fun openWithPooledClient(
         url: String,
         method: String,
         headers: Map<String, String>,
         body: String?,
         acceptErrors: Boolean = false,
-        read: (HttpURLConnection) -> T,
-    ): T {
+    ): ComicHttpResponse {
         var currentUrl = url
         var currentMethod = method
         var currentBody = body
         var currentHeaders = headers
         var redirectCount = 0
         val maxRedirects = 5
+        // 统一关闭自动跟随重定向，显式实现跨域名剥离认证 Header 逻辑并共享 AuroraHttpClient 连接池与 DoH/TLS 自愈能力
+        val noRedirectClient = AuroraHttpClient.standardClient.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
+            .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
 
         while (true) {
-            val connection = URL(currentUrl).openConnection() as HttpURLConnection
-            try {
-                connection.requestMethod = currentMethod
-                connection.connectTimeout = 12_000
-                connection.readTimeout = 15_000
-                connection.instanceFollowRedirects = false
-                connection.setRequestProperty("User-Agent", VideoRepository.USER_AGENT)
-                connection.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9")
-                currentHeaders.forEach(connection::setRequestProperty)
-                if (currentBody != null && (currentMethod == "POST" || currentMethod == "PUT")) {
-                    connection.doOutput = true
-                    connection.outputStream.bufferedWriter().use { it.write(currentBody) }
-                }
-                val status = connection.responseCode
+            val requestBuilder = Request.Builder()
+                .url(currentUrl)
+                .header("User-Agent", VideoRepository.USER_AGENT)
+                .header("Accept-Language", "zh-CN,zh;q=0.9")
+            currentHeaders.forEach { (k, v) -> requestBuilder.header(k, v) }
+            if (currentMethod == "POST" || currentMethod == "PUT") {
+                val contentType = currentHeaders.entries
+                    .firstOrNull { it.key.equals("Content-Type", ignoreCase = true) }
+                    ?.value ?: "application/json; charset=UTF-8"
+                val requestBody = (currentBody ?: "").toRequestBody(contentType.toMediaType())
+                if (currentMethod == "PUT") requestBuilder.put(requestBody) else requestBuilder.post(requestBody)
+            } else if (currentMethod == "HEAD") {
+                requestBuilder.head()
+            } else {
+                requestBuilder.get()
+            }
+
+            val BuiltRequest = requestBuilder.build()
+            val okResponse: Response = try {
+                noRedirectClient.newCall(BuiltRequest).execute()
+            } catch (err: IOException) {
+                val isSsl = generateSequence(err as Throwable?) { it.cause }.any { it is javax.net.ssl.SSLException }
+                val fallback = if (isSsl) AuroraHttpClient.permissiveTlsClient else AuroraHttpClient.http1Client
+                fallback.newBuilder()
+                    .followRedirects(false)
+                    .followSslRedirects(false)
+                    .connectTimeout(12, java.util.concurrent.TimeUnit.SECONDS)
+                    .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                    .build()
+                    .newCall(BuiltRequest)
+                    .execute()
+            }
+
+            okResponse.use { resp ->
+                val status = resp.code
                 if (status in listOf(301, 302, 303, 307, 308) && redirectCount < maxRedirects) {
-                    val location = connection.getHeaderField("Location")
+                    val location = resp.header("Location")
                     if (!location.isNullOrBlank()) {
-                        connection.disconnect()
                         val nextUrl = resolve(currentUrl, location) ?: location
-                        val oldHost = runCatching { java.net.URI(currentUrl).host?.lowercase() }.getOrNull()
-                        val nextHost = runCatching { java.net.URI(nextUrl).host?.lowercase() }.getOrNull()
+                        val oldHost = runCatching { URI(currentUrl).host?.lowercase() }.getOrNull()
+                        val nextHost = runCatching { URI(nextUrl).host?.lowercase() }.getOrNull()
                         if (oldHost != null && nextHost != null && oldHost != nextHost) {
                             currentHeaders = currentHeaders.filterKeys { key ->
                                 !key.equals("authorization", ignoreCase = true) &&
@@ -125,9 +148,12 @@ internal object ComicHttp {
                 if (!acceptErrors && status !in 200..299) {
                     throw IOException("漫画源返回 HTTP $status")
                 }
-                return read(connection)
-            } finally {
-                connection.disconnect()
+                val text = resp.body?.string().orEmpty()
+                return ComicHttpResponse(
+                    status = status,
+                    body = text,
+                    finalUrl = resp.request.url.toString(),
+                )
             }
         }
     }

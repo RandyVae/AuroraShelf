@@ -75,13 +75,12 @@ public final class ComicRepository: ObservableObject {
     }
 
     private init() {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 25
-        config.httpAdditionalHeaders = [
-            "User-Agent": ComicSourceAdapter.userAgent
-        ]
-        self.session = URLSession.permissive(configuration: config)
+        self.session = AuroraNetworkEngine.shared.session
+        if let snapshot = SourceSnapshotStore.shared.getComicFeed(sourceId: currentSource.id, category: selectedCategory),
+           !snapshot.items.isEmpty {
+            self.comics = snapshot.items
+            print("[AuroraPerf] comic_swr_init source=\(currentSource.id) count=\(snapshot.items.count) fresh=\(snapshot.isFresh)")
+        }
         self.loadComics(for: ComicSourceCatalog.jm)
     }
 
@@ -89,8 +88,16 @@ public final class ComicRepository: ObservableObject {
         guard currentSource.id != source.id else { return }
         self.currentSource = source
         self.selectedCategory = source.categories.first ?? "全部"
-        self.comics = []
-        self.currentPage = 1
+        if let snapshot = SourceSnapshotStore.shared.getComicFeed(sourceId: source.id, category: self.selectedCategory),
+           !snapshot.items.isEmpty {
+            self.comics = snapshot.items
+            self.currentPage = 1
+            self.errorMessage = nil
+            print("[AuroraPerf] comic_switch_swr_hit source=\(source.id) count=\(snapshot.items.count)")
+        } else {
+            self.comics = []
+            self.currentPage = 1
+        }
         self.canLoadMore = true
         self.isLoadingNextPage = false
         self.loadComics(for: source)
@@ -99,8 +106,15 @@ public final class ComicRepository: ObservableObject {
     public func switchCategory(to category: String) {
         guard selectedCategory != category else { return }
         self.selectedCategory = category
-        self.comics = []
-        self.currentPage = 1
+        if let snapshot = SourceSnapshotStore.shared.getComicFeed(sourceId: currentSource.id, category: category),
+           !snapshot.items.isEmpty {
+            self.comics = snapshot.items
+            self.currentPage = 1
+            self.errorMessage = nil
+        } else {
+            self.comics = []
+            self.currentPage = 1
+        }
         self.canLoadMore = true
         self.isLoadingNextPage = false
         self.loadComics(for: currentSource)
@@ -110,15 +124,22 @@ public final class ComicRepository: ObservableObject {
         loadTask?.cancel()
         let requestID = UUID()
         activeRequestID = requestID
-        self.isLoading = true
+        let targetCategory = self.selectedCategory
+        if self.comics.isEmpty,
+           let snapshot = SourceSnapshotStore.shared.getComicFeed(sourceId: source.id, category: targetCategory),
+           !snapshot.items.isEmpty {
+            self.comics = snapshot.items
+        }
+        self.isLoading = self.comics.isEmpty
         self.errorMessage = nil
         self.currentPage = 1
         self.canLoadMore = true
         self.isLoadingNextPage = false
+        let startedAt = Date()
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let loaded = try await self.fetchRealComics(source: source, category: self.selectedCategory, page: 1)
+                let loaded = try await self.fetchRealComics(source: source, category: targetCategory, page: 1)
                 guard !Task.isCancelled, self.activeRequestID == requestID else { return }
                 var seen = Set<String>()
                 var uniqueList: [ComicItem] = []
@@ -128,13 +149,23 @@ public final class ComicRepository: ObservableObject {
                         uniqueList.append(item)
                     }
                 }
+                if !uniqueList.isEmpty {
+                    SourceSnapshotStore.shared.putComicFeed(sourceId: source.id, category: targetCategory, items: uniqueList)
+                }
+                let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                print("[AuroraPerf] comic_net_load source=\(source.id) ms=\(elapsedMs) count=\(uniqueList.count)")
                 self.comics = uniqueList
                 self.canLoadMore = !uniqueList.isEmpty
                 self.currentPage = 1
                 self.errorMessage = nil
             } catch {
                 guard !Task.isCancelled, self.activeRequestID == requestID else { return }
-                self.errorMessage = error.localizedDescription
+                // Stale-If-Error：若已有本地快照展示，静默保留旧数据不触发全屏白屏错误
+                if self.comics.isEmpty {
+                    self.errorMessage = error.localizedDescription
+                } else {
+                    self.errorMessage = nil
+                }
             }
             self.isLoading = false
             self.loadTask = nil
@@ -205,7 +236,13 @@ public final class ComicRepository: ObservableObject {
         }
         switch activeSource.id {
         case "copy":
-            let response = try await request(url, headers: ComicSourceAdapter.requestHeaders(sourceID: "copy", referer: "https://www.copymanga.site/"))
+            let copyURLs = SourceHealthRegistry.shared.expandCandidateURLs(sourceKey: "copy", requestURL: url)
+            let response = try await AuroraNetworkEngine.shared.fetchHedged(
+                sourceKey: "copy",
+                candidateURLs: copyURLs,
+                headersBuilder: { _ in ComicSourceAdapter.requestHeaders(sourceID: "copy", referer: "https://www.copymanga.site/") },
+                validator: { $0.data.count > 10 }
+            )
             return try ComicSourceAdapter.decodeCopyComicFeed(response.data)
         case "komiic":
             let queryGQL = "query searchComics($keyword: String!, $pagination: Pagination!) { searchComics(keyword: $keyword, pagination: $pagination) { id title status year imageUrl authors { id name } categories { id name } dateUpdated } }"
@@ -242,7 +279,8 @@ public final class ComicRepository: ObservableObject {
                     author = ""
                 }
                 let tags = raw["tags"] as? [String] ?? []
-                let cover = "https://cdn-msp.jmapiproxy1.cc/media/albums/\(idString)_3x4.jpg"
+                let cdnOrigin = SourceHealthRegistry.shared.resolveOrigins(sourceKey: "jm-cdn").first ?? "https://cdn-msp.jmapiproxy2.cc"
+                let cover = "\(cdnOrigin)/media/albums/\(idString)_3x4.jpg"
                 return ComicItem(id: idString, sourceId: "jm", title: title, author: author, coverUrl: cover, tags: tags)
             }
         case "picacg":
@@ -261,7 +299,7 @@ public final class ComicRepository: ObservableObject {
         }
     }
 
-    private func fetchRealComics(source: ComicSourceDefinition, category: String, page: Int = 1) async throws -> [ComicItem] {
+    func fetchRealComics(source: ComicSourceDefinition, category: String, page: Int = 1) async throws -> [ComicItem] {
         let p = max(page, 1)
         switch source.id {
         case "baozi":
@@ -295,7 +333,13 @@ public final class ComicRepository: ObservableObject {
         guard let url = ComicSourceAdapter.browseURL(source: ComicSourceCatalog.copycomic, category: category, page: page) else {
             throw ComicFetchError.invalidURL
         }
-        let response = try await request(url, headers: ComicSourceAdapter.requestHeaders(sourceID: "copy", referer: "https://www.copymanga.site/"))
+        let copyURLs = SourceHealthRegistry.shared.expandCandidateURLs(sourceKey: "copy", requestURL: url)
+        let response = try await AuroraNetworkEngine.shared.fetchHedged(
+            sourceKey: "copy",
+            candidateURLs: copyURLs,
+            headersBuilder: { _ in ComicSourceAdapter.requestHeaders(sourceID: "copy", referer: "https://www.copymanga.site/") },
+            validator: { $0.data.count > 10 }
+        )
         return try ComicSourceAdapter.decodeCopyComicFeed(response.data)
     }
 
@@ -341,7 +385,8 @@ public final class ComicRepository: ObservableObject {
                 author = ""
             }
             let tags = raw["tags"] as? [String] ?? []
-            let cover = "https://cdn-msp.jmapiproxy1.cc/media/albums/\(idString)_3x4.jpg"
+            let cdnOrigin = SourceHealthRegistry.shared.resolveOrigins(sourceKey: "jm-cdn").first ?? "https://cdn-msp.jmapiproxy2.cc"
+            let cover = "\(cdnOrigin)/media/albums/\(idString)_3x4.jpg"
             return ComicItem(id: idString, sourceId: "jm", title: title, author: author, coverUrl: cover, tags: tags)
         }
     }
@@ -361,15 +406,29 @@ public final class ComicRepository: ObservableObject {
     }
 
     private func fetchCopyDetails(_ comic: ComicItem) async throws -> ComicItem {
-        let api = "https://api.2024manga.com/api/v3"
-        guard let detailURL = URL(string: "\(api)/comic2/\(comic.id)?platform=3") else { throw ComicFetchError.invalidURL }
-        let detail = try await request(detailURL, headers: ComicSourceAdapter.requestHeaders(sourceID: "copy", referer: "https://www.copymanga.site/"))
+        let origins = SourceHealthRegistry.shared.resolveOrigins(sourceKey: "copy", defaults: ["https://api.mangacopy.com", "https://api.2024manga.com"])
+        let detailURLs = origins.compactMap { URL(string: "\($0)/api/v3/comic2/\(comic.id)?platform=3") }
+        let chapterURLs = origins.compactMap { URL(string: "\($0)/api/v3/comic/\(comic.id)/group/default/chapters?limit=500&offset=0&platform=3") }
+        let copyHeaders = ComicSourceAdapter.requestHeaders(sourceID: "copy", referer: "https://www.copymanga.site/")
+
+        async let detailTask = AuroraNetworkEngine.shared.fetchHedged(
+            sourceKey: "copy",
+            candidateURLs: detailURLs,
+            headersBuilder: { _ in copyHeaders },
+            validator: { $0.data.count > 10 }
+        )
+        async let chaptersTask = AuroraNetworkEngine.shared.fetchHedged(
+            sourceKey: "copy",
+            candidateURLs: chapterURLs,
+            headersBuilder: { _ in copyHeaders },
+            validator: { $0.data.count > 10 }
+        )
+
+        let (detail, chapterResult) = try await (detailTask, chaptersTask)
         guard let root = try JSONSerialization.jsonObject(with: detail.data) as? [String: Any],
               let results = root["results"] as? [String: Any], let item = results["comic"] as? [String: Any] else {
             throw ComicFetchError.malformedResponse
         }
-        guard let chapterURL = URL(string: "\(api)/comic/\(comic.id)/group/default/chapters?limit=500&offset=0&platform=3") else { throw ComicFetchError.invalidURL }
-        let chapterResult = try await request(chapterURL, headers: ComicSourceAdapter.requestHeaders(sourceID: "copy", referer: "https://www.copymanga.site/"))
         let chapterRoot = try JSONSerialization.jsonObject(with: chapterResult.data) as? [String: Any]
         let chapterList = ((chapterRoot?["results"] as? [String: Any])?["list"] as? [[String: Any]]) ?? []
         let version = item["reclass"] == nil || item["reclass"] is NSNull ? 2 : 1
@@ -429,7 +488,8 @@ public final class ComicRepository: ObservableObject {
         } else {
             author = comic.author
         }
-        let updated = ComicItem(id: comic.id, sourceId: comic.sourceId, title: item["name"] as? String ?? comic.title, author: author.isEmpty ? comic.author : author, coverUrl: "https://cdn-msp.jmapiproxy1.cc/media/albums/\(comic.id)_3x4.jpg", category: comic.category, tags: item["tags"] as? [String] ?? comic.tags, chapters: chapters.isEmpty ? [ComicChapter(id: comic.id, title: "完整内容")] : chapters, latestChapterTitle: chapters.first?.title ?? "完整内容")
+        let cdnOrigin = SourceHealthRegistry.shared.resolveOrigins(sourceKey: "jm-cdn").first ?? "https://cdn-msp.jmapiproxy2.cc"
+        let updated = ComicItem(id: comic.id, sourceId: comic.sourceId, title: item["name"] as? String ?? comic.title, author: author.isEmpty ? comic.author : author, coverUrl: "\(cdnOrigin)/media/albums/\(comic.id)_3x4.jpg", category: comic.category, tags: item["tags"] as? [String] ?? comic.tags, chapters: chapters.isEmpty ? [ComicChapter(id: comic.id, title: "完整内容")] : chapters, latestChapterTitle: chapters.first?.title ?? "完整内容")
         return updated
     }
 
@@ -468,8 +528,15 @@ public final class ComicRepository: ObservableObject {
         let suffix = version >= 2 ? String(version) : ""
         let path = "comic/\(comicId)/chapter\(suffix)/\(uuid)?platform=3"
         let referer = "https://www.copymanga.site/comic/\(comicId)/chapter/\(uuid)"
-        guard let url = URL(string: "https://api.2024manga.com/api/v3/\(path)") else { throw ComicFetchError.invalidURL }
-        let response = try await request(url, headers: ComicSourceAdapter.requestHeaders(sourceID: "copy", referer: referer))
+        let origins = SourceHealthRegistry.shared.resolveOrigins(sourceKey: "copy", defaults: ["https://api.mangacopy.com", "https://api.2024manga.com"])
+        let candidateURLs = origins.compactMap { URL(string: "\($0)/api/v3/\(path)") }
+        let copyHeaders = ComicSourceAdapter.requestHeaders(sourceID: "copy", referer: referer)
+        let response = try await AuroraNetworkEngine.shared.fetchHedged(
+            sourceKey: "copy",
+            candidateURLs: candidateURLs,
+            headersBuilder: { _ in copyHeaders },
+            validator: { $0.data.count > 10 }
+        )
         let root = try JSONSerialization.jsonObject(with: response.data) as? [String: Any]
         let chapter = (((root?["results"] as? [String: Any])?["chapter"] as? [String: Any]) ?? [:])
         let contents = chapter["contents"] as? [[String: Any]] ?? []
@@ -505,7 +572,8 @@ public final class ComicRepository: ObservableObject {
         }
         let files = item["images"] as? [String] ?? []
         let scrambleID = await requestJMScrambleID(photoID: photoID)
-        let hosts = ["cdn-msp.jmapiproxy1.cc", "cdn-msp.jmapiproxy2.cc", "cdn-msp2.jmapiproxy2.cc", "cdn-msp3.jmapiproxy2.cc", "cdn-msp.jmapinodeudzn.net"]
+        let defaultHosts = ["cdn-msp.jmapiproxy2.cc", "cdn-msp2.jmapiproxy2.cc", "cdn-msp3.jmapiproxy2.cc", "cdn-msp.jmapinodeudzn.net", "cdn-msp.jmapiproxy1.cc"]
+        let hosts = SourceHealthRegistry.shared.rankCandidates(sourceKey: "jm-cdn", candidates: defaultHosts)
         return files.enumerated().map { index, filename in
             let imageName = filename.split(separator: "?").first.map(String.init) ?? filename
             let basename = (imageName as NSString).deletingPathExtension
@@ -731,18 +799,25 @@ public final class ComicRepository: ObservableObject {
         headers: [String: String],
         timeoutInterval: TimeInterval? = nil
     ) async throws -> ComicHTTPResponse {
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.httpBody = body
-        if let timeoutInterval {
-            request.timeoutInterval = timeoutInterval
-        }
-        headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { throw ComicFetchError.invalidResponse }
-            guard (200...299).contains(http.statusCode) else { throw ComicFetchError.httpStatus(http.statusCode) }
-            return ComicHTTPResponse(data: data, statusCode: http.statusCode, finalURL: http.url ?? url)
+            let response = try await AuroraNetworkEngine.shared.fetch(
+                url: url,
+                sourceKey: SourceHealthRegistry.sourceKey(for: url),
+                method: method,
+                body: body,
+                headers: headers,
+                timeout: timeoutInterval ?? 14
+            )
+            return ComicHTTPResponse(data: response.data, statusCode: response.statusCode, finalURL: response.finalURL)
+        } catch let error as AuroraNetworkError {
+            switch error {
+            case .httpStatus(let code, _):
+                throw ComicFetchError.httpStatus(code)
+            case .invalidResponse:
+                throw ComicFetchError.invalidResponse
+            default:
+                throw ComicFetchError.networkError(error.localizedDescription)
+            }
         } catch let error as ComicFetchError {
             throw error
         } catch {
@@ -762,32 +837,54 @@ public final class ComicRepository: ObservableObject {
     }
 
     private func jmRequest(path: String, secretKey: String) async throws -> [String: Any] {
-        var lastError: Error?
-        let baseDomains = ["www.cdnhjk.net", "www.cdngwc.cc", "www.cdngwc.net", "www.cdngwc.club"]
-        let orderedDomains: [String]
+        let baseDomains = ["www.cdnhjk.net", "www.cdngwc.net", "www.cdngwc.club", "www.cdngwc.cc"]
+        var defaults = baseDomains.map { "https://\($0)" }
         if let preferred = preferredJMDomain {
-            orderedDomains = [preferred] + baseDomains.filter { $0 != preferred }
-        } else {
-            orderedDomains = baseDomains
+            defaults = ["https://\(preferred)"] + defaults.filter { $0 != "https://\(preferred)" }
         }
-        for domain in orderedDomains {
-            do {
+        let origins = SourceHealthRegistry.shared.resolveOrigins(sourceKey: "jm", defaults: defaults)
+        let candidateURLs = origins.compactMap { URL(string: "\($0)/\(path)") }
+
+        final class DecodedBox: @unchecked Sendable {
+            private let lock = NSLock()
+            private var map: [String: [String: Any]] = [:]
+            func set(_ url: String, _ value: [String: Any]) {
+                lock.lock(); map[url] = value; lock.unlock()
+            }
+            func get(_ url: String) -> [String: Any]? {
+                lock.lock(); let v = map[url]; lock.unlock(); return v
+            }
+            func anyValue() -> [String: Any]? {
+                lock.lock(); let v = map.values.first; lock.unlock(); return v
+            }
+        }
+        let decodedBox = DecodedBox()
+
+        let response = try await AuroraNetworkEngine.shared.fetchHedged(
+            sourceKey: "jm",
+            candidateURLs: candidateURLs,
+            timeout: 7,
+            executor: { targetURL, _ in
                 let timestamp = String(Int(Date().timeIntervalSince1970))
                 let token = ComicProtocolSecrets.md5Hex(timestamp + ComicProtocolSecrets.value(secretKey))
                 let headers = ["token": token, "tokenparam": "\(timestamp),2.1.2", "Cookie": "AVS=1", "X-Requested-With": "com.JMComic3.app"]
-                guard let url = URL(string: "https://\(domain)/\(path)") else { throw ComicFetchError.invalidURL }
-                let response = try await request(url, headers: headers, timeoutInterval: 7)
-                guard let outer = try JSONSerialization.jsonObject(with: response.data) as? [String: Any],
-                      outer["code"] as? Int == 200, let encoded = outer["data"] as? String,
+                let resp = try await AuroraNetworkEngine.shared.fetch(url: targetURL, sourceKey: "jm", headers: headers, timeout: 7)
+                guard let outer = try? JSONSerialization.jsonObject(with: resp.data) as? [String: Any],
+                      outer["code"] as? Int == 200,
+                      let encoded = outer["data"] as? String,
                       let decoded = ComicProtocolSecrets.decryptJMPayload(encoded, timestamp: timestamp),
-                      let result = try JSONSerialization.jsonObject(with: decoded) as? [String: Any] else {
+                      let result = try? JSONSerialization.jsonObject(with: decoded) as? [String: Any] else {
                     throw ComicFetchError.malformedResponse
                 }
-                preferredJMDomain = domain
-                return result
-            } catch { lastError = error }
+                decodedBox.set(resp.finalURL.absoluteString, result)
+                return resp
+            }
+        )
+        preferredJMDomain = response.finalURL.host ?? preferredJMDomain
+        guard let result = decodedBox.get(response.finalURL.absoluteString) ?? decodedBox.anyValue() else {
+            throw ComicFetchError.malformedResponse
         }
-        throw lastError ?? ComicFetchError.networkError("禁漫接口连接失败。")
+        return result
     }
 
     private func picacgHeaders(method: String, path: String, token: String) -> [String: String] {

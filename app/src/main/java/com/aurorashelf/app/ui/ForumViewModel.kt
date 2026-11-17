@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aurorashelf.app.data.AppPreferences
 import com.aurorashelf.app.data.forum.ForumRepository
+import com.aurorashelf.app.data.resilience.SourceSnapshotStore
 import com.aurorashelf.app.model.ForumPage
 import com.aurorashelf.app.model.ForumPost
 import java.io.IOException
@@ -55,12 +56,15 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
         val state = mutableUiState.value
         if (state.page != 0 || state.isLoading || loadJob?.isActive == true) return
         loadJob = viewModelScope.launch {
-            val cached = withContext(Dispatchers.IO) { preferences.cachedForumFirstPage() }
-            if (cached != null && cached.posts.isNotEmpty() && mutableUiState.value.posts.isEmpty()) {
+            val cached = withContext(Dispatchers.IO) {
+                SourceSnapshotStore.getForumFeed("all")?.items?.takeIf { it.isNotEmpty() }
+                    ?: preferences.cachedForumFirstPage()?.posts
+            }
+            if (!cached.isNullOrEmpty() && mutableUiState.value.posts.isEmpty()) {
                 mutableUiState.update {
-                    it.copy(posts = cached.posts, canLoadMore = false, error = null, loadMoreError = null)
+                    it.copy(posts = cached, canLoadMore = false, error = null, loadMoreError = null)
                 }
-                logSafely { Log.i(TAG, "first-screen cache posts=${cached.posts.size}") }
+                logSafely { Log.i(TAG, "first-screen cache posts=${cached.size}") }
             }
             performRefresh()
         }
@@ -79,7 +83,7 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
         val startedAt = System.currentTimeMillis()
         var loggedFirstResult = false
         mutableUiState.update {
-            it.copy(isLoading = true, isLoadingMore = false, error = null, loadMoreError = null, unavailableSources = emptyList())
+            it.copy(isLoading = it.posts.isEmpty(), isLoadingMore = false, error = null, loadMoreError = null, unavailableSources = emptyList())
         }
         runCatching {
             repository.loadProgressively(1) { posts, unavailable, canLoadMore ->
@@ -114,7 +118,10 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             if (page.posts.isNotEmpty()) {
-                withContext(Dispatchers.IO) { preferences.saveForumFirstPage(page.posts) }
+                withContext(Dispatchers.IO) {
+                    SourceSnapshotStore.putForumFeed("all", page.posts)
+                    preferences.saveForumFirstPage(page.posts)
+                }
             }
             if (page.canLoadMore && page.posts.isNotEmpty()) prefetchPage(2)
         }.onFailure(::handleFailure)

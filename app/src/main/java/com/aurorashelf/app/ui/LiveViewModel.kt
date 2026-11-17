@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.aurorashelf.app.data.AppPreferences
 import com.aurorashelf.app.data.HornyStudentsLiveRepository
 import com.aurorashelf.app.data.StripchatLiveRepository
+import com.aurorashelf.app.data.resilience.SourceSnapshotStore
 import com.aurorashelf.app.model.LiveCategory
 import com.aurorashelf.app.model.LiveItem
 import com.aurorashelf.app.model.LiveSourceCatalog
@@ -51,12 +52,14 @@ class LiveViewModel(
 
     private val preferences = AppPreferences(application)
     private val initialSourceId = preferences.liveSourceId
-    private val initialCached = preferences.cachedLiveFeed(initialSourceId, LiveCategory.WOMEN.name)
+    private val initialCachedItems =
+        SourceSnapshotStore.getLiveFeed(initialSourceId, LiveCategory.WOMEN.name)?.items
+            ?: preferences.cachedLiveFeed(initialSourceId, LiveCategory.WOMEN.name)?.items.orEmpty()
     private val mutableUiState = MutableStateFlow(
         LiveUiState(
             selectedSourceId = initialSourceId,
-            items = initialCached?.items.orEmpty(),
-            page = if (initialCached != null) 1 else 0,
+            items = initialCachedItems,
+            page = if (initialCachedItems.isNotEmpty()) 1 else 0,
         ),
     )
     val uiState: StateFlow<LiveUiState> = mutableUiState.asStateFlow()
@@ -73,13 +76,16 @@ class LiveViewModel(
     fun selectSource(sourceId: String) {
         if (sourceId == mutableUiState.value.selectedSourceId) return
         preferences.liveSourceId = sourceId
+        val category = mutableUiState.value.selectedCategory
+        val cached = SourceSnapshotStore.getLiveFeed(sourceId, category.name)?.items
+            ?: preferences.cachedLiveFeed(sourceId, category.name)?.items.orEmpty()
         mutableUiState.update {
             it.copy(
                 selectedSourceId = sourceId,
-                items = emptyList(),
-                page = 0,
+                items = cached,
+                page = if (cached.isNotEmpty()) 1 else 0,
                 canLoadMore = true,
-                isLoading = true,
+                isLoading = cached.isEmpty(),
                 isLoadingMore = false,
                 error = null,
             )
@@ -89,14 +95,16 @@ class LiveViewModel(
 
     fun selectCategory(category: LiveCategory) {
         if (category == mutableUiState.value.selectedCategory) return
-        val cached = preferences.cachedLiveFeed(mutableUiState.value.selectedSourceId, category.name)
+        val sourceId = mutableUiState.value.selectedSourceId
+        val cached = SourceSnapshotStore.getLiveFeed(sourceId, category.name)?.items
+            ?: preferences.cachedLiveFeed(sourceId, category.name)?.items.orEmpty()
         mutableUiState.update {
             it.copy(
                 selectedCategory = category,
-                items = cached?.items.orEmpty(),
-                page = if (cached != null && cached.items.isNotEmpty()) 1 else 0,
+                items = cached,
+                page = if (cached.isNotEmpty()) 1 else 0,
                 canLoadMore = true,
-                isLoading = true,
+                isLoading = cached.isEmpty(),
                 isLoadingMore = false,
                 error = null,
             )
@@ -106,7 +114,7 @@ class LiveViewModel(
 
     fun refresh() {
         loadJob?.cancel()
-        mutableUiState.update { it.copy(isLoading = true, isLoadingMore = false, error = null) }
+        mutableUiState.update { it.copy(isLoading = it.items.isEmpty(), isLoadingMore = false, error = null) }
         load(1, replace = true)
     }
 
@@ -143,6 +151,7 @@ class LiveViewModel(
             }
             result.onSuccess { res ->
                 if (page == 1 && res.items.isNotEmpty()) {
+                    SourceSnapshotStore.putLiveFeed(activeSourceId, category.name, res.items)
                     preferences.saveLiveFeed(activeSourceId, category.name, res.items)
                 }
                 mutableUiState.update { current ->

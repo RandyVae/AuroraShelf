@@ -46,7 +46,13 @@ if [ "${TARGET}" != "Android" ] && [ "${TARGET}" != "UploadOnly" ]; then
 fi
 
 # 3. 上传到远程服务器与清理老版本
-SSH_OPTS=(-o StrictHostKeyChecking=accept-new -o ConnectTimeout=15)
+SSH_OPTS=(
+  -o StrictHostKeyChecking=accept-new
+  -o ConnectTimeout=15
+  -o ControlMaster=auto
+  -o ControlPath=/tmp/netgrey-ota-%r@%h:%p
+  -o ControlPersist=60s
+)
 SSHPASS_BIN=""
 if [ -n "${SERVER_PASS}" ]; then
   SSH_OPTS+=(-o PubkeyAuthentication=no)
@@ -80,7 +86,7 @@ upload_atomic() {
   run_ssh "chmod 644 '${REMOTE_DIR}/${tmp_name}' && mv -f '${REMOTE_DIR}/${tmp_name}' '${REMOTE_DIR}/${remote_name}'"
 }
 
-REMOTE_CLEAN_AND_CHECK="chmod 644 ${REMOTE_DIR}/Netgrey.ipa ${REMOTE_DIR}/Netgrey.apk ${REMOTE_DIR}/index.html ${REMOTE_DIR}/manifest.plist 2>/dev/null || true; \
+REMOTE_CLEAN_AND_CHECK="chmod 644 ${REMOTE_DIR}/Netgrey.ipa ${REMOTE_DIR}/Netgrey.apk ${REMOTE_DIR}/index.html ${REMOTE_DIR}/manifest.plist ${REMOTE_DIR}/source-manifest.json 2>/dev/null || true; \
 find ${REMOTE_DIR} -maxdepth 2 -type f \( -name '*.tmp*' -o -name '*.old' -o -name '*.bak' -o -name '*~' \) -delete; \
 echo '--- 服务器最新版本清单 ---'; \
 ls -lh ${REMOTE_DIR}/Netgrey.*; \
@@ -90,10 +96,13 @@ df -h /"
 if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ] || [ -f "${PROJECT_ROOT}/dist/Netgrey.apk" ]; then
   echo "[3/3] 正在原子上传最新安装包并清理服务器老版本残留..."
   if [ -f "${PROJECT_ROOT}/scripts/ota_web/index.html" ]; then
-    echo "上传 OTA 网页 index.html 与 manifest.plist..."
+    echo "上传 OTA 网页 index.html、manifest.plist 与 source-manifest.json..."
     upload_atomic "${PROJECT_ROOT}/scripts/ota_web/index.html" "index.html"
     if [ -f "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" ]; then
       upload_atomic "${PROJECT_ROOT}/scripts/ota_web/manifest.plist" "manifest.plist"
+    fi
+    if [ -f "${PROJECT_ROOT}/scripts/ota_web/source-manifest.json" ]; then
+      upload_atomic "${PROJECT_ROOT}/scripts/ota_web/source-manifest.json" "source-manifest.json"
     fi
   fi
   if [ -f "${OUTPUT_DIR}/Netgrey.ipa" ]; then

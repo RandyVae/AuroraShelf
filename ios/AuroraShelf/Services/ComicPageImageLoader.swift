@@ -107,45 +107,68 @@ actor ComicPageImageLoader {
         }
 
         let data: Data
+        let host = imageURL.host?.lowercased() ?? ""
+        let cdnPoolKey: String? = (host.hasSuffix("bzcdn.net") || host.hasSuffix("baozicdn.com") || host.hasSuffix("baozimh.com"))
+            ? "baozi-cdn"
+            : ((host.contains("jmapiproxy") || host.contains("jmapinode")) ? "jm-cdn" : nil)
+
+        var targetURL = imageURL
+        var targetHost = host
+        var targetReferer = imageReferer
+        // 主动熔断绕过：若该图床 CDN 已被标记为离线/超慢，直接切换至健康度榜首镜像，避免每张图重复等超时
+        if let cdnPoolKey, SourceHealthRegistry.shared.isCircuitOpen(urlOrHost: host),
+           var comps = URLComponents(url: imageURL, resolvingAgainstBaseURL: true),
+           let bestHost = SourceHealthRegistry.shared.resolveOrigins(sourceKey: cdnPoolKey)
+            .compactMap({ URL(string: $0)?.host?.lowercased() })
+            .first(where: { $0 != host }) {
+            comps.host = bestHost
+            if let rerouted = comps.url {
+                targetURL = rerouted
+                targetHost = bestHost
+                if cdnPoolKey == "baozi-cdn" && bestHost.contains("baozimh") {
+                    targetReferer = "https://cn.twbzmg.com/"
+                }
+            }
+        }
+
+        let startedAt = Date()
         do {
-            let (fetchedData, _) = try await request(url: imageURL, headers: page.headers, referer: imageReferer)
+            let (fetchedData, _) = try await request(url: targetURL, headers: page.headers, referer: targetReferer)
+            if let cdnPoolKey {
+                let elapsed = Int(Date().timeIntervalSince(startedAt) * 1000)
+                SourceHealthRegistry.shared.recordSuccess(sourceKey: cdnPoolKey, urlOrHost: targetHost, latencyMs: elapsed)
+            }
             data = fetchedData
         } catch {
-            // 1. Baozi CDN 容灾自动回退：轮询官方与镜像节点
-            if let host = imageURL.host?.lowercased(),
-               (host.hasSuffix("bzcdn.net") || host.hasSuffix("baozicdn.com") || host.hasSuffix("baozimh.com")),
+            if let cdnPoolKey {
+                SourceHealthRegistry.shared.recordFailure(sourceKey: cdnPoolKey, urlOrHost: targetHost, isHardBlock: true)
+            }
+            // 1. Baozi / JM CDN 容灾自动回退：按健康度排序轮询候选镜像节点
+            if let cdnPoolKey,
                var fallbackComponents = URLComponents(url: imageURL, resolvingAgainstBaseURL: true) {
-                let backupHosts = ["s1.baozicdn.com", "s2.baozicdn.com", "s1.bzcdn.net", "s2.bzcdn.net", "static-tw.baozimh.com"]
+                let defaults = cdnPoolKey == "baozi-cdn"
+                    ? ["s1.baozicdn.com", "s2.baozicdn.com", "static-tw.baozimh.com", "s1.bzcdn.net", "s2.bzcdn.net"]
+                    : ["cdn-msp.jmapiproxy2.cc", "cdn-msp2.jmapiproxy2.cc", "cdn-msp3.jmapiproxy2.cc", "cdn-msp.jmapinodeudzn.net", "cdn-msp.jmapiproxy1.cc"]
+                let rankedHosts = SourceHealthRegistry.shared.rankCandidates(sourceKey: cdnPoolKey, candidates: defaults)
+                    .filter { $0 != targetHost && $0 != host }
                 var fallbackData: Data?
-                for backupHost in backupHosts where backupHost != host {
+                for backupHost in rankedHosts {
                     fallbackComponents.host = backupHost
+                    let backupReferer = (cdnPoolKey == "baozi-cdn")
+                        ? (backupHost.contains("baozimh") ? "https://cn.twbzmg.com/" : "https://cn.webmota.com/")
+                        : imageReferer
+                    let hopStart = Date()
                     if let fallbackURL = fallbackComponents.url,
-                       let (candidateData, _) = try? await request(url: fallbackURL, headers: page.headers, referer: "https://cn.twbzmg.com/") {
+                       let (candidateData, _) = try? await request(url: fallbackURL, headers: page.headers, referer: backupReferer) {
+                        let hopMs = Int(Date().timeIntervalSince(hopStart) * 1000)
+                        SourceHealthRegistry.shared.recordSuccess(sourceKey: cdnPoolKey, urlOrHost: backupHost, latencyMs: hopMs)
                         fallbackData = candidateData
                         break
+                    } else {
+                        SourceHealthRegistry.shared.recordFailure(sourceKey: cdnPoolKey, urlOrHost: backupHost)
                     }
                 }
                 if let fallbackData {
-                    data = fallbackData
-                } else {
-                    throw error
-                }
-            } else if let host = imageURL.host?.lowercased(), host.contains("jmapiproxy") || host.contains("jmapinode"),
-                      var fallbackComponents = URLComponents(url: imageURL, resolvingAgainstBaseURL: true) {
-                // 2. JM 禁漫 CDN 容灾自动回退：轮询候选镜像节点
-                let backupHosts = ["cdn-msp.jmapiproxy2.cc", "cdn-msp2.jmapiproxy2.cc", "cdn-msp3.jmapiproxy2.cc", "cdn-msp.jmapinodeudzn.net"]
-                var fallbackSuccess = false
-                var fallbackData: Data?
-                for backupHost in backupHosts where backupHost != host {
-                    fallbackComponents.host = backupHost
-                    if let backupURL = fallbackComponents.url,
-                       let (d, _) = try? await request(url: backupURL, headers: page.headers, referer: imageReferer) {
-                        fallbackData = d
-                        fallbackSuccess = true
-                        break
-                    }
-                }
-                if fallbackSuccess, let fallbackData {
                     data = fallbackData
                 } else {
                     throw error

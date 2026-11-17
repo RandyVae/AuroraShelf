@@ -1,5 +1,22 @@
 # Existing Architectural Decisions
 
+## 5-Layer Autonomous Source Self-Healing & Instant-Load Engine
+
+Date: 2026-11-18
+
+Status: Implemented, dual-platform Release verified, and published in `v2.16.40 (Build 266)`.
+
+Decision: Adopt a five-layer client-autonomous source resilience architecture across Android, iOS, and iPadOS backed by a zero-SPOF optional remote manifest (`https://bananarey.us/source-manifest.json`), instead of centralized reverse-proxy relaying, blind all-mirror broadcast, or headless WebView scraping.
+
+Architecture:
+- L0 (`SourceSnapshotStore`): 32–36 slot L1+L2 atomic disk SWR snapshot cache (`freshTtl = 90s`, `maxStale = 72h` Stale-If-Error).
+- L1 (`RemoteSourceManifest` + portal discovery): 3s non-blocking background sync with built-in mirror fallback + runtime 91 portal forum mirror extraction.
+- L2 (`ResilientDns` on Android OkHttp + Coil): 600ms system DNS race, mandatory RFC 2544 `198.18.0.0/15` TUN Fake-IP passthrough (never overwritten by DoH), bogon filtering, and direct-IP DoH (`1.1.1.1` / `223.5.5.5`).
+- L3 (`AuroraHttpClient` / `AuroraNetworkEngine` + `SourceHealthRegistry`): Shared HTTP/2 pools, automatic HTTP/1.1 & permissive TLS fallback, `1100ms` staggered hedged racing (zero redundant requests when primary `< 1.1s`), EWMA latency ranking (`alpha = 0.30`), and exponential circuit breaker backoff (`30s -> 60s -> 120s -> 240s`, capped `300s`).
+- L4 (`AdaptiveHtmlFallbackParser` / `AdaptiveHTMLFallbackParser`): Manifest-driven selectors and structural anchor/image heuristic recovery when upstreams rotate card CSS classes.
+
+Boundary: Strict anti-bot compliance — no CAPTCHA or Cloudflare Turnstile bypassing; transient challenge errors open exponential circuit-breaker cooldowns cleanly without starving other sources. See `docs/architecture/SOURCE_SELF_HEALING_REPORT_zh-HK.md`.
+
 ## Repository facts
 
 Date: 2026-09-24

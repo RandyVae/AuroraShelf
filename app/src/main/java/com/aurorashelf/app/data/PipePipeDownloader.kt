@@ -5,6 +5,8 @@ import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 import android.util.Log
+import com.aurorashelf.app.data.resilience.AuroraHttpClient
+import com.aurorashelf.app.data.resilience.SourceHealthRegistry
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
@@ -17,12 +19,13 @@ import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 
 /** Minimal cookie-free network implementation for the vendored PipePipe extractor. */
 internal class PipePipeDownloader : Downloader() {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(12, TimeUnit.SECONDS)
-        .readTimeout(22, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .build()
+    // 共享全局 HTTP/2 连接池 + TUN-Safe DoH DNS 解析，并提供 22 秒读超时适配国际大站点提取器
+    private val client: OkHttpClient by lazy {
+        AuroraHttpClient.standardClient.newBuilder()
+            .connectTimeout(12, TimeUnit.SECONDS)
+            .readTimeout(22, TimeUnit.SECONDS)
+            .build()
+    }
 
     override fun execute(request: Request): Response {
         val okhttpRequest = request.toOkHttpRequest()
@@ -33,14 +36,38 @@ internal class PipePipeDownloader : Downloader() {
     }
 
     private fun executeWithRetry(request: okhttp3.Request): okhttp3.Response {
+        val urlStr = request.url.toString()
+        val sourceKey = SourceHealthRegistry.sourceKeyForUrl(urlStr)
+        val started = System.currentTimeMillis()
         return try {
-            client.newCall(request).execute()
+            val resp = client.newCall(request).execute()
+            if (resp.isSuccessful && sourceKey != null) {
+                SourceHealthRegistry.recordSuccess(sourceKey, urlStr, System.currentTimeMillis() - started)
+            }
+            resp
         } catch (failure: IOException) {
             val isRetryableTimeout = failure is java.net.SocketTimeoutException
+            if (sourceKey != null) {
+                SourceHealthRegistry.recordFailure(sourceKey, urlStr, isHardBlock = true)
+            }
             if (request.method !in IDEMPOTENT_METHODS || (!failure.isTransientTransportFailure() && !isRetryableTimeout)) {
                 throw failure
             }
-            client.newCall(request).execute()
+            // 若具备其他健康镜像（如 Pornhub cn/jp/www），先切换到健康镜像重试，否则降级 HTTP/1.1 重试
+            val alternateUrl = sourceKey?.let { key ->
+                SourceHealthRegistry.expandCandidateUrls(key, urlStr).firstOrNull { it != urlStr }
+            }
+            val retryRequest = if (alternateUrl != null) {
+                request.newBuilder().url(alternateUrl).build()
+            } else {
+                request
+            }
+            AuroraHttpClient.http1Client.newBuilder()
+                .connectTimeout(12, TimeUnit.SECONDS)
+                .readTimeout(22, TimeUnit.SECONDS)
+                .build()
+                .newCall(retryRequest)
+                .execute()
         }
     }
 

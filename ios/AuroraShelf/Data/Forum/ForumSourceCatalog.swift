@@ -14,7 +14,7 @@ public struct ForumBoard: Identifiable, Hashable, Sendable {
     }
 }
 
-public struct ForumPostItem: Identifiable, Hashable, Sendable {
+public struct ForumPostItem: Identifiable, Hashable, Codable, Sendable {
     public let id: String
     public let fid: Int
     public var compositeID: String { "\(fid):\(id)" }
@@ -83,7 +83,7 @@ enum ForumBoardSelection {
 }
 
 enum ForumSourceAdapter {
-    static func pageURL(fid: Int, page: Int) -> URL? {
+    static func pageURL(fid: Int, page: Int, baseOrigin: String? = nil) -> URL? {
         guard page >= 1 else { return nil }
         if fid == ForumSourceCatalog.t66y.fid {
             return URL(string: "https://t66y.com/thread0806.php?fid=7&page=\(page)")
@@ -91,7 +91,33 @@ enum ForumSourceAdapter {
         if fid == ForumSourceCatalog.t66yDaguerre.fid {
             return URL(string: "https://t66y.com/thread0806.php?fid=16&page=\(page)")
         }
-        return URL(string: "https://t924.sol140.com/forumdisplay.php?fid=\(fid)&page=\(page)")
+        let origin = baseOrigin?.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            ?? SourceHealthRegistry.shared.resolveOrigins(sourceKey: "t906").first
+            ?? "https://t924.sol140.com"
+        return URL(string: "\(origin)/forumdisplay.php?fid=\(fid)&page=\(page)")
+    }
+
+    static func extractPortalForumBaseURL(from html: String) -> String? {
+        let pattern = #"href=["'](https?://[^\s"'<>]+)["']?[^>]*>\s*自拍论坛"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else { return nil }
+        let ns = html as NSString
+        guard let match = regex.firstMatch(in: html, range: NSRange(location: 0, length: ns.length)),
+              match.numberOfRanges > 1 else { return nil }
+        return ns.substring(with: match.range(at: 1)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+    }
+
+    static func isTrustedForumHost(_ host: String) -> Bool {
+        let lower = host.lowercased()
+        if lower == "t66y.com" || lower.hasSuffix(".t66y.com") || lower == "t924.sol140.com" {
+            return true
+        }
+        if lower.range(of: #"^(?:[a-z0-9-]+\.)?sol\d+\.com$"#, options: .regularExpression) != nil {
+            return true
+        }
+        if lower.hasSuffix(".abc2507.cc") || lower == "abc2507.cc" {
+            return true
+        }
+        return SourceHealthRegistry.shared.knownHosts(for: "t906").contains(lower)
     }
 }
 
@@ -443,7 +469,13 @@ public final class ForumRepository: ObservableObject {
     public func selectBoard(_ fid: Int?) {
         guard selectedBoardFid != fid else { return }
         selectedBoardFid = fid
-        posts = []
+        if postFetcher == nil,
+           let snapshot = SourceSnapshotStore.shared.getForumFeed(boardKey: fid.map(String.init) ?? "all"),
+           !snapshot.items.isEmpty {
+            posts = snapshot.items
+        } else {
+            posts = []
+        }
         currentPage = 1
         hasMorePages = true
         isLoadingNextPage = false
@@ -491,18 +523,33 @@ public final class ForumRepository: ObservableObject {
             return try await ongoing.value
         }
         guard let url = URL(string: post.threadUrl), url.scheme == "https",
-              ["t924.sol140.com", "t66y.com"].contains(url.host?.lowercased() ?? "") else {
+              let host = url.host,
+              ForumSourceAdapter.isTrustedForumHost(host) else {
             throw ForumFetchError.invalidURL
         }
-        let session = self.session
+        let candidateDetailURLs: [URL]
+        if ForumSourceCatalog.isT66Y(fid: post.fid) {
+            candidateDetailURLs = [url]
+        } else {
+            candidateDetailURLs = SourceHealthRegistry.shared.expandCandidateURLs(sourceKey: "t906", requestURL: url)
+        }
         let task = Task<ForumPostItem, Error> {
-            var request = URLRequest(url: url)
-            request.setValue("https://\(url.host ?? "")", forHTTPHeaderField: "Referer")
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else { throw ForumFetchError.invalidResponse }
-            guard (200...299).contains(http.statusCode) else { throw ForumFetchError.httpStatus(http.statusCode) }
-            guard let html = String(data: data, encoding: .utf8)
-                    ?? String(data: data, encoding: .init(rawValue: 0x80000632)) else { throw ForumFetchError.invalidResponse }
+            let response = try await AuroraNetworkEngine.shared.fetchHedged(
+                sourceKey: ForumSourceCatalog.isT66Y(fid: post.fid) ? nil : "t906",
+                candidateURLs: candidateDetailURLs,
+                headersBuilder: { target in
+                    var h: [String: String] = [
+                        "Referer": "https://\(target.host ?? "")",
+                        "Accept-Language": "zh-CN,zh;q=0.9"
+                    ]
+                    if !ForumSourceCatalog.isT66Y(fid: post.fid) {
+                        h["Cookie"] = "language=cn_CN; watch_times=1"
+                    }
+                    return h
+                }
+            )
+            guard let html = String(data: response.data, encoding: .utf8)
+                    ?? String(data: response.data, encoding: .init(rawValue: 0x80000632)) else { throw ForumFetchError.invalidResponse }
             let detail = ForumPostParser.parseDetail(html, post: post)
             guard !detail.contentText.isEmpty || detail.previewImageUrl != nil else { throw ForumFetchError.invalidResponse }
             return detail
@@ -519,11 +566,19 @@ public final class ForumRepository: ObservableObject {
         currentLoadTask?.cancel()
         let requestID = UUID()
         activeRequestID = requestID
-        self.isLoading = true
+        let boardKey = selectedFid.map(String.init) ?? "all"
+        if postFetcher == nil && self.posts.isEmpty,
+           let snapshot = SourceSnapshotStore.shared.getForumFeed(boardKey: boardKey),
+           !snapshot.items.isEmpty {
+            self.posts = snapshot.items
+            print("[AuroraPerf] forum_swr_hit board=\(boardKey) count=\(snapshot.items.count) fresh=\(snapshot.isFresh)")
+        }
+        self.isLoading = self.posts.isEmpty
         self.errorMessage = nil
         currentPage = 1
         hasMorePages = true
         isLoadingNextPage = false
+        let startedAt = Date()
         let loadTask = Task { [weak self] in
             guard let self else { return }
             let (loaded, failures) = await self.fetchSelectedBoards(selectedFid, page: 1)
@@ -534,6 +589,11 @@ public final class ForumRepository: ObservableObject {
             }
             if !loaded.isEmpty || failures.isEmpty {
                 self.posts = loaded
+                if self.postFetcher == nil && !loaded.isEmpty {
+                    SourceSnapshotStore.shared.putForumFeed(boardKey: boardKey, items: loaded)
+                    let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+                    print("[AuroraPerf] forum_net_load board=\(boardKey) ms=\(elapsedMs) count=\(loaded.count)")
+                }
                 self.prefetchPostImages(for: loaded)
             }
             self.hasMorePages = !loaded.isEmpty || !failures.isEmpty
@@ -610,26 +670,91 @@ public final class ForumRepository: ObservableObject {
         return (orderedPosts, failures)
     }
 
-    // MARK: - 真实抓取 91 论坛帖子
+    // MARK: - 真实抓取 91 论坛与草榴帖子（含多镜像对冲 + 门户动态自愈发现）
 
-    nonisolated private static func fetchRealForumPosts(fid: Int, page: Int, session: URLSession) async throws -> [ForumPostItem] {
-        guard let url = ForumSourceAdapter.pageURL(fid: fid, page: page),
-              let baseUrl = url.host.map({ "https://\($0)" }) else { throw ForumFetchError.invalidURL }
-
-        var request = URLRequest(url: url)
-        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
-        request.setValue("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
-        request.setValue(baseUrl, forHTTPHeaderField: "Referer")
-        let (data, response) = try await session.data(for: request)
-        guard let httpResp = response as? HTTPURLResponse else { throw ForumFetchError.invalidResponse }
-        guard (200...299).contains(httpResp.statusCode) else { throw ForumFetchError.httpStatus(httpResp.statusCode) }
-        guard let html = String(data: data, encoding: .utf8)
-                ?? String(data: data, encoding: .init(rawValue: 0x80000632)) /* GBK */ else {
-            throw ForumFetchError.invalidResponse
+    nonisolated static func fetchRealForumPosts(fid: Int, page: Int, session _: URLSession) async throws -> [ForumPostItem] {
+        if ForumSourceCatalog.isT66Y(fid: fid) {
+            guard let url = ForumSourceAdapter.pageURL(fid: fid, page: page),
+                  let baseUrl = url.host.map({ "https://\($0)" }) else { throw ForumFetchError.invalidURL }
+            let response = try await AuroraNetworkEngine.shared.fetch(
+                url: url,
+                sourceKey: nil,
+                headers: [
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Referer": baseUrl,
+                    "Accept-Language": "zh-CN,zh;q=0.9"
+                ]
+            )
+            guard let html = String(data: response.data, encoding: .utf8)
+                    ?? String(data: response.data, encoding: .init(rawValue: 0x80000632)) else {
+                throw ForumFetchError.invalidResponse
+            }
+            return ForumPostParser.parseT66Y(html, fid: fid, baseUrl: baseUrl)
         }
 
-        return ForumSourceCatalog.isT66Y(fid: fid)
-            ? ForumPostParser.parseT66Y(html, fid: fid, baseUrl: baseUrl)
-            : ForumPostParser.parse(html, fid: fid, baseUrl: baseUrl)
+        let origins = SourceHealthRegistry.shared.resolveOrigins(sourceKey: "t906")
+        let candidateURLs = origins.compactMap { ForumSourceAdapter.pageURL(fid: fid, page: page, baseOrigin: $0) }
+        guard !candidateURLs.isEmpty else { throw ForumFetchError.invalidURL }
+
+        do {
+            let response = try await AuroraNetworkEngine.shared.fetchHedged(
+                sourceKey: "t906",
+                candidateURLs: candidateURLs,
+                headersBuilder: { target in
+                    [
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                        "Referer": "https://\(target.host ?? "")",
+                        "Cookie": "language=cn_CN; watch_times=1"
+                    ]
+                },
+                validator: { resp in
+                    guard let html = String(data: resp.data, encoding: .utf8)
+                            ?? String(data: resp.data, encoding: .init(rawValue: 0x80000632)) else { return false }
+                    let parsed = ForumPostParser.parse(html, fid: fid, baseUrl: "https://\(resp.finalURL.host ?? "")")
+                    return !parsed.isEmpty || page > 1
+                }
+            )
+            let resolvedBase = "https://\(response.finalURL.host ?? candidateURLs[0].host ?? "")"
+            guard let html = String(data: response.data, encoding: .utf8)
+                    ?? String(data: response.data, encoding: .init(rawValue: 0x80000632)) else {
+                throw ForumFetchError.invalidResponse
+            }
+            return ForumPostParser.parse(html, fid: fid, baseUrl: resolvedBase)
+        } catch {
+            // 若已知论坛域名全部失联，主动从 91 视频门户主页自动提取最新论坛入口并即时重试！
+            if let discoveredOrigin = await discoverT906MirrorFromPortal(),
+               let recoveryURL = ForumSourceAdapter.pageURL(fid: fid, page: page, baseOrigin: discoveredOrigin) {
+                SourceHealthRegistry.shared.registerLearnedMirror(sourceKey: "t906", originURL: discoveredOrigin)
+                let recoveryResp = try await AuroraNetworkEngine.shared.fetch(
+                    url: recoveryURL,
+                    sourceKey: "t906",
+                    headers: [
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                        "Referer": discoveredOrigin,
+                        "Cookie": "language=cn_CN; watch_times=1"
+                    ]
+                )
+                guard let html = String(data: recoveryResp.data, encoding: .utf8)
+                        ?? String(data: recoveryResp.data, encoding: .init(rawValue: 0x80000632)) else {
+                    throw ForumFetchError.invalidResponse
+                }
+                return ForumPostParser.parse(html, fid: fid, baseUrl: discoveredOrigin)
+            }
+            throw error
+        }
+    }
+
+    nonisolated private static func discoverT906MirrorFromPortal() async -> String? {
+        let portalURLs = SourceHealthRegistry.shared.resolveOrigins(sourceKey: "91porn")
+            .compactMap { URL(string: "\($0.trimmingCharacters(in: CharacterSet(charactersIn: "/")))/index.php") }
+        guard !portalURLs.isEmpty else { return nil }
+        guard let response = try? await AuroraNetworkEngine.shared.fetchHedged(
+            sourceKey: "91porn",
+            candidateURLs: portalURLs,
+            timeout: 8,
+            headersBuilder: { _ in ["Cookie": "language=cn_CN; watch_times=1"] }
+        ),
+        let html = String(data: response.data, encoding: .utf8) else { return nil }
+        return ForumSourceAdapter.extractPortalForumBaseURL(from: html)
     }
 }

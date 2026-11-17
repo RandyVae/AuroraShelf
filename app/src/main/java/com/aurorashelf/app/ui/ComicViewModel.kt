@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.aurorashelf.app.data.AppPreferences
 import com.aurorashelf.app.data.comic.EncryptedComicAuthStore
 import com.aurorashelf.app.data.comic.ComicRepository
+import com.aurorashelf.app.data.resilience.SourceSnapshotStore
 import com.aurorashelf.app.model.ComicDetails
 import com.aurorashelf.app.model.ComicPage
 import com.aurorashelf.app.model.ComicSourceInfo
@@ -67,14 +68,16 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     } ?: AppPreferences.DEFAULT_COMIC_SOURCE_ID
     private val initialCategoryId = repository.availableSources.find { it.id == initialSourceId }
         ?.categories?.firstOrNull()?.id.orEmpty()
-    private val initialCached = preferences.cachedComicFeed(initialSourceId, initialCategoryId)
+    private val initialSnapshotComics =
+        SourceSnapshotStore.getComicFeed(initialSourceId, initialCategoryId)?.items
+            ?: preferences.cachedComicFeed(initialSourceId, initialCategoryId)?.comics.orEmpty()
     private val mutableUiState = MutableStateFlow(
         ComicUiState(
             sources = repository.availableSources,
             selectedSourceId = initialSourceId,
             selectedCategoryId = initialCategoryId,
-            comics = initialCached?.comics.orEmpty(),
-            page = if (initialCached != null) 1 else 0,
+            comics = initialSnapshotComics,
+            page = if (initialSnapshotComics.isNotEmpty()) 1 else 0,
             isSourceAuthenticated = repository.isAuthenticated(initialSourceId),
         ),
     )
@@ -102,13 +105,15 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         readerRequestToken++
         val firstCategory = repository.availableSources.find { it.id == sourceId }
             ?.categories?.firstOrNull()?.id.orEmpty()
+        val cachedForSource = SourceSnapshotStore.getComicFeed(sourceId, firstCategory)?.items
+            ?: preferences.cachedComicFeed(sourceId, firstCategory)?.comics.orEmpty()
         mutableUiState.update {
             it.copy(
                 selectedSourceId = sourceId,
                 selectedCategoryId = firstCategory,
-                comics = emptyList(),
+                comics = cachedForSource,
                 activeQuery = "",
-                page = 0,
+                page = if (cachedForSource.isNotEmpty()) 1 else 0,
                 canLoadMore = true,
                 error = null,
                 details = null,
@@ -167,14 +172,15 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         detailsRequestToken++
         readerRequestToken++
         val sourceId = mutableUiState.value.selectedSourceId
-        val cached = preferences.cachedComicFeed(sourceId, categoryId)
+        val cachedComics = SourceSnapshotStore.getComicFeed(sourceId, categoryId)?.items
+            ?: preferences.cachedComicFeed(sourceId, categoryId)?.comics.orEmpty()
         mutableUiState.update {
             it.copy(
                 selectedCategoryId = categoryId,
                 query = "",
                 activeQuery = "",
-                comics = cached?.comics.orEmpty(),
-                page = if (cached != null && cached.comics.isNotEmpty()) 1 else 0,
+                comics = cachedComics,
+                page = if (cachedComics.isNotEmpty()) 1 else 0,
                 canLoadMore = true,
                 loadMoreError = null,
                 details = null,
@@ -364,13 +370,19 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         listJob?.cancel()
         val sourceId = mutableUiState.value.selectedSourceId
         val categoryId = mutableUiState.value.selectedCategoryId
-        val cached = if (query.isBlank()) preferences.cachedComicFeed(sourceId, categoryId) else null
+        val startedAt = System.currentTimeMillis()
+        val snapshotComics = if (query.isBlank()) {
+            SourceSnapshotStore.getComicFeed(sourceId, categoryId)?.items
+                ?: preferences.cachedComicFeed(sourceId, categoryId)?.comics.orEmpty()
+        } else {
+            emptyList()
+        }
         listJob = viewModelScope.launch {
             mutableUiState.update { current ->
                 val fallbackComics = when {
                     query.isNotBlank() -> emptyList()
                     current.selectedSourceId == sourceId && current.selectedCategoryId == categoryId && current.comics.isNotEmpty() -> current.comics
-                    cached != null -> cached.comics
+                    snapshotComics.isNotEmpty() -> snapshotComics
                     else -> emptyList()
                 }
                 current.copy(
@@ -378,7 +390,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                     activeQuery = query,
                     page = if (fallbackComics.isNotEmpty()) 1 else 0,
                     canLoadMore = true,
-                    isLoading = true,
+                    isLoading = fallbackComics.isEmpty(),
                     isLoadingMore = false,
                     error = null,
                 )
@@ -386,7 +398,11 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
             runCatching { load(sourceId, categoryId, query, 1) }
                 .onSuccess { result ->
                     if (query.isBlank() && result.isNotEmpty()) {
+                        SourceSnapshotStore.putComicFeed(sourceId, categoryId, result)
                         preferences.saveComicFeed(sourceId, categoryId, result)
+                    }
+                    runCatching {
+                        android.util.Log.i("AuroraPerf", "comic_net_load source=$sourceId ms=${System.currentTimeMillis() - startedAt} count=${result.size}")
                     }
                     mutableUiState.update {
                         if (
@@ -394,15 +410,16 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                             it.selectedCategoryId != categoryId ||
                             it.activeQuery != query
                         ) it
-                        else it.copy(comics = result, page = 1, canLoadMore = result.isNotEmpty(), isLoading = false)
+                        else it.copy(comics = result, page = 1, canLoadMore = result.isNotEmpty(), isLoading = false, error = null)
                     }
                 }
                 .onFailure { failure ->
                     if (failure is CancellationException) return@onFailure
                     mutableUiState.update {
+                        val keepStale = query.isBlank() && it.selectedSourceId == sourceId && it.comics.isNotEmpty()
                         it.copy(
                             isLoading = false,
-                            error = failure.userMessage(),
+                            error = if (keepStale) null else failure.userMessage(),
                             isSourceAuthenticated = repository.isAuthenticated(sourceId),
                         )
                     }

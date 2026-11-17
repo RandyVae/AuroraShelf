@@ -1,5 +1,6 @@
 package com.aurorashelf.app.data.forum
 
+import com.aurorashelf.app.data.resilience.SourceHealthRegistry
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.ForumPost
 import java.io.IOException
@@ -24,20 +25,32 @@ internal class T906ForumSource(
 
     override suspend fun load(page: Int): List<ForumPost> = withContext(Dispatchers.IO) {
         require(page >= 1) { "页码必须从 1 开始" }
-        val currentUrl = activeBaseUrl
-        val firstAttempt = runCatching { fetchPosts(currentUrl, page) }
+        // 若初始化时仍为默认值，则优先采用健康度注册中心记忆的最佳/新近发现论坛域名
+        val rankedDefault = if (activeBaseUrl == PRIMARY_BASE_URL) {
+            SourceHealthRegistry.resolveOrigins("t906", CANDIDATE_BASE_URLS).firstOrNull() ?: activeBaseUrl
+        } else {
+            activeBaseUrl
+        }
+        val firstAttempt = runCatching { fetchPosts(rankedDefault, page) }
         if (firstAttempt.isSuccess && (page > 1 || firstAttempt.getOrThrow().isNotEmpty())) {
+            activeBaseUrl = rankedDefault
+            SourceHealthRegistry.recordSuccess("t906", rankedDefault, 250L)
             return@withContext firstAttempt.getOrThrow()
         }
+        SourceHealthRegistry.recordFailure("t906", rankedDefault, isHardBlock = true)
 
         // 当前基础域名失效或未解析出帖子，启动候选域名与门户页动态探测
-        val candidates = buildCandidateBaseUrls(currentUrl)
+        val candidates = buildCandidateBaseUrls(rankedDefault)
         for (candidate in candidates) {
+            val started = System.currentTimeMillis()
             val result = runCatching { fetchPosts(candidate, page) }
             if (result.isSuccess && (page > 1 || result.getOrThrow().isNotEmpty())) {
                 activeBaseUrl = candidate
+                SourceHealthRegistry.registerLearnedMirror("t906", candidate)
+                SourceHealthRegistry.recordSuccess("t906", candidate, System.currentTimeMillis() - started)
                 return@withContext result.getOrThrow()
             }
+            SourceHealthRegistry.recordFailure("t906", candidate)
         }
 
         firstAttempt.getOrThrow()
@@ -75,9 +88,16 @@ internal class T906ForumSource(
 
     private fun buildCandidateBaseUrls(failedUrl: String): List<String> {
         val candidates = linkedSetOf<String>()
-        // 1. 尝试从默认视频源门户主页动态提取最新论坛入口
-        discoverBaseUrlFromPortal()?.let { candidates.add(it) }
-        // 2. 预置候选域名列表
+        // 1. 尝试从门户主页及健康镜像池动态提取最新论坛入口
+        val portalOrigins = SourceHealthRegistry.resolveOrigins("91porn", listOf(ContentSourceCatalog.T91_BASE_URL))
+        for (portal in portalOrigins) {
+            discoverBaseUrlFromPortal(portal)?.let { discovered ->
+                candidates.add(discovered)
+                SourceHealthRegistry.registerLearnedMirror("t906", discovered)
+            }
+        }
+        // 2. 合并健康度排序的镜像与内置候选域名
+        SourceHealthRegistry.resolveOrigins("t906", CANDIDATE_BASE_URLS).forEach { candidates.add(it) }
         CANDIDATE_BASE_URLS.forEach { candidates.add(it) }
         candidates.remove(failedUrl)
         return candidates.toList()
