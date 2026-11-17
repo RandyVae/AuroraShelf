@@ -484,12 +484,19 @@ class VideoRepository {
     }
 
     private fun fetchDocument(requestUrl: String, baseUrl: String): Document {
-        fun request(): Document = Jsoup.connect(requestUrl)
-            .userAgent(USER_AGENT)
-            .header("Accept-Language", if (ContentSourceCatalog.isMissAv(baseUrl)) "ja,en-US;q=0.8,en;q=0.6" else "zh-CN,zh;q=0.9")
-            .timeout(REQUEST_TIMEOUT_MS)
-            .followRedirects(true)
-            .get()
+        fun request(): Document {
+            val connection = Jsoup.connect(requestUrl)
+                .userAgent(USER_AGENT)
+                .header("Accept-Language", if (ContentSourceCatalog.isMissAv(baseUrl)) "ja,en-US;q=0.8,en;q=0.6" else "zh-CN,zh;q=0.9")
+                .timeout(REQUEST_TIMEOUT_MS)
+                .followRedirects(true)
+            if (ContentSourceCatalog.is91(baseUrl)) {
+                connection
+                    .cookie("language", "cn_CN")
+                    .cookie("watch_times", "1")
+            }
+            return connection.get()
+        }
 
         return try {
             request()
@@ -789,10 +796,16 @@ class VideoRepository {
         // Generic pagination/navigation links also contain "video" on the source site.
         // Keep fallback site compatibility, but never turn a text-only navigation link into a card.
         if (!href.contains("view_video", ignoreCase = true) && image == null) return null
-        val title = selectFirst(".video-title, .hg-drama-card__title")?.text().orEmpty()
+        val title = selectFirst(".video-title, .vname, .vcap .vci, .vcap, .hg-drama-card__title")?.text().orEmpty()
             .ifBlank { attr("title") }
             .ifBlank { image?.attr("alt").orEmpty() }
-            .ifBlank { text() }
+            .ifBlank {
+                if (ContentSourceCatalog.is91(baseUrl)) {
+                    clone().apply { select(".thumb-overlay, .duration, .hd-text-icon, .original-text-icon").remove() }.text()
+                } else {
+                    text()
+                }
+            }
             .trim()
             .let { Parser.unescapeEntities(it, false) }
             .replace(Regex("\\s+"), " ")

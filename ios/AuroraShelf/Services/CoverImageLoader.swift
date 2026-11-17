@@ -314,10 +314,6 @@ public actor CoverImageLoader {
             defaultReferer = "https://jp.pornhub.com/"
         } else if ["fourhoi.com", "mrstcdn.store", "missav.media", "missav.ws", "missav.ai", "missav123.com"].contains(where: { host == $0 || host.hasSuffix(".\($0)") }) {
             defaultReferer = "https://missav.media/"
-        } else if host == "jav.sb" || host.hasSuffix(".jav.sb") {
-            defaultReferer = "https://jav.sb/"
-        } else if host == "javnoni.com" || host.hasSuffix(".javnoni.com") {
-            defaultReferer = "https://javnoni.com/"
         } else if ["sol140.com", "sol148.com", "23img.com", "cdn77.org"].contains(where: { host == $0 || host.hasSuffix(".\($0)") }) || host.contains("sol") {
             defaultReferer = "https://h1014.sol148.com/"
         } else if host.contains("huarenlivewebsite")

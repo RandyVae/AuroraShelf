@@ -84,20 +84,6 @@ public struct ChannelVisualSpec: Sendable {
                 gradientColors: [Color(rgb: 0x1C1C1E), Color(rgb: 0x2A2A2D)],
                 accentColor: Color(rgb: 0xFFA000)
             )
-        case "javnoni":
-            // JAV-NONI：皇家天青蓝
-            return ChannelVisualSpec(
-                iconName: "star.fill",
-                gradientColors: [Color(rgb: 0x0D47A1), Color(rgb: 0x1976D2)],
-                accentColor: Color(rgb: 0x64B5F6)
-            )
-        case "javsb":
-            // JAVSB：深海绿松石/高速蓝
-            return ChannelVisualSpec(
-                iconName: "bolt.horizontal.fill",
-                gradientColors: [Color(rgb: 0x006064), Color(rgb: 0x00838F)],
-                accentColor: Color(rgb: 0x4DD0E1)
-            )
         case "tokyomotion":
             // TOKYO Motion：涉谷霓虹艳粉
             return ChannelVisualSpec(
@@ -184,8 +170,6 @@ private struct ChannelGlyph: View {
         case "kissjav": return "K"
         case "85po": return "85"
         case "pornhub": return "PH"
-        case "javnoni": return "JN"
-        case "javsb": return "JS"
         case "tokyomotion": return "TM"
         case "spankbang": return "SB"
         case "xhamster": return "XH"

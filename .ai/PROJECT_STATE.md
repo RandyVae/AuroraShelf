@@ -1,6 +1,19 @@
 # Project State
 
-## 最新工作状态（2026年11月17日 · 双端顶部 Hero 海报统一全幅铺满＋TestFlight 邮件邀请排查与重发功能＋双端 Release 验证与全通道发布 · v2.16.38 Build 264）
+## 最新工作状态（2026年11月17日 · 双端移除 JAVSB/JAV-NONI＋91视频深度修复＋全规模模拟器验收与全通道上线 · v2.16.39 Build 265）
+
+- **版本号全链路同步至 `v2.16.39 (Build 265)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`。
+- **双端彻底移除 `JAVSB` 与 `JAV-NONI`（20 → 18 视频源）**：
+  - iOS 清理 [VideoSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoSourceCatalog.swift)、[VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift)（`resolveJavSbStream` / `JavSbSignature`）、[HTMLVideoSourceAdapter.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HTMLVideoSourceAdapter.swift)、[CoverImageLoader.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/CoverImageLoader.swift) 与 [ChannelsShelf.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/ChannelsShelf.swift)；Android [ContentSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/ContentSource.kt) 过滤 `"JAV-NONI"` / `"JAVSB"` 并清理 [PipePipeDownloader.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PipePipeDownloader.kt)；同步更新探测脚本与双端单测。
+- **双端 `91视频` 彻底修复（动态类名轮换＋偏好劫持根除＋中文语系 Cookie）**：
+  - iOS [VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift) 重构 `parse91PornHtml` 兼容移动端 `<article class="vitem well-sm well">` 与 PC `<div class="well well-sm">`，依次匹配 `.video-title` / `.vname` / `.vci` / `.vcap` 并在类名轮换时通过剥离 `.duration`/角标实现纯结构兜底，补齐 HTML 实体解码、`viewkey` 去重与 `language=cn_CN` Cookie。
+  - Android 修复 [AppPreferences.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/AppPreferences.kt) 将 `https://h1014.sol148.com` 误劫持回 `DEFAULT_SOURCE` 的缺陷，并在 [VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt) 增加 `.vname` / `.vcap .vci` 选择器及去角标结构提取。
+- **验证与全渠道上线结果（v2.16.39 Build 265）**：
+  - Android：`./gradlew testDebugUnitTest lintDebug assembleRelease` 与 `RUN_LIVE_SOURCE_TESTS=1` 全通；`emulator-5554` R8 APK 实测 `91视频` 干净标题与 `la.btc620.com` mp4 出画、18 源无 JAVSB/JAV-NONI、禁漫漫画、直播、论坛及 `Lust Goddess` v2.16.39 正常。
+  - iOS：187/188 通过且在线全源 `LiveVideoSourceAuditTests` **18/18** 视频（含 `91porn items=24`）、**9/9** 非鉴权漫画、全部直播、7/7 论坛板列表翻页全通（`fid=34` 旧置顶贴外链图床 `nsaimg.com` 停服）；`iPhone 18 Pro` & `iPad Pro 13-inch (M5)` Release 实测 `91视频` 列表、18 源、`操肉丝高跟顶美扇她耳光（有完整版）` 播放出画及各板块正常。
+  - 全通道发布：`https://bananarey.us` OTA（137M APK / 135M IPA、`manifest.plist` `2.16.39` `HTTP 200`，`/` 剩 `11G`）与 TestFlight **`v2.16.39 (Build 265)`**（`Upload succeeded`）均已上线。
+
+## 历史工作状态（2026年11月17日 · 双端顶部 Hero 海报统一全幅铺满＋TestFlight 邮件邀请排查与重发功能＋双端 Release 验证与全通道发布 · v2.16.38 Build 264）
 
 - **版本号全链路同步至 `v2.16.38 (Build 264)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist` 与 `scripts/ota_web/index.html`。
 - **TestFlight 邀请未收件核查与网页重发补齐**：

@@ -121,7 +121,7 @@ class AppPreferences(context: Context) {
         // Migrate the old default or empty-address demo setting to the latest default source without erasing favorites/history.
         get() {
             val raw = preferences.getString(KEY_SOURCE_URL, null)
-            if (raw == null || raw == "https://h1014.sol148.com") {
+            if (raw.isNullOrBlank()) {
                 return DEFAULT_SOURCE
             }
             return normalizeBaseUrl(raw).ifBlank { DEFAULT_SOURCE }

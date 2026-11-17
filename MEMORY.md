@@ -23,32 +23,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `1a134c5`（2026-11-16），未提交 17 个文件
+- Git：`main` @ `e4a8522`（2026-11-17），未提交 28 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-17（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-17（今天）
   - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-16（今天）
   - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-16（今天）
-  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（22 天前）
+  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（23 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-17（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-17 10:41 by `sync.py`
+- 最后同步：2026-11-17 12:07 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-17 · Build 264 / v2.16.38）：完成两项交付：(1) **排查 TestFlight 邀请未收件问题并上线网页重发功能**：核实服务器 `2026-11-16 18:18:21` 已成功为 `17371253934@163.com` 调用 Apple `userInvitations`（ID `9531fe62-6480-4fcd-9d13-04c16fcf539a`，有效期至 `2026-11-19`），未收件系 `163` 邮箱拦截/归类 Apple `no_reply@email.apple.com` 系统邮件所致；已在 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 新增 `resend`（`DELETE` 旧邀请后立即重建触发重发），并在 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 补齐「没收到邮件？重发团队邀请邮件」按钮及 `163/QQ` 垃圾箱提示；(2) **双端顶部 Hero 海报统一全幅铺满**：修复 iOS [HeroBanner.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/HeroBanner.swift) 与 Android [HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt) 因横向图触发 `cinemaStage` 导致顶部缩进为局部圆角卡片的问题，统一为 `.fullBleed` / `FULL_BLEED` 居中 `.fill` / `Crop` 铺满顶部视口，并更新 [VideoPreloadManagerTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/VideoPreloadManagerTests.swift) 与 [ForumUiStateTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/ui/ForumUiStateTest.kt)；(3) **双端全规模验证与同步上线（v2.16.38 / Build 264）**：Android 离线 269 项（261 通/8 跳）+ `lintDebug` + `RUN_LIVE_SOURCE_TESTS=1 RUN_LIVE_FORUM_TESTS=1` 数据源 25 套件 **166/166 全通**、iOS 离线 190 项（182 通/8 跳）、iOS 在线漫画 30/30 / 直播 5/5 / 华视 206 切片 / 17/20 视频 / 7/7 论坛板翻页通过（外部受限：`91porn`、`javnoni`、`javsb` `-1005` 及 `fid=34` 外链图 `-1005`）、Node 探针 33/35、游戏脚本全通；`iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 与 `emulator-5554` R8 APK 实测确认横向《你好星期六》《现在就出发第四季》完整铺满顶部及各板块/内置游戏正常；已同步发布至网页 OTA `https://bananarey.us`（137M APK / 135M IPA）、TestFlight Build 264、Git 与 GitHub Release `v2.16.38`。
-- 进行中：等待受邀邮箱在收件箱/垃圾箱点确认团队邀请后自动入群；持续跟进外部第三方上游站可用性与 PocketBase 管理员/SMTP 配置。
+- 当前阶段（2026-11-17 · Build 265 / v2.16.39）：完成双端源清理与 `91视频` 彻底修复：(1) **双端彻底移除 `JAVSB` 与 `JAV-NONI`**：移除 iOS [VideoSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoSourceCatalog.swift)（20 → 18 源）、[VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift)（`resolveJavSbStream`/`JavSbSignature`）、[HTMLVideoSourceAdapter.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HTMLVideoSourceAdapter.swift)、[CoverImageLoader.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/CoverImageLoader.swift) 与 [ChannelsShelf.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/ChannelsShelf.swift)，Android [ContentSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/ContentSource.kt) 过滤 `JAV-NONI`/`JAVSB` 及清理 [PipePipeDownloader.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PipePipeDownloader.kt)，并更新 `probe_all_sources.mjs`、`diagnose_sources.swift` 与双端单测/UI 审计；(2) **双端 `91视频` 深度修复**：iOS [VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift) 更新 `parse91PornHtml` 同时兼容 PC `.video-title`、移动端 `.vname` / `.vcap .vci` 及站端动态轮换类名兜底、HTML 实体反转义与 `viewkey` 去重，并统一附加 `language=cn_CN; watch_times=1` Cookie 与 `zh-CN` 语系；Android 修复 [AppPreferences.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/AppPreferences.kt) 将 `https://h1014.sol148.com` 静默回切 `DEFAULT_SOURCE` 的历史劫持缺陷，并在 [VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt) 剥离 `.thumb-overlay`/`.duration`/角标实现纯净中文标题解析；(3) **双端全规模测试、Release 实测与全通道同步上线（v2.16.39 / Build 265）**：Android `testDebugUnitTest lintDebug assembleRelease` 及 `RUN_LIVE_SOURCE_TESTS=1` 全通；iOS 187/188 通过且在线全源 `LiveVideoSourceAuditTests` 18/18 视频（`91porn items=24`）及 9/9 非鉴权漫画、全部直播、7/7 论坛板翻页全通（仅 `fid=34` 置顶贴外链 `nsaimg.com` 自身停服）；`iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 与 `emulator-5554` R8 APK 均实测 `91视频` 列表与出画正常、`18` 源无 `JAVSB`/`JAV-NONI`；同步上线至 `https://bananarey.us`（137M APK / 135M IPA，`/` 剩 `11G`）、TestFlight Build 265、Git 与 GitHub Release `v2.16.39`。
+- 进行中：持续观察第三方上游源（`85po` / `SpankBang` 防护及 `fid=34` 外部旧图床）波动。
 - 下一步：按需完成 PocketBase 首个管理员与 SMTP 配置及云端收藏同步。
-- 阻塞：外部第三方源实时探针中 `91porn`（iOS 列表解析空）、`JAV-NONI`、`JAVSB`（`-1005` 断连）与论坛 `fid=34` 置顶贴外链图（`-1005`）受限于上游站与网络环境。
-- 最近一次更新：2026-11-17 by Antigravity
+- 阻塞：论坛 `fid=34` 置顶贴 `417968` 2021 年外链图床 `www.nsaimg.com` 停服（不阻塞实际帖子与其它版块浏览）；`禁漫天堂` 需端内HMAC密钥，无密钥 Node 探测报 `401`。
+- 最近一次更新：2026-11-17 by Antigravity (gemini-3.1-pro)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-17（Antigravity）：双端移除 `JAVSB`/`JAV-NONI` 并彻底修复 `91视频` 站端动态类名与 Android 偏好劫持（v2.16.39 Build 265）。经真机级 Release 模拟器排查，确认两处隐藏根因：(1) `h1014.sol148.com` 会动态轮换视频卡片标题类名（`.vname` 与 `.vcap > .vci` 等），双端新增多选择器并加入剥离 `.thumb-overlay`/`.duration`/角标后的纯结构兜底＋`language=cn_CN` Cookie；(2) Android `AppPreferences.kt` 旧版迁移逻辑 `raw == "https://h1014.sol148.com"` 劫持用户切换到 `91视频` 的选择并回切默认源，移除后双端 Release 实测加载与起播全部恢复；全通道（网页 OTA、TestFlight、Git & GitHub Release）已同步发布 `v2.16.39 (Build 265)`。
 
 - 2026-11-17（Antigravity）：统一双端首页顶部 Hero 海报为全幅铺满（`.fullBleed` / `FULL_BLEED`）并增强 TestFlight 网页重发能力（v2.16.38 Build 264）。响应用户反馈「前两张横图海报未铺满顶部而第三张竖图铺满」，将 iOS [HeroBanner.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/HeroBanner.swift) 与 Android [HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt) 原本针对 `16:9` / 超宽图退化为居中悬浮卡片的 `cinemaStage` 逻辑全部收敛为 `.fullBleed` / `FULL_BLEED`（居中 `.fill` / `ContentScale.Crop` 铺满顶部视口）；同时在 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 与 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 补齐 `resend` 撤销重建重发能力与 `163/QQ` 邮箱垃圾箱提示，双端 Release 模拟器实测全幅铺满后同步发布至 OTA 与 TestFlight Build 264。
 

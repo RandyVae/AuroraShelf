@@ -8,7 +8,7 @@ final class ChannelVisualSpecTests: XCTestCase {
     func testAllSupportedSourcesHaveAppleDesignChannelVisualSpecs() {
         let sources = VideoSourceCatalog.supportedSources
 
-        XCTAssertEqual(sources.count, 20, "应有完整 20 个支持的视频流媒体源")
+        XCTAssertEqual(sources.count, 18, "应有完整 18 个支持的视频流媒体源")
 
         for source in sources {
             let spec = ChannelVisualSpec.forSource(source.id)

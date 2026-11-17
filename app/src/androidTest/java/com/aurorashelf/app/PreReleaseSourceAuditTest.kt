@@ -41,7 +41,7 @@ class PreReleaseSourceAuditTest {
 
     @Test fun repairedPaginationReturnsNewRecords() = runBlocking {
         org.junit.Assume.assumeTrue("Set -Pandroid.testInstrumentationRunnerArguments.sourceAudit=true to run source audit tests", isSourceAuditEnabled())
-        val expected = setOf("KissJAV", "Pornhub", "SpankBang", "EPORNER", "MRDOUGA", "XNXX", "TOKYO Motion", "85po", "JAV-NONI", "XVideos", "xHamster")
+        val expected = setOf("KissJAV", "Pornhub", "SpankBang", "EPORNER", "MRDOUGA", "XNXX", "TOKYO Motion", "85po", "XVideos", "xHamster")
         val repository = VideoRepository()
         for (source in ContentSourceCatalog.sources.filter { it.name in expected }) {
             val first = repository.loadFeed(source.baseUrl, FeedCategory.RECENT, 1).map { it.pageUrl }.toSet()

@@ -67,8 +67,6 @@ object ContentSourceCatalog {
         "MissAV" -> "高清日韩番号 · 海外直连/代理"
         "85po" -> "热门自拍与原创 · 海外直连/代理"
         "KissJAV" -> "海量综合视频 · 海外直连/代理"
-        "JAV-NONI" -> "独家精选流媒体 · 海外直连/代理"
-        "JAVSB" -> "亚洲精选影视 · 海外直连/代理"
         "TOKYO Motion" -> "日本同人与动漫 · 海外直连/代理"
         "MRDOUGA" -> "二次元同人动画 · 海外直连/代理"
         "OHentai" -> "动漫里番合集 · 海外直连/代理"
@@ -81,8 +79,12 @@ object ContentSourceCatalog {
         else -> "MISSPipe 视频源 · 海外线路"
     }
 
+    private val removedServiceNames = setOf("JAV-NONI", "JAVSB")
+
     private val pipePipeSources: List<ContentSource> by lazy {
-        NewPipe.getServices().map { service ->
+        NewPipe.getServices()
+            .filterNot { it.serviceInfo.name in removedServiceNames }
+            .map { service ->
             val serviceName = service.serviceInfo.name
             val kiosks = runCatching { service.kioskList.availableKiosks.toList() }.getOrDefault(emptyList())
                 .sortedWith(compareBy({ KIOSK_ORDER.indexOf(it).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }, { it }))

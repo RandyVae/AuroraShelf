@@ -124,7 +124,7 @@ final class X134SourceServiceTests: XCTestCase {
     }
 
     func testCatalogRegistrationAndLiveFeedWhenOptedIn() async throws {
-        XCTAssertEqual(VideoSourceCatalog.allSources.count, 20)
+        XCTAssertEqual(VideoSourceCatalog.allSources.count, 18)
         XCTAssertTrue(VideoSourceCatalog.supportedSourceIDs.contains("134x"))
         XCTAssertTrue(VideoSourceCatalog.searchableSourceIDs.contains("134x"))
         XCTAssertEqual(VideoSourceCatalog.find(by: "134x").name, "134X")

@@ -1050,9 +1050,12 @@ public final class VideoRepository: ObservableObject {
             throw VideoFeedError.invalidURL(source: "91视频")
         }
         var request = URLRequest(url: url)
+        request.setValue(Self.USER_AGENT, forHTTPHeaderField: "User-Agent")
         request.setValue("https://h1014.sol148.com/", forHTTPHeaderField: "Referer")
+        request.setValue("language=cn_CN; watch_times=1", forHTTPHeaderField: "Cookie")
+        request.setValue("zh-CN,zh;q=0.9", forHTTPHeaderField: "Accept-Language")
         let data = try await requestFeedData(for: request, source: "91视频")
-        guard let html = String(data: data, encoding: .utf8) else {
+        guard let html = decodeHTML(data) else {
             throw VideoFeedError.malformedResponse(source: "91视频")
         }
         return parse91PornHtml(html, category: category)
@@ -1060,9 +1063,23 @@ public final class VideoRepository: ObservableObject {
 
     nonisolated func parse91PornHtml(_ html: String, category: String) -> [VideoItem] {
         var videos: [VideoItem] = []
-        let wells = html.components(separatedBy: "class=\"well well-sm").dropFirst()
+        var seenViewkeys = Set<String>()
+        let cardMarkerPattern = #"<(?:article|div)\b[^>]*class\s*=\s*["'][^"']*\b(?:vitem\s+well-sm|well\s+well-sm)\b[^"']*["'][^>]*>"#
+        let wells: [String]
+        if let markerRegex = try? NSRegularExpression(pattern: cardMarkerPattern, options: .caseInsensitive) {
+            let nsHtml = html as NSString
+            let matches = markerRegex.matches(in: html, range: NSRange(location: 0, length: nsHtml.length))
+            var slices: [String] = []
+            for (idx, match) in matches.enumerated() {
+                let start = match.range.location
+                let end = idx + 1 < matches.count ? matches[idx + 1].range.location : nsHtml.length
+                slices.append(nsHtml.substring(with: NSRange(location: start, length: end - start)))
+            }
+            wells = slices
+        } else {
+            wells = Array(html.components(separatedBy: "class=\"well well-sm").dropFirst())
+        }
 
-        var index = 0
         for well in wells {
             // 提取 viewkey
             var viewkey = ""
@@ -1070,7 +1087,7 @@ public final class VideoRepository: ObservableObject {
                 let raw = String(well[vkRange])
                 viewkey = raw.replacingOccurrences(of: "viewkey=", with: "")
             }
-            guard !viewkey.isEmpty else { continue }
+            guard !viewkey.isEmpty, seenViewkeys.insert(viewkey).inserted else { continue }
 
             // 提取封面缩略图
             var coverUrl = ""
@@ -1093,14 +1110,40 @@ public final class VideoRepository: ObservableObject {
                               .trimmingCharacters(in: .whitespacesAndNewlines)
             }
 
-            // 提取标题
+            // 提取标题：同时兼容 PC (<span class="video-title">)、移动端 (<div class="vname"> / <div class="vcap"><i class="vci">) 及任意轮换标题类
             var title = ""
-            if let titleRange = well.range(of: #"class="video-title[^"]*">([^<]+)</span>"#, options: .regularExpression) {
-                let raw = String(well[titleRange])
-                let clean = raw.replacingOccurrences(of: #"class="video-title[^"]*">"#, with: "", options: .regularExpression)
-                               .replacingOccurrences(of: "</span>", with: "")
-                               .trimmingCharacters(in: .whitespacesAndNewlines)
-                if !clean.isEmpty { title = clean }
+            let titlePatterns = [
+                #"<span[^>]*class\s*=\s*["'][^"']*\bvideo-title\b[^"']*["'][^>]*>([\s\S]*?)</span>"#,
+                #"<div[^>]*class\s*=\s*["'][^"']*\bvname\b[^"']*["'][^>]*>([\s\S]*?)</div>"#,
+                #"<i[^>]*class\s*=\s*["'][^"']*\bvci\b[^"']*["'][^>]*>([\s\S]*?)</i>"#,
+                #"<div[^>]*class\s*=\s*["'][^"']*\bvcap\b[^"']*["'][^>]*>([\s\S]*?)</div>"#
+            ]
+            for pattern in titlePatterns where title.isEmpty {
+                if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+                   let match = regex.firstMatch(in: well, range: NSRange(location: 0, length: (well as NSString).length)),
+                   match.numberOfRanges > 1 {
+                    let rawTitle = (well as NSString).substring(with: match.range(at: 1))
+                    let cleaned = Self.clean91PornTitle(rawTitle)
+                    if !cleaned.isEmpty { title = cleaned }
+                }
+            }
+            if title.isEmpty,
+               let anchorRegex = try? NSRegularExpression(pattern: #"<a\b[^>]*href\s*=\s*["'][^"']*view_video\.php[^"']*["'][^>]*>([\s\S]*?)</a>"#, options: .caseInsensitive),
+               let anchorMatch = anchorRegex.firstMatch(in: well, range: NSRange(location: 0, length: (well as NSString).length)),
+               anchorMatch.numberOfRanges > 1 {
+                var inner = (well as NSString).substring(with: anchorMatch.range(at: 1))
+                inner = inner.replacingOccurrences(
+                    of: #"<span[^>]*class\s*=\s*["'][^"']*\bduration\b[^"']*["'][^>]*>[\s\S]*?</span>"#,
+                    with: "",
+                    options: .regularExpression
+                )
+                inner = inner.replacingOccurrences(
+                    of: #"<div[^>]*class\s*=\s*["'][^"']*\b(?:hd-text-icon|original-text-icon)\b[^"']*["'][^>]*>[\s\S]*?</div>"#,
+                    with: "",
+                    options: .regularExpression
+                )
+                let cleaned = Self.clean91PornTitle(inner)
+                if !cleaned.isEmpty { title = cleaned }
             }
             guard !title.isEmpty else { continue }
 
@@ -1120,8 +1163,6 @@ public final class VideoRepository: ObservableObject {
                 rankNumber: nil,
                 sourceName: "91视频"
             ))
-
-            index += 1
         }
 
         if category == "AI漫剧" {
@@ -1135,6 +1176,24 @@ public final class VideoRepository: ObservableObject {
         }
 
         return videos
+    }
+
+    private nonisolated static func clean91PornTitle(_ raw: String) -> String {
+        var text = raw.replacingOccurrences(of: #"<[^>]+>"#, with: " ", options: .regularExpression)
+        for _ in 0..<2 {
+            text = text
+                .replacingOccurrences(of: "&amp;", with: "&")
+                .replacingOccurrences(of: "&#039;", with: "'")
+                .replacingOccurrences(of: "&#39;", with: "'")
+                .replacingOccurrences(of: "&apos;", with: "'")
+                .replacingOccurrences(of: "&quot;", with: "\"")
+                .replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
+                .replacingOccurrences(of: "&nbsp;", with: " ")
+        }
+        return text
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     public static func unescapeJavaScriptString(_ value: String) -> String {
@@ -1176,10 +1235,12 @@ public final class VideoRepository: ObservableObject {
         var request = URLRequest(url: url)
         request.setValue("https://h1014.sol148.com/", forHTTPHeaderField: "Referer")
         request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
+        request.setValue("language=cn_CN; watch_times=1", forHTTPHeaderField: "Cookie")
+        request.setValue("zh-CN,zh;q=0.9", forHTTPHeaderField: "Accept-Language")
 
         let (data, response) = try await session.data(for: request)
         guard let httpResp = response as? HTTPURLResponse, (200...299).contains(httpResp.statusCode),
-              let html = String(data: data, encoding: .utf8) else {
+              let html = decodeHTML(data) else {
             throw NSError(domain: "VideoRepository", code: 502, userInfo: [NSLocalizedDescriptionKey: "无法加载 91视频 播放页"])
         }
 
@@ -1751,10 +1812,6 @@ public final class VideoRepository: ObservableObject {
             return try await resolveHTMLSourceStream(pageUrl: video.playbackUrl, source: VideoSourceCatalog.eporner, title: video.title)
         }
 
-        if sourceID == VideoSourceCatalog.javsb.id {
-            return try await resolveJavSbStream(pageUrl: video.playbackUrl, title: video.title)
-        }
-
         if let source = VideoSourceCatalog.allSources.first(where: { $0.id == sourceID }),
            VideoSourceCatalog.htmlAdapterSourceIDs.contains(source.id) {
             return try await resolveHTMLSourceStream(pageUrl: video.playbackUrl, source: source, title: video.title)
@@ -1835,82 +1892,11 @@ public final class VideoRepository: ObservableObject {
         throw VideoFeedError.malformedResponse(source: source.name)
     }
 
-    private func decodeHTML(_ data: Data) -> String? {
+    private nonisolated func decodeHTML(_ data: Data) -> String? {
         String(data: data, encoding: .utf8)
             ?? String(data: data, encoding: .shiftJIS)
             ?? String(data: data, encoding: .windowsCP1252)
             ?? String(data: data, encoding: .isoLatin1)
-    }
-
-    private func resolveJavSbStream(pageUrl: String, title: String) async throws -> PlaybackSourceResult {
-        guard let pageURL = URL(string: pageUrl) else {
-            throw VideoFeedError.invalidURL(source: "JAVSB")
-        }
-        var pageRequest = URLRequest(url: pageURL)
-        pageRequest.setValue("https://jav.sb/", forHTTPHeaderField: "Referer")
-        pageRequest.setValue("text/html,application/xhtml+xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
-        let data = try await requestFeedData(for: pageRequest, source: "JAVSB")
-        guard let html = decodeHTML(data) else {
-            throw VideoFeedError.malformedResponse(source: "JAVSB")
-        }
-
-        if let mediaURL = HTMLVideoSourceAdapter.extractMediaURL(from: html, pageURL: pageURL) {
-            return PlaybackSourceResult(url: mediaURL, referer: pageURL.absoluteString, title: title)
-        }
-
-        guard let srcRegex = try? NSRegularExpression(pattern: #"[?&]src=([A-Za-z0-9]{16,})"#) else {
-            throw VideoFeedError.malformedResponse(source: "JAVSB")
-        }
-        let nsHTML = html as NSString
-        guard let match = srcRegex.firstMatch(in: html, range: NSRange(location: 0, length: nsHTML.length)),
-              match.numberOfRanges > 1 else {
-            throw VideoFeedError.malformedResponse(source: "JAVSB")
-        }
-        let fileCode = nsHTML.substring(with: match.range(at: 1))
-
-        guard let tokenURL = URL(string: "https://jav.sb/token.php?file=\(fileCode)") else {
-            throw VideoFeedError.invalidURL(source: "JAVSB")
-        }
-        var tokenRequest = URLRequest(url: tokenURL)
-        tokenRequest.setValue("https://jav.sb/ja/static/player/videojs.html?src=\(fileCode)", forHTTPHeaderField: "Referer")
-        tokenRequest.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
-        let tokenData = try await requestFeedData(for: tokenRequest, source: "JAVSB")
-
-        guard let tokenJson = try? JSONSerialization.jsonObject(with: tokenData) as? [String: Any],
-              let token = tokenJson["token"] as? String,
-              let ts = tokenJson["ts"] else {
-            throw VideoFeedError.malformedResponse(source: "JAVSB")
-        }
-        let tsString = "\(ts)"
-
-        let currentSecond = Int(Date().timeIntervalSince1970)
-        let candidates = [currentSecond, Int(tsString) ?? currentSecond, currentSecond - 1, currentSecond + 1]
-
-        for sec in candidates {
-            let signature = JavSbSignature.createSignature(for: "\(fileCode)@\(sec)")
-            guard let cacheURL = URL(string: "https://jav.sb/save_m3u8_cache.php?file=\(fileCode)&token=\(token)&ts=\(tsString)&sign=\(signature)") else {
-                continue
-            }
-            var cacheRequest = URLRequest(url: cacheURL)
-            cacheRequest.setValue("https://jav.sb/ja/static/player/videojs.html?src=\(fileCode)", forHTTPHeaderField: "Referer")
-            cacheRequest.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
-            guard let cacheData = try? await requestFeedData(for: cacheRequest, source: "JAVSB"),
-                  let cacheJson = try? JSONSerialization.jsonObject(with: cacheData) as? [String: Any] else {
-                continue
-            }
-            if let sourceStr = cacheJson["source"] as? String, let sourceURL = URL(string: sourceStr) {
-                return PlaybackSourceResult(url: sourceURL, referer: "https://jav.sb/", title: title)
-            }
-            if let m3u8File = cacheJson["m3u8_file"] as? String {
-                let fullPath = m3u8File.hasPrefix("http") ? m3u8File : "https://jav.sb\(m3u8File.hasPrefix("/") ? "" : "/")\(m3u8File)"
-                let separator = fullPath.contains("?") ? "&" : "?"
-                if let streamURL = URL(string: "\(fullPath)\(separator)sign=\(signature)") {
-                    return PlaybackSourceResult(url: streamURL, referer: "https://jav.sb/", title: title)
-                }
-            }
-        }
-
-        throw VideoFeedError.malformedResponse(source: "JAVSB")
     }
 
     public nonisolated static func parseHuavodPlayLines(html: String, vodId: String, targetNid: Int) -> [String] {
@@ -2403,6 +2389,10 @@ public final class VideoRepository: ObservableObject {
         }
         if source.id == VideoSourceCatalog.beeg.id {
             request.setValue("https://beeg.com", forHTTPHeaderField: "Origin")
+        }
+        if source.id == VideoSourceCatalog.porn91.id {
+            request.setValue("language=cn_CN; watch_times=1", forHTTPHeaderField: "Cookie")
+            request.setValue("zh-CN,zh;q=0.9", forHTTPHeaderField: "Accept-Language")
         }
         let data = try await requestFeedData(for: request, source: source.name)
 
@@ -3127,32 +3117,5 @@ public final class VideoRepository: ObservableObject {
             }
         }
         return sorted
-    }
-}
-
-public enum JavSbSignature {
-    private static let alphabet = Array("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-    private static let xorKey: UInt8 = 0x7b
-
-    public static func createSignature(for value: String) -> String {
-        let bytes = Array(value.utf8).map { $0 ^ xorKey }
-        var number = Array(bytes)
-        while number.first == 0 { number.removeFirst() }
-        if number.isEmpty { return String(alphabet[0]) }
-
-        var result: [Character] = []
-        while !number.isEmpty {
-            var remainder = 0
-            var newDigits: [UInt8] = []
-            for byte in number {
-                let current = remainder * 256 + Int(byte)
-                let quotient = current / 62
-                remainder = current % 62
-                if !newDigits.isEmpty || quotient > 0 { newDigits.append(UInt8(quotient)) }
-            }
-            result.append(alphabet[remainder])
-            number = newDigits
-        }
-        return String(result.reversed())
     }
 }

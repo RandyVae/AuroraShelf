@@ -3,7 +3,7 @@ import http from 'http';
 import { URL } from 'url';
 
 const sources = [
-  // 视频源 (19 + 1)
+  // 视频源 (17 + 1)
   { type: '视频', id: 'huavod', name: '华视影院', url: 'https://huavod.com', referer: 'https://huavod.com/' },
   { 
     type: '视频', 
@@ -37,8 +37,6 @@ const sources = [
     },
     referer: 'https://jp.pornhub.com/' 
   },
-  { type: '视频', id: 'javnoni', name: 'JAV-NONI', url: 'https://javnoni.com', referer: 'https://javnoni.com/' },
-  { type: '视频', id: 'javsb', name: 'JAVSB', url: 'https://jav.sb', headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }, referer: 'https://jav.sb/' },
   { type: '视频', id: 'tokyomotion', name: 'TOKYO Motion', url: 'https://www.tokyomotion.net', referer: 'https://www.tokyomotion.net/' },
   { type: '视频', id: 'spankbang', name: 'SpankBang', url: 'https://www.spankbang.com', headers: { 'Cookie': 'age_pass=1; pg_interstitial_v5=1; player_quality=1080; backend_version=main' }, referer: 'https://www.spankbang.com/', expectedAntiBot: true },
   { type: '视频', id: 'xhamster', name: 'xHamster', url: 'https://xhamster.com', referer: 'https://xhamster.com/' },

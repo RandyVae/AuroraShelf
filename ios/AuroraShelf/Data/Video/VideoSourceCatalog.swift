@@ -178,26 +178,6 @@ public enum VideoSourceCatalog {
         isDirectConnect: false
     )
     
-    public static let javnoni = VideoSourceDefinition(
-        id: "javnoni",
-        name: "JAV-NONI",
-        group: .overseas,
-        description: "站点分类与搜索列表 · 原站详情页解析",
-        baseUrl: "https://javnoni.com",
-        categories: ["最新", "热门", "推荐"],
-        isDirectConnect: false
-    )
-    
-    public static let javsb = VideoSourceDefinition(
-        id: "javsb",
-        name: "JAVSB",
-        group: .overseas,
-        description: "榜单与搜索列表 · 原站详情页解析",
-        baseUrl: "https://jav.sb",
-        categories: ["最新", "热门", "推荐"],
-        isDirectConnect: false
-    )
-    
     public static let tokyomotion = VideoSourceDefinition(
         id: "tokyomotion",
         name: "TOKYO Motion",
@@ -268,11 +248,11 @@ public enum VideoSourceCatalog {
         isDirectConnect: false
     )
     
-    // 全量 20 个视频源列表（与 Android 端 100% 对齐）
+    // 全量 18 个视频源列表（与 Android 端 100% 对齐）
     public static let allSources: [VideoSourceDefinition] = [
         huavod, huangguo, porn91, dongman91,
         beeg, x134, xvideos, missav, kissjav,
-        po85, pornhub, javnoni, javsb,
+        po85, pornhub,
         tokyomotion, spankbang, xhamster,
         eporner, mrdouga, ohentai, xnxx
     ]
@@ -284,7 +264,7 @@ public enum VideoSourceCatalog {
 
     /// Sources routed through the shared HTML list/detail parser.
     public static let htmlAdapterSourceIDs: Set<String> = [
-        missav.id, kissjav.id, po85.id, pornhub.id, javnoni.id, javsb.id,
+        missav.id, kissjav.id, po85.id, pornhub.id,
         tokyomotion.id, spankbang.id, xhamster.id, mrdouga.id, ohentai.id, xnxx.id
     ]
 

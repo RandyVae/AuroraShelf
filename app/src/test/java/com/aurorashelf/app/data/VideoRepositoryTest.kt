@@ -525,4 +525,59 @@ class VideoRepositoryTest {
         val ranked = VideoRepository().rankSearchResults(listOf(huavodPartial, otherExact, huavodExact), "折月亮")
         assertEquals(listOf("h1", "o1", "h2"), ranked.map { it.id })
     }
+
+    @Test
+    fun parseDocument_extractsCleanTitleFrom91MobileVnameCard() {
+        val html = """
+            <article class="vitem well-sm well">
+              <a href="https://h1014.sol148.com/view_video.php?viewkey=c3b388d3235e18f0a0de&page=1">
+                <div class="thumb-overlay">
+                  <img class="img-responsive" src="https://1729130453.rsc.cdn77.org/thumb/1259960.jpg" />
+                  <div class="hd-text-icon">HD</div><div class="original-text-icon">91</div>
+                  <span class="duration">00:03:35</span>
+                </div>
+                <div class="vname">[原创] 干净的91移动端标题</div>
+              </a>
+            </article>
+        """.trimIndent()
+        val items = VideoRepository().parseDocument(
+            Jsoup.parse(html, "https://h1014.sol148.com/v.php?category=hot"),
+            "https://h1014.sol148.com",
+        )
+        assertEquals(1, items.size)
+        assertEquals("[原创] 干净的91移动端标题", items.single().title)
+        assertEquals("00:03:35", items.single().duration)
+        assertEquals("https://1729130453.rsc.cdn77.org/thumb/1259960.jpg", items.single().thumbnailUrl)
+    }
+
+    @Test
+    fun parseDocument_extractsCleanTitleFrom91VcapVciAndRotatedClasses() {
+        val html = """
+            <article class="vitem well-sm well">
+              <a href="https://h1014.sol148.com/view_video.php?viewkey=c3b388d3235e18f0a0de&page=1">
+                <div class="thumb-overlay">
+                  <img class="img-responsive" src="https://1729130453.rsc.cdn77.org/thumb/1259960.jpg" />
+                  <div class="hd-text-icon">HD</div><div class="original-text-icon">91</div>
+                  <span class="duration">00:03:35</span>
+                </div>
+                <div class="vcap"><i class="vci">轮换类名标题A</i></div>
+              </a>
+            </article>
+            <article class="vitem well-sm well">
+              <a href="https://h1014.sol148.com/view_video.php?viewkey=e65e12d4ba6c925d58a4&page=1">
+                <div class="thumb-overlay">
+                  <img class="img-responsive" src="https://1729130453.rsc.cdn77.org/thumb/1259929.jpg" />
+                  <div class="original-text-icon">91</div>
+                  <span class="duration">00:13:27</span>
+                </div>
+                <div class="rotated-cls"><span>未知新类名标题B</span></div>
+              </a>
+            </article>
+        """.trimIndent()
+        val items = VideoRepository().parseDocument(
+            Jsoup.parse(html, "https://h1014.sol148.com/v.php?category=hot"),
+            "https://h1014.sol148.com",
+        )
+        assertEquals(listOf("轮换类名标题A", "未知新类名标题B"), items.map { it.title })
+    }
 }

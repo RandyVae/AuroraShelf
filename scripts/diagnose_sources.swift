@@ -39,8 +39,6 @@ let probes: [SourceProbe] = [
     SourceProbe(type: "视频", name: "KissJAV", id: "kissjav", url: "https://kissjav.li/most-popular/?sort_by=rating"),
     SourceProbe(type: "视频", name: "85po", id: "85po", url: "https://www.85po.com/ja/latest-updates/"),
     SourceProbe(type: "视频", name: "Pornhub", id: "pornhub", url: "https://jp.pornhub.com/video?o=cm"),
-    SourceProbe(type: "视频", name: "JAV-NONI", id: "javnoni", url: "https://javnoni.com/"),
-    SourceProbe(type: "视频", name: "JAVSB", id: "javsb", url: "https://jav.sb/ja/"),
     SourceProbe(type: "视频", name: "TOKYO Motion", id: "tokyomotion", url: "https://www.tokyomotion.net/videos"),
     SourceProbe(type: "视频", name: "SpankBang", id: "spankbang", url: "https://www.spankbang.com/", headers: ["Cookie": "age_pass=1; pg_interstitial_v5=1; pg_pop_v5=1; player_quality=1080; preroll_skip=1; backend_version=main; videos_layout=four-col", "Accept-Language": "en-US,en;q=0.9"]),
     SourceProbe(type: "视频", name: "xHamster", id: "xhamster", url: "https://xhamster.com/best"),

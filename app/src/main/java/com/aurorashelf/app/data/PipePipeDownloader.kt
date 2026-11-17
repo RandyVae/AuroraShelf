@@ -36,8 +36,7 @@ internal class PipePipeDownloader : Downloader() {
         return try {
             client.newCall(request).execute()
         } catch (failure: IOException) {
-            val isRetryableTimeout = failure is java.net.SocketTimeoutException &&
-                !request.url.host.equals("jav.sb", ignoreCase = true)
+            val isRetryableTimeout = failure is java.net.SocketTimeoutException
             if (request.method !in IDEMPOTENT_METHODS || (!failure.isTransientTransportFailure() && !isRetryableTimeout)) {
                 throw failure
             }

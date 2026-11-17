@@ -25,20 +25,6 @@ enum HTMLVideoSourceAdapter {
             route = category.contains("热") ? "/video?o=mv&t=m" :
                 category.contains("推荐") ? "/video?o=tr&t=m" :
                 category.contains("4K") ? "/video?c=298" : "/video?o=cm"
-        case "javnoni":
-            let isChinese = category.contains("热") || category.contains("中字") || category.contains("字幕") || category.contains("中文")
-            let base = isChinese ? "/archives/category/uncensored" : category.contains("推荐") ? "/archives/tag/japan" : ""
-            route = page == 1 ? (base.isEmpty ? "/" : "\(base)/") : (base.isEmpty ? "/page/\(page)/" : "\(base)/page/\(page)/")
-        case "javsb":
-            if category.contains("排行") || category.contains("热") {
-                route = page == 1 ? "/ja/label/rank/by/hits_week.html" : "/ja/label/rank/by/hits_week/page/\(page).html"
-            } else if category.contains("精选") || category.contains("推荐") {
-                route = page == 1 ? "/ja/label/rank/by/score.html" : "/ja/label/rank/by/score/page/\(page).html"
-            } else if category.contains("最新") {
-                route = page == 1 ? "/ja/label/rank/by/time.html" : "/ja/label/rank/by/time/page/\(page).html"
-            } else {
-                route = page == 1 ? "/ja/" : "/ja/label/rank/by/hits_week/page/\(page).html"
-            }
         case "tokyomotion":
             route = category.contains("评分") || category.contains("收藏") || category.contains("推荐") ? "/videos?sort=rating" : category.contains("热") ? "/videos?sort=popular" : "/videos"
         case "kissjav":
@@ -115,12 +101,6 @@ enum HTMLVideoSourceAdapter {
         case "pornhub":
             components = URLComponents(string: baseURL(for: source) + "/video/search")
             components?.queryItems = [URLQueryItem(name: "search", value: query), URLQueryItem(name: "page", value: String(page))]
-        case "javnoni":
-            components = URLComponents(string: baseURL(for: source) + "/")
-            components?.queryItems = [URLQueryItem(name: "s", value: query), URLQueryItem(name: "paged", value: String(page))]
-        case "javsb":
-            components = URLComponents(string: baseURL(for: source) + "/ja/vod/search.html")
-            components?.queryItems = [URLQueryItem(name: "wd", value: query), URLQueryItem(name: "page", value: String(page))]
         case "tokyomotion":
             components = URLComponents(string: baseURL(for: source) + "/search")
             components?.queryItems = [URLQueryItem(name: "search_query", value: query), URLQueryItem(name: "search_type", value: "videos"), URLQueryItem(name: "page", value: String(page))]
@@ -168,8 +148,6 @@ enum HTMLVideoSourceAdapter {
         case "missav": return "https://missav.media"
         case "85po": return "https://www.85po.com"
         case "pornhub": return "https://jp.pornhub.com"
-        case "javnoni": return "https://javnoni.com"
-        case "javsb": return "https://jav.sb"
         case "tokyomotion": return "https://www.tokyomotion.net"
         case "kissjav": return "https://kissjav.li"
         case "spankbang": return "https://www.spankbang.com"
@@ -458,42 +436,12 @@ enum HTMLVideoSourceAdapter {
                 return nil
             }
             let isSameSource = sourceHost.map { frameHost == $0 || frameHost.hasSuffix(".\($0)") } ?? false
-            let isKnownJavnoniPlayer = source.id == "javnoni"
-                && javnoniPlayerHosts.contains(where: { frameHost == $0 || frameHost.hasSuffix(".\($0)") })
-            guard isSameSource || isKnownJavnoniPlayer else { return nil }
+            guard isSameSource else { return nil }
             return frameURL
         }
 
-        guard source.id == "javnoni",
-              let playerDataRegex = try? NSRegularExpression(pattern: #"(?is)<script\b[^>]*class\s*=\s*['\"][^'\"]*javhd-player-data[^'\"]*['\"][^>]*>(.*?)</script>"#),
-              let dataMatch = playerDataRegex.firstMatch(in: html, range: fullRange),
-              dataMatch.numberOfRanges > 1 else {
-            return frames
-        }
-        let json = decodeHTML(htmlNSString.substring(with: dataMatch.range(at: 1)))
-        guard let providers = try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]] else {
-            return frames
-        }
-        let externalFrames = providers.flatMap { $0["episodes"] as? [[String: Any]] ?? [] }
-            .compactMap { $0["url"] as? String }
-            .compactMap { URL(string: decodeHTML($0), relativeTo: pageURL)?.absoluteURL }
-            .filter { url in
-                guard let host = url.host?.lowercased() else { return false }
-                return javnoniPlayerHosts.contains(where: { host == $0 || host.hasSuffix(".\($0)") })
-            }
-        return frames + externalFrames
+        return frames
     }
-
-    private static let javnoniPlayerHosts: [String] = [
-        "luluvid.com",
-        "luluvdo.com",
-        "luluvido.com",
-        "lulustream.com",
-        "nuvorel.top",
-        "streamruby.com",
-        "doodstream.com",
-        "playmogo.com",
-    ]
 
     private static func isVideoPage(_ url: URL, source: VideoSourceDefinition) -> Bool {
         let path = url.path.lowercased()
@@ -524,8 +472,6 @@ enum HTMLVideoSourceAdapter {
             return !reserved.contains(last)
         case "85po": return path.contains("/v/")
         case "pornhub": return url.path.contains("view_video.php") && url.query?.contains("viewkey=") == true
-        case "javnoni": return path.contains("/archives/") && !path.contains("/category/") && !path.contains("/tag/")
-        case "javsb": return path.hasPrefix("/ja/jav/") || path.hasPrefix("/ja/video/") || path.hasPrefix("/video/")
         case "tokyomotion": return path.hasPrefix("/video/")
         case "kissjav", "mrdouga": return path.hasPrefix("/video/")
         case "spankbang": return path.contains("/video/") || path.contains("/v/")

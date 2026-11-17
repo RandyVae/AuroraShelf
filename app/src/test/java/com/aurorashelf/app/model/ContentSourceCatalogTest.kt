@@ -15,11 +15,12 @@ class ContentSourceCatalogTest {
     fun exposesAllVendoredPipePipeServicesWithUsableKiosks() {
         val pipeSources = ContentSourceCatalog.sources.filter { it.extractorServiceName != null }
         val expectedServices = setOf(
-            "MissAV", "KissJAV", "85po", "Pornhub", "JAV-NONI", "JAVSB", "TOKYO Motion",
+            "MissAV", "KissJAV", "85po", "Pornhub", "TOKYO Motion",
             "SpankBang", "xHamster", "XVideos", "EPORNER", "MRDOUGA", "OHentai", "XNXX",
         )
 
         assertEquals(expectedServices, pipeSources.map(ContentSource::name).toSet())
+        assertTrue(ContentSourceCatalog.sources.none { it.name == "JAV-NONI" || it.name == "JAVSB" })
         assertEquals(pipeSources.size, pipeSources.map(ContentSource::id).distinct().size)
         assertTrue(pipeSources.all { it.baseUrl.startsWith("https://") && it.kioskIds.isNotEmpty() })
     }

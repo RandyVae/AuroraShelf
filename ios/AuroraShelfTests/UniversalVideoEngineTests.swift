@@ -121,7 +121,7 @@ final class UniversalVideoEngineTests: XCTestCase {
 
     func testHTMLSourceAdapterDoesNotMistakeThumbnailVideoForPlayback() throws {
         let html = #"<img src="https://cdn.example/preview.mp4"><script>var trailer="https://cdn.example/trailer.mp4";</script>"#
-        let pageURL = try XCTUnwrap(URL(string: "https://jav.sb/ja/jav/title.html"))
+        let pageURL = try XCTUnwrap(URL(string: "https://missav.media/ja/title"))
 
         XCTAssertNil(HTMLVideoSourceAdapter.extractMediaURL(from: html, pageURL: pageURL))
     }
@@ -180,16 +180,6 @@ final class UniversalVideoEngineTests: XCTestCase {
         )
     }
 
-    func testJAVSBParserKeepsAllSameSitePlayerFallbacksInOrder() throws {
-        let html = #"<iframe src="/ja/static/player/videojs.html?src=first"></iframe><iframe src="/videojs/300.php"></iframe><iframe src="/videojs/strip.php"></iframe><iframe src="https://ads.example/player"></iframe>"#
-        let pageURL = try XCTUnwrap(URL(string: "https://jav.sb/ja/jav/sample.html"))
-
-        XCTAssertEqual(
-            HTMLVideoSourceAdapter.playerFrameURLs(from: html, pageURL: pageURL, source: VideoSourceCatalog.javsb).map(\.path),
-            ["/ja/static/player/videojs.html", "/videojs/300.php", "/videojs/strip.php"]
-        )
-    }
-
     func testMissAVVIPNavigationIsNotParsedAsVideo() {
         let html = #"<a href="/ja/vip" title="VIP"></a><a href="/ja/real-video-title" title="Real video"></a>"#
 
@@ -204,8 +194,6 @@ final class UniversalVideoEngineTests: XCTestCase {
             ("kissjav", #"<a href="/video/123/sample/" title="KissJAV title"><img src="/cover.jpg"></a>"#),
             ("85po", #"<a href="/ja/v/37156.html" title="85po title"><img src="/cover.jpg"></a>"#),
             ("pornhub", #"<a href="/view_video.php?viewkey=abc123" title="Pornhub title"><img src="/cover.jpg"></a>"#),
-            ("javnoni", #"<a href="/archives/sample-title/" title="JAV-NONI title"><img src="/cover.jpg"></a>"#),
-            ("javsb", #"<a href="/ja/jav/sample-title.html" title="JAVSB title"><img src="/cover.jpg"></a>"#),
             ("tokyomotion", #"<a href="/video/7168663/sample" title="Tokyo title"><img src="/cover.jpg"></a>"#),
             ("spankbang", #"<a href="/video/123/sample" title="SpankBang title"><img src="/cover.jpg"></a>"#),
             ("xhamster", #"<a href="/videos/sample-xh123" title="xHamster title"><img src="/cover.jpg"></a>"#),
@@ -234,15 +222,6 @@ final class UniversalVideoEngineTests: XCTestCase {
         XCTAssertEqual(videos.first?.coverUrl, "https://cdn.example/thumbnail.jpg")
     }
 
-    func testJAVSBParserDoesNotTreatCategoryPagesAsVideoDetails() {
-        let html = #"<a href="/ja/javtype/Censored.html" title="Censored category">Censored</a><div><a href="/ja/jav/dandy-479-vol-12-1-1.html" title="JAV title"><img src="/cover.jpg"></a></div>"#
-
-        let videos = HTMLVideoSourceAdapter.parseHTMLFeed(html, source: VideoSourceCatalog.javsb, category: "全部")
-
-        XCTAssertEqual(videos.map(\.title), ["JAV title"])
-        XCTAssertTrue(videos.first?.playbackUrl.contains("/ja/jav/") == true)
-    }
-
     func testXNXXFeedUsesLiveBestListRouteInsteadOfEmptyHomeOr404LatestPath() throws {
         let source = VideoSourceCatalog.xnxx
 
@@ -263,19 +242,6 @@ final class UniversalVideoEngineTests: XCTestCase {
     }
 
     func testHTMLVideoSourceAdapterPageTwoRoutesMatchSiteConventions() throws {
-        // JAVSB uses path pagination; query params cause 404 or empty redirect
-        let javsbRank = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.javsb, category: "排行", page: 2))
-        XCTAssertEqual(javsbRank.path, "/ja/label/rank/by/hits_week/page/2.html")
-        XCTAssertNil(javsbRank.query)
-
-        let javsbScore = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.javsb, category: "精选", page: 2))
-        XCTAssertEqual(javsbScore.path, "/ja/label/rank/by/score/page/2.html")
-        XCTAssertNil(javsbScore.query)
-
-        let javsbAll = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.javsb, category: "全部", page: 2))
-        XCTAssertEqual(javsbAll.path, "/ja/label/rank/by/hits_week/page/2.html")
-        XCTAssertNil(javsbAll.query)
-
         // 85po uses trailing slash path pagination
         let po85Latest = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.po85, category: "最近更新", page: 2))
         XCTAssertEqual(po85Latest.path, "/ja/latest-updates/2")
@@ -291,12 +257,6 @@ final class UniversalVideoEngineTests: XCTestCase {
         let xnxxPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.xnxx, category: "全部", page: 2))
         XCTAssertEqual(xnxxPage2.path, "/best/2")
         XCTAssertNil(xnxxPage2.query)
-
-        // JAV-NONI uses WordPress /page/2/ path
-        let javnoniPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.javnoni, category: "中文字幕", page: 2))
-        XCTAssertEqual(javnoniPage2.path, "/archives/category/uncensored/page/2")
-        XCTAssertTrue(javnoniPage2.absoluteString.hasSuffix("/archives/category/uncensored/page/2/"))
-        XCTAssertNil(javnoniPage2.query)
 
         // KissJAV uses path before query
         let kissjavPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.kissjav, category: "新片", page: 2))
@@ -331,9 +291,6 @@ final class UniversalVideoEngineTests: XCTestCase {
         XCTAssertEqual(URLComponents(url: pornHubLatest, resolvingAgainstBaseURL: false)?.query, "o=cm")
         XCTAssertEqual(URLComponents(url: pornHubPopular, resolvingAgainstBaseURL: false)?.query, "o=mv&t=m")
         XCTAssertEqual(URLComponents(url: pornHubRecommended, resolvingAgainstBaseURL: false)?.query, "o=tr&t=m")
-
-        let javsbRecommended = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.javsb, category: "推荐"))
-        XCTAssertEqual(javsbRecommended.path, "/ja/label/rank/by/score.html")
     }
 
     func testEPORNERFeedDecoderUsesLiveAPIFields() throws {
@@ -367,7 +324,7 @@ final class UniversalVideoEngineTests: XCTestCase {
                 source.id
             )
         }
-        XCTAssertEqual(VideoSourceCatalog.searchableSources.count, 19)
+        XCTAssertEqual(VideoSourceCatalog.searchableSources.count, 17)
         XCTAssertFalse(VideoSourceCatalog.searchableSourceIDs.contains(VideoSourceCatalog.beeg.id))
     }
 
@@ -377,8 +334,7 @@ final class UniversalVideoEngineTests: XCTestCase {
             (VideoSourceCatalog.huangguo, "/search", "keyword", "测试 搜索"),
             (VideoSourceCatalog.porn91, "/search_result.php", "search_id", "测试 搜索"),
             (VideoSourceCatalog.dongman91, "/search-result/", "q", "测试 搜索"),
-            (VideoSourceCatalog.missav, "/ja/search/测试 搜索", "", "测试 搜索"),
-            (VideoSourceCatalog.javsb, "/ja/vod/search.html", "wd", "测试 搜索")
+            (VideoSourceCatalog.missav, "/ja/search/测试 搜索", "", "测试 搜索")
         ]
 
         for (source, path, queryName, queryValue) in cases {
@@ -564,10 +520,64 @@ final class UniversalVideoEngineTests: XCTestCase {
         XCTAssertEqual(VideoRepository.unescapeJavaScriptString(unicodeTest), "中文 video")
     }
 
-    func testJavSbStreamSignatureMatchesKnownVector() {
-        let testVal = "22a7902ff093f509ed4aba25768d4d11@1793888601"
-        let signature = JavSbSignature.createSignature(for: testVal)
-        XCTAssertEqual(signature, "6ZFINbkpMCtKSeSlybypbVpVYF0CQf1g0KfhV57GIckytOBRCsrFO5RkZc")
+    func test91PornParsesBothMobileVitemAndDesktopWellCardsWithDeduplication() {
+        let html = """
+        <style>.vitem{text-align:left}</style>
+        <article class="vitem well-sm well">
+          <a href="https://h1014.sol148.com/view_video.php?viewkey=e65e12d4ba6c925d58a4&page=1">
+            <img class="img-responsive" src="https://1729130453.rsc.cdn77.org/thumb/1259929.jpg" />
+            <span class="duration">00:13:27</span>
+            <div class="vname">移动端卡片标题 &amp;#039;精选&amp;#039;</div>
+          </a>
+        </article>
+        <article class="vitem well-sm well">
+          <a href="https://h1014.sol148.com/view_video.php?viewkey=e65e12d4ba6c925d58a4&c=dup">
+            <img class="img-responsive" src="https://1729130453.rsc.cdn77.org/thumb/1259929.jpg" />
+            <span class="duration">00:13:27</span>
+            <div class="vname">重复卡片应去重</div>
+          </a>
+        </article>
+        <div class="well well-sm">
+          <a href="view_video.php?viewkey=41f25e30ad90fb74a354&c=cvgqa">
+            <img class="img-responsive" src="https://1729130453.rsc.cdn77.org/thumb/1225110.jpg" />
+            <span class="duration">00:05:11</span>
+            <span class="video-title title-truncate m-t-5">
+              搜索页经典标题
+            </span>
+          </a>
+        </div>
+        <article class="vitem well-sm well">
+          <a href="https://h1014.sol148.com/view_video.php?viewkey=c3b388d3235e18f0a0de&page=1">
+            <div class="thumb-overlay">
+              <img class="img-responsive" src="https://1729130453.rsc.cdn77.org/thumb/1259960.jpg" />
+              <div class="hd-text-icon">HD</div><div class="original-text-icon">91</div>
+              <span class="duration">00:03:35</span>
+            </div>
+            <div class="vcap"><i class="vci">轮换类名标题A</i></div>
+          </a>
+        </article>
+        <article class="vitem well-sm well">
+          <a href="https://h1014.sol148.com/view_video.php?viewkey=9999999999999999aaaa&page=1">
+            <div class="thumb-overlay">
+              <img class="img-responsive" src="https://1729130453.rsc.cdn77.org/thumb/1260000.jpg" />
+              <div class="original-text-icon">91</div>
+              <span class="duration">00:08:00</span>
+            </div>
+            <div class="rotated-future"><i class="x123">未来轮换类名标题B</i></div>
+          </a>
+        </article>
+        """
+
+        let videos = VideoRepository.shared.parse91PornHtml(html, category: "当前最热")
+        XCTAssertEqual(videos.count, 4)
+        XCTAssertEqual(videos[0].title, "移动端卡片标题 '精选'")
+        XCTAssertEqual(videos[0].duration, "00:13:27")
+        XCTAssertEqual(videos[0].coverUrl, "https://1729130453.rsc.cdn77.org/thumb/1259929.jpg")
+        XCTAssertEqual(videos[0].playbackUrl, "https://h1014.sol148.com/view_video.php?viewkey=e65e12d4ba6c925d58a4")
+        XCTAssertEqual(videos[1].title, "搜索页经典标题")
+        XCTAssertEqual(videos[1].duration, "00:05:11")
+        XCTAssertEqual(videos[2].title, "轮换类名标题A")
+        XCTAssertEqual(videos[3].title, "未来轮换类名标题B")
     }
 
     func testMissAvExtractsPackedEvalStream() {
@@ -624,12 +634,6 @@ final class UniversalVideoEngineTests: XCTestCase {
         let page2 = HTMLVideoSourceAdapter.feedURL(for: kissjav, category: "新片", page: 2)
         XCTAssertEqual(page1?.absoluteString, "https://kissjav.li/latest-updates/")
         XCTAssertEqual(page2?.absoluteString, "https://kissjav.li/latest-updates/2/")
-
-        let javsb = VideoSourceCatalog.allSources.first { $0.id == "javsb" }!
-        let javsbPage1 = HTMLVideoSourceAdapter.feedURL(for: javsb, category: "精选", page: 1)
-        let javsbPage2 = HTMLVideoSourceAdapter.feedURL(for: javsb, category: "精选", page: 2)
-        XCTAssertEqual(javsbPage1?.absoluteString, "https://jav.sb/ja/label/rank/by/score.html")
-        XCTAssertEqual(javsbPage2?.absoluteString, "https://jav.sb/ja/label/rank/by/score/page/2.html")
 
         let missav = VideoSourceCatalog.allSources.first { $0.id == "missav" }!
         let missavPage1 = HTMLVideoSourceAdapter.feedURL(for: missav, category: "热门", page: 1)
