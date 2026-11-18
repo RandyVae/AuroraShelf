@@ -241,14 +241,22 @@ SSH_OPTS=(
   -o ControlPath=/tmp/netgrey-ota-%r@%h:%p
   -o ControlPersist=60s
 )
-SSHPASS_BIN=""
+ASKPASS_SCRIPT=""
+cleanup_ssh_helpers() {
+  if [ -n "${ASKPASS_SCRIPT}" ] && [ -f "${ASKPASS_SCRIPT}" ]; then
+    rm -f "${ASKPASS_SCRIPT}"
+  fi
+}
+trap cleanup_ssh_helpers EXIT
+
 if [ -n "${SERVER_PASS}" ]; then
   SSH_OPTS+=(-o PubkeyAuthentication=no)
-  SSHPASS_BIN="$(command -v sshpass 2>/dev/null || echo "/opt/homebrew/bin/sshpass")"
-  if [ ! -x "${SSHPASS_BIN}" ]; then
-    echo "错误: 已配置 SERVER_PASS 但未找到可执行的 sshpass" >&2
-    exit 1
-  fi
+  ASKPASS_SCRIPT="$(mktemp)"
+  chmod 700 "${ASKPASS_SCRIPT}"
+  cat > "${ASKPASS_SCRIPT}" <<'EOF'
+#!/bin/sh
+printf '%s\n' "${SSHPASS}"
+EOF
 fi
 
 REMOTE_HOST="${SERVER_USER}@${SERVER_IP}"
@@ -257,7 +265,8 @@ run_scp() {
   local src="$1"
   local dest="$2"
   if [ -n "${SERVER_PASS}" ]; then
-    SSHPASS="${SERVER_PASS}" "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${src}" "${REMOTE_HOST}:${dest}"
+    SSHPASS="${SERVER_PASS}" SSH_ASKPASS="${ASKPASS_SCRIPT}" SSH_ASKPASS_REQUIRE=force DISPLAY="${DISPLAY:-:0}" \
+      scp "${SSH_OPTS[@]}" "${src}" "${REMOTE_HOST}:${dest}"
   else
     scp "${SSH_OPTS[@]}" "${src}" "${REMOTE_HOST}:${dest}"
   fi
@@ -266,7 +275,8 @@ run_scp() {
 run_ssh() {
   local cmd="$1"
   if [ -n "${SERVER_PASS}" ]; then
-    SSHPASS="${SERVER_PASS}" "${SSHPASS_BIN}" -e ssh "${SSH_OPTS[@]}" "${REMOTE_HOST}" "${cmd}"
+    SSHPASS="${SERVER_PASS}" SSH_ASKPASS="${ASKPASS_SCRIPT}" SSH_ASKPASS_REQUIRE=force DISPLAY="${DISPLAY:-:0}" \
+      ssh "${SSH_OPTS[@]}" "${REMOTE_HOST}" "${cmd}"
   else
     ssh "${SSH_OPTS[@]}" "${REMOTE_HOST}" "${cmd}"
   fi

@@ -8,11 +8,13 @@ public struct CategoryShelfView: View {
     public let onSeeAll: (String) -> Void
     public let onSelectVideo: (VideoItem) -> Void
     public var onDetailVideo: ((VideoItem) -> Void)?
+    @ObservedObject private var locManager = LocalizationManager.shared
+    @Environment(\.auroraContainerSize) private var containerSize
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var cardWidth: CGFloat {
-        let form = DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
+        let form = DeviceLayout.resolveCurrent(containerSize: containerSize, horizontalSizeClass: horizontalSizeClass)
         let base = DeviceLayout.posterCardWidth(for: form)
         return dynamicTypeSize.isAccessibilitySize ? max(base, 190) : base
     }
@@ -35,7 +37,7 @@ public struct CategoryShelfView: View {
             HStack(alignment: .firstTextBaseline) {
                 Button(action: { onSeeAll(shelf.category) }) {
                     HStack(spacing: 6) {
-                        Text(shelf.category)
+                        Text(shelf.category.localizedCategoryLabel)
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundStyle(AuroraColor.textPrimary)
@@ -45,9 +47,12 @@ public struct CategoryShelfView: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(AuroraColor.textTertiary)
                     }
+                    .frame(minHeight: AuroraMetrics.minTouchTarget)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .hoverEffect(.highlight)
+                .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
@@ -60,7 +65,9 @@ public struct CategoryShelfView: View {
                             .font(.caption2)
                             .fontWeight(.bold)
                     }
-                    .foregroundStyle(AuroraColor.brand)
+                    .foregroundStyle(AuroraColor.brandLabel)
+                    .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .hoverEffect(.highlight)

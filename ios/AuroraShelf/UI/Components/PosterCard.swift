@@ -56,9 +56,9 @@ public struct PosterCard: View {
                 }
                 .contentShape(Rectangle())
             }
+            .auroraZoomSource("video:\(video.id)")
             .buttonStyle(AppleSpringCardButtonStyle())
-            .hoverEffect(.lift)
-            .accessibilityLabel("播放\(video.title)")
+            .accessibilityLabel("card.play_a11y".localized(video.title))
 
             Button(action: onSelect) {
                 Text(video.title)
@@ -98,7 +98,7 @@ public struct PosterCard: View {
                 Button {
                     onDetail()
                 } label: {
-                    Label("查看详情", systemImage: "info.circle")
+                    Label("hero.details_a11y".localized, systemImage: "info.circle")
                 }
             }
             Button {
@@ -112,13 +112,13 @@ public struct PosterCard: View {
                 }
             } label: {
                 Label(
-                    WatchlistStore.shared.contains(video) ? "从片单移除" : "加入片单",
+                    WatchlistStore.shared.contains(video) ? "watchlist.remove".localized : "watchlist.add".localized,
                     systemImage: WatchlistStore.shared.contains(video) ? "bookmark.fill" : "bookmark"
                 )
             }
             if let url = URL(string: video.playbackUrl), !video.playbackUrl.isEmpty {
                 ShareLink(item: url) {
-                    Label("分享视频", systemImage: "square.and.arrow.up")
+                    Label("card.share_video".localized, systemImage: "square.and.arrow.up")
                 }
             }
         } preview: {

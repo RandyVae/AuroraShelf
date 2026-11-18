@@ -1,8 +1,11 @@
 import SwiftUI
+import UIKit
 
 public struct MainContainerView: View {
     @ObservedObject private var locManager = LocalizationManager.shared
     @AppStorage("aurora_theme_mode") private var themeModeRaw: String = AuroraThemeMode.system.rawValue
+    @Environment(\.appearsActive) private var appearsActive
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedTab: MainTab = .home
     @State private var playerCoordinator = PlayerCoordinator.shared
     @State private var showSearchSheet: Bool = false
@@ -10,9 +13,17 @@ public struct MainContainerView: View {
     @State private var searchInitialScope: SearchSheetView.SearchScope = .video
     @State private var measuredWindowSize: CGSize = DeviceLayout.currentWindowSize
     @State private var autoPlayTask: Task<Void, Never>?
-    
+
     public init() {
         let args = ProcessInfo.processInfo.arguments
+        if let langIdx = args.firstIndex(of: "--lang"), langIdx + 1 < args.count,
+           let parsedLang = AppLanguage(rawValue: args[langIdx + 1]) {
+            LocalizationManager.shared.setLanguage(parsedLang)
+        }
+        if let themeIdx = args.firstIndex(of: "--theme"), themeIdx + 1 < args.count,
+           let parsedTheme = AuroraThemeMode(rawValue: args[themeIdx + 1]) {
+            UserDefaults.standard.set(parsedTheme.rawValue, forKey: "aurora_theme_mode")
+        }
         if let idx = args.firstIndex(of: "--tab"), idx + 1 < args.count {
             let tabArg = args[idx + 1].lowercased()
             switch tabArg {
@@ -24,6 +35,13 @@ public struct MainContainerView: View {
                 _selectedTab = State(initialValue: .forum)
             case "personal", "my", "wode", "profile":
                 _selectedTab = State(initialValue: .profile)
+            case "search":
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    _selectedTab = State(initialValue: .search)
+                } else {
+                    _selectedTab = State(initialValue: .home)
+                    _showSearchSheet = State(initialValue: true)
+                }
             default:
                 _selectedTab = State(initialValue: .home)
             }
@@ -33,7 +51,7 @@ public struct MainContainerView: View {
     private var activePreferredColorScheme: ColorScheme? {
         AuroraThemeMode(rawValue: themeModeRaw)?.preferredColorScheme
     }
-    
+
     public var body: some View {
         @Bindable var coordinator = playerCoordinator
 
@@ -44,28 +62,101 @@ public struct MainContainerView: View {
                 return false
             },
             rootContent: {
-                TabView(selection: $selectedTab) {
-            NavigationStack {
-                HomeScreen(
-                    onPlayVideo: { video in
-                        coordinator.play(video)
-                    },
-                    onOpenSearch: {
-                        searchInitialQuery = ""
-                        searchInitialScope = .video
-                        showSearchSheet = true
-                    },
-                    onOpenAccount: {
-                        selectedTab = .profile
-                    },
-                    onOpenSearchWithKeyword: { keyword in
-                        searchInitialQuery = keyword
-                        searchInitialScope = .video
-                        showSearchSheet = true
-                    }
-                )
+                mainTabHierarchy(coordinator: coordinator)
+            },
+            destinationContent: { route in
+                immersiveDestinationView(for: route, coordinator: coordinator)
+                    .id(route)
+                    .tint(AuroraColor.brand)
+                    .environment(\.locale, locManager.activeLocale)
+                    .environment(\.auroraContainerSize, measuredWindowSize)
             }
-            .tabItem {
+        )
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { _, newSize in
+            if newSize.width > 0 && newSize.height > 0 {
+                measuredWindowSize = newSize
+            }
+        }
+        .onChange(of: coordinator.requestedTab) { _, target in
+            guard let target else { return }
+            selectedTab = target
+            coordinator.requestedTab = nil
+        }
+        .onChange(of: coordinator.openSearchTrigger) { _, _ in
+            let incomingQuery = coordinator.requestedSearchQuery ?? ""
+            if let rawScope = coordinator.requestedSearchScope,
+               let parsedScope = SearchSheetView.SearchScope(rawValue: rawScope) {
+                searchInitialScope = parsedScope
+            } else {
+                switch selectedTab {
+                case .comics: searchInitialScope = .comic
+                case .live: searchInitialScope = .live
+                case .forum: searchInitialScope = .forum
+                default: searchInitialScope = .video
+                }
+            }
+            if incomingQuery.isEmpty, horizontalSizeClass == .regular {
+                selectedTab = .search
+            } else {
+                searchInitialQuery = incomingQuery
+                showSearchSheet = true
+            }
+            coordinator.requestedSearchQuery = nil
+            coordinator.requestedSearchScope = nil
+        }
+        .onChange(of: coordinator.refreshActiveTabTrigger) { _, _ in
+            switch selectedTab {
+            case .home:
+                VideoRepository.shared.loadFeed(for: VideoRepository.shared.currentSource, category: VideoRepository.shared.currentCategory)
+            case .comics:
+                ComicRepository.shared.loadComics(for: ComicRepository.shared.currentSource)
+            case .live:
+                LiveRepository.shared.loadStreams()
+            case .forum:
+                ForumRepository.shared.loadPosts()
+            case .profile, .search:
+                break
+            }
+        }
+        .preferredColorScheme(activePreferredColorScheme)
+        .ignoresSafeArea()
+    }
+
+    private func triggerSearch(scope: SearchSheetView.SearchScope) {
+        searchInitialQuery = ""
+        searchInitialScope = scope
+        if horizontalSizeClass == .regular {
+            selectedTab = .search
+        } else {
+            showSearchSheet = true
+        }
+    }
+
+    @ViewBuilder
+    private func mainTabHierarchy(coordinator: PlayerCoordinator) -> some View {
+        let baseTabs = TabView(selection: $selectedTab) {
+            Tab(value: MainTab.home) {
+                NavigationStack {
+                    HomeScreen(
+                        onPlayVideo: { video in
+                            coordinator.play(video)
+                        },
+                        onOpenSearch: {
+                            triggerSearch(scope: .video)
+                        },
+                        onOpenAccount: {
+                            selectedTab = .profile
+                        },
+                        onOpenSearchWithKeyword: { keyword in
+                            searchInitialQuery = keyword
+                            searchInitialScope = .video
+                            showSearchSheet = true
+                        }
+                    )
+                }
+            } label: {
                 Label {
                     Text(MainTab.home.title)
                 } icon: {
@@ -76,59 +167,87 @@ public struct MainContainerView: View {
                     #endif
                 }
             }
-            .tag(MainTab.home)
-            
-            NavigationStack {
-                ComicsScreen(onOpenSearch: {
-                    searchInitialQuery = ""
-                    searchInitialScope = .comic
-                    showSearchSheet = true
-                })
+
+            Tab(
+                MainTab.comics.title,
+                systemImage: selectedTab == .comics ? MainTab.comics.selectedIconName : MainTab.comics.iconName,
+                value: MainTab.comics
+            ) {
+                NavigationStack {
+                    ComicsScreen(onOpenSearch: {
+                        triggerSearch(scope: .comic)
+                    })
+                }
             }
-            .tabItem {
-                Label(MainTab.comics.title, systemImage: selectedTab == .comics ? MainTab.comics.selectedIconName : MainTab.comics.iconName)
+
+            Tab(
+                MainTab.live.title,
+                systemImage: selectedTab == .live ? MainTab.live.selectedIconName : MainTab.live.iconName,
+                value: MainTab.live
+            ) {
+                NavigationStack {
+                    LiveScreen(onOpenSearch: {
+                        triggerSearch(scope: .live)
+                    })
+                }
             }
-            .tag(MainTab.comics)
-            
-            NavigationStack {
-                LiveScreen(onOpenSearch: {
-                    searchInitialQuery = ""
-                    searchInitialScope = .live
-                    showSearchSheet = true
-                })
+
+            Tab(
+                MainTab.forum.title,
+                systemImage: selectedTab == .forum ? MainTab.forum.selectedIconName : MainTab.forum.iconName,
+                value: MainTab.forum
+            ) {
+                NavigationStack {
+                    ForumScreen(onOpenSearch: {
+                        triggerSearch(scope: .forum)
+                    })
+                }
             }
-            .tabItem {
-                Label(MainTab.live.title, systemImage: selectedTab == .live ? MainTab.live.selectedIconName : MainTab.live.iconName)
+
+            Tab(
+                MainTab.profile.title,
+                systemImage: selectedTab == .profile ? MainTab.profile.selectedIconName : MainTab.profile.iconName,
+                value: MainTab.profile
+            ) {
+                NavigationStack {
+                    PersonalScreen(onPlayVideo: { video in
+                        coordinator.play(video)
+                    })
+                }
             }
-            .tag(MainTab.live)
-            
-            NavigationStack {
-                ForumScreen(onOpenSearch: {
-                    searchInitialQuery = ""
-                    searchInitialScope = .forum
-                    showSearchSheet = true
-                })
+
+            if horizontalSizeClass == .regular {
+                Tab(value: MainTab.search, role: .search) {
+                    SearchSheetView(
+                        initialQuery: searchInitialQuery,
+                        initialScope: searchInitialScope,
+                        isEmbeddedInTab: true,
+                        onPlayVideo: { video in
+                            coordinator.play(video)
+                        },
+                        onSelectComic: { comic in
+                            coordinator.openComic(comic)
+                        },
+                        onSelectLive: { stream in
+                            let related = LiveRepository.shared.liveStreams.filter { $0.id != stream.id }
+                            coordinator.openLive(stream, relatedStreams: related)
+                        },
+                        onSelectForumPost: { post in
+                            coordinator.openForumPost(post)
+                        },
+                        onDismiss: {
+                            selectedTab = .home
+                        }
+                    )
+                }
             }
-            .tabItem {
-                Label(MainTab.forum.title, systemImage: selectedTab == .forum ? MainTab.forum.selectedIconName : MainTab.forum.iconName)
-            }
-            .tag(MainTab.forum)
-            
-            NavigationStack {
-                PersonalScreen(onPlayVideo: { video in
-                    coordinator.play(video)
-                })
-            }
-            .tabItem {
-                Label(MainTab.profile.title, systemImage: selectedTab == .profile ? MainTab.profile.selectedIconName : MainTab.profile.iconName)
-            }
-            .tag(MainTab.profile)
         }
-        .id(locManager.selectedLanguage.rawValue)
         .tabViewStyle(.sidebarAdaptable)
+        .tabBarMinimizeBehavior(.onScrollDown)
         .tabViewSidebarHeader {
             HStack {
                 NetgreyLogoView()
+                    .opacity(appearsActive ? 1.0 : 0.62)
                 Spacer()
             }
             .padding(.horizontal, 16)
@@ -141,6 +260,7 @@ public struct MainContainerView: View {
             SearchSheetView(
                 initialQuery: searchInitialQuery,
                 initialScope: searchInitialScope,
+                isEmbeddedInTab: false,
                 onPlayVideo: { video in
                     showSearchSheet = false
                     searchInitialQuery = ""
@@ -190,8 +310,10 @@ public struct MainContainerView: View {
                 selectedTab = .forum
             } else if args.contains("--tab-profile") {
                 selectedTab = .profile
+            } else if args.contains("--tab-search") {
+                triggerSearch(scope: .video)
             }
-            
+
             if args.contains("--auto-play") {
                 selectedTab = .home
                 autoPlayTask?.cancel()
@@ -215,34 +337,15 @@ public struct MainContainerView: View {
                 selectedTab = .profile
             }
             if args.contains("--open-search") {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    showSearchSheet = true
-                }
+                triggerSearch(scope: .video)
             }
         }
         .onDisappear {
             autoPlayTask?.cancel()
             autoPlayTask = nil
         }
-            },
-            destinationContent: { route in
-                immersiveDestinationView(for: route, coordinator: coordinator)
-                    .id(route)
-                    .tint(AuroraColor.brand)
-                    .environment(\.locale, locManager.activeLocale)
-                    .environment(\.auroraContainerSize, measuredWindowSize)
-            }
-        )
-        .onGeometryChange(for: CGSize.self) { proxy in
-            proxy.size
-        } action: { _, newSize in
-            if newSize.width > 0 && newSize.height > 0 {
-                measuredWindowSize = newSize
-                DeviceLayout.updateMeasuredWindowSize(newSize)
-            }
-        }
-        .preferredColorScheme(activePreferredColorScheme)
-        .ignoresSafeArea()
+
+        baseTabs
     }
 
     @ViewBuilder
@@ -341,11 +444,11 @@ final class ImmersiveNavigationController: UINavigationController {
     }
 }
 
-private struct ImmersiveNavigationHost<Route: Hashable, RootContent: View, DestinationContent: View>: UIViewControllerRepresentable {
-    @Binding var activeRoute: Route?
-    let showsNavigationBar: (Route) -> Bool
+private struct ImmersiveNavigationHost<RootContent: View, DestinationContent: View>: UIViewControllerRepresentable {
+    @Binding var activeRoute: AppImmersiveRoute?
+    let showsNavigationBar: (AppImmersiveRoute) -> Bool
     @ViewBuilder let rootContent: () -> RootContent
-    @ViewBuilder let destinationContent: (Route) -> DestinationContent
+    @ViewBuilder let destinationContent: (AppImmersiveRoute) -> DestinationContent
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -374,23 +477,29 @@ private struct ImmersiveNavigationHost<Route: Hashable, RootContent: View, Desti
                     destVC.rootView = destinationContent(route)
                     let showBar = showsNavigationBar(route)
                     if nav.isNavigationBarHidden == showBar {
-                        nav.setNavigationBarHidden(!showBar, animated: true)
+                        nav.setNavigationBarHidden(!showBar, animated: !UIAccessibility.isReduceMotionEnabled)
                     }
                 }
             } else {
                 let destVC = UIHostingController(rootView: destinationContent(route))
                 destVC.view.backgroundColor = UIColor(AuroraColor.canvas)
                 destVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                if !UIAccessibility.isReduceMotionEnabled,
+                   ZoomTransitionSourceRegistry.shared.sourceView(for: route) != nil {
+                    destVC.preferredTransition = .zoom { _ in
+                        ZoomTransitionSourceRegistry.shared.sourceView(for: route)
+                    }
+                }
                 coord.destinationController = destVC
                 coord.displayedRoute = route
                 let showBar = showsNavigationBar(route)
                 nav.setNavigationBarHidden(!showBar, animated: false)
-                nav.pushViewController(destVC, animated: true)
+                nav.pushViewController(destVC, animated: !UIAccessibility.isReduceMotionEnabled)
             }
         } else if nav.viewControllers.count > 1 {
             coord.displayedRoute = nil
             coord.destinationController = nil
-            nav.popToRootViewController(animated: true)
+            nav.popToRootViewController(animated: !UIAccessibility.isReduceMotionEnabled)
         } else {
             coord.displayedRoute = nil
             coord.destinationController = nil
@@ -402,7 +511,7 @@ private struct ImmersiveNavigationHost<Route: Hashable, RootContent: View, Desti
         weak var navigationController: UINavigationController?
         weak var rootController: UIHostingController<RootContent>?
         weak var destinationController: UIHostingController<DestinationContent>?
-        var displayedRoute: Route?
+        var displayedRoute: AppImmersiveRoute?
 
         init(parent: ImmersiveNavigationHost) {
             self.parent = parent

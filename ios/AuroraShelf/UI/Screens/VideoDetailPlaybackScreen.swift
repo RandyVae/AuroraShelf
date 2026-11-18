@@ -68,7 +68,7 @@ public struct VideoDetailPlaybackScreen: View {
     @State private var isPlaying: Bool = true
     @State private var isMuted: Bool = false
     @State private var isResolving: Bool = true
-    @State private var resolveStatus: String = "正在连接视频源…"
+    @State private var resolveStatus: String = "player.connecting_source".localized
     @State private var resolveError: String? = nil
     @State private var currentTime: Double = 0
     @State private var bufferedTime: Double = 0
@@ -99,6 +99,7 @@ public struct VideoDetailPlaybackScreen: View {
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
     @ObservedObject private var progressStore = PlaybackProgressStore.shared
     @ObservedObject private var videoRepo = VideoRepository.shared
+    private var coordinator: PlayerCoordinator { PlayerCoordinator.shared }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityVoiceOverEnabled) private var isVoiceOverEnabled
@@ -224,7 +225,7 @@ public struct VideoDetailPlaybackScreen: View {
                                     }
                                     .onChange(of: currentVideo.id) { _, _ in
                                         inlineScrollOffsetY = 0
-                                        withAnimation(.easeOut(duration: 0.2)) {
+                                        AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                                             scrollProxy.scrollTo("video-detail-top-anchor", anchor: .top)
                                         }
                                     }
@@ -257,7 +258,7 @@ public struct VideoDetailPlaybackScreen: View {
                                 }
                                 .onChange(of: currentVideo.id) { _, _ in
                                     inlineScrollOffsetY = 0
-                                    withAnimation(.easeOut(duration: 0.2)) {
+                                    AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                                         scrollProxy.scrollTo("video-detail-top-anchor", anchor: .top)
                                     }
                                 }
@@ -285,7 +286,7 @@ public struct VideoDetailPlaybackScreen: View {
                             Spacer().frame(height: min(targetHeight + 16, screenSize.height * 0.45))
                             HStack(spacing: 8) {
                                 Image(systemName: "arrow.down.circle.fill")
-                                    .foregroundStyle(AuroraColor.brand)
+                                    .foregroundStyle(AuroraColor.brandSolid)
                                 Text(downloadToastText)
                                     .font(.subheadline.bold())
                                     .foregroundStyle(.white)
@@ -293,9 +294,10 @@ public struct VideoDetailPlaybackScreen: View {
                             .padding(.horizontal, 18)
                             .padding(.vertical, 10)
                             .glassEffect(.clear, in: .capsule)
+                            .glassEffectTransition(.materialize)
                             .shadow(color: .black.opacity(0.28), radius: 10, y: 5)
                             .environment(\.colorScheme, .dark)
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                            .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                             Spacer()
                         }
                         .frame(maxWidth: .infinity)
@@ -330,6 +332,16 @@ public struct VideoDetailPlaybackScreen: View {
             if enabled {
                 hideControlsTask?.cancel()
                 showControls = true
+            }
+        }
+        .onChange(of: coordinator.togglePlayPauseTrigger) { _, _ in
+            togglePlayPause()
+        }
+        .onChange(of: coordinator.toggleFullScreenTrigger) { _, _ in
+            if isFullScreen {
+                exitAdaptiveFullscreen()
+            } else {
+                enterAdaptiveFullscreen()
             }
         }
         .onAppear {
@@ -388,17 +400,17 @@ public struct VideoDetailPlaybackScreen: View {
         }
         .onKeyPress(.leftArrow) {
             seekRelative(-10)
-            showHud(icon: "gobackward.10", text: "快退 10 秒")
+            showHud(icon: "gobackward.10", text: "player.rewind_10s".localized)
             return .handled
         }
         .onKeyPress(.rightArrow) {
             seekRelative(10)
-            showHud(icon: "goforward.10", text: "快进 10 秒")
+            showHud(icon: "goforward.10", text: "player.forward_10s".localized)
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "jJ")) { _ in
             seekRelative(-10)
-            showHud(icon: "gobackward.10", text: "快退 10 秒")
+            showHud(icon: "gobackward.10", text: "player.rewind_10s".localized)
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "kK")) { _ in
@@ -407,7 +419,7 @@ public struct VideoDetailPlaybackScreen: View {
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "lL")) { _ in
             seekRelative(10)
-            showHud(icon: "goforward.10", text: "快进 10 秒")
+            showHud(icon: "goforward.10", text: "player.forward_10s".localized)
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "mM")) { _ in
@@ -445,7 +457,7 @@ public struct VideoDetailPlaybackScreen: View {
             actionToolbarSection
 
             if !episodes.isEmpty || isLoadingEpisodes {
-                episodesShelfSection
+                episodesShelfSection(columnWidth: columnWidth)
             }
 
             if let meta = detailMetadata, !meta.directors.isEmpty || !meta.actors.isEmpty {
@@ -455,7 +467,7 @@ public struct VideoDetailPlaybackScreen: View {
             synopsisSection
 
             if includeRecommendations && !relatedVideos.isEmpty {
-                relatedVideosSection
+                relatedVideosSection(columnWidth: columnWidth)
             }
 
             Spacer().frame(height: 60)
@@ -470,9 +482,10 @@ public struct VideoDetailPlaybackScreen: View {
         let thumbWidth = min(152, max(118, (width - horizontalPadding * 2 - 10) * 0.43))
         let thumbHeight = (thumbWidth * 9.0 / 16.0).rounded()
         return VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-            Text("更多推荐")
+            Text("detail.more_recommendations".localized)
                 .font(.title3.bold())
                 .foregroundStyle(AuroraColor.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             ForEach(relatedVideos.prefix(20)) { related in
                 Button {
@@ -513,7 +526,7 @@ public struct VideoDetailPlaybackScreen: View {
                 }
                 .buttonStyle(.plain)
                 .hoverEffect(.highlight)
-                .frame(minHeight: thumbHeight)
+                .frame(minHeight: max(thumbHeight, AuroraMetrics.minTouchTarget))
             }
         }
         .padding(.horizontal, horizontalPadding)
@@ -577,7 +590,7 @@ public struct VideoDetailPlaybackScreen: View {
                                 viewportWidth: targetWidth,
                                 isPad: isPad,
                                 onSingleTap: {
-                                    withAnimation(.easeInOut(duration: 0.22)) {
+                                    AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                                         showControls.toggle()
                                         if !showControls {
                                             isShowingInPlayerEpisodes = false
@@ -618,9 +631,9 @@ public struct VideoDetailPlaybackScreen: View {
                     if let error = resolveError {
                         VStack(spacing: 12) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.system(size: 30))
+                                .font(.title)
                                 .foregroundStyle(AuroraColor.warning)
-                            Text("播放失败")
+                            Text("player.failed_title".localized)
                                 .font(.headline)
                                 .foregroundStyle(.white)
                             Text(error)
@@ -631,14 +644,14 @@ public struct VideoDetailPlaybackScreen: View {
 
                             GlassEffectContainer(spacing: 12) {
                                 HStack(spacing: 12) {
-                                    PlayerGlassPillButton(systemName: "chevron.backward", title: "返回") {
+                                    PlayerGlassPillButton(systemName: "chevron.backward", title: "common.back".localized) {
                                         dismissView()
                                     }
 
                                     PlayerGlassPillButton(
                                         systemName: "arrow.clockwise",
-                                        title: "重试",
-                                        tint: AuroraColor.brand
+                                        title: "common.retry".localized,
+                                        tint: AuroraColor.brandSolid
                                     ) {
                                         let stage = max(recoveryStage, 1)
                                         recoveryStage = stage
@@ -661,7 +674,7 @@ public struct VideoDetailPlaybackScreen: View {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 .scaleEffect(1.15)
-                            Text(isResolving ? resolveStatus : "正在缓冲视频…")
+                            Text(isResolving ? resolveStatus : "player.buffering".localized)
                                 .font(.caption.bold())
                                 .foregroundStyle(.white)
                                 .shadow(color: .black.opacity(0.5), radius: 3)
@@ -707,7 +720,7 @@ public struct VideoDetailPlaybackScreen: View {
                     HStack {
                         PlayerGlassIconButton(
                             systemName: "chevron.backward",
-                            accessibilityTitle: "返回",
+                            accessibilityTitle: "common.back".localized,
                             visualDiameter: 40,
                             symbolSize: 16,
                             symbolWeight: .bold
@@ -728,19 +741,20 @@ public struct VideoDetailPlaybackScreen: View {
                 VStack {
                     HStack(spacing: 6) {
                         Image(systemName: "forward.fill")
-                            .font(.system(size: 12, weight: .bold))
-                        Text("2.0x 倍速快放")
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.caption.bold())
+                        Text("player.boost_2x".localized)
+                            .font(.footnote.bold())
                     }
                     .foregroundStyle(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 7)
                     .glassEffect(.clear, in: .capsule)
+                    .glassEffectTransition(.materialize)
                     .environment(\.colorScheme, .dark)
                     .padding(.top, isFullScreen ? max(18, safeTop) : safeTop + 10)
                     Spacer()
                 }
-                .transition(.scale(scale: 0.9).combined(with: .opacity))
+                .transition(reduceMotion ? .opacity : .scale(scale: 0.9).combined(with: .opacity))
                 .allowsHitTesting(false)
                 .zIndex(45)
             }
@@ -749,7 +763,7 @@ public struct VideoDetailPlaybackScreen: View {
             if let msg = hudMessage {
                 PlayerLiquidGlassHUD(icon: hudIcon, message: msg, progress: hudProgress)
                     .environment(\.colorScheme, .dark)
-                    .transition(.scale(scale: 0.88).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.88).combined(with: .opacity))
                     .zIndex(50)
             }
         }
@@ -766,9 +780,9 @@ public struct VideoDetailPlaybackScreen: View {
         )
         .clipped()
         .ignoresSafeArea()
-        .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86), value: isFullScreen)
-        .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86), value: isLandscape)
-        .animation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.88), value: effectiveAspectRatio)
+        .animation(reduceMotion ? nil : AuroraMotion.cinema, value: isFullScreen)
+        .animation(reduceMotion ? nil : AuroraMotion.cinema, value: isLandscape)
+        .animation(reduceMotion ? nil : AuroraMotion.smooth, value: effectiveAspectRatio)
     }
 
     // MARK: - 播放器控制层（撤除浓黑遮罩，释放 Glass.clear 动态视频折射）
@@ -857,24 +871,23 @@ public struct VideoDetailPlaybackScreen: View {
             GlassEffectContainer(spacing: 10) {
                 HStack(spacing: 10) {
                     if isFullScreen {
-                        // 全屏左上角：收起回二级详情页 + 静音快捷开关（对齐 Apple TV / AVKit）
                         PlayerGlassIconButton(
                             systemName: "chevron.down",
-                            accessibilityTitle: "退出全屏",
+                            accessibilityTitle: "live.exit_fullscreen".localized,
                             visualDiameter: isPad ? 44 : 40,
                             symbolSize: isPad ? 17 : 15,
                             symbolWeight: .bold
                         ) {
-                            let impact = UIImpactFeedbackGenerator(style: .medium)
-                            impact.impactOccurred()
+                            AuroraHaptics.impact(.medium)
                             exitAdaptiveFullscreen()
                             scheduleHideControls()
                         }
                         .glassEffectID("nav-primary", in: glassMorphNamespace)
+                        .glassEffectTransition(.matchedGeometry)
 
                         PlayerGlassIconButton(
                             systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                            accessibilityTitle: isMuted ? "取消静音" : "静音",
+                            accessibilityTitle: isMuted ? "player.unmute".localized : "player.mute".localized,
                             visualDiameter: isPad ? 44 : 40,
                             symbolSize: isPad ? 16 : 14,
                             symbolWeight: .semibold
@@ -883,11 +896,10 @@ public struct VideoDetailPlaybackScreen: View {
                             scheduleHideControls()
                         }
 
-                        // iPhone 全屏顶栏附带横竖屏自由切换圆钮（释放窄屏底栏空间，确保底栏全按钮零裁切）
                         if !isPad {
                             PlayerGlassIconButton(
                                 systemName: "rotate.right",
-                                accessibilityTitle: isLandscape ? "切换竖屏显示" : "切换横屏显示",
+                                accessibilityTitle: isLandscape ? "live.switch_portrait".localized : "live.switch_landscape".localized,
                                 visualDiameter: 40,
                                 symbolSize: 14,
                                 symbolWeight: .semibold
@@ -896,27 +908,26 @@ public struct VideoDetailPlaybackScreen: View {
                             }
                         }
                     } else {
-                        // 二级页内嵌左上角：返回上一级
                         if isPad {
-                            PlayerGlassPillButton(systemName: "chevron.backward", title: "返回") {
-                                let impact = UIImpactFeedbackGenerator(style: .medium)
-                                impact.impactOccurred()
+                            PlayerGlassPillButton(systemName: "chevron.backward", title: "common.back".localized) {
+                                AuroraHaptics.impact(.medium)
                                 dismissView()
                             }
                             .glassEffectID("nav-primary", in: glassMorphNamespace)
+                            .glassEffectTransition(.matchedGeometry)
                         } else {
                             PlayerGlassIconButton(
                                 systemName: "chevron.backward",
-                                accessibilityTitle: "返回",
+                                accessibilityTitle: "common.back".localized,
                                 visualDiameter: 38,
                                 symbolSize: 15,
                                 symbolWeight: .bold
                             ) {
-                                let impact = UIImpactFeedbackGenerator(style: .medium)
-                                impact.impactOccurred()
+                                AuroraHaptics.impact(.medium)
                                 dismissView()
                             }
                             .glassEffectID("nav-primary", in: glassMorphNamespace)
+                            .glassEffectTransition(.matchedGeometry)
                         }
                     }
                 }
@@ -924,19 +935,17 @@ public struct VideoDetailPlaybackScreen: View {
 
             Spacer(minLength: 8)
 
-            // 右上角：仅保留系统级投射双键（PiP 画中画 + AirPlay），彻底告别 6 按钮拥挤
             GlassEffectContainer(spacing: 8) {
                 HStack(spacing: 8) {
                     if AVPictureInPictureController.isPictureInPictureSupported() {
                         PlayerGlassIconButton(
                             systemName: PictureInPictureManager.shared.isActive ? "pip.exit" : "pip.enter",
-                            accessibilityTitle: "画中画",
+                            accessibilityTitle: "player.pip".localized,
                             visualDiameter: isPad ? 42 : 38,
                             symbolSize: isPad ? 15 : 13,
                             symbolWeight: .semibold
                         ) {
-                            let impact = UIImpactFeedbackGenerator(style: .medium)
-                            impact.impactOccurred()
+                            AuroraHaptics.impact(.medium)
                             PictureInPictureManager.shared.toggle()
                             scheduleHideControls()
                         }
@@ -962,7 +971,7 @@ public struct VideoDetailPlaybackScreen: View {
             HStack(spacing: groupSpacing) {
                 PlayerGlassIconButton(
                     systemName: "gobackward.10",
-                    accessibilityTitle: "快退 10 秒",
+                    accessibilityTitle: "player.rewind_10s".localized,
                     visualDiameter: sideSize,
                     symbolSize: isPad ? 23 : (isFullScreen ? 20 : 17),
                     symbolWeight: .semibold
@@ -972,7 +981,7 @@ public struct VideoDetailPlaybackScreen: View {
 
                 PlayerGlassIconButton(
                     systemName: isPlaying ? "pause.fill" : "play.fill",
-                    accessibilityTitle: isPlaying ? "暂停" : "播放",
+                    accessibilityTitle: isPlaying ? "player.pause".localized : "player.play".localized,
                     visualDiameter: centerSize,
                     symbolSize: isPad ? 32 : (isFullScreen ? 28 : 22),
                     symbolWeight: .bold,
@@ -983,7 +992,7 @@ public struct VideoDetailPlaybackScreen: View {
 
                 PlayerGlassIconButton(
                     systemName: "goforward.10",
-                    accessibilityTitle: "快进 10 秒",
+                    accessibilityTitle: "player.forward_10s".localized,
                     visualDiameter: sideSize,
                     symbolSize: isPad ? 23 : (isFullScreen ? 20 : 17),
                     symbolWeight: .semibold
@@ -1009,13 +1018,13 @@ public struct VideoDetailPlaybackScreen: View {
                     Text(showRemainingTime ? formatRemainingTime(currentTime, duration: duration) : formatTime(duration))
                         .foregroundStyle(.white.opacity(0.82))
                 }
-                .font(.system(size: isPad ? 12 : 11, weight: .semibold, design: .monospaced))
+                .font(.caption.weight(.semibold).monospacedDigit())
                 .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
                 .fixedSize(horizontal: true, vertical: false)
             }
             .buttonStyle(.plain)
-            .frame(minHeight: 36)
-            .accessibilityLabel("切换剩余时间与总时长")
+            .frame(minHeight: AuroraMetrics.minTouchTarget)
+            .accessibilityLabel("player.toggle_time_a11y".localized)
 
             PlayerScrubberBar(
                 currentTime: $currentTime,
@@ -1034,22 +1043,21 @@ public struct VideoDetailPlaybackScreen: View {
                     }
                 }
             )
-            .frame(height: isPad ? 38 : 34)
+            .frame(height: AuroraMetrics.minTouchTarget)
 
-            // 右下角固定全屏展开按钮（点击后按视频真实比例智能进入横屏全屏或竖屏全屏！）
             PlayerGlassIconButton(
                 systemName: "arrow.up.left.and.arrow.down.right",
-                accessibilityTitle: "全屏播放",
+                accessibilityTitle: "player.enter_fullscreen".localized,
                 visualDiameter: isPad ? 40 : 36,
                 symbolSize: isPad ? 15 : 13,
                 symbolWeight: .bold
             ) {
-                let impact = UIImpactFeedbackGenerator(style: .medium)
-                impact.impactOccurred()
+                AuroraHaptics.impact(.medium)
                 enterAdaptiveFullscreen()
                 scheduleHideControls()
             }
             .glassEffectID("fullscreen-anchor", in: glassMorphNamespace)
+            .glassEffectTransition(.matchedGeometry)
         }
     }
 
@@ -1057,7 +1065,6 @@ public struct VideoDetailPlaybackScreen: View {
     @ViewBuilder
     private func fullscreenCinemaBottomDeck(availableWidth: CGFloat) -> some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        // 窄屏竖向全屏（如 393pt 播放竖屏短剧）自动收敛为紧凑图标圆钮，彻底杜绝文字截断与横向溢出
         let useCompactIcons = availableWidth < 540
 
         VStack(alignment: .leading, spacing: isPad ? 10 : 6) {
@@ -1065,7 +1072,6 @@ public struct VideoDetailPlaybackScreen: View {
                 inPlayerEpisodesDrawer
             }
 
-            // 第一层：Apple TV 左下角片名与剧集上下文（完整舒展，绝不被顶栏挤压）
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(currentVideo.sourceName)
@@ -1081,7 +1087,7 @@ public struct VideoDetailPlaybackScreen: View {
                             .foregroundStyle(.white)
                             .padding(.horizontal, 7)
                             .padding(.vertical, 2)
-                            .glassEffect(.clear.tint(AuroraColor.brand), in: .capsule)
+                            .glassEffect(.clear.tint(AuroraColor.brandSolid), in: .capsule)
                     }
                 }
 
@@ -1092,10 +1098,9 @@ public struct VideoDetailPlaybackScreen: View {
                     .lineLimit(1)
             }
 
-            // 第二层：已播时间 + 6pt->12pt 流体膨胀液态胶囊进度条 + 倒计时剩余时间
             HStack(spacing: isPad ? 14 : 10) {
                 Text(formatTime(currentTime))
-                    .font(.system(size: isPad ? 13 : 12, weight: .semibold, design: .monospaced))
+                    .font(.caption.weight(.semibold).monospacedDigit())
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
                     .fixedSize(horizontal: true, vertical: false)
@@ -1122,28 +1127,27 @@ public struct VideoDetailPlaybackScreen: View {
                     showRemainingTime.toggle()
                 } label: {
                     Text(showRemainingTime ? formatRemainingTime(currentTime, duration: duration) : formatTime(duration))
-                        .font(.system(size: isPad ? 13 : 12, weight: .semibold, design: .monospaced))
+                        .font(.caption.weight(.semibold).monospacedDigit())
                         .foregroundStyle(.white.opacity(0.88))
                         .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
                         .frame(minWidth: isPad ? 52 : 46, alignment: .trailing)
                         .fixedSize(horizontal: true, vertical: false)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(showRemainingTime ? "切换至总时长" : "切换至倒计时")
+                .frame(minHeight: AuroraMetrics.minTouchTarget)
+                .accessibilityLabel(showRemainingTime ? "player.show_duration".localized : "player.show_remaining".localized)
             }
 
-            // 第三层：Apple TV 底部功能胶囊栏（右侧固定退出全屏锚点，左侧/中部支持窄屏自适应零溢出）
             HStack(spacing: 8) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     GlassEffectContainer(spacing: 8) {
                         HStack(spacing: 8) {
                             PlayerGlassPillButton(
                                 systemName: "info.circle",
-                                title: "详情",
+                                title: "home.details".localized,
                                 isCompactIconOnly: useCompactIcons
                             ) {
-                                let impact = UIImpactFeedbackGenerator(style: .light)
-                                impact.impactOccurred()
+                                AuroraHaptics.impact(.light)
                                 isShowingInSight = true
                                 scheduleHideControls()
                             }
@@ -1151,13 +1155,12 @@ public struct VideoDetailPlaybackScreen: View {
                             if episodes.count > 1 {
                                 PlayerGlassPillButton(
                                     systemName: "square.stack.3d.down.right",
-                                    title: "选集",
+                                    title: "player.episodes".localized,
                                     isCompactIconOnly: useCompactIcons,
-                                    tint: isShowingInPlayerEpisodes ? AuroraColor.brand : nil
+                                    tint: isShowingInPlayerEpisodes ? AuroraColor.brandSolid : nil
                                 ) {
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                    AuroraHaptics.impact(.medium)
+                                    AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
                                         isShowingInPlayerEpisodes.toggle()
                                     }
                                     scheduleHideControls()
@@ -1168,11 +1171,10 @@ public struct VideoDetailPlaybackScreen: View {
                                let nextEp = episodes.first(where: { $0.number == currentEp.number + 1 }) {
                                 PlayerGlassPillButton(
                                     systemName: "forward.end.fill",
-                                    title: "下一集",
+                                    title: "player.next_episode".localized,
                                     isCompactIconOnly: useCompactIcons
                                 ) {
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
+                                    AuroraHaptics.impact(.medium)
                                     switchEpisode(nextEp)
                                 }
                             }
@@ -1186,24 +1188,23 @@ public struct VideoDetailPlaybackScreen: View {
                                 )
                             }
 
-                            // 倍速原生菜单（Glass.clear 胶囊）
                             Menu {
                                 ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { speed in
                                     Button {
-                                        let impact = UIImpactFeedbackGenerator(style: .light)
-                                        impact.impactOccurred()
+                                        AuroraHaptics.impact(.light)
                                         playbackRate = Float(speed)
                                         if isPlaying && !isSpeedBoosting {
                                             player?.rate = Float(speed)
                                         }
+                                        let speedText = speed == 1.0 ? "1.0" : String(format: "%.2g", speed)
                                         showHud(
                                             icon: "gauge.with.dots.needle.bottom.50percent",
-                                            text: "\(speed == 1.0 ? "1.0" : String(format: "%.2g", speed))x 倍速"
+                                            text: String(format: "player.speed_hud".localized, speedText)
                                         )
                                         scheduleHideControls()
                                     } label: {
                                         HStack {
-                                            Text(speed == 1.0 ? "正常 (1.0x)" : "\(String(format: "%.2g", speed))x")
+                                            Text(speed == 1.0 ? "player.speed_normal".localized : "\(String(format: "%.2g", speed))x")
                                             if playbackRate == Float(speed) {
                                                 Image(systemName: "checkmark")
                                             }
@@ -1212,22 +1213,22 @@ public struct VideoDetailPlaybackScreen: View {
                                 }
                             } label: {
                                 Text(playbackRate == 1.0 ? "1.0x" : "\(String(format: "%.2g", playbackRate))x")
-                                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                                    .font(.footnote.bold())
+                                    .fontDesign(.rounded)
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 10)
                                     .padding(.vertical, 5)
                                     .fixedSize(horizontal: true, vertical: false)
                             }
-                            .playerClearGlassCapsuleButton(tint: playbackRate != 1.0 ? AuroraColor.brand : nil)
+                            .playerClearGlassCapsuleButton(tint: playbackRate != 1.0 ? AuroraColor.brandSolid : nil)
                             .frame(minHeight: AuroraMetrics.minTouchTarget)
-                            .accessibilityLabel("播放倍速 \(playbackRate)x")
+                            .accessibilityLabel(String(format: "player.speed_a11y".localized, "\(playbackRate)"))
 
-                            // 专属画幅切换键（使用外扩/内收画幅框图标，彻底区分全屏对角箭头图标！）
                             PlayerGlassPillButton(
                                 systemName: isFillMode ? "rectangle.arrowtriangle.2.inward" : "rectangle.arrowtriangle.2.outward",
-                                title: isFillMode ? "原比" : "满铺",
+                                title: isFillMode ? "player.fit_short".localized : "player.fill_short".localized,
                                 isCompactIconOnly: useCompactIcons,
-                                tint: isFillMode ? AuroraColor.brand : nil
+                                tint: isFillMode ? AuroraColor.brandSolid : nil
                             ) {
                                 toggleFillMode()
                             }
@@ -1238,20 +1239,19 @@ public struct VideoDetailPlaybackScreen: View {
 
                 Spacer(minLength: 4)
 
-                // 右下角固定「退出全屏」锚点（与内嵌态右下角「进入全屏」肌肉记忆 1:1 对齐）
                 PlayerGlassIconButton(
                     systemName: "arrow.down.right.and.arrow.up.left",
-                    accessibilityTitle: "退出全屏",
+                    accessibilityTitle: "live.exit_fullscreen".localized,
                     visualDiameter: isPad ? 42 : 38,
                     symbolSize: isPad ? 15 : 13,
                     symbolWeight: .bold
                 ) {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
+                    AuroraHaptics.impact(.medium)
                     exitAdaptiveFullscreen()
                     scheduleHideControls()
                 }
                 .glassEffectID("fullscreen-anchor", in: glassMorphNamespace)
+                .glassEffectTransition(.matchedGeometry)
             }
         }
     }
@@ -1261,23 +1261,23 @@ public struct VideoDetailPlaybackScreen: View {
     private var inPlayerEpisodesDrawer: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("快速选集")
+                Text("player.quick_episodes".localized)
                     .font(.subheadline.bold())
                     .foregroundStyle(.white)
                 Spacer()
                 Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
                         isShowingInPlayerEpisodes = false
                     }
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18))
+                        .font(.body)
                         .foregroundStyle(.white.opacity(0.8))
                         .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("关闭选集")
+                .accessibilityLabel("player.close_episodes_a11y".localized)
             }
             .padding(.horizontal, 14)
 
@@ -1289,10 +1289,10 @@ public struct VideoDetailPlaybackScreen: View {
                             PlayerGlassPillButton(
                                 systemName: isSelected ? "play.circle.fill" : nil,
                                 title: ep.label,
-                                tint: isSelected ? AuroraColor.brand : nil
+                                tint: isSelected ? AuroraColor.brandSolid : nil
                             ) {
                                 switchEpisode(ep)
-                                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                                AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
                                     isShowingInPlayerEpisodes = false
                                 }
                             }
@@ -1304,8 +1304,9 @@ public struct VideoDetailPlaybackScreen: View {
         }
         .padding(.vertical, 10)
         .glassEffect(.clear, in: .rect(cornerRadius: 18))
+        .glassEffectTransition(.materialize)
         .padding(.bottom, 4)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
     }
 
     // MARK: - 2. 视频主标题与信息
@@ -1317,6 +1318,7 @@ public struct VideoDetailPlaybackScreen: View {
                 .font(isPad ? .title2.bold() : .title3.bold())
                 .foregroundStyle(AuroraColor.textPrimary)
                 .lineLimit(2)
+                .accessibilityAddTraits(.isHeader)
 
             HStack(spacing: 8) {
                 Text(currentVideo.sourceName)
@@ -1324,11 +1326,11 @@ public struct VideoDetailPlaybackScreen: View {
                     .foregroundStyle(AuroraColor.brandLabel)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(AuroraColor.brand.opacity(0.16), in: Capsule())
+                    .background(AuroraColor.brandLabel.opacity(0.15), in: Capsule())
 
                 if !currentVideo.duration.isEmpty {
                     Text(currentVideo.duration)
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.caption2.bold())
                         .foregroundStyle(AuroraColor.textSecondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
@@ -1338,24 +1340,25 @@ public struct VideoDetailPlaybackScreen: View {
                 if !currentVideo.rating.isEmpty {
                     HStack(spacing: 3) {
                         Image(systemName: "star.fill")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .foregroundStyle(.yellow)
                         Text(currentVideo.rating)
                             .font(.caption.bold())
-                            .foregroundStyle(.primary)
+                            .foregroundStyle(AuroraColor.textPrimary)
                     }
                     .padding(.horizontal, 7)
                     .padding(.vertical, 2)
-                    .background(.regularMaterial, in: Capsule())
+                    .background(AuroraColor.surfaceCard, in: Capsule())
+                    .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 0.75))
                 }
 
                 if let ep = currentEpisode {
                     Text(ep.label)
                         .font(.caption.bold())
-                        .foregroundStyle(AuroraColor.brand)
+                        .foregroundStyle(AuroraColor.brandLabel)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 2)
-                        .background(AuroraColor.brand.opacity(0.12), in: Capsule())
+                        .background(AuroraColor.brandLabel.opacity(0.12), in: Capsule())
                 }
             }
 
@@ -1382,7 +1385,7 @@ public struct VideoDetailPlaybackScreen: View {
         }
     }
 
-    // MARK: - 3. 二级详情页单行正交胶囊工具栏（统一 iPhone / Duo / iPad，根除双播放键冲突）
+    // MARK: - 3. 二级详情页单行正交胶囊工具栏（统一 iPhone / Duo / iPad，根除双播放键冲突与未激活粉色染色）
 
     @ViewBuilder
     private var actionToolbarSection: some View {
@@ -1393,10 +1396,8 @@ public struct VideoDetailPlaybackScreen: View {
         ScrollView(.horizontal, showsIndicators: false) {
             GlassEffectContainer(spacing: 10) {
                 HStack(spacing: 10) {
-                    // 1. Apple TV 标志性高对比主胶囊：一键最佳方向全屏沉浸观影（若暂停则同步恢复播放）
                     Button {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
+                        AuroraHaptics.impact(.medium)
                         if let p = player, !isPlaying {
                             p.play()
                             if playbackRate != 1.0 {
@@ -1411,9 +1412,9 @@ public struct VideoDetailPlaybackScreen: View {
                     } label: {
                         HStack(spacing: 7) {
                             Image(systemName: "arrow.up.left.and.arrow.down.right")
-                                .font(.system(size: 14, weight: .bold))
-                            Text("全屏观影")
-                                .font(.system(size: 15, weight: .bold))
+                                .font(.subheadline.weight(.bold))
+                            Text("player.watch_fullscreen".localized)
+                                .font(.subheadline.weight(.bold))
                         }
                         .padding(.horizontal, 18)
                         .frame(minHeight: AuroraMetrics.minTouchTarget)
@@ -1423,19 +1424,17 @@ public struct VideoDetailPlaybackScreen: View {
                     }
                     .buttonStyle(AppleSpringCardButtonStyle())
                     .hoverEffect(.highlight)
-                    .accessibilityLabel("全屏观影")
+                    .accessibilityLabel("player.watch_fullscreen".localized)
 
-                    // 2. 片单收藏胶囊
                     let bookmarkPill = Button {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
+                        AuroraHaptics.impact(.medium)
                         try? watchlist.setBookmarked(!isBookmarked, for: currentVideo)
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: isBookmarked ? "bookmark.fill" : "plus")
-                                .font(.system(size: 14, weight: .bold))
-                            Text(isBookmarked ? "已在片单" : "加入片单")
-                                .font(.system(size: 14, weight: .semibold))
+                                .font(.subheadline.weight(.bold))
+                            Text(isBookmarked ? "watchlist.in_list".localized : "watchlist.add".localized)
+                                .font(.subheadline.weight(.semibold))
                         }
                         .padding(.horizontal, 10)
                         .frame(minHeight: 36)
@@ -1447,57 +1446,56 @@ public struct VideoDetailPlaybackScreen: View {
                     if isBookmarked {
                         bookmarkPill
                             .buttonStyle(.glassProminent)
-                            .tint(AuroraColor.brand)
+                            .tint(AuroraColor.brandSolid)
                     } else {
                         bookmarkPill
                             .buttonStyle(.glass)
+                            .tint(AuroraColor.textPrimary)
                     }
 
-                    // 3. 离线缓存胶囊
                     Button {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
+                        AuroraHaptics.impact(.medium)
                         if !isDownloaded {
                             downloadManager.startDownload(video: currentVideo, episode: currentEpisode)
-                            showToast(text: "已加入缓存队列")
+                            showToast(text: "player.queued_download".localized)
                         } else {
-                            showToast(text: "该视频已完成离线缓存")
+                            showToast(text: "player.already_downloaded".localized)
                         }
                     } label: {
                         HStack(spacing: 6) {
                             if isDownloaded {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
-                                Text("已缓存")
+                                Text("player.cached".localized)
                             } else if let status = downloadStatus, status.isDownloading {
                                 ProgressView(value: status.progressValue)
                                     .frame(width: 16, height: 16)
-                                    .tint(AuroraColor.brand)
+                                    .tint(AuroraColor.brandLabel)
                                 Text("\(Int(status.progressValue * 100))%")
                             } else {
                                 Image(systemName: "arrow.down.circle")
-                                Text("离线缓存")
+                                Text("player.offline_cache".localized)
                             }
                         }
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .padding(.horizontal, 10)
                         .frame(minHeight: 36)
                         .fixedSize(horizontal: true, vertical: false)
                     }
                     .buttonStyle(.glass)
                     .buttonBorderShape(.capsule)
+                    .tint(isDownloaded ? .green : AuroraColor.textPrimary)
                     .frame(minHeight: AuroraMetrics.minTouchTarget)
 
-                    // 4. 选集胶囊（多集时可见）
                     if episodes.count > 1 {
                         Button {
                             isShowingEpisodePicker = true
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "square.stack.3d.down.right")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("选集 (\(episodes.count))")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.subheadline.weight(.bold))
+                                Text(String(format: "player.episodes_count".localized, episodes.count))
+                                    .font(.subheadline.weight(.semibold))
                             }
                             .padding(.horizontal, 10)
                             .frame(minHeight: 36)
@@ -1505,17 +1503,17 @@ public struct VideoDetailPlaybackScreen: View {
                         }
                         .buttonStyle(.glass)
                         .buttonBorderShape(.capsule)
+                        .tint(AuroraColor.textPrimary)
                         .frame(minHeight: AuroraMetrics.minTouchTarget)
                     }
 
-                    // 5. 原生分享胶囊
                     if let shareURL = URL(string: currentVideo.playbackUrl), !currentVideo.playbackUrl.isEmpty {
                         ShareLink(item: shareURL) {
                             HStack(spacing: 6) {
                                 Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 14, weight: .bold))
-                                Text("分享")
-                                    .font(.system(size: 14, weight: .semibold))
+                                    .font(.subheadline.weight(.bold))
+                                Text("common.share".localized)
+                                    .font(.subheadline.weight(.semibold))
                             }
                             .padding(.horizontal, 10)
                             .frame(minHeight: 36)
@@ -1523,6 +1521,7 @@ public struct VideoDetailPlaybackScreen: View {
                         }
                         .buttonStyle(.glass)
                         .buttonBorderShape(.capsule)
+                        .tint(AuroraColor.textPrimary)
                         .frame(minHeight: AuroraMetrics.minTouchTarget)
                     }
                 }
@@ -1533,19 +1532,20 @@ public struct VideoDetailPlaybackScreen: View {
         .padding(.horizontal, -AuroraMetrics.contentInset)
     }
 
-    // MARK: - 4. 选集货架（iPad 端呈现 Apple TV 16:9 横版剧照大卡片货架）
+    // MARK: - 4. 选集货架（按窗口实际列宽自适应 16:9 横版大卡或紧凑选集胶囊）
 
-    private var episodesShelfSection: some View {
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        return VStack(alignment: .leading, spacing: isPad ? 14 : AuroraMetrics.spacingM) {
+    private func episodesShelfSection(columnWidth: CGFloat) -> some View {
+        let useWideEpisodeCards = UIDevice.current.userInterfaceIdiom == .pad && columnWidth >= 560
+        return VStack(alignment: .leading, spacing: useWideEpisodeCards ? 14 : AuroraMetrics.spacingM) {
             HStack {
                 HStack(spacing: 6) {
                     Image(systemName: "square.stack.3d.down.right.fill")
                         .font(.subheadline)
-                        .foregroundStyle(AuroraColor.brand)
-                    Text("选集播放")
-                        .font(isPad ? .title3.bold() : .headline)
+                        .foregroundStyle(AuroraColor.brandLabel)
+                    Text("player.episodes_play_title".localized)
+                        .font(useWideEpisodeCards ? .title3.bold() : .headline)
                         .foregroundStyle(AuroraColor.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
                 }
                 Spacer()
                 if episodes.count > 1 {
@@ -1553,12 +1553,13 @@ public struct VideoDetailPlaybackScreen: View {
                         isShowingEpisodePicker = true
                     } label: {
                         HStack(spacing: 4) {
-                            Text("全部 \(episodes.count) 集")
+                            Text(String(format: "player.all_episodes_count".localized, episodes.count))
                                 .font(.caption.bold())
                             Image(systemName: "chevron.right")
                                 .font(.caption2.bold())
                         }
-                        .foregroundStyle(AuroraColor.brand)
+                        .foregroundStyle(AuroraColor.brandLabel)
+                        .frame(minHeight: AuroraMetrics.minTouchTarget)
                     }
                 }
             }
@@ -1569,11 +1570,11 @@ public struct VideoDetailPlaybackScreen: View {
                         ForEach(0..<4, id: \.self) { _ in
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .fill(AuroraColor.surfaceCard.opacity(0.6))
-                                .frame(width: isPad ? 250 : 110, height: isPad ? 140 : 56)
+                                .frame(width: useWideEpisodeCards ? 250 : 110, height: useWideEpisodeCards ? 140 : 56)
                         }
                     }
                 }
-            } else if isPad {
+            } else if useWideEpisodeCards {
                 ScrollView(.horizontal, showsIndicators: false) {
                     LazyHStack(spacing: 16) {
                         ForEach(episodes) { ep in
@@ -1618,7 +1619,7 @@ public struct VideoDetailPlaybackScreen: View {
                                             ZStack {
                                                 Color.black.opacity(0.35)
                                                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
-                                                    .font(.system(size: 18, weight: .bold))
+                                                    .font(.headline.bold())
                                                     .foregroundStyle(.white)
                                                     .frame(width: 44, height: 44)
                                                     .glassEffect(.clear, in: .circle)
@@ -1645,16 +1646,16 @@ public struct VideoDetailPlaybackScreen: View {
                                     .cornerRadius(12)
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(isSelected ? Color.white : AuroraColor.hairline, lineWidth: isSelected ? 2 : 1)
+                                            .stroke(isSelected ? AuroraColor.brandLabel : AuroraColor.hairline, lineWidth: isSelected ? 2 : 1)
                                     )
-                                    .shadow(color: isSelected ? Color.white.opacity(0.2) : Color.black.opacity(0.3), radius: isSelected ? 10 : 4, y: 3)
+                                    .shadow(color: isSelected ? Color.black.opacity(0.25) : Color.black.opacity(0.18), radius: isSelected ? 8 : 4, y: 3)
 
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(ep.label)
-                                            .font(.system(size: 14, weight: isSelected ? .bold : .medium))
-                                            .foregroundStyle(isSelected ? AuroraColor.brand : AuroraColor.textPrimary)
+                                            .font(.subheadline.weight(isSelected ? .bold : .medium))
+                                            .foregroundStyle(isSelected ? AuroraColor.brandLabel : AuroraColor.textPrimary)
                                         Text(currentVideo.sourceName)
-                                            .font(.system(size: 12))
+                                            .font(.caption)
                                             .foregroundStyle(AuroraColor.textTertiary)
                                     }
                                     .frame(width: 250, alignment: .leading)
@@ -1678,26 +1679,26 @@ public struct VideoDetailPlaybackScreen: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
                                         Text(ep.label)
-                                            .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                                            .font(.footnote.weight(isSelected ? .bold : .medium))
                                             .foregroundStyle(isSelected ? .white : AuroraColor.textPrimary)
                                             .lineLimit(1)
                                         Spacer()
                                         if isSelected {
                                             Image(systemName: "play.circle.fill")
-                                                .font(.system(size: 12))
+                                                .font(.caption)
                                                 .foregroundStyle(.white)
                                         }
                                     }
                                     Text(currentVideo.sourceName)
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(isSelected ? .white.opacity(0.8) : AuroraColor.textTertiary)
+                                        .font(.caption2)
+                                        .foregroundStyle(isSelected ? .white.opacity(0.85) : AuroraColor.textTertiary)
                                         .lineLimit(1)
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .frame(width: 116, height: 54)
                                 .background(
-                                    isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                    isSelected ? AuroraColor.brandSolid : AuroraColor.surfaceCard,
                                     in: RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 )
                                 .overlay(
@@ -1717,20 +1718,40 @@ public struct VideoDetailPlaybackScreen: View {
 
     // MARK: - 5. 演职员阵容与基本介绍
 
+    private enum CrewRoleKind {
+        case director
+        case actor
+
+        var localizedTitle: String {
+            switch self {
+            case .director: return "detail.role_director".localized
+            case .actor: return "detail.role_actor".localized
+            }
+        }
+
+        var iconName: String {
+            switch self {
+            case .director: return "megaphone.fill"
+            case .actor: return "person.crop.circle.fill"
+            }
+        }
+    }
+
     @ViewBuilder
     private func castCrewSection(metadata: VideoDetailMetadata) -> some View {
-        let crewItems: [(name: String, role: String, icon: String)] =
-            metadata.directors.map { ($0, "导演", "megaphone.fill") } +
-            metadata.actors.map { ($0, "主演", "person.crop.circle.fill") }
+        let crewItems: [(name: String, kind: CrewRoleKind)] =
+            metadata.directors.map { ($0, CrewRoleKind.director) } +
+            metadata.actors.map { ($0, CrewRoleKind.actor) }
 
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("演员表")
+                Text("detail.cast_title".localized)
                     .font(.headline)
                     .foregroundStyle(AuroraColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 if onOpenSearchKeyword != nil {
-                    Text("轻点检索相关作品")
+                    Text("detail.cast_tap_hint".localized)
                         .font(.caption2)
                         .foregroundStyle(AuroraColor.textTertiary)
                 }
@@ -1740,16 +1761,16 @@ public struct VideoDetailPlaybackScreen: View {
                 LazyHStack(spacing: 10) {
                     ForEach(Array(crewItems.enumerated()), id: \.offset) { _, member in
                         let chipBody = HStack(spacing: 7) {
-                            Image(systemName: member.icon)
+                            Image(systemName: member.kind.iconName)
                                 .font(.caption)
-                                .foregroundStyle(member.role == "导演" ? AuroraColor.brand : AuroraColor.textSecondary)
+                                .foregroundStyle(member.kind == .director ? AuroraColor.brandLabel : AuroraColor.textSecondary)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(member.name)
                                     .font(.caption.bold())
                                     .foregroundStyle(AuroraColor.textPrimary)
                                     .lineLimit(1)
-                                Text(member.role)
-                                    .font(.system(size: 10, weight: .medium))
+                                Text(member.kind.localizedTitle)
+                                    .font(.caption2.weight(.medium))
                                     .foregroundStyle(AuroraColor.textSecondary)
                                     .lineLimit(1)
                             }
@@ -1761,11 +1782,11 @@ public struct VideoDetailPlaybackScreen: View {
                             RoundedRectangle(cornerRadius: 12, style: .continuous)
                                 .stroke(AuroraColor.hairline, lineWidth: 1)
                         )
-                        .frame(minHeight: 44)
+                        .frame(minHeight: AuroraMetrics.minTouchTarget)
 
                         if let onSearch = onOpenSearchKeyword {
                             Button {
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                AuroraHaptics.impact(.light)
                                 isViewDismissed = true
                                 tearDownDeviceOrientationTracking()
                                 restoreBrightnessAndOrientationIfNeeded()
@@ -1775,6 +1796,7 @@ public struct VideoDetailPlaybackScreen: View {
                                 chipBody
                             }
                             .buttonStyle(.plain)
+                            .hoverEffect(.highlight)
                         } else {
                             chipBody
                         }
@@ -1788,16 +1810,17 @@ public struct VideoDetailPlaybackScreen: View {
 
     private var synopsisSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("基本介绍")
+            Text("detail.intro_title".localized)
                 .font(.headline)
                 .foregroundStyle(AuroraColor.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             let metaSynopsis = detailMetadata?.synopsis.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let fallbackSubtitle = currentVideo.subtitle.trimmingCharacters(in: .whitespacesAndNewlines)
             let description: String = {
                 if !metaSynopsis.isEmpty { return metaSynopsis }
                 if !fallbackSubtitle.isEmpty { return fallbackSubtitle }
-                return "本片由 \(currentVideo.sourceName) 源站直连分发。"
+                return String(format: "detail.source_direct_desc".localized, currentVideo.sourceName)
             }()
 
             VStack(alignment: .leading, spacing: 6) {
@@ -1809,13 +1832,14 @@ public struct VideoDetailPlaybackScreen: View {
 
                 if description.count > 75 {
                     Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                             isDescriptionExpanded.toggle()
                         }
                     } label: {
-                        Text(isDescriptionExpanded ? "收起" : "展开全部")
+                        Text(isDescriptionExpanded ? "detail.collapse".localized : "detail.expand_all".localized)
                             .font(.caption.bold())
-                            .foregroundStyle(AuroraColor.brand)
+                            .foregroundStyle(AuroraColor.brandLabel)
+                            .frame(minHeight: AuroraMetrics.minTouchTarget)
                     }
                 }
             }
@@ -1829,36 +1853,28 @@ public struct VideoDetailPlaybackScreen: View {
         }
     }
 
-    // MARK: - 6. 下方其他视频推荐
+    // MARK: - 6. 下方其他视频推荐（按窗口实际列宽动态分列：窄窗 2 列 / 中窗 3 列 / 宽窗 4 列）
 
-    private var relatedVideosSection: some View {
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+    private func relatedVideosSection(columnWidth: CGFloat) -> some View {
+        let isWide = columnWidth >= 680
+        let gridSpacing: CGFloat = isWide ? 16 : 12
+        let columns = DeviceLayout.relatedVideoGridColumns(for: columnWidth, spacing: gridSpacing)
+        let maxCount = columns.count >= 4 ? 16 : 12
+
         return VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-            Text("更多推荐")
-                .font(isPad ? .title3.bold() : .headline)
+            Text("detail.more_recommendations".localized)
+                .font(isWide ? .title3.bold() : .headline)
                 .foregroundStyle(AuroraColor.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
-            if isPad {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 4), spacing: 20) {
-                    ForEach(relatedVideos.prefix(16)) { related in
-                        PosterCard(
-                            video: related,
-                            onSelect: {
-                                switchToVideo(related)
-                            }
-                        )
-                    }
-                }
-            } else {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 16) {
-                    ForEach(relatedVideos.prefix(12)) { related in
-                        PosterCard(
-                            video: related,
-                            onSelect: {
-                                switchToVideo(related)
-                            }
-                        )
-                    }
+            LazyVGrid(columns: columns, spacing: isWide ? 20 : 16) {
+                ForEach(relatedVideos.prefix(maxCount)) { related in
+                    PosterCard(
+                        video: related,
+                        onSelect: {
+                            switchToVideo(related)
+                        }
+                    )
                 }
             }
         }
@@ -1875,7 +1891,7 @@ public struct VideoDetailPlaybackScreen: View {
             ?? VideoAspectProfile.prefersLandscapeFullscreen(aspectRatio: effectiveAspectRatio, idiom: idiom)
         gravityMachine.enterFullscreen(preferLandscape: preferLandscape, triggeredByGravity: triggeredByGravity)
         PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: preferLandscape)
-        withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86)) {
+        AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: reduceMotion) {
             isFullScreen = true
             isLandscape = preferLandscape
         }
@@ -1885,7 +1901,7 @@ public struct VideoDetailPlaybackScreen: View {
     private func exitAdaptiveFullscreen() {
         gravityMachine.exitFullscreen()
         PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: false)
-        withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86)) {
+        AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: reduceMotion) {
             isFullScreen = false
             isLandscape = false
             isShowingInPlayerEpisodes = false
@@ -1894,8 +1910,7 @@ public struct VideoDetailPlaybackScreen: View {
     }
 
     private func toggleManualOrientation() {
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+        AuroraHaptics.impact(.medium)
         let nextLandscape = !isLandscape
         if !isFullScreen {
             enterAdaptiveFullscreen(forceLandscapeOverride: nextLandscape)
@@ -1904,13 +1919,13 @@ public struct VideoDetailPlaybackScreen: View {
             let physicallyLandscape = (devOri == .landscapeLeft || devOri == .landscapeRight)
             gravityMachine.setLandscapeInFullscreen(nextLandscape, currentlyPhysicallyLandscape: physicallyLandscape)
             PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: nextLandscape)
-            withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86)) {
+            AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: reduceMotion) {
                 isLandscape = nextLandscape
             }
         }
         showHud(
             icon: nextLandscape ? "iphone.landscape" : "iphone",
-            text: nextLandscape ? "横屏沉浸" : "竖屏模式"
+            text: nextLandscape ? "live.hud_landscape".localized : "live.hud_portrait".localized
         )
         scheduleHideControls()
     }
@@ -1947,14 +1962,14 @@ public struct VideoDetailPlaybackScreen: View {
                         landscape: true,
                         preferredDeviceOrientation: devOri
                     )
-                    withAnimation(self.reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86)) {
+                    AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: self.reduceMotion) {
                         self.isFullScreen = true
                         self.isLandscape = true
                     }
                     self.scheduleHideControls()
                 case .exitToInlinePortrait:
                     PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: false)
-                    withAnimation(self.reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86)) {
+                    AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: self.reduceMotion) {
                         self.isFullScreen = false
                         self.isLandscape = false
                         self.isShowingInPlayerEpisodes = false
@@ -1990,7 +2005,9 @@ public struct VideoDetailPlaybackScreen: View {
         activeResolveID = resolveID
         isResolving = true
         resolveError = nil
-        resolveStatus = alternateLineIndex > 0 ? "正在切换备用线路…" : (useRelay ? "正在切换防限流通道…" : "正在极速秒开…")
+        resolveStatus = alternateLineIndex > 0
+            ? "player.switching_backup".localized
+            : (useRelay ? "player.switching_relay".localized : "player.instant_opening".localized)
 
         if !forceFresh, let retainedPlayer = PictureInPictureManager.shared.consumeRetainedPlayer(for: video) {
             if retainedPlayer.error == nil,
@@ -2020,7 +2037,7 @@ public struct VideoDetailPlaybackScreen: View {
 
         if let localURL = await downloadManager.playableLocalURL(for: video, episode: currentEpisode) {
             guard activeResolveID == resolveID, !isViewDismissed, !Task.isCancelled else { return }
-            resolveStatus = "从离线缓存中加载…"
+            resolveStatus = "player.loading_offline".localized
             initPlayer(url: localURL, referer: nil)
             isResolving = false
             return
@@ -2126,7 +2143,7 @@ public struct VideoDetailPlaybackScreen: View {
                     if self.isLandscape != shouldLandscape {
                         self.gravityMachine.setLandscapeInFullscreen(shouldLandscape)
                         PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: shouldLandscape)
-                        withAnimation(self.reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.86)) {
+                        AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: self.reduceMotion) {
                             self.isLandscape = shouldLandscape
                         }
                     }
@@ -2285,15 +2302,13 @@ public struct VideoDetailPlaybackScreen: View {
     private func handleDoubleTap(at x: CGFloat, in width: CGFloat) {
         let effectiveWidth = max(width, 1)
         if x < effectiveWidth * 0.35 {
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
+            AuroraHaptics.impact(.medium)
             seekRelative(-10)
-            showHud(icon: "gobackward.10", text: "快退 10 秒")
+            showHud(icon: "gobackward.10", text: "player.rewind_10s".localized)
         } else if x > effectiveWidth * 0.65 {
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
+            AuroraHaptics.impact(.medium)
             seekRelative(10)
-            showHud(icon: "goforward.10", text: "快进 10 秒")
+            showHud(icon: "goforward.10", text: "player.forward_10s".localized)
         } else {
             toggleFillMode()
         }
@@ -2320,14 +2335,14 @@ public struct VideoDetailPlaybackScreen: View {
         case .brightness:
             let newBrightness = min(max(gestureInitialValue + deltaY, 0.0), 1.0)
             PlayerOrientationCoordinator.activeWindowScene()?.screen.brightness = newBrightness
-            showHud(icon: "sun.max.fill", text: "亮度", progress: Double(newBrightness))
+            showHud(icon: "sun.max.fill", text: "player.brightness".localized, progress: Double(newBrightness))
         case .volume:
             let newVolume = min(max(gestureInitialValue + deltaY, 0.0), 1.0)
             player?.isMuted = (newVolume == 0)
             player?.volume = Float(newVolume)
             isMuted = (newVolume == 0)
             let icon = newVolume > 0.5 ? "speaker.wave.3.fill" : (newVolume > 0 ? "speaker.wave.1.fill" : "speaker.slash.fill")
-            showHud(icon: icon, text: "音量", progress: Double(newVolume))
+            showHud(icon: icon, text: "player.volume".localized, progress: Double(newVolume))
         }
     }
 
@@ -2337,21 +2352,19 @@ public struct VideoDetailPlaybackScreen: View {
         }
         guard let base = pinchBaselineFillMode else { return }
         if !base && scale > 1.16 {
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+            AuroraHaptics.impact(.medium)
+            AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
                 isFillMode = true
             }
             pinchBaselineFillMode = true
-            showHud(icon: "rectangle.arrowtriangle.2.inward", text: "填满屏幕")
+            showHud(icon: "rectangle.arrowtriangle.2.inward", text: "player.fill_screen".localized)
         } else if base && scale < 0.86 {
-            let impact = UIImpactFeedbackGenerator(style: .medium)
-            impact.impactOccurred()
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+            AuroraHaptics.impact(.medium)
+            AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
                 isFillMode = false
             }
             pinchBaselineFillMode = false
-            showHud(icon: "rectangle.arrowtriangle.2.outward", text: "原片比例")
+            showHud(icon: "rectangle.arrowtriangle.2.outward", text: "player.original_ratio".localized)
         }
     }
 
@@ -2362,7 +2375,7 @@ public struct VideoDetailPlaybackScreen: View {
             preBoostPlaybackRate = playbackRate
             isSpeedBoosting = true
             p.rate = 2.0
-            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+            AuroraHaptics.impact(.rigid)
         } else if isSpeedBoosting {
             isSpeedBoosting = false
             if isPlaying {
@@ -2373,8 +2386,7 @@ public struct VideoDetailPlaybackScreen: View {
 
     private func togglePlayPause() {
         guard let p = player else { return }
-        let impact = UIImpactFeedbackGenerator(style: .light)
-        impact.impactOccurred()
+        AuroraHaptics.impact(.light)
         if isPlaying {
             isSpeedBoosting = false
             p.pause()
@@ -2395,20 +2407,19 @@ public struct VideoDetailPlaybackScreen: View {
 
     private func toggleMute() {
         guard let p = player else { return }
-        let impact = UIImpactFeedbackGenerator(style: .light)
-        impact.impactOccurred()
+        AuroraHaptics.impact(.light)
         if !isMuted && p.volume > 0 {
             gestureInitialValue = CGFloat(p.volume)
             p.isMuted = true
             p.volume = 0
             isMuted = true
-            showHud(icon: "speaker.slash.fill", text: "已静音", progress: 0)
+            showHud(icon: "speaker.slash.fill", text: "player.muted_hud".localized, progress: 0)
         } else {
             let restored = Float(gestureInitialValue > 0.05 ? gestureInitialValue : 0.85)
             p.isMuted = false
             p.volume = restored
             isMuted = false
-            showHud(icon: "speaker.wave.2.fill", text: "已恢复声音", progress: Double(restored))
+            showHud(icon: "speaker.wave.2.fill", text: "player.unmuted_hud".localized, progress: Double(restored))
         }
     }
 
@@ -2437,14 +2448,13 @@ public struct VideoDetailPlaybackScreen: View {
     }
 
     private func toggleFillMode() {
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+        AuroraHaptics.impact(.medium)
+        AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
             isFillMode.toggle()
         }
         showHud(
             icon: isFillMode ? "rectangle.arrowtriangle.2.inward" : "rectangle.arrowtriangle.2.outward",
-            text: isFillMode ? "填满屏幕" : "原片比例"
+            text: isFillMode ? "player.fill_screen".localized : "player.original_ratio".localized
         )
         scheduleHideControls()
     }
@@ -2577,7 +2587,7 @@ public struct VideoDetailPlaybackScreen: View {
             return
         }
         let task = DispatchWorkItem {
-            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.28)) {
+            AuroraMotion.perform(AuroraMotion.quick, reduceMotion: self.reduceMotion) {
                 if self.isPlaying && !self.isScrubbing {
                     self.showControls = false
                 }
@@ -2672,10 +2682,9 @@ public struct VideoDetailPlaybackScreen: View {
             isSwitchingNextEpisode = true
             showHud(
                 icon: "forward.end.fill",
-                text: "本集结束，自动播放 \(nextEp.label)"
+                text: String(format: "player.auto_next_ep".localized, nextEp.label)
             )
-            let impact = UINotificationFeedbackGenerator()
-            impact.notificationOccurred(.success)
+            AuroraHaptics.notification(.success)
             autoAdvanceWorkItem?.cancel()
             let item = DispatchWorkItem {
                 guard !self.isViewDismissed else {
@@ -2692,7 +2701,7 @@ public struct VideoDetailPlaybackScreen: View {
         } else {
             showHud(
                 icon: "checkmark.circle.fill",
-                text: "全剧播放完毕"
+                text: "player.series_completed".localized
             )
         }
     }
@@ -2716,7 +2725,7 @@ public struct VideoDetailPlaybackScreen: View {
             return
         }
         self.player = nil
-        self.resolveError = errorDescription ?? "播放器解码失败"
+        self.resolveError = errorDescription ?? "player.decode_failed".localized
         UIApplication.shared.isIdleTimerDisabled = false
     }
 
@@ -2752,8 +2761,7 @@ public struct VideoDetailPlaybackScreen: View {
     }
 
     private func switchToVideo(_ newVideo: VideoItem) {
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+        AuroraHaptics.impact(.medium)
         cleanupPlayer(forceStopPlayer: true)
         resolveError = nil
         recoveryStage = 0
@@ -2796,11 +2804,11 @@ public struct VideoDetailPlaybackScreen: View {
 
     private func showToast(text: String) {
         downloadToastText = text
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
             showDownloadToast = true
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            AuroraMotion.perform(AuroraMotion.quick, reduceMotion: self.reduceMotion) {
                 self.showDownloadToast = false
             }
         }
@@ -2833,13 +2841,13 @@ public struct VideoDetailPlaybackScreen: View {
 
     private func showHud(icon: String, text: String, progress: Double? = nil) {
         hudTask?.cancel()
-        withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+        AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
             self.hudIcon = icon
             self.hudMessage = text
             self.hudProgress = progress
         }
         let task = DispatchWorkItem {
-            withAnimation(.easeInOut(duration: 0.25)) {
+            AuroraMotion.perform(AuroraMotion.quick, reduceMotion: self.reduceMotion) {
                 self.hudMessage = nil
                 self.hudIcon = nil
                 self.hudProgress = nil
@@ -2911,15 +2919,13 @@ private struct PlayerSurfaceGestureModifier: ViewModifier {
                         guard isVerticalDominant else { return }
 
                         if isFullScreen {
-                            // 全屏中央区域向下轻扫 -> YouTube / Apple TV 式跟手退回二级页
                             if dy > 56 {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                AuroraHaptics.impact(.medium)
                                 onSwipeDownFullscreen()
                             }
                         } else {
-                            // 二级页内嵌播放器向上轻扫 -> 直接展开自适应全屏
                             if dy < -48 {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                AuroraHaptics.impact(.medium)
                                 onSwipeUpInline()
                             }
                         }

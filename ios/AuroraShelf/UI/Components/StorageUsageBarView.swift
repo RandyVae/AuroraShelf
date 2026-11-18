@@ -4,6 +4,7 @@ import SwiftUI
 public struct StorageUsageBarView: View {
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
     @ObservedObject private var comicDownloadManager = ComicDownloadManager.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
     
     @State private var freeBytes: Int64 = 0
     @State private var totalBytes: Int64 = 0
@@ -20,14 +21,14 @@ public struct StorageUsageBarView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("本地存储空间")
+                Text("storage.title".localized)
                     .font(.subheadline.bold())
                     .foregroundStyle(AuroraColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
                 
                 if cacheBytes > 0 {
                     Button {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
+                        AuroraHaptics.medium()
                         isClearingCache = true
                         Task {
                             await CoverImageLoader.shared.clearDiskAndMemoryCache()
@@ -43,27 +44,30 @@ public struct StorageUsageBarView: View {
                         HStack(spacing: 4) {
                             if isClearingCache {
                                 ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
+                                    .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brandLabel))
                                     .scaleEffect(0.6)
                             } else {
                                 Image(systemName: "trash")
                                     .font(.caption2)
-                                Text("清理缓存")
+                                Text("storage.clear_cache".localized)
                                     .font(.caption2.weight(.medium))
                             }
                         }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
                         .background(AuroraColor.surfaceHigh, in: Capsule())
-                        .foregroundStyle(AuroraColor.brand)
+                        .foregroundStyle(AuroraColor.brandLabel)
+                        .frame(minHeight: AuroraMetrics.minTouchTarget)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .hoverEffect(.highlight)
                     .disabled(isClearingCache)
                 }
                 
                 Spacer()
                 
-                Text("剩余可用 \(formatBytes(freeBytes))")
+                Text("storage.free_space".localized(formatBytes(freeBytes)))
                     .font(.caption.bold())
                     .foregroundStyle(AuroraColor.textSecondary)
             }
@@ -118,9 +122,9 @@ public struct StorageUsageBarView: View {
             
             // 图例说明行
             HStack(spacing: 12) {
-                legendItem(color: Color(rgb: 0x0A84FF), label: "离线下载", value: formatBytes(downloadedBytes))
-                legendItem(color: Color(rgb: 0xFF9F0A), label: "海报与缓存", value: formatBytes(cacheBytes))
-                legendItem(color: Color(rgb: 0x8E8E93), label: "系统与其他", value: nil)
+                legendItem(color: Color(rgb: 0x0A84FF), label: "storage.downloads".localized, value: formatBytes(downloadedBytes))
+                legendItem(color: Color(rgb: 0xFF9F0A), label: "storage.posters_cache".localized, value: formatBytes(cacheBytes))
+                legendItem(color: Color(rgb: 0x8E8E93), label: "storage.system_other".localized, value: nil)
             }
             .font(.caption2)
         }

@@ -10,17 +10,17 @@ public struct PersonalScreen: View {
     @ObservedObject private var comicDownloadManager = ComicDownloadManager.shared
     @ObservedObject private var account = AccountService.shared
     @AppStorage("aurora_theme_mode") private var themeModeRaw: String = AuroraThemeMode.system.rawValue
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     public let onPlayVideo: (VideoItem) -> Void
 
     @State private var showVideoSourcePicker: Bool = false
     @State private var showComicSourcePicker: Bool = false
-    @State private var showLiveSourceDialog: Bool = false
-    @State private var showAirPlayPicker: Bool = false
     @State private var showLanguagePicker: Bool = false
-    @State private var showThemeDialog: Bool = false
     @State private var showAccount: Bool = false
     @State private var showOpenSourceNotices: Bool = false
-    
+    @State private var pushWatchlistFromCommand: Bool = false
+    @State private var coordinator = PlayerCoordinator.shared
+
     public init(onPlayVideo: @escaping (VideoItem) -> Void) {
         self.onPlayVideo = onPlayVideo
     }
@@ -35,7 +35,7 @@ public struct PersonalScreen: View {
             if !trimmed.isEmpty { return trimmed }
             return profile.email.components(separatedBy: "@").first ?? profile.email
         }
-        return "访客用户"
+        return "account.guest".localized
     }
 
     private var profileInitial: String {
@@ -48,11 +48,11 @@ public struct PersonalScreen: View {
         guard let status = account.profile?.subscriptionStatus.lowercased() else { return false }
         return status == "pro" || status == "active" || status == "vip"
     }
-    
+
     public var body: some View {
         ZStack {
             AuroraColor.canvas.ignoresSafeArea()
-            
+
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: AuroraMetrics.spacingXL) {
                     // 1. 用户头像与会员卡（动态绑定 AccountService，点击打开账号管理）
@@ -62,20 +62,20 @@ public struct PersonalScreen: View {
                         HStack(spacing: AuroraMetrics.spacingL) {
                             ZStack {
                                 Circle()
-                                    .fill(AuroraColor.brand)
+                                    .fill(AuroraColor.brandSolid)
                                     .frame(width: 56, height: 56)
                                 Text(profileInitial)
-                                    .font(.system(size: 24, weight: .black, design: .rounded))
+                                    .font(.system(.title2, design: .rounded).weight(.black))
                                     .foregroundStyle(.white)
                             }
-                            
+
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack(spacing: 6) {
                                     Text(profileDisplayName)
                                         .font(.title2)
                                         .fontWeight(.bold)
                                         .foregroundStyle(AuroraColor.textPrimary)
-                                    
+
                                     if isProActive {
                                         Text("PRO")
                                             .font(.caption2)
@@ -85,7 +85,7 @@ public struct PersonalScreen: View {
                                             .padding(.vertical, 2)
                                             .background(Capsule().fill(Color.yellow))
                                     } else {
-                                        Text(account.profile != nil ? "免费版" : "未登录")
+                                        Text(account.profile != nil ? "account.free_plan".localized : "account.unlogged".localized)
                                             .font(.caption2)
                                             .fontWeight(.bold)
                                             .foregroundStyle(AuroraColor.textSecondary)
@@ -94,12 +94,19 @@ public struct PersonalScreen: View {
                                             .background(Capsule().fill(AuroraColor.surfaceHigh))
                                     }
                                 }
-                                
-                                Text("iOS 视频适配 \(VideoSourceCatalog.supportedSources.count)/\(VideoSourceCatalog.allSources.count) · 漫画适配 \(ComicSourceCatalog.supportedSources.count)/\(ComicSourceCatalog.allSources.count)")
-                                    .font(.footnote)
-                                    .foregroundStyle(AuroraColor.textSecondary)
+
+                                Text(
+                                    "settings.adaptation_summary".localized(
+                                        VideoSourceCatalog.supportedSources.count,
+                                        VideoSourceCatalog.allSources.count,
+                                        ComicSourceCatalog.supportedSources.count,
+                                        ComicSourceCatalog.allSources.count
+                                    )
+                                )
+                                .font(.footnote)
+                                .foregroundStyle(AuroraColor.textSecondary)
                             }
-                            
+
                             Spacer()
 
                             Image(systemName: "chevron.right")
@@ -116,10 +123,10 @@ public struct PersonalScreen: View {
                                 )
                         )
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(AppleSpringCardButtonStyle())
                     .padding(.horizontal, AuroraMetrics.contentInset)
                     .padding(.top, AuroraMetrics.spacingS)
-                    
+
                     // 资料库核心：接着播放与最近历史（对齐 Apple TV 资料库）
                     UpNextShelf(onPlayVideo: onPlayVideo)
 
@@ -129,45 +136,51 @@ public struct PersonalScreen: View {
                             .font(.headline)
                             .foregroundStyle(AuroraColor.textSecondary)
                             .padding(.horizontal, AuroraMetrics.spacingXS)
-                        
+                            .accessibilityAddTraits(.isHeader)
+
                         Button {
                             PlayerCoordinator.shared.openGame()
                         } label: {
                             HStack(spacing: AuroraMetrics.spacingL) {
                                 ZStack {
                                     RoundedRectangle(cornerRadius: AuroraMetrics.controlRadius, style: .continuous)
-                                        .fill(AuroraColor.brand.opacity(0.18))
+                                        .fill(AuroraColor.brand.opacity(0.16))
                                         .frame(width: 44, height: 44)
                                     Image(systemName: "gamecontroller.fill")
                                         .font(.title3)
-                                        .foregroundStyle(AuroraColor.brand)
+                                        .foregroundStyle(AuroraColor.brandLabel)
                                 }
-                                
-                                VStack(alignment: .leading, spacing: 3) {
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("settings.game_title".localized)
+                                        .font(.headline)
+                                        .foregroundStyle(AuroraColor.textPrimary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.85)
                                     HStack(spacing: 6) {
-                                        Text("settings.game_title".localized)
-                                            .font(.headline)
-                                            .foregroundStyle(AuroraColor.textPrimary)
                                         Text(shortAppVersion)
-                                            .font(.caption2)
-                                            .fontWeight(.bold)
-                                            .foregroundStyle(AuroraColor.brand)
+                                            .font(.caption2.weight(.bold))
+                                            .foregroundStyle(AuroraColor.brandLabel)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(AuroraColor.brandLabel.opacity(0.14), in: Capsule())
+                                        Text("settings.game_desc".localized)
+                                            .font(.caption)
+                                            .foregroundStyle(AuroraColor.textSecondary)
+                                            .fixedSize(horizontal: false, vertical: true)
                                     }
-                                    Text("settings.game_desc".localized)
-                                        .font(.caption)
-                                        .foregroundStyle(AuroraColor.textSecondary)
                                 }
-                                
+
                                 Spacer()
-                                
+
                                 HStack(spacing: 4) {
                                     Text("settings.launch".localized)
                                         .font(.subheadline)
                                         .fontWeight(.bold)
-                                        .foregroundStyle(AuroraColor.brand)
+                                        .foregroundStyle(AuroraColor.brandLabel)
                                     Image(systemName: "play.circle.fill")
                                         .font(.body)
-                                        .foregroundStyle(AuroraColor.brand)
+                                        .foregroundStyle(AuroraColor.brandLabel)
                                 }
                             }
                             .padding(AuroraMetrics.spacingM)
@@ -180,10 +193,11 @@ public struct PersonalScreen: View {
                                     )
                             )
                         }
-                        .buttonStyle(.plain)
+                        .auroraZoomSource("game:hub")
+                        .buttonStyle(AppleSpringCardButtonStyle())
                     }
                     .padding(.horizontal, AuroraMetrics.contentInset)
-                    
+
                     // 3. 源管理与设置列表
                     VStack(spacing: 0) {
                         Button {
@@ -191,12 +205,13 @@ public struct PersonalScreen: View {
                         } label: {
                             settingRow(
                                 icon: "person.crop.circle",
-                                title: "账号",
-                                value: account.profile?.email ?? "登录 / 免费注册",
+                                title: "account.title".localized,
+                                value: account.profile?.email ?? "account.login_or_register".localized,
                                 isNavigable: true
                             )
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
 
@@ -211,9 +226,10 @@ public struct PersonalScreen: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
-                        
+
                         Button {
                             showComicSourcePicker = true
                         } label: {
@@ -225,9 +241,10 @@ public struct PersonalScreen: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
-                        
+
                         NavigationLink {
                             WatchlistScreen(onPlayVideo: onPlayVideo)
                         } label: {
@@ -239,43 +256,81 @@ public struct PersonalScreen: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
 
-                        Button {
-                            showAirPlayPicker = true
-                        } label: {
-                            settingRow(icon: "tv", title: "settings.airplay_title".localized, value: "settings.airplay_select".localized, isNavigable: true)
+                        // 原生 AirPlay 单次轻点直达（覆盖 AirPlayRoutePicker 热区，拔除多余二次中转弹窗）
+                        ZStack {
+                            settingRow(
+                                icon: "tv",
+                                title: "settings.airplay_title".localized,
+                                value: "settings.airplay_select".localized,
+                                isNavigable: true
+                            )
+                            .allowsHitTesting(false)
+
+                            AirPlayRoutePicker()
+                                .frame(maxWidth: .infinity, minHeight: AuroraMetrics.minTouchTarget)
+                                .opacity(0.02)
+                                .accessibilityLabel("settings.airplay_title".localized)
                         }
-                        .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
 
-                        Button {
-                            showLiveSourceDialog = true
+                        // 原生行内锚定菜单（在 iPad 上直接于行右侧展开，不再浮现无锚点操作弹窗）
+                        Menu {
+                            ForEach(LiveSourceCatalog.allSources) { source in
+                                Button {
+                                    liveRepo.selectSource(source.id)
+                                } label: {
+                                    HStack {
+                                        Text(LiveSourceCatalog.name(for: source.id))
+                                        if liveRepo.selectedSourceID == source.id {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
                         } label: {
                             settingRow(
                                 icon: "antenna.radiowaves.left.and.right",
                                 title: "settings.live_source".localized,
                                 value: "\(LiveSourceCatalog.name(for: liveRepo.selectedSourceID)) · \(LiveSourceCatalog.allSources.count)",
-                                isNavigable: true
+                                isNavigable: true,
+                                trailingSymbol: "chevron.up.chevron.down"
                             )
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
 
-                        Button {
-                            showThemeDialog = true
+                        Menu {
+                            ForEach(AuroraThemeMode.allCases) { mode in
+                                Button {
+                                    themeModeRaw = mode.rawValue
+                                } label: {
+                                    HStack {
+                                        Text(mode.displayName)
+                                        if activeThemeMode == mode {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
                         } label: {
                             settingRow(
                                 icon: "circle.lefthalf.filled",
                                 title: "settings.appearance".localized,
                                 value: activeThemeMode.displayName,
-                                isNavigable: true
+                                isNavigable: true,
+                                trailingSymbol: "chevron.up.chevron.down"
                             )
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
 
@@ -290,6 +345,7 @@ public struct PersonalScreen: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
 
@@ -304,6 +360,7 @@ public struct PersonalScreen: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
 
@@ -318,6 +375,7 @@ public struct PersonalScreen: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
 
                         Divider().overlay(AuroraColor.hairline)
 
@@ -332,19 +390,19 @@ public struct PersonalScreen: View {
                             )
                     )
                     .padding(.horizontal, AuroraMetrics.contentInset)
-                    
+
                     // 4. Apple TV 风格本地存储容量多段彩色仪表盘
                     StorageUsageBarView()
                         .padding(.horizontal, AuroraMetrics.contentInset)
-                    
+
                     // 品牌脚注
                     VStack(spacing: 8) {
                         NetgreyMarkView(width: 22, height: 32)
 
                         Text("Netgrey")
-                            .font(.system(size: 15, weight: .heavy))
-                            .foregroundStyle(Color(red: 1.0, green: 0.31, blue: 0.48))
-                            .tracking(-0.5)
+                            .font(.subheadline.weight(.heavy))
+                            .foregroundStyle(AuroraColor.brandLabel)
+                            .tracking(-0.4)
 
                         Text(platformFootnote)
                             .font(.caption2)
@@ -352,12 +410,17 @@ public struct PersonalScreen: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.top, AuroraMetrics.spacingM)
-
-                    Spacer().frame(height: AuroraMetrics.spacingXXL)
                 }
+                .safeAreaPadding(.bottom, 96)
             }
         }
         .navigationTitle("library.title".localized)
+        .navigationDestination(isPresented: $pushWatchlistFromCommand) {
+            WatchlistScreen(onPlayVideo: onPlayVideo)
+        }
+        .onChange(of: coordinator.openWatchlistTrigger) { _, _ in
+            pushWatchlistFromCommand = true
+        }
         .onAppear {
             let args = CommandLine.arguments
             if args.contains("--game") || args.contains("--slots") || args.contains("--game-slots") || args.contains("--game-hub") || args.contains("--game-battle") || args.contains("--battle") {
@@ -378,48 +441,16 @@ public struct PersonalScreen: View {
                 videoRepo.switchSource(to: src)
                 showVideoSourcePicker = false
             }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showComicSourcePicker) {
             ComicSourcePickerSheet(selectedSource: comicRepo.currentSource) { src in
                 comicRepo.switchSource(to: src)
                 showComicSourcePicker = false
             }
-        }
-        .sheet(isPresented: $showAirPlayPicker) {
-            NavigationStack {
-                VStack(spacing: AuroraMetrics.spacingL) {
-                    Text("选择 AirPlay 设备")
-                        .font(.headline)
-                    AirPlayRoutePicker()
-                        .frame(width: 60, height: 60)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AuroraColor.canvas)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("完成") { showAirPlayPicker = false }
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                }
-            }
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
-        }
-        .confirmationDialog("settings.select_live_source".localized, isPresented: $showLiveSourceDialog, titleVisibility: .visible) {
-            ForEach(LiveSourceCatalog.allSources) { source in
-                Button(source.name) {
-                    liveRepo.selectSource(source.id)
-                }
-            }
-            Button("common.cancel".localized, role: .cancel) {}
-        }
-        .confirmationDialog("settings.appearance".localized, isPresented: $showThemeDialog, titleVisibility: .visible) {
-            ForEach(AuroraThemeMode.allCases) { mode in
-                Button(mode.displayName) {
-                    themeModeRaw = mode.rawValue
-                }
-            }
-            Button("common.cancel".localized, role: .cancel) {}
         }
     }
 
@@ -431,14 +462,14 @@ public struct PersonalScreen: View {
             let activeProgresses = downloadManager.activeItems.map(\.status.progressValue)
                 + comicDownloadManager.activeChapters.map(\.status.progressValue)
             let avg = activeProgresses.isEmpty ? 0.0 : activeProgresses.reduce(0, +) / Double(activeProgresses.count)
-            return "下载中 \(totalActive) 项 (\(Int(avg * 100))%)"
+            return "settings.downloading_summary".localized(totalActive, Int(avg * 100))
         }
         let videoCount = downloadManager.completedItems.count
         let comicCount = comicDownloadManager.completedChapters.count
         if videoCount == 0 && comicCount == 0 {
-            return "0 项"
+            return "settings.zero_items".localized
         }
-        return "\(videoCount) 视频 · \(comicCount) 漫章"
+        return "settings.cached_summary".localized(videoCount, comicCount)
     }
 
     private var shortAppVersion: String {
@@ -453,57 +484,95 @@ public struct PersonalScreen: View {
     }
 
     private var appVersion: String {
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "未知"
-        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "未知"
+        let unknown = "common.unknown".localized
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? unknown
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? unknown
         return "\(version) (Build \(build))"
     }
 
-    private func settingRow(icon: String, title: String, value: String, isNavigable: Bool = false) -> some View {
-        HStack(spacing: AuroraMetrics.spacingM) {
-            Image(systemName: icon)
-                .font(.body)
-                .foregroundStyle(AuroraColor.brand)
-                .frame(width: 24)
-            
-            Text(title)
-                .font(.body)
-                .foregroundStyle(AuroraColor.textPrimary)
-            
-            Spacer()
-            
-            Text(value)
-                .font(.subheadline)
-                .foregroundStyle(AuroraColor.textSecondary)
-                .multilineTextAlignment(.trailing)
-                .lineLimit(2)
-            
-            if isNavigable {
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(AuroraColor.textTertiary)
+    @ViewBuilder
+    private func settingRow(
+        icon: String,
+        title: String,
+        value: String,
+        isNavigable: Bool = false,
+        trailingSymbol: String = "chevron.right"
+    ) -> some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: AuroraMetrics.spacingS) {
+                    Image(systemName: icon)
+                        .font(.body)
+                        .foregroundStyle(AuroraColor.brandLabel)
+                    Text(title)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(AuroraColor.textPrimary)
+                    Spacer()
+                    if isNavigable {
+                        Image(systemName: trailingSymbol)
+                            .font(.caption)
+                            .foregroundStyle(AuroraColor.textTertiary)
+                    }
+                }
+                Text(value)
+                    .font(.subheadline)
+                    .foregroundStyle(AuroraColor.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.horizontal, AuroraMetrics.spacingL)
+            .padding(.vertical, AuroraMetrics.spacingM)
+            .frame(maxWidth: .infinity, minHeight: AuroraMetrics.minTouchTarget, alignment: .leading)
+            .contentShape(Rectangle())
+        } else {
+            HStack(spacing: AuroraMetrics.spacingM) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundStyle(AuroraColor.brandLabel)
+                    .frame(width: 24)
+
+                Text(title)
+                    .font(.body)
+                    .foregroundStyle(AuroraColor.textPrimary)
+
+                Spacer()
+
+                Text(value)
+                    .font(.subheadline)
+                    .foregroundStyle(AuroraColor.textSecondary)
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(2)
+
+                if isNavigable {
+                    Image(systemName: trailingSymbol)
+                        .font(.caption2)
+                        .foregroundStyle(AuroraColor.textTertiary)
+                }
+            }
+            .padding(.horizontal, AuroraMetrics.spacingL)
+            .padding(.vertical, AuroraMetrics.spacingM)
+            .frame(minHeight: AuroraMetrics.minTouchTarget)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, AuroraMetrics.spacingL)
-        .padding(.vertical, AuroraMetrics.spacingM)
-        .frame(minHeight: AuroraMetrics.minTouchTarget)
-        .contentShape(Rectangle())
     }
 }
 
 struct OpenSourceNoticesSheet: View {
+    @ObservedObject private var locManager = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
 
-    private let items: [(name: String, license: String, summary: String)] = [
-        ("PipePipeExtractor", "GNU GPLv3", "第三方流媒体站点解析组件（见仓库 THIRD_PARTY_NOTICES.md 与源码树）"),
-        ("Spine WebGL Runtime", "Spine Runtimes License", "2D 骨骼动画渲染运行时（Esoteric Software）"),
-        ("Comic Protocol Reference", "Apache-2.0", "漫画接口协议与分片重排算法参考实现（JHenTai / Mihon 生态）"),
-        ("Apple Native Frameworks", "Apple SDK", "SwiftUI、AVKit、AVFoundation、WebKit、Network、CryptoKit")
-    ]
+    private var items: [(name: String, license: String, summary: String)] {
+        [
+            ("PipePipeExtractor", "GNU GPLv3", "settings.oss_pipepipe".localized),
+            ("Spine WebGL Runtime", "Spine Runtimes License", "settings.oss_spine".localized),
+            ("Comic Protocol Reference", "Apache-2.0", "settings.oss_comic".localized),
+            ("Apple Native Frameworks", "Apple SDK", "SwiftUI, AVKit, AVFoundation, WebKit, Network, CryptoKit, AppIntents")
+        ]
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                Section("开源组件与致谢") {
+                Section("settings.oss_section".localized) {
                     ForEach(items, id: \.name) { item in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
@@ -524,8 +593,8 @@ struct OpenSourceNoticesSheet: View {
                 }
                 Section {
                     if let url = URL(string: "https://github.com/RandyVae/AuroraShelf/blob/main/THIRD_PARTY_NOTICES.md") {
-                        Link("查看完整 THIRD_PARTY_NOTICES.md", destination: url)
-                            .foregroundStyle(AuroraColor.brand)
+                        Link("settings.oss_full_link".localized, destination: url)
+                            .foregroundStyle(AuroraColor.brandLabel)
                     }
                 }
             }
@@ -534,86 +603,77 @@ struct OpenSourceNoticesSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("common.done".localized) { dismiss() }
-                        .frame(minWidth: 44, minHeight: 44)
+                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                 }
             }
         }
     }
 }
 
-// 漫画源切换面板
+// 漫画源切换面板（统一升级为原生 NavigationStack + List(.insetGrouped)，与视频源选择器 1:1 对齐）
 struct ComicSourcePickerSheet: View {
     let selectedSource: ComicSourceDefinition
     let onSelect: (ComicSourceDefinition) -> Void
+    @ObservedObject private var locManager = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
-    
+
     var body: some View {
-        ZStack {
-            AuroraColor.canvas.ignoresSafeArea()
-            
-            VStack(alignment: .leading, spacing: AuroraMetrics.spacingL) {
-                HStack {
-                    Text("iOS 漫画源 · \(ComicSourceCatalog.supportedSources.count)/\(ComicSourceCatalog.allSources.count) 个已配置适配")
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundStyle(AuroraColor.textPrimary)
-                    Spacer()
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(AuroraColor.textSecondary)
-                            .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel("common.close".localized)
-                }
-                .padding(.horizontal, AuroraMetrics.contentInset)
-                .padding(.top, AuroraMetrics.spacingL)
-                
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: AuroraMetrics.spacingM) {
-                        ForEach(ComicSourceCatalog.allSources) { src in
-                            let isSelected = src.id == selectedSource.id
-                            Button(action: { onSelect(src) }) {
-                                HStack(spacing: AuroraMetrics.spacingM) {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(src.name)
-                                            .font(.body)
-                                            .fontWeight(.semibold)
-                                            .foregroundStyle(isSelected ? AuroraColor.brand : AuroraColor.textPrimary)
-                                        Text(ComicSourceCatalog.isSupported(src) ? src.description : "iOS 解析器尚未接入")
-                                            .font(.caption)
-                                            .foregroundStyle(AuroraColor.textSecondary)
-                                    }
-                                    Spacer()
-                                    if isSelected {
-                                        Image(systemName: "checkmark")
-                                            .font(.headline)
-                                            .fontWeight(.bold)
-                                            .foregroundStyle(AuroraColor.brand)
-                                    } else if !ComicSourceCatalog.isSupported(src) {
-                                        Text("暂不可用")
-                                            .font(.caption2.weight(.semibold))
-                                            .foregroundStyle(AuroraColor.textSecondary)
-                                    }
+        NavigationStack {
+            List {
+                Section(
+                    "settings.comic_source_header".localized(
+                        ComicSourceCatalog.supportedSources.count,
+                        ComicSourceCatalog.allSources.count
+                    )
+                ) {
+                    ForEach(ComicSourceCatalog.allSources) { src in
+                        let isSupported = ComicSourceCatalog.isSupported(src)
+                        let isSelected = src.id == selectedSource.id
+                        Button {
+                            guard isSupported else { return }
+                            AuroraHaptics.medium()
+                            onSelect(src)
+                        } label: {
+                            HStack(spacing: AuroraMetrics.spacingM) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(src.name)
+                                        .font(.body.weight(.semibold))
+                                        .foregroundStyle(isSelected ? AuroraColor.brandLabel : AuroraColor.textPrimary)
+                                    Text(isSupported ? src.description : "home.parser_pending".localized)
+                                        .font(.caption)
+                                        .foregroundStyle(AuroraColor.textSecondary)
                                 }
-                                .padding(.horizontal, AuroraMetrics.spacingL)
-                                .padding(.vertical, AuroraMetrics.spacingM)
-                                .background(
-                                    RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
-                                        .fill(isSelected ? AuroraColor.brand.opacity(0.12) : AuroraColor.surface)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
-                                                .stroke(isSelected ? AuroraColor.brand.opacity(0.4) : AuroraColor.hairline, lineWidth: 1)
-                                        )
-                                )
+                                Spacer()
+                                if isSelected {
+                                    Image(systemName: "checkmark")
+                                        .font(.body.weight(.bold))
+                                        .foregroundStyle(AuroraColor.brandLabel)
+                                } else if !isSupported {
+                                    Text("settings.not_available".localized)
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(AuroraColor.textSecondary)
+                                }
                             }
-                            .buttonStyle(.plain)
-                            .disabled(!ComicSourceCatalog.isSupported(src))
+                            .frame(minHeight: AuroraMetrics.minTouchTarget)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
+                        .disabled(!isSupported)
+                        .listRowBackground(AuroraColor.surface)
                     }
-                    .padding(.horizontal, AuroraMetrics.contentInset)
-                    .padding(.bottom, AuroraMetrics.spacingXXL)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(AuroraColor.canvas.ignoresSafeArea())
+            .navigationTitle("comics.select_source".localized)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("common.done".localized) { dismiss() }
+                        .foregroundStyle(AuroraColor.brandLabel)
+                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                 }
             }
         }
@@ -683,7 +743,7 @@ struct LanguagePickerSheet: View {
                                     )
                                     .frame(width: 32, height: 32)
                                 Image(systemName: meta.icon)
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(.white)
                             }
                             .overlay(Circle().stroke(Color.white.opacity(0.2), lineWidth: 1))
@@ -694,7 +754,7 @@ struct LanguagePickerSheet: View {
                                     .font(.body)
                                     .foregroundStyle(AuroraColor.textPrimary)
                                 if lang == .system {
-                                    Text("跟随当前系统语言设置")
+                                    Text("settings.follow_system_lang_desc".localized)
                                         .font(.caption)
                                         .foregroundStyle(AuroraColor.textSecondary)
                                 }
@@ -703,12 +763,14 @@ struct LanguagePickerSheet: View {
                             if locManager.selectedLanguage == lang {
                                 Image(systemName: "checkmark")
                                     .font(.body.weight(.bold))
-                                    .foregroundStyle(AuroraColor.brand)
+                                    .foregroundStyle(AuroraColor.brandLabel)
                             }
                         }
+                        .frame(minHeight: AuroraMetrics.minTouchTarget)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .hoverEffect(.highlight)
                     .listRowBackground(AuroraColor.surface)
                 }
             }
@@ -722,8 +784,8 @@ struct LanguagePickerSheet: View {
                     Button("common.done".localized) {
                         dismiss()
                     }
-                    .foregroundStyle(AuroraColor.brand)
-                    .frame(minWidth: 44, minHeight: 44)
+                    .foregroundStyle(AuroraColor.brandLabel)
+                    .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                 }
             }
         }

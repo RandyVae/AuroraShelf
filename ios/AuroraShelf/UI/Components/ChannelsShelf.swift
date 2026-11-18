@@ -163,7 +163,7 @@ private struct ChannelGlyph: View {
         case "huavod": return "HU"
         case "huangguo": return "HG"
         case "91porn": return "91"
-        case "91dongman": return "漫"
+        case "91dongman": return "channels.badge_anime".localized
         case "beeg": return "B"
         case "xvideos": return "XV"
         case "missav": return "M"
@@ -194,7 +194,7 @@ private struct ChannelGlyph: View {
         }
         .frame(width: 38, height: 38)
         .shadow(color: .black.opacity(isSelected ? 0.28 : 0.12), radius: 3, y: 1)
-        .accessibilityLabel("频道图标")
+        .accessibilityLabel("channels.icon_a11y".localized)
     }
 }
 
@@ -284,6 +284,8 @@ public struct ChannelBrandCard: View {
 /// Apple TV 风格的「频道与流媒体来源（Channels & Sources）」横向货架
 public struct ChannelsShelf: View {
     @ObservedObject private var repo = VideoRepository.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     public let onOpenSourcePicker: () -> Void
 
     public init(onOpenSourcePicker: @escaping () -> Void) {
@@ -292,48 +294,54 @@ public struct ChannelsShelf: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-            // 货架标题（Apple TV 原生纯粹排版，无多余副标胶囊）
             HStack(spacing: AuroraMetrics.spacingS) {
                 Text("home.channels".localized)
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundStyle(AuroraColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
                 Button(action: onOpenSourcePicker) {
                     HStack(spacing: 2) {
-                        Text("全量 \(VideoSourceCatalog.allSources.count) 源")
+                        Text("channels.all_sources_count".localized(VideoSourceCatalog.allSources.count))
                             .font(.subheadline)
                             .fontWeight(.medium)
-                            .foregroundStyle(AuroraColor.brand)
+                            .foregroundStyle(AuroraColor.brandLabel)
                         Image(systemName: "chevron.right")
                             .font(.caption2)
-                            .foregroundStyle(AuroraColor.brand)
+                            .foregroundStyle(AuroraColor.brandLabel)
                     }
+                    .frame(minHeight: AuroraMetrics.minTouchTarget)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("查看全量 \(VideoSourceCatalog.allSources.count) 个频道来源")
+                .hoverEffect(.highlight)
+                .accessibilityLabel("channels.all_sources_a11y".localized(VideoSourceCatalog.allSources.count))
             }
             .padding(.horizontal, AuroraMetrics.contentInset)
 
-            // 频道卡片横向滚动流
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: AuroraMetrics.spacingM) {
                     ForEach(VideoSourceCatalog.supportedSources) { source in
                         let isSelected = repo.currentSource.id == source.id
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                                 repo.switchSource(to: source)
                             }
                         } label: {
                             ChannelBrandCard(source: source, isSelected: isSelected)
                         }
                         .buttonStyle(AppleSpringCardButtonStyle())
-                        .accessibilityLabel("频道 \(source.name)，\(isSelected ? "当前正在播放" : "轻点切换")")
+                        .accessibilityLabel(
+                            "channels.card_a11y".localized(
+                                source.name,
+                                isSelected ? "channels.status_active".localized : "channels.status_tap".localized
+                            )
+                        )
                     }
 
-                    // 探索更多频道入口
                     Button(action: onOpenSourcePicker) {
                         VStack(spacing: 8) {
                             ZStack {
@@ -352,19 +360,19 @@ public struct ChannelsShelf: View {
                                     )
 
                                 Image(systemName: "ellipsis.circle.fill")
-                                    .font(.system(size: 22, weight: .bold))
+                                    .font(.title3.weight(.bold))
                                     .foregroundStyle(AuroraColor.brand)
                             }
 
-                            Text("更多频道")
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                            Text("channels.more".localized)
+                                .font(.caption.weight(.medium))
                                 .foregroundStyle(AuroraColor.textSecondary)
                                 .lineLimit(1)
                                 .frame(width: 88)
                         }
                     }
                     .buttonStyle(AppleSpringCardButtonStyle())
-                    .accessibilityLabel("探索更多流媒体来源")
+                    .accessibilityLabel("channels.more_a11y".localized)
                 }
                 .padding(.horizontal, AuroraMetrics.contentInset)
             }

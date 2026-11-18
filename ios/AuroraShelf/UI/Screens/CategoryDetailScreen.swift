@@ -1,8 +1,6 @@
 import SwiftUI
 
 /// Apple TV 风格的二级分类专区页（Category Detail Screen）
-/// 承接用户从主页货架点击「分类标题 ›」或「全部 ›」之后的深层浏览需求；
-/// 提供细分品类切换 Chip、自适应海报网格与无限上拉分页流。
 public struct CategoryDetailScreen: View {
     public let source: VideoSourceDefinition
     public let initialCategory: String
@@ -10,12 +8,21 @@ public struct CategoryDetailScreen: View {
     public let onOpenDetail: (VideoItem) -> Void
 
     public enum SortOption: String, CaseIterable, Identifiable {
-        case `default` = "推荐排序"
-        case latest = "最新上架"
-        case rating = "高分优选"
+        case `default` = "default"
+        case latest = "latest"
+        case rating = "rating"
         public var id: String { rawValue }
+
+        public var displayTitle: String {
+            switch self {
+            case .default: return "category.sort_default".localized
+            case .latest: return "category.sort_latest".localized
+            case .rating: return "category.sort_rating".localized
+            }
+        }
     }
 
+    @ObservedObject private var locManager = LocalizationManager.shared
     @State private var selectedCategory: String
     @State private var sortOption: SortOption = .default
     @State private var videos: [VideoItem] = []
@@ -27,9 +34,11 @@ public struct CategoryDetailScreen: View {
     @State private var loadMoreError: String? = nil
     @State private var selectedDetailVideo: VideoItem? = nil
 
+    @Environment(\.auroraContainerSize) private var containerSize
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var availableCategories: [String] {
         source.categories.isEmpty ? [initialCategory] : source.categories
@@ -47,7 +56,7 @@ public struct CategoryDetailScreen: View {
     }
 
     private var gridColumns: [GridItem] {
-        let form = DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
+        let form = DeviceLayout.resolveCurrent(containerSize: containerSize, horizontalSizeClass: horizontalSizeClass)
         let baseMin = DeviceLayout.gridMinimumWidth(for: form)
         let minimumWidth: CGFloat = dynamicTypeSize.isAccessibilitySize ? max(baseMin, 260) : baseMin
         return [GridItem(.adaptive(minimum: minimumWidth, maximum: 340), spacing: AuroraMetrics.spacingM)]
@@ -72,7 +81,6 @@ public struct CategoryDetailScreen: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: AuroraMetrics.spacingL) {
-                    // 1. 分类细分子标签切换栏（支持在专区内快捷跳转其他板块）
                     if availableCategories.count > 1 {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: AuroraMetrics.spacingS) {
@@ -80,32 +88,35 @@ public struct CategoryDetailScreen: View {
                                     let isSelected = (cat == selectedCategory)
                                     Button {
                                         if selectedCategory != cat {
-                                            selectedCategory = cat
+                                            AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
+                                                selectedCategory = cat
+                                            }
                                             loadFirstPage()
                                         }
                                     } label: {
-                                        Text(cat)
+                                        Text(cat.localizedCategoryLabel)
                                             .font(.subheadline)
                                             .fontWeight(isSelected ? .bold : .medium)
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 8)
+                                            .frame(minHeight: AuroraMetrics.minTouchTarget)
                                             .background(
-                                                isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                                isSelected ? AuroraColor.brandSolid : AuroraColor.surfaceCard,
                                                 in: Capsule()
                                             )
                                             .foregroundStyle(isSelected ? .white : AuroraColor.textPrimary)
                                     }
                                     .buttonStyle(.plain)
+                                    .hoverEffect(.highlight)
                                 }
                             }
                             .padding(.horizontal, AuroraMetrics.contentInset)
                             .padding(.top, AuroraMetrics.spacingS)
                         }
+                        .sensoryFeedback(.selection, trigger: selectedCategory)
                     }
 
-                    // 2. 视频内容网格
                     if isLoading && videos.isEmpty {
-                        // Apple TV 原生骨架屏（Poster Shimmer Skeleton）
                         LazyVGrid(columns: gridColumns, spacing: AuroraMetrics.spacingL) {
                             ForEach(0..<6, id: \.self) { _ in
                                 VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
@@ -130,15 +141,15 @@ public struct CategoryDetailScreen: View {
                         .padding(.vertical, 8)
                     } else if let error = errorMessage, videos.isEmpty {
                         ContentUnavailableView {
-                            Label("无法加载内容", systemImage: "wifi.exclamationmark")
+                            Label("category.load_failed".localized, systemImage: "wifi.exclamationmark")
                         } description: {
                             Text(error)
                         } actions: {
-                            Button("重新连接", systemImage: "arrow.clockwise") {
+                            Button("category.reconnect".localized, systemImage: "arrow.clockwise") {
                                 loadFirstPage()
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(AuroraColor.brand)
+                            .tint(AuroraColor.brandSolid)
                         }
                         .padding(.vertical, 60)
                     } else {
@@ -167,7 +178,7 @@ public struct CategoryDetailScreen: View {
                                 HStack(spacing: AuroraMetrics.spacingM) {
                                     ProgressView()
                                         .controlSize(.regular)
-                                        .tint(AuroraColor.brand)
+                                        .tint(AuroraColor.brandLabel)
                                     Text("home.loading_more".localized)
                                         .font(.footnote)
                                         .foregroundStyle(AuroraColor.textSecondary)
@@ -179,9 +190,10 @@ public struct CategoryDetailScreen: View {
                                     self.loadMoreError = nil
                                     loadNextPage()
                                 } label: {
-                                    Label("\(loadMoreError)（点击重试）", systemImage: "arrow.clockwise")
+                                    Label("category.load_more_retry".localized(loadMoreError), systemImage: "arrow.clockwise")
                                         .font(.footnote.weight(.medium))
-                                        .foregroundStyle(AuroraColor.brand)
+                                        .foregroundStyle(AuroraColor.brandLabel)
+                                        .frame(minHeight: AuroraMetrics.minTouchTarget)
                                 }
                                 .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity)
@@ -198,27 +210,26 @@ public struct CategoryDetailScreen: View {
                         .frame(maxWidth: .infinity)
                     }
 
-                    Spacer().frame(height: 60)
+                    Spacer().frame(height: 80)
                 }
             }
             .refreshable {
                 await reloadAsync()
             }
         }
-        .navigationTitle("\(selectedCategory) · \(source.name)")
+        .navigationTitle("\(selectedCategory.localizedCategoryLabel) · \(source.name)")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     ForEach(SortOption.allCases) { opt in
                         Button {
-                            withAnimation(.easeInOut(duration: 0.2)) {
+                            AuroraMotion.perform(AuroraMotion.subtle, reduceMotion: reduceMotion) {
                                 sortOption = opt
                             }
                         } label: {
                             HStack {
-                                Text(opt.rawValue)
+                                Text(opt.displayTitle)
                                 if sortOption == opt {
                                     Image(systemName: "checkmark")
                                 }
@@ -227,12 +238,13 @@ public struct CategoryDetailScreen: View {
                     }
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
-                        .font(.caption.bold())
+                        .font(.subheadline.bold())
                         .foregroundStyle(AuroraColor.textPrimary)
-                        .frame(width: 32, height: 32)
-                        .background(AuroraColor.surfaceCard, in: Circle())
+                        .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                        .contentShape(Rectangle())
                 }
-                .accessibilityLabel("排序方式，当前：\(sortOption.rawValue)")
+                .hoverEffect(.highlight)
+                .accessibilityLabel("category.sort_a11y".localized(sortOption.displayTitle))
             }
         }
         .sheet(item: $selectedDetailVideo) { video in

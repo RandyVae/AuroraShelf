@@ -2,12 +2,6 @@ import SwiftUI
 import UIKit
 
 // MARK: - iOS 26 / 27 SDK 原生高透折射液态玻璃（Glass.clear）播放器组件库
-//
-// 设计准则：
-// 1. 视频浮层一律采用 `Glass.clear.interactive()`（底层对应 `UIGlassEffectStyleClear`），
-//    取代发灰雾化的 `Glass.regular`，让动态视频像素在按钮边缘产生强折射透镜高光（Specular Rim & Lensing）。
-// 2. 优先使用 iOS 26.1+ / 27 SDK 原生 `.buttonStyle(.glass(.clear.interactive()))`，并在 iOS 26.0 上平滑回退至
-//    `.glassEffect(.clear.interactive(), in: ...)`，确保零自定义模糊伪造且 100% 兼容部署基线。
 
 public extension View {
     /// 为视频浮层圆形按钮赋予 iOS 27 SDK 高透液态玻璃样式（`Glass.clear.interactive()`）
@@ -127,10 +121,10 @@ public struct PlayerGlassPillButton: View {
                 HStack(spacing: 5) {
                     if let systemName {
                         Image(systemName: systemName)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.footnote.weight(.semibold))
                     }
                     Text(title)
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
                         .lineLimit(1)
                 }
                 .foregroundStyle(.white)
@@ -150,6 +144,7 @@ public struct PlayerLiquidGlassHUD: View {
     public let icon: String?
     public let message: String
     public let progress: Double?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(icon: String?, message: String, progress: Double? = nil) {
         self.icon = icon
@@ -160,13 +155,19 @@ public struct PlayerLiquidGlassHUD: View {
     public var body: some View {
         VStack(spacing: 8) {
             if let icon {
-                Image(systemName: icon)
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(.white)
-                    .symbolEffect(.bounce, value: message)
+                if reduceMotion {
+                    Image(systemName: icon)
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+                } else {
+                    Image(systemName: icon)
+                        .font(.title2.bold())
+                        .foregroundStyle(.white)
+                        .symbolEffect(.bounce, value: message)
+                }
             }
             Text(message)
-                .font(.system(size: 13, weight: .bold))
+                .font(.footnote.bold())
                 .foregroundStyle(.white)
                 .lineLimit(1)
 
@@ -187,6 +188,7 @@ public struct PlayerLiquidGlassHUD: View {
         .padding(.horizontal, 22)
         .padding(.vertical, 15)
         .glassEffect(.clear, in: .rect(cornerRadius: 20))
+        .glassEffectTransition(.materialize)
         .shadow(color: .black.opacity(0.28), radius: 14, y: 6)
         .allowsHitTesting(false)
     }

@@ -574,11 +574,30 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                 guard let self = self, !self.isDismantled else { return }
                 if self.parent.isLoading && self.parent.errorMessage == nil {
                     self.parent.isLoading = false
-                    self.parent.errorMessage = "主播当前离线或暂未开播"
+                    self.parent.errorMessage = "live.err_offline".localized
                 }
             }
             playTimeoutTask = task
             DispatchQueue.main.asyncAfter(deadline: .now() + 25.0, execute: task)
+        }
+
+        private static func localizedBridgeError(_ raw: String?) -> String {
+            guard let raw, !raw.isEmpty else {
+                return "live.err_stream_failed".localized
+            }
+            if raw.contains("私密秀") || raw.lowercased().contains("private") {
+                return "live.err_private_show".localized
+            }
+            if raw.contains("离线") || raw.lowercased().contains("offline") {
+                return "live.err_offline".localized
+            }
+            if raw.contains("离开") || raw.lowercased().contains("away") {
+                return "live.err_away".localized
+            }
+            if raw.contains("解码") || raw.lowercased().contains("decode") {
+                return "player.decode_failed".localized
+            }
+            return raw
         }
 
         public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
@@ -591,12 +610,13 @@ public struct StripchatLiveWebView: UIViewRepresentable {
 
             DispatchQueue.main.async { [weak self] in
                 guard let self = self, !self.isDismantled else { return }
+                let reduceMotion = UIAccessibility.isReduceMotionEnabled
                 switch type {
                 case "playing":
                     self.playTimeoutTask?.cancel()
                     self.playTimeoutTask = nil
                     if !self.parent.isPlaying || self.parent.isLoading || self.parent.errorMessage != nil {
-                        withAnimation(AuroraMotion.smooth) {
+                        AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                             self.parent.isLoading = false
                             self.parent.isPlaying = true
                             self.parent.errorMessage = nil
@@ -624,15 +644,15 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                 case "error":
                     self.playTimeoutTask?.cancel()
                     self.playTimeoutTask = nil
-                    let msg = body["message"] as? String ?? "直播流拉取失败"
-                    withAnimation(AuroraMotion.smooth) {
+                    let msg = Self.localizedBridgeError(body["message"] as? String)
+                    AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                         self.parent.isLoading = false
                         self.parent.isPlaying = false
                         self.parent.errorMessage = msg
                     }
                 case "comment":
                     guard let commentText = body["text"] as? String, !commentText.isEmpty else { return }
-                    let author = (body["author"] as? String) ?? "观众"
+                    let author = (body["author"] as? String) ?? "live.viewer_default".localized
                     let commentId = (body["id"] as? String) ?? UUID().uuidString
                     let liveComment = LiveComment(
                         id: commentId,
@@ -653,7 +673,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
             DispatchQueue.main.async { [weak self] in
                 guard let self, !self.isDismantled else { return }
                 self.parent.isLoading = false
-                self.parent.errorMessage = "网络连接中断，请重试"
+                self.parent.errorMessage = "live.err_network_interrupted".localized
             }
         }
 
@@ -684,7 +704,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
             DispatchQueue.main.async { [weak self] in
                 guard let self, !self.isDismantled else { return }
                 self.parent.isLoading = false
-                self.parent.errorMessage = "网络连接超时，请检查网络后点击重试"
+                self.parent.errorMessage = "live.err_timeout".localized
             }
         }
 

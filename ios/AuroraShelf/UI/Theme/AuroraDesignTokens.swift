@@ -13,8 +13,8 @@ public enum AuroraThemeMode: String, CaseIterable, Identifiable, Sendable {
     public var displayName: String {
         switch self {
         case .system: return "settings.follow_system".localized
-        case .light: return "浅色 / Light"
-        case .dark: return "深色 / Dark"
+        case .light: return "appearance.light".localized
+        case .dark: return "appearance.dark".localized
         }
     }
 
@@ -31,11 +31,19 @@ public enum AuroraColor {
     // 品牌
     public static let brand        = Color(rgb: 0xFF4F7B)   // AuroraCoral，1:1 对齐 Android
     public static let brandDeep    = Color(rgb: 0xB20A14)
+    /// WCAG 2.2 AA+ 自适应品牌文字与图标色（浅色 #B20A14 对比度 6.31:1，深色 #FF5C86 对比度 6.30:1）
     public static let brandLabel = adaptive(
         light: 0xB20A14,
-        dark: 0xFF4F7B,
+        dark: 0xFF5C86,
         lightHigh: 0x8B0000,
         darkHigh: 0xFF91AC
+    )
+    /// WCAG 2.2 AA+ 自适应实心选中胶囊填充色（配纯白文字对比度 >= 5.10:1）
+    public static let brandSolid = adaptive(
+        light: 0xC8103E,
+        dark: 0xD81B4C,
+        lightHigh: 0x9E0B2F,
+        darkHigh: 0xE11D48
     )
     public static let accentRed    = Color(rgb: 0xE50914)   // 仅用于排行/徽章等标记
 
@@ -161,11 +169,85 @@ public enum AuroraMetrics {
 }
 
 public enum AuroraMotion {
-    public static let quick  = Animation.spring(response: 0.24, dampingFraction: 0.82)
-    public static let smooth = Animation.spring(response: 0.36, dampingFraction: 0.78)
+    public static let quick  = Animation.snappy(duration: 0.24, extraBounce: 0.04)
+    public static let snappy = quick
+    public static let smooth = Animation.smooth(duration: 0.34, extraBounce: 0.06)
+    public static let cinema = Animation.smooth(duration: 0.42, extraBounce: 0.0)
+    public static let subtle = Animation.easeOut(duration: 0.20)
+
+    public static func quick(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : quick
+    }
+
+    public static func smooth(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : smooth
+    }
+
+    public static func cinema(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : cinema
+    }
+
+    public static func subtle(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : subtle
+    }
 
     public static func selection(reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : quick
+    }
+
+    @MainActor
+    @discardableResult
+    public static func perform<Result>(
+        _ animation: Animation = AuroraMotion.smooth,
+        reduceMotion: Bool? = nil,
+        _ body: () throws -> Result
+    ) rethrows -> Result {
+        let shouldReduce = reduceMotion ?? UIAccessibility.isReduceMotionEnabled
+        return try withAnimation(shouldReduce ? nil : animation, body)
+    }
+}
+
+@MainActor
+public enum AuroraHaptics {
+    private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+    private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
+    private static let rigidGenerator = UIImpactFeedbackGenerator(style: .rigid)
+    private static let selectionGenerator = UISelectionFeedbackGenerator()
+    private static let notificationGenerator = UINotificationFeedbackGenerator()
+
+    public static func light() {
+        lightGenerator.impactOccurred()
+    }
+
+    public static func medium() {
+        mediumGenerator.impactOccurred()
+    }
+
+    public static func rigid() {
+        rigidGenerator.impactOccurred()
+    }
+
+    public static func selection() {
+        selectionGenerator.selectionChanged()
+    }
+
+    public static func notify(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        notificationGenerator.notificationOccurred(type)
+    }
+
+    public static func notification(_ type: UINotificationFeedbackGenerator.FeedbackType) {
+        notificationGenerator.notificationOccurred(type)
+    }
+
+    public static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle = .medium) {
+        switch style {
+        case .light, .soft:
+            lightGenerator.impactOccurred()
+        case .rigid, .heavy:
+            rigidGenerator.impactOccurred()
+        default:
+            mediumGenerator.impactOccurred()
+        }
     }
 }
 

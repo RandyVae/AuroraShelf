@@ -375,21 +375,21 @@ struct GameWebViewRepresentable: UIViewRepresentable {
                 let style = dict["style"] as? String ?? "medium"
                 switch style {
                 case "light":
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    AuroraHaptics.light()
                 case "medium":
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    AuroraHaptics.medium()
                 case "heavy":
-                    UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                    AuroraHaptics.rigid()
                 case "selection":
-                    UISelectionFeedbackGenerator().selectionChanged()
+                    AuroraHaptics.selection()
                 case "success", "bigWin":
-                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    AuroraHaptics.notify(.success)
                 case "warning", "nearMiss":
-                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    AuroraHaptics.notify(.warning)
                 case "error", "defeat":
-                    UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    AuroraHaptics.notify(.error)
                 default:
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    AuroraHaptics.medium()
                 }
             case "exitGame":
                 onExitRequest()
@@ -561,8 +561,11 @@ private final class WeakGameScriptMessageHandler: NSObject, WKScriptMessageHandl
 public struct GameContainerView: View {
     public let onDismiss: () -> Void
 
+    @ObservedObject private var locManager = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var gameCapsuleNamespace
     @State private var sessionRef = GameWebViewSessionRef()
     @State private var isMuted: Bool = false
     @State private var reloadToken: UUID = UUID()
@@ -600,11 +603,11 @@ public struct GameContainerView: View {
                             exitImmediately()
                         },
                         onGameMessage: { msg in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                                 toastMessage = msg
                             }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                                withAnimation(.easeOut(duration: 0.2)) {
+                                AuroraMotion.perform(AuroraMotion.subtle, reduceMotion: reduceMotion) {
                                     if toastMessage == msg {
                                         toastMessage = nil
                                     }
@@ -616,95 +619,91 @@ public struct GameContainerView: View {
                     )
                     .ignoresSafeArea()
 
-                    // Apple HIG 右上角浮动胶囊按键（[ ··· | ✕ ]，44×44pt 触控热区，兼容横屏灵动岛/刘海与 iPad 安全区）
+                    // iOS 27 原生联体 Liquid Glass 小程序控制胶囊（[ ··· | ✕ ]，44×44pt 触控热区）
                     HStack {
                         Spacer()
-                        HStack(spacing: 0) {
-                            Menu {
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    isMuted.toggle()
-                                } label: {
-                                    Label(isMuted ? "开启音效" : "静音", systemImage: isMuted ? "speaker.wave.2" : "speaker.slash")
-                                }
+                        GlassEffectContainer(spacing: 0) {
+                            HStack(spacing: 0) {
+                                Menu {
+                                    Button {
+                                        AuroraHaptics.light()
+                                        isMuted.toggle()
+                                    } label: {
+                                        Label(
+                                            isMuted ? "game.unmute".localized : "game.mute".localized,
+                                            systemImage: isMuted ? "speaker.wave.2" : "speaker.slash"
+                                        )
+                                    }
 
-                                Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    sessionRef.tryHandleBack {
+                                    Button {
+                                        AuroraHaptics.light()
+                                        sessionRef.tryHandleBack {
+                                            exitImmediately()
+                                        }
+                                    } label: {
+                                        Label("game.back_step".localized, systemImage: "chevron.backward")
+                                    }
+
+                                    Button {
+                                        AuroraHaptics.light()
+                                        reloadToken = UUID()
+                                    } label: {
+                                        Label("common.reload".localized, systemImage: "arrow.clockwise")
+                                    }
+
+                                    Divider()
+
+                                    Button(role: .destructive) {
+                                        AuroraHaptics.medium()
                                         exitImmediately()
+                                    } label: {
+                                        Label("game.exit".localized, systemImage: "xmark.circle")
                                     }
                                 } label: {
-                                    Label("返回上一级", systemImage: "chevron.backward")
+                                    Image(systemName: "ellipsis")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 46, height: AuroraMetrics.minTouchTarget)
+                                        .contentShape(Rectangle())
                                 }
+                                .glassEffect(.clear.interactive(), in: .capsule)
+                                .glassEffectUnion(id: "game_chrome_capsule", namespace: gameCapsuleNamespace)
+                                .accessibilityLabel("game.options_a11y".localized)
+
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.24))
+                                    .frame(width: 0.8, height: 18)
+                                    .allowsHitTesting(false)
 
                                 Button {
-                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                    reloadToken = UUID()
+                                    AuroraHaptics.medium()
+                                    exitGracefully()
                                 } label: {
-                                    Label("重新加载", systemImage: "arrow.clockwise")
+                                    Image(systemName: "xmark")
+                                        .font(.footnote.weight(.bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 46, height: AuroraMetrics.minTouchTarget)
+                                        .contentShape(Rectangle())
                                 }
-
-                                Divider()
-
-                                Button(role: .destructive) {
-                                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                    exitImmediately()
-                                } label: {
-                                    Label("退出小程序", systemImage: "xmark.circle")
-                                }
-                            } label: {
-                                Image(systemName: "ellipsis")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 46, height: AuroraMetrics.minTouchTarget)
-                                    .contentShape(Rectangle())
+                                .buttonStyle(.plain)
+                                .glassEffect(.clear.interactive(), in: .capsule)
+                                .glassEffectUnion(id: "game_chrome_capsule", namespace: gameCapsuleNamespace)
+                                .accessibilityLabel("game.close_a11y".localized)
                             }
-                            .accessibilityLabel("小程序功能选项")
-
-                            Rectangle()
-                                .fill(Color.white.opacity(0.22))
-                                .frame(width: 0.8, height: 18)
-
-                            Button {
-                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                                exitGracefully()
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 13, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 46, height: AuroraMetrics.minTouchTarget)
-                                    .contentShape(Rectangle())
-                            }
-                            .accessibilityLabel("关闭并退出小程序")
                         }
-                        .background(
-                            Capsule()
-                                .fill(Color.black.opacity(0.45))
-                                .background(.ultraThinMaterial, in: Capsule())
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(Color.white.opacity(0.22), lineWidth: 0.8)
-                        )
-                        .shadow(color: .black.opacity(0.35), radius: 6, y: 2)
                     }
                     .padding(.trailing, trailingInset)
                     .padding(.top, topInset + 4)
 
                     if let msg = toastMessage {
                         Text(msg)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.footnote.weight(.bold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 18)
                             .padding(.vertical, 10)
-                            .background(Color.black.opacity(0.75), in: Capsule())
-                            .overlay(
-                                Capsule()
-                                    .stroke(AuroraColor.brand.opacity(0.6), lineWidth: 1)
-                            )
-                            .shadow(color: .black.opacity(0.5), radius: 10, y: 4)
+                            .glassEffect(.regular, in: .capsule)
                             .padding(.top, topInset + 56)
-                            .transition(.scale.combined(with: .opacity))
+                            .transition(.opacity)
                     }
                 }
             }
@@ -732,8 +731,12 @@ public struct GameContainerView: View {
             UIApplication.shared.isIdleTimerDisabled = false
             sessionRef.pauseGame()
         }
-        // 禁用全内容区右滑返回，仅保留最左侧边缘手势，防止游戏内滑动误退
-        .enableSwipeBack(isEnabled: true, allowsContentSwipe: false) {
+        // 拦截左边缘侧滑手势并转发至 exitGracefully()（先询问 Web 子页面返回，根页面才退出小程序）
+        .enableSwipeBack(
+            isEnabled: true,
+            allowsContentSwipe: false,
+            interceptsPopWithCustomDismiss: true
+        ) {
             exitGracefully()
         }
     }

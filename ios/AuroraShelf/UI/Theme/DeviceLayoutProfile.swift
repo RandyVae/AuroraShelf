@@ -31,13 +31,6 @@ public extension EnvironmentValues {
 /// 设备屏幕尺寸与折叠形态判定引擎
 @MainActor
 public struct DeviceLayout {
-    private static var measuredWindowSizeOverride: CGSize = .zero
-
-    public static func updateMeasuredWindowSize(_ size: CGSize) {
-        if size.width > 0 && size.height > 0 {
-            measuredWindowSizeOverride = size
-        }
-    }
     /// 判定当前上下文形态（以实际可用窗口宽度为首要判定标准，杜绝 iPad 分屏时强判 pad 导致布局溢出）
     public static func resolve(
         size: CGSize,
@@ -51,7 +44,7 @@ public struct DeviceLayout {
             return .standardPhone
         }
 
-        // 1. 若当前视口宽度紧凑（< 500pt，如 iPad 1/3 Split View、Slide Over、标准 iPhone），
+        // 1. 若当前视口宽度紧凑（< 500pt，如 iPad 1/3 Split View、Slide Over、自由窗口窄窗、标准 iPhone），
         // 必须判定为紧凑形态，杜绝机械按硬件 idiom 判定
         if size.width < 500 {
             let isDuoFoldedDimensions = (size.width >= 445 && size.width < 520 && size.height <= 740)
@@ -74,11 +67,8 @@ public struct DeviceLayout {
         return .duoUnfolded
     }
 
-    /// 获取当前活动窗口真实尺寸（精准支持 iPad Split View、Slide Over、Stage Manager 与各种 iPhone 窗口）
+    /// 获取当前活动窗口真实尺寸（仅作为未注入 `@Environment(\.auroraContainerSize)` 时的后备）
     public static var currentWindowSize: CGSize {
-        if measuredWindowSizeOverride.width > 0 && measuredWindowSizeOverride.height > 0 {
-            return measuredWindowSizeOverride
-        }
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
         let window = activeScene?.windows.first(where: { $0.isKeyWindow }) ?? activeScene?.windows.first
@@ -88,7 +78,7 @@ public struct DeviceLayout {
         return CGSize(width: 393, height: 852)
     }
 
-    /// 判定当前上下文形态（自动读取当前活动窗口尺寸或传入的容器尺寸，彻底消除对过时 UIScreen.main 的依赖）
+    /// 判定当前上下文形态（优先使用按窗口 Scene 隔离下发的 `containerSize`）
     public static func resolveCurrent(
         containerSize: CGSize = .zero,
         horizontalSizeClass: UserInterfaceSizeClass? = nil,
@@ -98,13 +88,27 @@ public struct DeviceLayout {
         return resolve(size: effectiveSize, horizontalSizeClass: horizontalSizeClass, idiom: idiom)
     }
 
+    /// 针对任意窗口宽度计算相关推荐网格自适应列数（彻底消除 iPadOS 27 自由窄窗强塞 4 列至 73.75pt 的坍塌）
+    public static func relatedVideoGridColumns(for availableWidth: CGFloat, spacing: CGFloat = 14) -> [GridItem] {
+        let usable = max(240, availableWidth - AuroraMetrics.contentInset * 2)
+        let columnCount: Int
+        if usable >= 920 {
+            columnCount = 4
+        } else if usable >= 600 {
+            columnCount = 3
+        } else {
+            columnCount = 2
+        }
+        return Array(repeating: GridItem(.flexible(), spacing: spacing), count: columnCount)
+    }
+
     /// 检测是否为 iPhone Duo 硬件/模拟器环境
     public static var isDuoHardware: Bool {
         var systemInfo = utsname()
         uname(&systemInfo)
         let machine = withUnsafePointer(to: &systemInfo.machine) {
             $0.withMemoryRebound(to: CChar.self, capacity: 1) {
-                String(validatingUTF8: $0) ?? ""
+                String(validatingCString: $0) ?? ""
             }
         }
         if machine.contains("iPhone19,4") || machine.contains("V68") {

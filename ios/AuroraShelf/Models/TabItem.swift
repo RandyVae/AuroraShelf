@@ -1,11 +1,12 @@
 import SwiftUI
 
-public enum MainTab: String, CaseIterable, Identifiable {
+public enum MainTab: String, CaseIterable, Identifiable, Sendable {
     case home = "home"
     case comics = "comics"
     case live = "live"
     case forum = "forum"
     case profile = "profile"
+    case search = "search"
     
     public var id: String { rawValue }
     
@@ -16,6 +17,7 @@ public enum MainTab: String, CaseIterable, Identifiable {
         case .live: return "tab.live".localized
         case .forum: return "tab.forum".localized
         case .profile: return "tab.library".localized
+        case .search: return "tab.search".localized
         }
     }
     
@@ -26,6 +28,7 @@ public enum MainTab: String, CaseIterable, Identifiable {
         case .live: return "dot.radiowaves.left.and.right"
         case .forum: return "person.2"
         case .profile: return "books.vertical"
+        case .search: return "magnifyingglass"
         }
     }
     
@@ -36,6 +39,7 @@ public enum MainTab: String, CaseIterable, Identifiable {
         case .live: return "dot.radiowaves.left.and.right"
         case .forum: return "person.2.fill"
         case .profile: return "books.vertical.fill"
+        case .search: return "magnifyingglass"
         }
     }
 }

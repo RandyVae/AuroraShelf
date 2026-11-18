@@ -54,7 +54,7 @@ public struct EpisodePickerSheet: View {
                                     .padding(.vertical, 2)
                                     .background(AuroraColor.brand.opacity(0.12), in: Capsule())
 
-                                Text("共 \(episodes.count) 集 · 高清流媒体")
+                                Text("episode.total_hd".localized(episodes.count))
                                     .font(.caption)
                                     .foregroundStyle(AuroraColor.textSecondary)
                             }
@@ -62,7 +62,6 @@ public struct EpisodePickerSheet: View {
                         .padding(.horizontal, AuroraMetrics.contentInset)
                         .padding(.top, AuroraMetrics.spacingM)
 
-                        // 剧集网格
                         LazyVGrid(columns: columns, spacing: AuroraMetrics.spacingM) {
                             ForEach(episodes) { ep in
                                 let isSelected = ep.number == currentEpisodeNumber
@@ -72,18 +71,18 @@ public struct EpisodePickerSheet: View {
                                 } label: {
                                     VStack(spacing: 4) {
                                         Text(ep.label)
-                                            .font(.system(size: 14, weight: isSelected ? .bold : .medium))
+                                            .font(.subheadline.weight(isSelected ? .bold : .medium))
                                             .foregroundStyle(isSelected ? .white : AuroraColor.textPrimary)
                                             .lineLimit(1)
 
-                                        Text(isSelected ? "正在播放" : "选集")
+                                        Text(isSelected ? "episode.playing_now".localized : "player.episodes".localized)
                                             .font(.caption2)
-                                            .foregroundStyle(isSelected ? .white.opacity(0.85) : AuroraColor.textTertiary)
+                                            .foregroundStyle(isSelected ? .white.opacity(0.88) : AuroraColor.textTertiary)
                                     }
                                     .frame(maxWidth: .infinity, minHeight: 52)
                                     .padding(.horizontal, 8)
                                     .background(
-                                        isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                        isSelected ? AuroraColor.brandSolid : AuroraColor.surfaceCard,
                                         in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                                     )
                                     .overlay(
@@ -95,7 +94,12 @@ public struct EpisodePickerSheet: View {
                                     )
                                 }
                                 .buttonStyle(AppleSpringCardButtonStyle())
-                                .accessibilityLabel("第 \(ep.number) 集，\(isSelected ? "当前播放" : "轻点播放")")
+                                .accessibilityLabel(
+                                    "episode.item_a11y".localized(
+                                        ep.number,
+                                        isSelected ? "episode.playing_now".localized : "channels.status_tap".localized
+                                    )
+                                )
                             }
                         }
                         .padding(.horizontal, AuroraMetrics.contentInset)
@@ -112,7 +116,8 @@ public struct EpisodePickerSheet: View {
                         onDismiss()
                     }
                     .font(.body.bold())
-                    .foregroundStyle(AuroraColor.brand)
+                    .foregroundStyle(AuroraColor.brandLabel)
+                    .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                 }
             }
         }

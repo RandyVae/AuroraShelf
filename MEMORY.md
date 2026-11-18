@@ -12,7 +12,7 @@
   3. 内屏双联展开态：460pt 剧院高度与 420pt 居中操作组、280pt 待播卡片与 3 列大图自适应流展，顶栏自动切为 `NetgreyMarkView`；
   4. 自动化测试：新增 `DeviceLayoutTests` 5 项测试，全量 101 项单元测试 100% 全部通过（0 failures, 5 skipped，耗时 4.277 秒）。
 
-# Netgrey · Android & iOS 2.17.5 · 跨 Agent 记忆
+# Netgrey · Android & iOS 2.17.6 · 跨 Agent 记忆
 
 > 本文件是所有 AI Agent（DSH / Codex / Claude / Hermes / Antigravity）进入本项目的统一入口。
 > 开工先读本文件，再按「权威来源」读细节；收工前更新「当前状态」。
@@ -23,12 +23,12 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `a38e37f`（2026-11-18），未提交 0 个文件
+- Git：`main` @ `a1972ff`（2026-11-18），未提交 79 个文件
 - 权威记忆文件：
-  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-18（今天）
-  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-18（今天）
-  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-18（今天）
-  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-18（今天）
+  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-19（今天）
+  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-19（今天）
+  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-19（今天）
+  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-19（今天）
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（24 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-18（今天）
 - Codex 全局记忆（只读参考）：
@@ -36,19 +36,23 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-18 21:06 by `sync.py`
+- 最后同步：2026-11-19 00:16 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-18 · Build 272 / v2.17.5）：全面重构 iOS / iPadOS 视频播放器（方案 A），落地 iOS 27 `Glass.clear.interactive()` 液态玻璃光学引擎 2.0（高折射水滴三联播放镜 + `0%` 顶中区黑遮罩 + Apple TV 无圆球流体膨胀胶囊进度条）、YouTube 画幅感知与物理重力智能横竖屏引擎（`AVPlayerItem.presentationSize` KVO 识别横/竖画幅，`16:9` 视频全屏通过 `UIWindowScene.requestGeometryUpdate` 真正旋转横屏铺满、`9:16` 短剧保持竖屏全屏与高纵向内嵌吸顶舞台，支持横握自动全屏与立起回退）及 Apple TV 三层影院底部控制坞与二级页单排正交胶囊栏；全链路升级版本号至 `v2.17.5 (Build 272)`，三端 Release 模拟器（`iPhone 18 Pro` Release、`iPad Pro 13-inch (M5)` Release、Android `emulator-5554` 正式签名 R8 APK）全规模实测通过，网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,487,977` B / `Netgrey.ipa` `140,162,204` B，`/` 剩 `11G`）、TestFlight Build `272` 与 GitHub Release `v2.17.5` 全部同步上线。
-- 进行中：无阻塞任务；`v2.17.5 (Build 272)` 重构与三通道同步发布已闭环。
+- 当前阶段（2026-11-19 · Build 273 / v2.17.6）：全面完成 iOS 27 / iPadOS 27 SDK 与 Apple HIG 28 项审计整改（阶段一 P1×6、阶段二 P2×14、阶段三 P3×8 全部落地）并清零全部 9 项 Xcode 27.2 Release 编译警告：落地 WCAG 2.2 AA+ 自适应品牌令牌（`AuroraColor.brandLabel` / `brandSolid`）、12 语种 `539` 键全覆盖与香港繁体校准、顶栏静态 `NetgreyLogoView` 去圆底玻璃与 `VideoDetailSheet` 单层关闭按钮、Regular 宽屏原生 6 槽 `Tab(role: .search)` 与 Compact 窄屏 5 核心 Tab 防 `More` 折叠、iOS 27 原生 `preferredTransition = .zoom` 流体缩放过渡、iPadOS 27 菜单栏 `Commands` 快捷键与 `AppIntents`、漫画缩放旋转几何锚点修复，以及全站 iOS 27 `Spring(duration:bounce:)` + `Reduce Motion` + `.sensoryFeedback` 收口；全链路升级版本号至 `v2.17.6 (Build 273)`，三端 Release 模拟器（`iPhone 18 Pro` Release、`iPad Pro 13-inch (M5)` Release、Android `emulator-5554` 正式签名 R8 APK）全规模实测零截断零错位通过，网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,487,964` B / `Netgrey.ipa` `140,446,235` B，`/` 剩 `11G`）、TestFlight Build `273` 与 GitHub Release `v2.17.6` 全部同步上线。
+- 进行中：无阻塞任务；`v2.17.6 (Build 273)` 三阶段全量整改与三通道同步发布已闭环。
 - 下一步：常规版本演进与线上源站日常监控。
 - 阻塞：无。
-- 最近一次更新：2026-11-18 by Antigravity (Gemini 4 Argon)
+- 最近一次更新：2026-11-19 by Antigravity (Gemini 4 Hydrogen)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-19（Antigravity）：全量落地 iOS 27 / iPadOS 27 SDK 与 Apple HIG 28 项审计整改并清零 Xcode 27.2 编译警告，发布 `v2.17.6 (Build 273)`。(1) **对比度、液态玻璃语义与多语种闭环**：新增 `AuroraColor.brandLabel`（浅色 `#B20A14` `6.31:1` / 深色 `#FF5C86` `6.30:1`）与 `AuroraColor.brandSolid`（`>= 5.10:1`），将次级动作统一为无染色中性 `.buttonStyle(.glass)` 单行等高胶囊，移除四屏顶栏非交互 `NetgreyLogoView` 的圆形玻璃背板与 `VideoDetailSheet` 双层玻璃关闭环，并将 12 套 `Localizable.strings` 扩充至 `539` 键（香港繁体正字词汇校准 + `LiveStreamItem.localizedSubtitle` 动态去重映射）；(2) **跨形态导航、缩放过渡与桌面级交互**：`MainContainerView` 仅在 `horizontalSizeClass == .regular` 暴露第 6 槽 `Tab(role: .search)` 以避免 iPhone Compact 触发 `UIMoreNavigationController` 吞没第 4/5 Tab，并在 `SearchSheetView` 固定 `.navigationBarDrawer(displayMode: .always)` 与 `164pt` 热搜网格消除遮罩与 `"..."` 截断；新增 [ZoomTransitionSourceRegistry.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Theme/ZoomTransitionSourceRegistry.swift)、[AuroraAppCommands.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/App/AuroraAppCommands.swift) 与 [AuroraAppIntents.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/App/AuroraAppIntents.swift)，修复 `ForumPostDetailView` 原生导航栏、`ComicReaderView` 缩放旋转几何与 `DeviceLayout.relatedVideoGridColumns` iPad 双列推荐网格；(3) **动效触觉统一与无 TTY 发布加固**：`UI/` 层全量迁移至 iOS 27 `Spring(duration:bounce:)` + `AuroraMotion.perform(..., reduceMotion:)` 与 `.sensoryFeedback` / `AuroraHaptics`，清零全部 `9` 项 Xcode 27.2 编译警告，并在 [publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 采用 `SSH_ASKPASS_REQUIRE=force` 解决非交互终端无 `/dev/tty` 导致的 SSH 鉴权失败。
+
+- 2026-11-18（Antigravity）：修复 OTA 网页与 Nginx 下载头导致的 Android 旧包缓存碰撞及完善三星/Android 安装指引。(1) **根因定位**：远端 Nginx 原对 `/` 与 `/index.html` 未设 `Cache-Control: no-store` 导致 Chrome 切回旧标签页停留在历史版本（如 `v2.16.35`），且原 `location ~* \.apk$` 硬编码了 `Content-Disposition: attachment; filename=Netgrey-v2.16.0.apk`，覆盖了页面 `<a download="Netgrey-v2.17.x.apk">` 的版本号，致使浏览器命中本地旧 `2.16.x` 调试签名包并触发「是否重新下载」误点旧包、报「未安装应用。」；(2) **服务端与页面修复**：在 [netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf) 为 `=` `/`、`/index.html` 添加 `Cache-Control: no-store, no-cache, must-revalidate` 与 `Pragma: no-cache`，为 `=` `/Netgrey.apk` 设为无硬编码文件名的 `Content-Disposition: attachment`（消除双 `Content-Type` 与旧文件名覆盖）并经 [configure_auth_proxy.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/configure_auth_proxy.sh) 部署；在 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 补充防缓存 meta 及针对三星 One UI「自动阻止程序」「安装未知应用」「未安装应用/签名不一致」与微信内置浏览器拦截的指引，并同步更新线上 `v2.17.5` 页面。
 
 - 2026-11-18（Antigravity）：全面重构 iOS / iPadOS 视频播放器为 iOS 27 `Glass.clear.interactive()` 光学引擎 2.0、Apple TV 三层影院控制坞与 YouTube 画幅/重力智能横竖屏引擎，并发布 `v2.17.5 (Build 272)`。(1) **液态玻璃折射缺失根因与光学 2.0 重构**：原播放器使用灰雾磨砂 `Glass.regular`（无参 `.buttonStyle(.glass)`）叠加 `85%` 不透明黑色渐变底衬与实心粉色 `.glassProminent` 按钮，吞没了底层动态视频色彩；新增 [LiquidGlassPlayerControls.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/LiquidGlassPlayerControls.swift) 切换至 `Glass.clear.interactive()`（`iOS 26.1+/27` 原生高折射清透水滴玻璃，兼容 `iOS 26.0` `.glassEffect(.clear.interactive())`），移除顶/中区黑遮罩改用无染色清透水滴三联圆镜，并将 [PlayerScrubberBar.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/PlayerScrubberBar.swift) 重构为 Apple TV 无圆球流体膨胀胶囊（`6pt -> 12/14pt` + `Glass.clear` 悬浮时间气泡）；(2) **画幅感知与重力横竖屏状态机**：新增 [VideoAspectProfile.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/VideoAspectProfile.swift) 与 [PlayerOrientationCoordinator.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/PlayerOrientationCoordinator.swift)（接入 `AuroraAppDelegate` 与 `ImmersiveNavigationController.supportedInterfaceOrientations`），通过 KVO 监听 `AVPlayerItem.presentationSize`，`16:9` 横屏视频点击全屏自动调用 `UIWindowScene.requestGeometryUpdate` 真正旋转横屏铺满，`9:16` 竖屏短剧维持竖屏全屏并在内嵌页提供纵向高舞台与 `.onScrollGeometryChange` 下滑吸顶收敛，同时内置 `PlayerGravityRotationStateMachine`（含 `hasAlignedWithPhysicalLandscape` 防误退锁）支持物理横握自动全屏、竖握自动回退，并同步打通直播播放器旋转；(3) **Apple TV 三层控制坞与自然手势**：[VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift) 内嵌态右下角锚定全屏键、二级页收敛为单排正交胶囊栏、全屏底部采用 Apple TV 三层控制坞（iPhone 手动旋转移至左上控制簇确保 `393pt` 竖屏全屏零裁切），并在 [AuroraPlayerSurface.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/AuroraPlayerSurface.swift) 补齐 `0.42s` 零延迟长按 `2.0x` 倍速、上下滑全屏与双指捏合 Fit/Fill。
 
@@ -428,6 +432,7 @@
 - 2026-11-15（3）：运行 `LiveVideoSourceAuditTests` 须前置环境变量 `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1 xcodebuild test ...`（无检查进仓库的共享 `.xcscheme` 时，不能用 `RUN_IOS_LIVE_SOURCE_AUDIT=1` 或将其作为 build setting），否则在线源审计测试会被 `XCTSkip` 跳过。
 - 2026-11-18：SWR 异步刷新链路不能裁剪固定子分类货架数，且代理环境下系统 DNS 若返回 `198.18.0.0/15` TUN Fake-IP 严禁用 DoH 真实 IP 覆盖。此外 Apple App Store Connect REST `/v1/apps` 出现间歇 HTTP 500 导致 `xcodebuild -exportArchive (destination=upload)` 超时时，可先以 `destination=export` 本地导出再调用 `xcrun altool --use-old-altool --upload-package` 绑定 App ID（见私有凭据配置）完成 TestFlight 上传。
 - 2026-11-18（2）：HLS 主清单 HTTP 200 `#EXTM3U` 假阳性与直播广告桩陷阱：Stripchat 启用 Mouflon v2 后，未携带有效 `pkey` 的 master M3U8 仍返回 HTTP 200 `#EXTM3U`，但其子变体 M3U8 会下发 `#EXT-X-MOUFLON-ADVERT` 12 秒静态 VOD 片段；若探针仅检查 master 首部是否含 `#EXTM3U`，原生播放器会播完 12 秒广告桩后触发 `STATE_ENDED` 误报「主播已离线」且不触发 Web 降级。做法是同时检查首个子变体是否含 `#EXT-X-MOUFLON-ADVERT` / `#EXT-X-MOUFLON:FILE:`，支持从官方 MMP `main.js` 动态提取刷新 `pkey`，并对 `<25s` 结束事件挂接 WebRTC 兜底。
+- 2026-11-19：① iOS 26/27 `TabView` 在 Compact 宽度（iPhone）挂载超过 5 个 `Tab`（含 `Tab(role: .search)` 第 6 槽）会触发 UIKit `UIMoreNavigationController`（`More ...`）吞掉第 4、5 个核心 Tab；必须仅在 `horizontalSizeClass == .regular`（iPad）挂载第 6 槽 `Tab(role: .search)`，Compact 维持 5 核心 Tab 并以 Sheet 承载搜索；② iPadOS 27 `Tab(role: .search)` 内嵌 `NavigationStack` 若使用 `.searchable(placement: .automatic)` 会折叠为右上角重复放大镜并激活半透明搜索遮罩，应显式指定 `.navigationBarDrawer(displayMode: .always)`；③ macOS 非交互自动化子进程无 `/dev/tty` 会导致 `sshpass` 报 `read_passphrase: can't open /dev/tty`，应优先使用 OpenSSH 原生 `SSH_ASKPASS` + `SSH_ASKPASS_REQUIRE=force` 临时 `0700` 辅助脚本并在 `EXIT` trap 销毁。
 
 ## 权威来源（细节以这些文件为准）
 

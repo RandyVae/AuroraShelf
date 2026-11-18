@@ -24,6 +24,7 @@ public struct UpNextShelf: View {
                         .font(.title3)
                         .fontWeight(.bold)
                         .foregroundStyle(AuroraColor.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
 
                     Spacer()
                 }

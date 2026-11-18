@@ -14,6 +14,7 @@ public struct InSightSheetView: View {
 
     @ObservedObject private var watchlistStore = WatchlistStore.shared
     @ObservedObject private var progressStore = PlaybackProgressStore.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
 
     public init(
         video: VideoItem,
@@ -40,7 +41,6 @@ public struct InSightSheetView: View {
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
-                    // 1. 顶部当前影视卡片
                     HStack(spacing: AuroraMetrics.spacingM) {
                         AuroraCoverImage(
                             url: video.coverUrl,
@@ -82,89 +82,100 @@ public struct InSightSheetView: View {
                     }
                     .padding(.horizontal, AuroraMetrics.contentInset)
 
-                    // 2. 媒体流与画质规格
                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                        Text("媒体规格")
+                        Text("insight.media_specs".localized)
                             .font(.caption)
                             .fontWeight(.bold)
                             .foregroundStyle(AuroraColor.textTertiary)
                             .padding(.horizontal, AuroraMetrics.contentInset)
+                            .accessibilityAddTraits(.isHeader)
 
                         HStack(spacing: AuroraMetrics.spacingM) {
-                            specBadge(title: "画面比例", value: isFillMode ? "铺满屏幕" : "原始比例")
-                            specBadge(title: "协议流", value: video.playbackUrl.contains(".m3u8") ? "HLS" : "MP4")
-                            specBadge(title: "视频源", value: video.sourceName)
+                            specBadge(
+                                title: "insight.aspect_ratio".localized,
+                                value: isFillMode ? "player.fill_screen".localized : "player.original_ratio".localized
+                            )
+                            specBadge(
+                                title: "insight.protocol".localized,
+                                value: video.playbackUrl.contains(".m3u8") ? "HLS" : "MP4"
+                            )
+                            specBadge(
+                                title: "insight.video_source".localized,
+                                value: video.sourceName
+                            )
                         }
                         .padding(.horizontal, AuroraMetrics.contentInset)
                     }
 
-                    // 3. 画面与投屏控制
                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                        Text("显示与投屏")
+                        Text("insight.display_airplay".localized)
                             .font(.caption)
                             .fontWeight(.bold)
                             .foregroundStyle(AuroraColor.textTertiary)
                             .padding(.horizontal, AuroraMetrics.contentInset)
+                            .accessibilityAddTraits(.isHeader)
 
                         VStack(spacing: 1) {
-                            // 画幅切换
                             Button(action: onToggleFillMode) {
                                 HStack {
                                     Label(
-                                        isFillMode ? "画幅：裁切充满（Fill）" : "画幅：等比居中（Fit）",
+                                        isFillMode ? "insight.aspect_fill_desc".localized : "insight.aspect_fit_desc".localized,
                                         systemImage: isFillMode ? "rectangle.arrowtriangle.2.inward" : "rectangle.arrowtriangle.2.outward"
                                     )
                                     Spacer()
-                                    Text(isFillMode ? "消除黑边" : "原始比例")
+                                    Text(isFillMode ? "insight.remove_bars".localized : "player.original_ratio".localized)
                                         .font(.subheadline)
                                         .foregroundStyle(AuroraColor.textSecondary)
                                 }
                                 .padding()
+                                .frame(minHeight: AuroraMetrics.minTouchTarget)
                                 .background(AuroraColor.surfaceCard)
                             }
                             .buttonStyle(.plain)
+                            .hoverEffect(.highlight)
 
-                            // 屏幕旋转（仅 iPhone 呈现；iPad 跟随物理重力全向自然旋转）
                             if !isPad {
                                 Button(action: onToggleOrientation) {
                                     HStack {
                                         Label(
-                                            isLandscape ? "显示方向：横屏沉浸" : "显示方向：竖屏便携",
+                                            isLandscape ? "insight.orient_landscape".localized : "insight.orient_portrait".localized,
                                             systemImage: isLandscape ? "iphone" : "iphone.landscape"
                                         )
                                         Spacer()
-                                        Text(isLandscape ? "横屏锁定" : "默认")
+                                        Text(isLandscape ? "insight.landscape_locked".localized : "insight.default".localized)
                                             .font(.subheadline)
                                             .foregroundStyle(AuroraColor.textSecondary)
                                     }
                                     .padding()
+                                    .frame(minHeight: AuroraMetrics.minTouchTarget)
                                     .background(AuroraColor.surfaceCard)
                                 }
                                 .buttonStyle(.plain)
+                                .hoverEffect(.highlight)
                             }
 
-                            // 投屏
                             HStack {
-                                Label("AirPlay 隔空播放", systemImage: "airplayvideo")
+                                Label("insight.airplay_label".localized, systemImage: "airplayvideo")
                                 Spacer()
                                 AirPlayRoutePicker()
                                     .frame(width: 44, height: 44)
                             }
                             .padding(.horizontal)
                             .padding(.vertical, 4)
+                            .frame(minHeight: AuroraMetrics.minTouchTarget)
                             .background(AuroraColor.surfaceCard)
                         }
                         .clipShape(RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
                         .padding(.horizontal, AuroraMetrics.contentInset)
                     }
 
-                    // 4. 片单与待播快捷操作
                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                        Text("片单管理")
+                        Text("insight.watchlist_mgmt".localized)
                             .font(.caption)
                             .fontWeight(.bold)
                             .foregroundStyle(AuroraColor.textTertiary)
                             .padding(.horizontal, AuroraMetrics.contentInset)
+                            .accessibilityAddTraits(.isHeader)
 
                         HStack(spacing: AuroraMetrics.spacingM) {
                             let isBookmarked = watchlistStore.contains(video)
@@ -176,24 +187,29 @@ public struct InSightSheetView: View {
                                     systemImage: isBookmarked ? "bookmark.fill" : "bookmark"
                                 )
                                 .font(.subheadline.bold())
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(isBookmarked ? AuroraColor.brand.opacity(0.15) : AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 10))
-                                .foregroundStyle(isBookmarked ? AuroraColor.brand : AuroraColor.textPrimary)
+                                .frame(maxWidth: .infinity, minHeight: AuroraMetrics.minTouchTarget)
+                                .padding(.vertical, 4)
+                                .background(
+                                    isBookmarked ? AuroraColor.brand.opacity(0.15) : AuroraColor.surfaceCard,
+                                    in: RoundedRectangle(cornerRadius: 10)
+                                )
+                                .foregroundStyle(isBookmarked ? AuroraColor.brandLabel : AuroraColor.textPrimary)
                             }
                             .buttonStyle(.plain)
+                            .hoverEffect(.highlight)
 
                             Button {
                                 progressStore.markCompleted(for: video)
                             } label: {
-                                Label("标记已看", systemImage: "checkmark.circle")
+                                Label("insight.mark_watched".localized, systemImage: "checkmark.circle")
                                     .font(.subheadline.bold())
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
+                                    .frame(maxWidth: .infinity, minHeight: AuroraMetrics.minTouchTarget)
+                                    .padding(.vertical, 4)
                                     .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 10))
                                     .foregroundStyle(AuroraColor.textPrimary)
                             }
                             .buttonStyle(.plain)
+                            .hoverEffect(.highlight)
                         }
                         .padding(.horizontal, AuroraMetrics.contentInset)
                     }
@@ -221,10 +237,10 @@ public struct InSightSheetView: View {
     private func specBadge(title: String, value: String) -> some View {
         VStack(spacing: 2) {
             Text(title)
-                .font(.system(size: 10))
+                .font(.caption2)
                 .foregroundStyle(AuroraColor.textTertiary)
             Text(value)
-                .font(.system(size: 12, weight: .bold))
+                .font(.caption.weight(.bold))
                 .foregroundStyle(AuroraColor.textPrimary)
         }
         .frame(maxWidth: .infinity)

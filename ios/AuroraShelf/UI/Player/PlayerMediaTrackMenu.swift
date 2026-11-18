@@ -26,11 +26,11 @@ public struct PlayerMediaTrackMenu: View {
         let _ = selectionRevision
         Menu {
             if let subtitleGroup, !subtitleGroup.options.isEmpty {
-                Section("字幕") {
+                Section("player.tracks_subtitles".localized) {
                     Button {
                         select(nil, in: subtitleGroup)
                     } label: {
-                        trackLabel("关闭", selected: selectedOption(in: subtitleGroup) == nil)
+                        trackLabel("player.tracks_off".localized, selected: selectedOption(in: subtitleGroup) == nil)
                     }
 
                     ForEach(Array(subtitleGroup.options.enumerated()), id: \.offset) { entry in
@@ -45,7 +45,7 @@ public struct PlayerMediaTrackMenu: View {
             }
 
             if let audioGroup, audioGroup.options.count > 1 {
-                Section("音频") {
+                Section("player.tracks_audio".localized) {
                     ForEach(Array(audioGroup.options.enumerated()), id: \.offset) { entry in
                         let option = entry.element
                         Button {
@@ -60,9 +60,11 @@ public struct PlayerMediaTrackMenu: View {
             if showLabelText {
                 HStack(spacing: 5) {
                     Image(systemName: selectedSubtitle != nil ? "captions.bubble.fill" : "captions.bubble")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("音轨字幕")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.footnote.weight(.semibold))
+                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+                    Text("player.tracks_btn".localized)
+                        .font(.footnote.weight(.semibold))
+                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                         .lineLimit(1)
                 }
                 .foregroundStyle(.white)
@@ -71,15 +73,16 @@ public struct PlayerMediaTrackMenu: View {
                 .fixedSize(horizontal: true, vertical: false)
             } else {
                 Image(systemName: selectedSubtitle != nil ? "captions.bubble.fill" : "captions.bubble")
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.footnote.weight(.semibold))
+                    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                     .foregroundStyle(.white)
                     .frame(width: 26, height: 26)
             }
         }
         .modifier(MediaTrackGlassModifier(isCapsule: showLabelText))
         .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
-        .accessibilityLabel("字幕与音轨")
-        .accessibilityHint("选择可用的字幕或音频轨道")
+        .accessibilityLabel("player.tracks_a11y".localized)
+        .accessibilityHint("player.tracks_hint".localized)
     }
 
     private struct MediaTrackGlassModifier: ViewModifier {

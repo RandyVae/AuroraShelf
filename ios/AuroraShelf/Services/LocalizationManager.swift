@@ -20,7 +20,7 @@ public enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     
     public var displayName: String {
         switch self {
-        case .system: return "跟随系统 / Follow System"
+        case .system: return "settings.follow_system".localized
         case .zhHant: return "繁體中文（香港）"
         case .zhHans: return "简体中文"
         case .en: return "English"
@@ -183,5 +183,22 @@ extension String {
     
     public func localized(_ args: CVarArg...) -> String {
         LocalizationManager.shared.localized(self, args)
+    }
+
+    public var localizedCategoryLabel: String {
+        switch self {
+        case "全部":
+            return "home.all".localized
+        case "女性主播":
+            return "live.female".localized
+        case "男性主播":
+            return "live.male".localized
+        case "情侣双人", "情侶雙人", "情侣互动", "情侶互動":
+            return "live.couples".localized
+        case "跨性别", "跨性別":
+            return "live.trans".localized
+        default:
+            return self
+        }
     }
 }

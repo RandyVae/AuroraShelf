@@ -1,5 +1,44 @@
 import SwiftUI
 
+/// 漫画阅读器缩放几何引擎（真实布局宽高放大，彻底杜绝 `.scaleEffect` 造成的左右边缘不可平移与下半章截断）
+public enum ComicZoomGeometry {
+    public static let minScale: CGFloat = 1.0
+    public static let maxScale: CGFloat = 3.0
+
+    public static func clampedScale(_ proposed: CGFloat) -> CGFloat {
+        min(max(proposed, minScale), maxScale)
+    }
+
+    public static func snappedScale(_ proposed: CGFloat) -> CGFloat {
+        let clamped = clampedScale(proposed)
+        return clamped < 1.08 ? 1.0 : clamped
+    }
+
+    public static func contentWidth(viewportWidth: CGFloat, zoomScale: CGFloat) -> CGFloat {
+        max(1, viewportWidth) * clampedScale(zoomScale)
+    }
+
+    /// 计算双击位置对应的目标滚动偏移（Zoom-to-Point），确保放大后左右与上下全范围可平移触达
+    public static func targetOffsetForDoubleTap(
+        tapLocationInViewport: CGPoint,
+        currentOffset: CGPoint,
+        viewportSize: CGSize,
+        oldScale: CGFloat,
+        newScale: CGFloat
+    ) -> CGPoint {
+        guard newScale > 1.01, oldScale > 0 else {
+            return CGPoint(x: 0, y: max(0, currentOffset.y / max(oldScale, 1)))
+        }
+        let ratio = newScale / oldScale
+        let contentPointX = currentOffset.x + tapLocationInViewport.x
+        let contentPointY = currentOffset.y + tapLocationInViewport.y
+        let maxOffsetX = max(0, viewportSize.width * newScale - viewportSize.width)
+        let targetX = min(max(0, contentPointX * ratio - viewportSize.width * 0.5), maxOffsetX)
+        let targetY = max(0, contentPointY * ratio - viewportSize.height * 0.5)
+        return CGPoint(x: targetX, y: targetY)
+    }
+}
+
 private struct ComicPageImageView: View {
     let sourceId: String
     let comicId: String
@@ -24,10 +63,10 @@ private struct ComicPageImageView: View {
                 VStack(spacing: AuroraMetrics.spacingS) {
                     Image(systemName: "photo.badge.exclamationmark")
                         .font(.title2)
-                    Text("第 \(pageNumber) 页加载失败")
+                    Text("reader.page_load_failed".localized(pageNumber))
                     Text(errorMessage)
                         .font(.caption)
-                    Button("重试", systemImage: "arrow.clockwise") {
+                    Button("common.retry".localized, systemImage: "arrow.clockwise") {
                         startLoad()
                     }
                     .buttonStyle(.bordered)
@@ -49,8 +88,6 @@ private struct ComicPageImageView: View {
             startLoad()
         }
         .onDisappear {
-            // Release offscreen decoded UIImage from @State so 100+ page chapters never OOM;
-            // re-entering viewport reloads rapidly from ComicPageImageLoader's NSCache or local disk.
             activeTask?.cancel()
             activeTask = nil
             image = nil
@@ -70,7 +107,6 @@ private struct ComicPageImageView: View {
         image = nil
         errorMessage = nil
 
-        // 1. 优先读取离线已解密缓存图片（100% 离线秒开、零网络消耗）
         if let local = await ComicDownloadManager.shared.localImage(
             comicId: comicId,
             chapterId: chapterId,
@@ -94,12 +130,21 @@ private struct ComicPageImageView: View {
 }
 
 public enum ComicReaderTheme: String, CaseIterable, Identifiable {
-    case oled = "OLED 纯黑"
-    case parchment = "暖羊皮纸"
-    case charcoal = "典雅炭灰"
-    case paper = "原纸暖白"
+    case oled = "oled"
+    case parchment = "parchment"
+    case charcoal = "charcoal"
+    case paper = "paper"
 
     public var id: String { rawValue }
+
+    public var displayTitle: String {
+        switch self {
+        case .oled: return "reader.theme_oled".localized
+        case .parchment: return "reader.theme_parchment".localized
+        case .charcoal: return "reader.theme_charcoal".localized
+        case .paper: return "reader.theme_paper".localized
+        }
+    }
 
     public var backgroundColor: Color {
         switch self {
@@ -138,7 +183,10 @@ public struct ComicReaderView: View {
     @State private var isTwoPageSpread: Bool = false
     @State private var zoomScale: CGFloat = 1.0
     @State private var committedZoomScale: CGFloat = 1.0
+    @State private var scrollPosition = ScrollPosition()
+    @State private var currentScrollOffset: CGPoint = .zero
     @ObservedObject private var downloadManager = ComicDownloadManager.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -164,211 +212,237 @@ public struct ComicReaderView: View {
 
     public var body: some View {
         ZStack {
-            // 环境光阅读底衬（支持 Apple Books 经典 4 态自适应切换）
             readerTheme.backgroundColor.ignoresSafeArea()
 
-            // 漫画页面瀑布流（支持双指缩放与双击还原）
-            ScrollViewReader { proxy in
-                ScrollView(zoomScale > 1.01 ? [.vertical, .horizontal] : .vertical, showsIndicators: false) {
-                    LazyVStack(spacing: 0) {
-                        // 顶部定位锚点（换章置顶核心锚点，杜绝滚动越界）
-                        Color.clear.frame(height: 1).id("top_anchor")
-
-                        if let loadError {
-                            ContentUnavailableView {
-                                Label("章节暂不可用", systemImage: "wifi.exclamationmark")
-                            } description: {
-                                Text(loadError)
-                            } actions: {
-                                HStack(spacing: AuroraMetrics.spacingM) {
-                                    Button("重试", systemImage: "arrow.clockwise") {
-                                        loadPages()
-                                    }
-                                    .buttonStyle(.borderedProminent)
-
-                                    Button("返回漫画列表", systemImage: "chevron.backward") {
-                                        dismissReader()
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
-                            }
-                            .tint(AuroraColor.brand)
-                            .frame(maxWidth: .infinity, minHeight: 300)
-                        } else if isLoading {
-                            VStack(spacing: AuroraMetrics.spacingM) {
-                                ProgressView("正在加载章节…")
-                                Button("取消并返回") {
-                                    dismissReader()
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(AuroraColor.brand)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 300)
-                        } else if pages.isEmpty {
-                            ContentUnavailableView {
-                                Label("本章没有页面", systemImage: "photo")
-                            } description: {
-                                Text("此章节暂时没有可显示的图片。")
-                            } actions: {
-                                HStack(spacing: AuroraMetrics.spacingM) {
-                                    Button("重新加载", systemImage: "arrow.clockwise") {
-                                        loadPages()
-                                    }
-                                    .buttonStyle(.borderedProminent)
-
-                                    Button("返回漫画列表", systemImage: "chevron.backward") {
-                                        dismissReader()
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
-                            }
-                            .tint(AuroraColor.brand)
-                            .frame(maxWidth: .infinity, minHeight: 300)
-                        } else {
-                            if isTwoPageSpread && horizontalSizeClass == .regular {
-                                // iPad 宽屏双页展开模式（Apple Books 拟物阅读画廊）
-                                let pairs = stride(from: 0, to: pages.count, by: 2).map {
-                                    Array(pages[$0..<min($0 + 2, pages.count)])
-                                }
-                                ForEach(Array(pairs.enumerated()), id: \.offset) { pairIndex, pair in
-                                    HStack(spacing: 8) {
-                                        ForEach(Array(pair.enumerated()), id: \.element.id) { subIndex, page in
-                                            let pageNum = pairIndex * 2 + subIndex + 1
-                                            ComicPageImageView(
-                                                sourceId: comic.sourceId,
-                                                comicId: comic.id,
-                                                chapterId: currentChapter?.id ?? "",
-                                                page: page,
-                                                pageNumber: pageNum,
-                                                onAppearPage: { visiblePage in
-                                                    recordReadingProgress(pageNumber: visiblePage)
-                                                }
-                                            )
-                                        }
-                                    }
-                                    .id("page_\(pairIndex * 2 + 1)")
-                                    .frame(maxWidth: 1080)
-                                    .padding(.horizontal, 16)
-                                }
-                            } else {
-                                ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
-                                    let pageNum = index + 1
-                                    ComicPageImageView(
-                                        sourceId: comic.sourceId,
-                                        comicId: comic.id,
-                                        chapterId: currentChapter?.id ?? "",
-                                        page: page,
-                                        pageNumber: pageNum,
-                                        onAppearPage: { visiblePage in
-                                            recordReadingProgress(pageNumber: visiblePage)
-                                        }
-                                    )
-                                    .id("page_\(pageNum)")
-                                }
-                            }
-                        }
-
-                        // 换章操作栏
-                        VStack(spacing: AuroraMetrics.spacingL) {
-                            HStack(spacing: AuroraMetrics.spacingXL) {
-                                Button(action: {
-                                    if currentChapterIndex > 0 {
-                                        switchChapter(to: currentChapterIndex - 1, proxy: proxy)
-                                    }
-                                }) {
-                                    Text("reader.prev_chapter".localized)
-                                        .font(.headline)
-                                        .foregroundStyle(
-                                            currentChapterIndex > 0
-                                                ? (readerTheme.isDark ? Color.white : Color.black.opacity(0.88))
-                                                : Color.secondary
-                                        )
-                                        .padding(.horizontal, AuroraMetrics.spacingXL)
-                                        .frame(height: AuroraMetrics.minTouchTarget)
-                                        .background(
-                                            readerTheme.isDark ? AuroraColor.surfaceCard : Color.black.opacity(0.08),
-                                            in: .capsule
-                                        )
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(currentChapterIndex <= 0)
-
-                                Button(action: {
-                                    if currentChapterIndex < comic.chapters.count - 1 {
-                                        switchChapter(to: currentChapterIndex + 1, proxy: proxy)
-                                    }
-                                }) {
-                                    Text("reader.next_chapter".localized)
-                                        .font(.headline)
-                                        .foregroundStyle(currentChapterIndex < comic.chapters.count - 1 ? .white : .secondary)
-                                        .padding(.horizontal, AuroraMetrics.spacingXL)
-                                        .frame(height: AuroraMetrics.minTouchTarget)
-                                        .background(AuroraColor.brand, in: .capsule)
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(currentChapterIndex >= comic.chapters.count - 1)
-                            }
-
-                            Text("已阅至本话末尾")
-                                .font(.footnote)
-                                .foregroundStyle(readerTheme.isDark ? Color.white.opacity(0.6) : Color.black.opacity(0.55))
-                        }
-                        .padding(.vertical, AuroraMetrics.spacingXXL)
-                    }
-                    .scaleEffect(zoomScale, anchor: .top)
-                }
-                .simultaneousGesture(
-                    MagnificationGesture()
-                        .onChanged { value in
-                            let proposed = committedZoomScale * value
-                            zoomScale = min(max(proposed, 1.0), 3.0)
-                        }
-                        .onEnded { value in
-                            let finalScale = min(max(committedZoomScale * value, 1.0), 3.0)
-                            let snapped = finalScale < 1.08 ? 1.0 : finalScale
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                                zoomScale = snapped
-                            }
-                            committedZoomScale = snapped
-                        }
+            GeometryReader { viewportGeo in
+                let viewportSize = viewportGeo.size
+                let contentWidth = ComicZoomGeometry.contentWidth(
+                    viewportWidth: viewportSize.width,
+                    zoomScale: zoomScale
                 )
-                .onTapGesture(count: 2) {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
-                        if zoomScale > 1.05 {
-                            zoomScale = 1.0
-                            committedZoomScale = 1.0
-                        } else {
-                            zoomScale = 2.0
-                            committedZoomScale = 2.0
+
+                ScrollViewReader { proxy in
+                    ScrollView(zoomScale > 1.01 ? [.vertical, .horizontal] : .vertical, showsIndicators: false) {
+                        LazyVStack(spacing: 0) {
+                            Color.clear.frame(height: 1).id("top_anchor")
+
+                            if let loadError {
+                                ContentUnavailableView {
+                                    Label("reader.chapter_unavailable".localized, systemImage: "wifi.exclamationmark")
+                                } description: {
+                                    Text(loadError)
+                                } actions: {
+                                    HStack(spacing: AuroraMetrics.spacingM) {
+                                        Button("common.retry".localized, systemImage: "arrow.clockwise") {
+                                            loadPages()
+                                        }
+                                        .buttonStyle(.borderedProminent)
+
+                                        Button("reader.back_to_list".localized, systemImage: "chevron.backward") {
+                                            dismissReader()
+                                        }
+                                        .buttonStyle(.bordered)
+                                    }
+                                }
+                                .tint(AuroraColor.brandSolid)
+                                .frame(width: viewportSize.width)
+                                .frame(minHeight: 300)
+                            } else if isLoading {
+                                VStack(spacing: AuroraMetrics.spacingM) {
+                                    ProgressView("comics.loading_chapters".localized)
+                                    Button("reader.cancel_and_back".localized) {
+                                        dismissReader()
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(AuroraColor.brandLabel)
+                                }
+                                .frame(width: viewportSize.width)
+                                .frame(minHeight: 300)
+                            } else if pages.isEmpty {
+                                ContentUnavailableView {
+                                    Label("reader.empty_chapter".localized, systemImage: "photo")
+                                } description: {
+                                    Text("reader.empty_chapter_desc".localized)
+                                } actions: {
+                                    HStack(spacing: AuroraMetrics.spacingM) {
+                                        Button("common.reload".localized, systemImage: "arrow.clockwise") {
+                                            loadPages()
+                                        }
+                                        .buttonStyle(.borderedProminent)
+
+                                        Button("reader.back_to_list".localized, systemImage: "chevron.backward") {
+                                            dismissReader()
+                                        }
+                                        .buttonStyle(.bordered)
+                                    }
+                                }
+                                .tint(AuroraColor.brandSolid)
+                                .frame(width: viewportSize.width)
+                                .frame(minHeight: 300)
+                            } else {
+                                if isTwoPageSpread && horizontalSizeClass == .regular {
+                                    let pairs = stride(from: 0, to: pages.count, by: 2).map {
+                                        Array(pages[$0..<min($0 + 2, pages.count)])
+                                    }
+                                    ForEach(Array(pairs.enumerated()), id: \.offset) { pairIndex, pair in
+                                        HStack(spacing: 8) {
+                                            ForEach(Array(pair.enumerated()), id: \.element.id) { subIndex, page in
+                                                let pageNum = pairIndex * 2 + subIndex + 1
+                                                ComicPageImageView(
+                                                    sourceId: comic.sourceId,
+                                                    comicId: comic.id,
+                                                    chapterId: currentChapter?.id ?? "",
+                                                    page: page,
+                                                    pageNumber: pageNum,
+                                                    onAppearPage: { visiblePage in
+                                                        recordReadingProgress(pageNumber: visiblePage)
+                                                    }
+                                                )
+                                            }
+                                        }
+                                        .id("page_\(pairIndex * 2 + 1)")
+                                        .frame(maxWidth: max(1080, contentWidth))
+                                        .padding(.horizontal, 16)
+                                    }
+                                } else {
+                                    ForEach(Array(pages.enumerated()), id: \.element.id) { index, page in
+                                        let pageNum = index + 1
+                                        ComicPageImageView(
+                                            sourceId: comic.sourceId,
+                                            comicId: comic.id,
+                                            chapterId: currentChapter?.id ?? "",
+                                            page: page,
+                                            pageNumber: pageNum,
+                                            onAppearPage: { visiblePage in
+                                                recordReadingProgress(pageNumber: visiblePage)
+                                            }
+                                        )
+                                        .id("page_\(pageNum)")
+                                    }
+                                }
+                            }
+
+                            // 换章操作栏（始终居中在视口或放大内容底部，保证放大态亦可滑到底部点击下一话）
+                            VStack(spacing: AuroraMetrics.spacingL) {
+                                HStack(spacing: AuroraMetrics.spacingXL) {
+                                    Button(action: {
+                                        if currentChapterIndex > 0 {
+                                            switchChapter(to: currentChapterIndex - 1, proxy: proxy)
+                                        }
+                                    }) {
+                                        Text("reader.prev_chapter".localized)
+                                            .font(.headline)
+                                            .foregroundStyle(
+                                                currentChapterIndex > 0
+                                                    ? (readerTheme.isDark ? Color.white : Color.black.opacity(0.88))
+                                                    : Color.secondary
+                                            )
+                                            .padding(.horizontal, AuroraMetrics.spacingXL)
+                                            .frame(height: AuroraMetrics.minTouchTarget)
+                                            .background(
+                                                readerTheme.isDark ? AuroraColor.surfaceCard : Color.black.opacity(0.08),
+                                                in: .capsule
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .hoverEffect(.highlight)
+                                    .disabled(currentChapterIndex <= 0)
+
+                                    Button(action: {
+                                        if currentChapterIndex < comic.chapters.count - 1 {
+                                            switchChapter(to: currentChapterIndex + 1, proxy: proxy)
+                                        }
+                                    }) {
+                                        Text("reader.next_chapter".localized)
+                                            .font(.headline)
+                                            .foregroundStyle(currentChapterIndex < comic.chapters.count - 1 ? .white : .secondary)
+                                            .padding(.horizontal, AuroraMetrics.spacingXL)
+                                            .frame(height: AuroraMetrics.minTouchTarget)
+                                            .background(AuroraColor.brandSolid, in: .capsule)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .hoverEffect(.highlight)
+                                    .disabled(currentChapterIndex >= comic.chapters.count - 1)
+                                }
+
+                                Text("reader.end_of_chapter".localized)
+                                    .font(.footnote)
+                                    .foregroundStyle(readerTheme.isDark ? Color.white.opacity(0.6) : Color.black.opacity(0.55))
+                            }
+                            .padding(.vertical, AuroraMetrics.spacingXXL)
+                            .frame(maxWidth: .infinity)
+                        }
+                        .frame(width: contentWidth)
+                    }
+                    .scrollPosition($scrollPosition)
+                    .scrollBounceBehavior(.basedOnSize, axes: [.vertical, .horizontal])
+                    .onScrollGeometryChange(for: CGPoint.self) { geo in
+                        geo.contentOffset
+                    } action: { _, newOffset in
+                        currentScrollOffset = newOffset
+                    }
+                    .simultaneousGesture(
+                        MagnifyGesture()
+                            .onChanged { value in
+                                zoomScale = ComicZoomGeometry.clampedScale(committedZoomScale * value.magnification)
+                            }
+                            .onEnded { value in
+                                let snapped = ComicZoomGeometry.snappedScale(committedZoomScale * value.magnification)
+                                AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
+                                    zoomScale = snapped
+                                    if snapped == 1.0 {
+                                        scrollPosition.scrollTo(x: 0)
+                                    }
+                                }
+                                committedZoomScale = snapped
+                            }
+                    )
+                    .simultaneousGesture(
+                        SpatialTapGesture(count: 2)
+                            .onEnded { event in
+                                let oldScale = zoomScale
+                                let nextScale: CGFloat = oldScale > 1.05 ? 1.0 : 2.0
+                                let targetOffset = ComicZoomGeometry.targetOffsetForDoubleTap(
+                                    tapLocationInViewport: event.location,
+                                    currentOffset: currentScrollOffset,
+                                    viewportSize: viewportSize,
+                                    oldScale: oldScale,
+                                    newScale: nextScale
+                                )
+                                AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
+                                    zoomScale = nextScale
+                                    committedZoomScale = nextScale
+                                    scrollPosition.scrollTo(point: targetOffset)
+                                }
+                            }
+                    )
+                    .onTapGesture(count: 1) {
+                        guard !shouldKeepControlsVisible else { return }
+                        AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
+                            showControls.toggle()
                         }
                     }
-                }
-                .onTapGesture(count: 1) {
-                    guard !shouldKeepControlsVisible else { return }
-                    withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
-                        showControls.toggle()
-                    }
-                }
-                .onChange(of: pages.count) { _, newCount in
-                    guard newCount > 0, let targetPage = pendingScrollPageNumber else { return }
-                    pendingScrollPageNumber = nil
-                    let clampedPage = min(max(1, targetPage), newCount)
-                    currentPageNumber = clampedPage
-                    if clampedPage > 1 {
-                        let anchorID: String
-                        if isTwoPageSpread && horizontalSizeClass == .regular {
-                            let oddPage = ((clampedPage - 1) / 2) * 2 + 1
-                            anchorID = "page_\(oddPage)"
-                        } else {
-                            anchorID = "page_\(clampedPage)"
-                        }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-                            proxy.scrollTo(anchorID, anchor: .top)
+                    .onChange(of: pages.count) { _, newCount in
+                        guard newCount > 0, let targetPage = pendingScrollPageNumber else { return }
+                        pendingScrollPageNumber = nil
+                        let clampedPage = min(max(1, targetPage), newCount)
+                        currentPageNumber = clampedPage
+                        if clampedPage > 1 {
+                            let anchorID: String
+                            if isTwoPageSpread && horizontalSizeClass == .regular {
+                                let oddPage = ((clampedPage - 1) / 2) * 2 + 1
+                                anchorID = "page_\(oddPage)"
+                            } else {
+                                anchorID = "page_\(clampedPage)"
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                                proxy.scrollTo(anchorID, anchor: .top)
+                            }
                         }
                     }
-                }
-                .sheet(isPresented: $showChapterPicker) {
-                    chapterPickerSheet(proxy: proxy)
+                    .sheet(isPresented: $showChapterPicker) {
+                        chapterPickerSheet(proxy: proxy)
+                    }
                 }
             }
 
@@ -378,9 +452,9 @@ public struct ComicReaderView: View {
                         title: comic.title,
                         subtitle: currentChapter.map {
                             pages.isEmpty
-                                ? "\($0.title) · 连载瀑布流"
+                                ? "reader.webtoon_flow".localized($0.title)
                                 : "\($0.title) · \("reader.page".localized(currentPageNumber, pages.count))"
-                        } ?? "章节不可用",
+                        } ?? "reader.chapter_unavailable".localized,
                         onDismiss: {
                             dismissReader()
                         }
@@ -394,13 +468,13 @@ public struct ComicReaderView: View {
                                         .font(.subheadline.bold())
                                         .foregroundStyle(.white)
                                         .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                        .glassEffect(.regular.interactive(), in: .circle)
+                                        .glassEffect(.clear.interactive(), in: .circle)
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel("章节目录")
+                                .hoverEffect(.highlight)
+                                .accessibilityLabel("reader.toc_a11y".localized)
                             }
 
-                            // 离线下载当前话与整本漫画
                             if let chapter = currentChapter {
                                 let downloadStatus = downloadManager.status(
                                     for: comic.id,
@@ -417,20 +491,20 @@ public struct ComicReaderView: View {
                                             )
                                             downloadManager.removeDownload(id: itemId)
                                         } label: {
-                                            Label("删除本话离线缓存", systemImage: "trash")
+                                            Label("reader.delete_chapter_cache".localized, systemImage: "trash")
                                         }
                                     } else {
                                         Button {
                                             downloadManager.startDownload(comic: comic, chapter: chapter)
                                         } label: {
-                                            Label("下载本话", systemImage: "arrow.down.circle")
+                                            Label("reader.download_chapter".localized, systemImage: "arrow.down.circle")
                                         }
                                     }
 
                                     Button {
                                         downloadManager.startDownloadAll(comic: comic)
                                     } label: {
-                                        Label("下载全部章节 (\(comic.chapters.count)话)", systemImage: "arrow.down.circle.fill")
+                                        Label("reader.download_all_chapters".localized(comic.chapters.count), systemImage: "arrow.down.circle.fill")
                                     }
                                 } label: {
                                     Group {
@@ -448,15 +522,14 @@ public struct ComicReaderView: View {
                                     }
                                     .font(.subheadline.bold())
                                     .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                    .glassEffect(.regular.interactive(), in: .circle)
+                                    .glassEffect(.clear.interactive(), in: .circle)
                                 }
-                                .accessibilityLabel("离线下载")
+                                .accessibilityLabel("reader.offline_a11y".localized)
                             }
 
-                            // iPad 双页展开切换
                             if horizontalSizeClass == .regular {
                                 Button {
-                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                    AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                                         isTwoPageSpread.toggle()
                                     }
                                 } label: {
@@ -464,20 +537,20 @@ public struct ComicReaderView: View {
                                         .font(.subheadline.bold())
                                         .foregroundStyle(.white)
                                         .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                        .glassEffect(.regular.interactive(), in: .circle)
+                                        .glassEffect(.clear.interactive(), in: .circle)
                                 }
                                 .buttonStyle(.plain)
-                                .accessibilityLabel(isTwoPageSpread ? "单页阅读模式" : "双页画册模式")
+                                .hoverEffect(.highlight)
+                                .accessibilityLabel(isTwoPageSpread ? "reader.single_page_mode".localized : "reader.spread_mode".localized)
                             }
 
-                            // Apple Books 风格阅读环境底色切换菜单
                             Menu {
                                 ForEach(ComicReaderTheme.allCases) { theme in
                                     Button {
                                         readerTheme = theme
                                     } label: {
                                         HStack {
-                                            Text(theme.rawValue)
+                                            Text(theme.displayTitle)
                                             if readerTheme == theme {
                                                 Image(systemName: "checkmark")
                                             }
@@ -489,18 +562,17 @@ public struct ComicReaderView: View {
                                     .font(.subheadline.bold())
                                     .foregroundStyle(.white)
                                     .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                                    .glassEffect(.regular.interactive(), in: .circle)
+                                    .glassEffect(.clear.interactive(), in: .circle)
                             }
-                            .accessibilityLabel("阅读背景底色，当前：\(readerTheme.rawValue)")
+                            .accessibilityLabel("reader.theme_a11y".localized(readerTheme.displayTitle))
                         }
                     }
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(.opacity)
                 }
 
                 Spacer()
 
                 if showControls && !shouldKeepControlsVisible {
-                    // 底部当前章节指示与选章胶囊（采用原生 Liquid Glass）
                     Button {
                         if comic.chapters.count > 1 {
                             showChapterPicker = true
@@ -515,22 +587,23 @@ public struct ComicReaderView: View {
                                 pages.isEmpty
                                     ? $0.title
                                     : "\($0.title) · \("reader.page".localized(currentPageNumber, pages.count))"
-                            } ?? "章节不可用")
+                            } ?? "reader.chapter_unavailable".localized)
                                 .font(.subheadline)
                             if zoomScale > 1.05 {
                                 Text(String(format: "%.1fx", zoomScale))
                                     .font(.caption2.monospacedDigit().bold())
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(AuroraColor.brand, in: Capsule())
+                                    .background(AuroraColor.brandSolid, in: Capsule())
                             }
                         }
                         .foregroundStyle(.white)
                         .padding(.horizontal, AuroraMetrics.spacingL)
                         .frame(height: AuroraMetrics.minTouchTarget)
-                        .glassEffect(.regular.interactive(), in: .capsule)
+                        .glassEffect(.clear.interactive(), in: .capsule)
                     }
                     .buttonStyle(.plain)
+                    .hoverEffect(.highlight)
                     .environment(\.colorScheme, .dark)
                     .padding(.bottom, max(DeviceLayout.safeAreaBottom, AuroraMetrics.spacingXL))
                 }
@@ -548,7 +621,7 @@ public struct ComicReaderView: View {
             flushCurrentProgress()
             pageLoadTask?.cancel()
         }
-        .enableSwipeBack {
+        .enableSwipeBack(isEnabled: zoomScale <= 1.02, allowsContentSwipe: false) {
             dismissReader()
         }
     }
@@ -572,12 +645,12 @@ public struct ComicReaderView: View {
                         HStack(spacing: AuroraMetrics.spacingM) {
                             Text("\(idx + 1)")
                                 .font(.caption.monospacedDigit().bold())
-                                .foregroundStyle(isCurrent ? AuroraColor.brand : AuroraColor.textTertiary)
+                                .foregroundStyle(isCurrent ? AuroraColor.brandLabel : AuroraColor.textTertiary)
                                 .frame(width: 32, alignment: .leading)
 
                             Text(chapter.title)
                                 .font(.body.weight(isCurrent ? .bold : .regular))
-                                .foregroundStyle(isCurrent ? AuroraColor.brand : AuroraColor.textPrimary)
+                                .foregroundStyle(isCurrent ? AuroraColor.brandLabel : AuroraColor.textPrimary)
                                 .lineLimit(2)
 
                             Spacer()
@@ -590,23 +663,25 @@ public struct ComicReaderView: View {
                             if isCurrent {
                                 Image(systemName: "checkmark")
                                     .font(.subheadline.bold())
-                                    .foregroundStyle(AuroraColor.brand)
+                                    .foregroundStyle(AuroraColor.brandLabel)
                             }
                         }
+                        .frame(minHeight: AuroraMetrics.minTouchTarget)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle("章节目录 (\(comic.chapters.count))")
+            .navigationTitle("reader.toc_nav_title".localized(comic.chapters.count))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("common.done".localized) {
                         showChapterPicker = false
                     }
-                    .foregroundStyle(AuroraColor.brand)
+                    .foregroundStyle(AuroraColor.brandLabel)
+                    .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                 }
             }
         }
@@ -658,16 +733,15 @@ public struct ComicReaderView: View {
     }
 
     private func switchChapter(to newIndex: Int, proxy: ScrollViewProxy) {
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+        AuroraHaptics.medium()
         zoomScale = 1.0
         committedZoomScale = 1.0
         currentPageNumber = 1
         pendingScrollPageNumber = nil
         self.currentChapterIndex = newIndex
 
-        // 关键踩坑经验：换章必须自动回顶，杜绝偏移量越界
-        withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+        AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
+            scrollPosition.scrollTo(point: .zero)
             proxy.scrollTo("top_anchor", anchor: .top)
         }
         loadPages()
@@ -681,11 +755,10 @@ public struct ComicReaderView: View {
         guard let chapter = currentChapter else {
             pages = []
             isLoading = false
-            loadError = "此漫画来源尚未提供章节列表。"
+            loadError = "reader.no_chapters_source".localized
             return
         }
 
-        // 1. 优先离线优先拦截：若本章节已完整下载，直接从沙盒秒开，无视断网与弱网环境
         if downloadManager.isDownloaded(comicId: comic.id, chapterId: chapter.id, sourceId: comic.sourceId),
            let record = downloadManager.chapters.first(where: {
                $0.comicId == comic.id && $0.chapterId == chapter.id && ($0.sourceId == comic.sourceId || $0.sourceId.isEmpty)
@@ -709,7 +782,6 @@ public struct ComicReaderView: View {
             }
         }
 
-        // 2. 内存秒开拦截：若前置预热或历史已解析此章节，0ms 瞬间渲染
         if let cached = ComicRepository.shared.cachedChapter(sourceId: comic.sourceId, comicId: comic.id, chapterId: chapter.id), !cached.isEmpty {
             self.pages = cached
             self.isLoading = false
@@ -733,13 +805,12 @@ public struct ComicReaderView: View {
                 guard !Task.isCancelled, activePageLoadID == requestID else { return }
                 pages = loaded
                 if loaded.isEmpty {
-                    loadError = "此章节暂时没有可显示的图片。"
+                    loadError = "reader.empty_chapter_desc".localized
                 } else {
                     prewarmNextChapterIfNeeded(after: chapter)
                 }
             } catch {
                 guard !Task.isCancelled, activePageLoadID == requestID else { return }
-                // 网络失败时的本地兜底恢复
                 if let record = downloadManager.chapters.first(where: {
                     $0.comicId == comic.id && $0.chapterId == chapter.id && ($0.sourceId == comic.sourceId || $0.sourceId.isEmpty)
                 }),

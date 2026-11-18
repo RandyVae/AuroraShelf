@@ -7,12 +7,13 @@ public struct LiveDetailView: View {
     public let onSelectStream: ((LiveStreamItem) -> Void)?
     public let onDismiss: () -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    private var coordinator: PlayerCoordinator { PlayerCoordinator.shared }
     @AppStorage private var isBookmarked: Bool
     @AppStorage private var localLikes: Int
     @State private var showChat = false
     @State private var isCommentsExpanded = true
 
-    // 全屏与画幅控制（单一播放源驱动，零重新缓冲，零黑屏）
     @State private var isFullScreen: Bool = false
     @State private var isLandscape: Bool = false
     @State private var isFillMode: Bool = false
@@ -65,7 +66,6 @@ public struct LiveDetailView: View {
             ZStack(alignment: .topLeading) {
                 AuroraColor.canvas.ignoresSafeArea()
 
-                // 主播信息、评论与推荐主播（始终维持单一 LivePlayerView 身份，进入/退出全屏零重建）
                 if !isFullScreen {
                     if isSplitMode {
                         HStack(alignment: .top, spacing: 0) {
@@ -98,14 +98,11 @@ public struct LiveDetailView: View {
                     } else {
                         ScrollView(.vertical, showsIndicators: false) {
                             VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
-                                // 主播信息与在线状态（Apple TV 标题层级）
                                 headerInfoSection
                                     .padding(.top, AuroraMetrics.spacingM)
 
-                                // 核心动作按钮组（点赞、收藏、聊天室）
                                 actionButtonsSection
 
-                                // 原生实时评论嵌入区（支持折叠/展开）
                                 LiveInlineCommentsView(
                                     stream: stream,
                                     externalComments: stripchatComments,
@@ -125,11 +122,10 @@ public struct LiveDetailView: View {
                         }
                         .padding(.top, targetHeight)
                         .frame(width: screenGeo.size.width, height: screenGeo.size.height)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                     }
                 }
 
-                // 顶部直播播放器视口（单一实例支持原位动态展开至全屏或分栏，不中断、不重载）
                 livePlayerContainer(
                     in: screenGeo,
                     isRotated: isRotated,
@@ -139,12 +135,11 @@ public struct LiveDetailView: View {
                 )
                 .zIndex(10)
 
-                // 全局 HUD 提示胶囊（iOS 27 Glass.clear 浮层）
                 if let hud = hudMessage {
                     PlayerLiquidGlassHUD(icon: nil, message: hud)
                         .environment(\.colorScheme, .dark)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                        .transition(.scale(scale: 0.9).combined(with: .opacity))
+                        .transition(reduceMotion ? .opacity : .scale(scale: 0.9).combined(with: .opacity))
                         .zIndex(30)
                 }
             }
@@ -153,6 +148,24 @@ public struct LiveDetailView: View {
         .toolbar(.hidden, for: .navigationBar)
         .statusBarHidden(isFullScreen)
         .persistentSystemOverlays(isFullScreen ? .hidden : .automatic)
+        .onChange(of: coordinator.toggleFullScreenTrigger) { _, _ in
+            AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: reduceMotion) {
+                isFullScreen.toggle()
+                if !isFullScreen {
+                    isLandscape = false
+                    PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: false)
+                }
+            }
+        }
+        .onKeyPress(.escape) {
+            guard isFullScreen else { return .ignored }
+            PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: false)
+            AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: reduceMotion) {
+                isFullScreen = false
+                isLandscape = false
+            }
+            return .handled
+        }
         .onAppear {
             let args = CommandLine.arguments
             if args.contains("--live-fullscreen") {
@@ -225,8 +238,8 @@ public struct LiveDetailView: View {
         )
         .ignoresSafeArea()
         .clipped()
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isFullScreen)
-        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isLandscape)
+        .animation(reduceMotion ? nil : AuroraMotion.cinema, value: isFullScreen)
+        .animation(reduceMotion ? nil : AuroraMotion.cinema, value: isLandscape)
     }
 
     // MARK: - iPad 横屏右侧栏（可折叠实时评论 + 更多直播推荐）
@@ -247,9 +260,10 @@ public struct LiveDetailView: View {
             )
 
             if !relatedStreams.isEmpty {
-                Text("更多直播")
+                Text("live.more_streams".localized)
                     .font(.title3.bold())
                     .foregroundStyle(AuroraColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
 
                 ScrollView(.vertical, showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
@@ -273,9 +287,10 @@ public struct LiveDetailView: View {
 
     private var stackedRelatedSection: some View {
         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-            Text("更多直播")
+            Text("live.more_streams".localized)
                 .font(.title3.bold())
                 .foregroundStyle(AuroraColor.textPrimary)
+                .accessibilityAddTraits(.isHeader)
 
             LazyVStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                 ForEach(relatedStreams.prefix(12)) { related in
@@ -297,13 +312,14 @@ public struct LiveDetailView: View {
                         title: related.username,
                         aspectRatio: AuroraMetrics.liveAspect,
                         contentMode: .fill,
-                        cornerRadius: 10
+                        cornerRadius: 10,
+                        placeholderStyle: .live
                     )
                     .frame(width: thumbWidth, height: thumbHeight)
                     .clipped()
 
-                    Text("LIVE")
-                        .font(.system(size: 9, weight: .heavy))
+                    Text("live.badge_live".localized)
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 2)
@@ -317,8 +333,8 @@ public struct LiveDetailView: View {
                         .foregroundStyle(AuroraColor.textPrimary)
                         .lineLimit(1)
 
-                    if !related.title.isEmpty {
-                        Text(related.title)
+                    if !related.localizedSubtitle.isEmpty {
+                        Text(related.localizedSubtitle)
                             .font(.caption)
                             .foregroundStyle(AuroraColor.textSecondary)
                             .lineLimit(2)
@@ -337,7 +353,7 @@ public struct LiveDetailView: View {
         }
         .buttonStyle(.plain)
         .hoverEffect(.highlight)
-        .frame(minHeight: thumbHeight)
+        .frame(minHeight: max(thumbHeight, AuroraMetrics.minTouchTarget))
     }
 
     // MARK: - 2. 主播信息与在线标签
@@ -348,18 +364,19 @@ public struct LiveDetailView: View {
                 Text(stream.username)
                     .font(.title2.weight(.bold))
                     .foregroundStyle(AuroraColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
 
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(Color.red)
-                        .frame(width: 7, height: 7)
-                    Text("LIVE")
-                        .font(.system(size: 10, weight: .heavy))
+                        .fill(Color.white)
+                        .frame(width: 6, height: 6)
+                    Text("live.badge_live".localized)
+                        .font(.caption2.weight(.heavy))
                         .foregroundStyle(.white)
                 }
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(Color.red.opacity(0.85), in: Capsule())
+                .background(Color.red.opacity(0.88), in: Capsule())
 
                 Spacer()
 
@@ -368,16 +385,16 @@ public struct LiveDetailView: View {
                         Image(systemName: "person.2.fill")
                             .font(.caption2)
                         Text("\(viewers)")
-                            .font(.caption.bold())
+                            .font(.caption.bold().monospacedDigit())
                     }
                     .foregroundStyle(AuroraColor.brandLabel)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(AuroraColor.brand.opacity(0.15), in: Capsule())
+                    .background(AuroraColor.brandLabel.opacity(0.14), in: Capsule())
                 }
             }
 
-            Text(stream.title.isEmpty ? "正在直播中" : stream.title)
+            Text(stream.localizedSubtitle.isEmpty ? "live.streaming_now".localized : stream.localizedSubtitle)
                 .font(.body)
                 .foregroundStyle(AuroraColor.textSecondary)
         }
@@ -388,22 +405,28 @@ public struct LiveDetailView: View {
     private var actionButtonsSection: some View {
         GlassEffectContainer(spacing: AuroraMetrics.spacingM) {
             HStack(spacing: AuroraMetrics.spacingM) {
-                actionButton("heart.fill", title: "点赞 \(localLikes)", tint: .pink) {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
+                actionButton(
+                    localLikes > 0 ? "heart.fill" : "heart",
+                    title: String(format: "live.like_count".localized, localLikes),
+                    tint: localLikes > 0 ? Color.pink : AuroraColor.textPrimary
+                ) {
+                    AuroraHaptics.impact(.medium)
                     localLikes += 1
                 }
                 actionButton(
                     isBookmarked ? "bookmark.fill" : "bookmark",
-                    title: isBookmarked ? "已收藏" : "收藏",
-                    tint: AuroraColor.brand,
+                    title: isBookmarked ? "live.bookmarked".localized : "live.bookmark".localized,
+                    tint: isBookmarked ? AuroraColor.brandSolid : AuroraColor.textPrimary,
                     isProminent: isBookmarked
                 ) {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
+                    AuroraHaptics.impact(.medium)
                     isBookmarked.toggle()
                 }
-                actionButton("bubble.left.and.bubble.right.fill", title: "聊天室", tint: AuroraColor.brand) {
+                actionButton(
+                    "bubble.left.and.bubble.right",
+                    title: "live.chat_room".localized,
+                    tint: AuroraColor.textPrimary
+                ) {
                     showChat = true
                 }
             }
@@ -415,8 +438,10 @@ public struct LiveDetailView: View {
         let base = Button(action: action) {
             Label(title, systemImage: icon)
                 .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .frame(maxWidth: .infinity, minHeight: 32)
+                .padding(.vertical, 4)
         }
         .buttonBorderShape(.capsule)
         .tint(tint)
@@ -431,11 +456,11 @@ public struct LiveDetailView: View {
 
     private func showHUD(_ text: String) {
         hudTask?.cancel()
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+        AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
             hudMessage = text
         }
         let task = DispatchWorkItem {
-            withAnimation(.easeOut(duration: 0.25)) {
+            AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                 if self.hudMessage == text {
                     self.hudMessage = nil
                 }

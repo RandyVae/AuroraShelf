@@ -14,7 +14,6 @@ public struct ForumBoardVisualSpec: Sendable {
 
     public static func forBoard(_ fid: Int?) -> ForumBoardVisualSpec {
         guard let fid else {
-            // 全部板块：黑曜石现代极简灰
             return ForumBoardVisualSpec(
                 iconName: "tray.2.fill",
                 gradientColors: [Color(rgb: 0x263238), Color(rgb: 0x37474F)],
@@ -24,63 +23,54 @@ public struct ForumBoardVisualSpec: Sendable {
 
         switch fid {
         case 100:
-            // 草榴技术区：经典翡翠墨绿
             return ForumBoardVisualSpec(
                 iconName: "wrench.and.screwdriver.fill",
                 gradientColors: [Color(rgb: 0x1B5E20), Color(rgb: 0x2E7D32)],
                 accentColor: Color(rgb: 0x81C784)
             )
         case 16:
-            // 唯美摄影：深海孔雀绿
             return ForumBoardVisualSpec(
                 iconName: "photo.artframe",
                 gradientColors: [Color(rgb: 0x004D40), Color(rgb: 0x00695C)],
                 accentColor: Color(rgb: 0x80CBC4)
             )
         case 4:
-            // 91 原创自拍：烈焰宝石红
             return ForumBoardVisualSpec(
                 iconName: "camera.fill",
                 gradientColors: [Color(rgb: 0xB71C1C), Color(rgb: 0xD32F2F)],
                 accentColor: Color(rgb: 0xFF8A80)
             )
         case 21:
-            // 我爱我妻：柔美洋红玫瑰
             return ForumBoardVisualSpec(
                 iconName: "heart.circle.fill",
                 gradientColors: [Color(rgb: 0x880E4F), Color(rgb: 0xAD1457)],
                 accentColor: Color(rgb: 0xF48FB1)
             )
         case 33:
-            // 草榴达盖尔：深海孔雀绿
             return ForumBoardVisualSpec(
                 iconName: "photo.artframe",
                 gradientColors: [Color(rgb: 0x004D40), Color(rgb: 0x00695C)],
                 accentColor: Color(rgb: 0x80CBC4)
             )
         case 34:
-            // 新时代征文：活力暖金柑橙
             return ForumBoardVisualSpec(
                 iconName: "text.book.closed.fill",
                 gradientColors: [Color(rgb: 0xE65100), Color(rgb: 0xEF6C00)],
                 accentColor: Color(rgb: 0xFFB74D)
             )
         case 36:
-            // 东方文学：暗曜紫罗兰
             return ForumBoardVisualSpec(
                 iconName: "books.vertical.fill",
                 gradientColors: [Color(rgb: 0x311B92), Color(rgb: 0x4527A0)],
                 accentColor: Color(rgb: 0xB39DDB)
             )
         case 37:
-            // 经典影视：经典剧院深红
             return ForumBoardVisualSpec(
                 iconName: "film.stack.fill",
                 gradientColors: [Color(rgb: 0x660A10), Color(rgb: 0xB71C1C)],
                 accentColor: Color(rgb: 0xFF5252)
             )
         case 38:
-            // 网友自拍：珊瑚晚霞橙
             return ForumBoardVisualSpec(
                 iconName: "person.crop.rectangle.fill",
                 gradientColors: [Color(rgb: 0xBF360C), Color(rgb: 0xD84315)],
@@ -100,6 +90,7 @@ public struct ForumBoardVisualSpec: Sendable {
 public struct ForumBoardsShelf: View {
     public let selectedBoardFid: Int?
     public let onSelect: (Int?) -> Void
+    @ObservedObject private var locManager = LocalizationManager.shared
 
     public init(
         selectedBoardFid: Int?,
@@ -112,23 +103,24 @@ public struct ForumBoardsShelf: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
             HStack(spacing: AuroraMetrics.spacingS) {
-                Text("社区板块")
+                Text("forum.boards_title".localized)
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundStyle(AuroraColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
-                Text("精选讨论区")
+                Text("forum.boards_subtitle".localized)
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundStyle(AuroraColor.brand)
+                    .foregroundStyle(AuroraColor.brandLabel)
             }
             .padding(.horizontal, AuroraMetrics.contentInset)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: AuroraMetrics.spacingM) {
-                    boardCard(nil, title: "全部")
+                    boardCard(nil, title: "home.all".localized)
 
                     ForEach(ForumSourceCatalog.allBoards) { board in
                         boardCard(board.fid, title: board.name)
@@ -167,7 +159,7 @@ public struct ForumBoardsShelf: View {
                         )
 
                     Image(systemName: spec.iconName)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.title3.weight(.bold))
                         .foregroundStyle(.white)
                         .shadow(color: .black.opacity(0.5), radius: 4, x: 0, y: 2)
                 }
@@ -186,11 +178,16 @@ public struct ForumBoardsShelf: View {
             }
         }
         .buttonStyle(AppleSpringCardButtonStyle())
-        .accessibilityLabel("社区板块 \(title)，\(isSelected ? "当前正在查看" : "轻点切换")")
+        .accessibilityLabel(
+            "forum.board_a11y".localized(
+                title,
+                isSelected ? "comics.status_browsing".localized : "channels.status_tap".localized
+            )
+        )
     }
 }
 
-/// 原生社区精选帖子卡片：严格统一 16:9 封面画幅与卡片高宽，拔除高低参差不齐缺陷
+/// 原生社区精选帖子卡片：严格统一 16:9 封面画幅与卡片高宽
 public struct ForumFeaturedCard: View {
     public let post: ForumPostItem
     public let cardWidth: CGFloat
@@ -206,7 +203,6 @@ public struct ForumFeaturedCard: View {
 
     public var body: some View {
         VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-            // 1. 严格统一尺寸的 16:9 封面容器
             ZStack(alignment: .bottomLeading) {
                 if let preview = post.previewImageUrl, !preview.isEmpty {
                     AuroraCoverImage(
@@ -233,11 +229,11 @@ public struct ForumFeaturedCard: View {
                             )
 
                         Image(systemName: spec.iconName)
-                            .font(.system(size: 32, weight: .light))
+                            .font(.largeTitle.weight(.light))
                             .foregroundStyle(.white.opacity(0.2))
 
                         Text(post.title)
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.caption.weight(.bold))
                             .foregroundStyle(.white.opacity(0.95))
                             .padding(12)
                             .lineLimit(3)
@@ -246,9 +242,8 @@ public struct ForumFeaturedCard: View {
                     .frame(width: cardWidth, height: coverHeight)
                 }
 
-                // 板块标识胶囊
                 Text(post.boardName)
-                    .font(.system(size: 10, weight: .bold))
+                    .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -262,7 +257,6 @@ public struct ForumFeaturedCard: View {
                     .stroke(AuroraColor.hairline, lineWidth: 1)
             )
 
-            // 2. 标题最小高度插槽（38pt），适应大字号且无论单行双行均顶部对齐
             Text(post.title)
                 .font(.subheadline)
                 .fontWeight(.semibold)
@@ -272,7 +266,6 @@ public struct ForumFeaturedCard: View {
                 .frame(width: cardWidth, alignment: .topLeading)
                 .frame(minHeight: 38, alignment: .topLeading)
 
-            // 3. 元数据最小高度插槽（16pt）
             HStack(spacing: 6) {
                 if let author = post.author, !author.isEmpty {
                     Text(author)
@@ -307,6 +300,7 @@ public struct ForumHeroBillboard: View {
     public let onEnter: () -> Void
     public let onCycle: () -> Void
 
+    @ObservedObject private var locManager = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
@@ -331,13 +325,8 @@ public struct ForumHeroBillboard: View {
         return DeviceLayout.heroHeight(for: formFactor, screenHeight: effectiveHeight)
     }
 
-    private var isWideAspect: Bool {
-        formFactor.isWide
-    }
-
     public var body: some View {
         ZStack(alignment: .bottom) {
-            // 背景封面或板块光晕
             if let preview = post.previewImageUrl, !preview.isEmpty {
                 Color.clear
                     .overlay(
@@ -362,7 +351,7 @@ public struct ForumHeroBillboard: View {
                     )
 
                     Image(systemName: spec.iconName)
-                        .font(.system(size: 140, weight: .ultraLight))
+                        .font(.system(size: 132, weight: .ultraLight))
                         .foregroundStyle(.white.opacity(0.08))
                         .offset(y: -40)
                 }
@@ -371,7 +360,7 @@ public struct ForumHeroBillboard: View {
 
             VStack(spacing: 0) {
                 LinearGradient(
-                    colors: [Color.black.opacity(0.7), Color.clear],
+                    colors: [Color.black.opacity(0.65), Color.clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -401,16 +390,16 @@ public struct ForumHeroBillboard: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .shadow(color: colorScheme == .dark ? .black.opacity(0.95) : .white.opacity(0.75), radius: 8, x: 0, y: 2)
                     .padding(.horizontal, AuroraMetrics.contentInset)
 
                 metadataView
-                    .shadow(color: colorScheme == .dark ? .black.opacity(0.9) : .clear, radius: 6, x: 0, y: 2)
 
-                HStack(spacing: AuroraMetrics.spacingM) {
-                    enterButton
-                        .frame(maxWidth: formFactor.isWide ? 220 : .infinity)
-                    cycleButton
+                GlassEffectContainer(spacing: AuroraMetrics.spacingM) {
+                    HStack(spacing: AuroraMetrics.spacingM) {
+                        enterButton
+                            .frame(maxWidth: formFactor.isWide ? 220 : .infinity)
+                        cycleButton
+                    }
                 }
                 .frame(maxWidth: DeviceLayout.heroActionsMaxWidth(for: formFactor) ?? .infinity)
                 .padding(.horizontal, AuroraMetrics.contentInset)
@@ -421,19 +410,16 @@ public struct ForumHeroBillboard: View {
 
     @ViewBuilder
     private var metadataView: some View {
-        let primaryMetaColor: Color = colorScheme == .dark ? .white : AuroraColor.textPrimary
-        let secondaryMetaColor: Color = colorScheme == .dark ? .white.opacity(0.85) : AuroraColor.textSecondary
-        let dotColor: Color = colorScheme == .dark ? .white.opacity(0.6) : AuroraColor.textTertiary
+        let isT66y = post.boardName.contains("草榴") || post.boardName.contains("达盖尔") || post.fid == 100 || post.fid == 16
 
         HStack(spacing: AuroraMetrics.spacingS) {
-            Text("热帖聚焦")
+            Text("forum.hot_focus".localized)
                 .font(.caption2.bold())
                 .foregroundStyle(.white)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
                 .background(
-                    (post.boardName.contains("草榴") || post.boardName.contains("达盖尔") || post.fid == 100 || post.fid == 16)
-                        ? AuroraColor.forestGreen.opacity(0.85) : AuroraColor.accentRed.opacity(0.85),
+                    isT66y ? AuroraColor.forestGreen : AuroraColor.accentRed,
                     in: Capsule()
                 )
 
@@ -443,18 +429,18 @@ public struct ForumHeroBillboard: View {
 
             if let author = post.author {
                 Text("•")
-                    .foregroundStyle(dotColor)
+                    .foregroundStyle(AuroraColor.textTertiary)
                 Text(author)
                     .font(.caption.bold())
-                    .foregroundStyle(primaryMetaColor)
+                    .foregroundStyle(AuroraColor.textPrimary)
             }
 
             if let replies = post.replies {
                 Text("•")
-                    .foregroundStyle(dotColor)
-                Text("\(replies) 回复")
+                    .foregroundStyle(AuroraColor.textTertiary)
+                Text("forum.replies_short".localized(replies))
                     .font(.caption2)
-                    .foregroundStyle(secondaryMetaColor)
+                    .foregroundStyle(AuroraColor.textSecondary)
             }
         }
         .lineLimit(1)
@@ -466,13 +452,14 @@ public struct ForumHeroBillboard: View {
             HStack(spacing: 6) {
                 Image(systemName: "bubble.left.and.bubble.right.fill")
                     .font(.headline)
-                Text("进入讨论")
+                Text("forum.enter_discussion".localized)
                     .font(.headline.weight(.bold))
             }
             .frame(maxWidth: .infinity, minHeight: 46)
-            .background(colorScheme == .dark ? Color.white : AuroraColor.brand, in: Capsule())
-            .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
+            .background(AuroraColor.textPrimary, in: Capsule())
+            .foregroundStyle(AuroraColor.canvas)
         }
+        .auroraZoomSource("forum:\(post.id)")
         .buttonStyle(AppleSpringCardButtonStyle())
     }
 
@@ -481,33 +468,30 @@ public struct ForumHeroBillboard: View {
             HStack(spacing: 6) {
                 Image(systemName: "shuffle")
                     .font(.headline)
-                Text("换篇热帖")
+                Text("forum.shuffle_post".localized)
                     .font(.headline.weight(.semibold))
+                    .lineLimit(1)
             }
-            .frame(minHeight: 46)
-            .padding(.horizontal, 16)
-            .background(.ultraThinMaterial, in: Capsule())
-            .background(
-                (colorScheme == .dark ? Color.black.opacity(0.35) : AuroraColor.surfaceHigh.opacity(0.88)),
-                in: Capsule()
-            )
-            .overlay(
-                Capsule()
-                    .stroke(colorScheme == .dark ? Color.white.opacity(0.25) : AuroraColor.hairline, lineWidth: 1)
-            )
-            .foregroundStyle(colorScheme == .dark ? Color.white : AuroraColor.textPrimary)
+            .frame(minHeight: 34)
+            .padding(.horizontal, 6)
+            .fixedSize(horizontal: true, vertical: false)
         }
-        .buttonStyle(AppleSpringCardButtonStyle())
-        .accessibilityHint("切换另一篇推荐热帖")
+        .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
+        .tint(AuroraColor.textPrimary)
+        .hoverEffect(.highlight)
+        .accessibilityHint("forum.shuffle_hint".localized)
     }
 }
 
 public struct ForumScreen: View {
     @ObservedObject public var repo = ForumRepository.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
     public let onOpenSearch: () -> Void
     @State private var spotlightIndex: Int = 0
     @State private var isScrolled: Bool = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(onOpenSearch: @escaping () -> Void = {}) {
         self.onOpenSearch = onOpenSearch
@@ -525,9 +509,9 @@ public struct ForumScreen: View {
 
     private var currentBoardTitle: String {
         if let fid = repo.selectedBoardFid {
-            return ForumSourceCatalog.allBoards.first(where: { $0.fid == fid })?.name ?? "板块"
+            return ForumSourceCatalog.allBoards.first(where: { $0.fid == fid })?.name ?? "forum.board_fallback".localized
         }
-        return "全部板块"
+        return "forum.all_boards".localized
     }
 
     public var body: some View {
@@ -536,13 +520,12 @@ public struct ForumScreen: View {
 
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: AuroraMetrics.spacingXL) {
-                    // 1. 顶部 Community Hero 聚焦大卡（Apple TV 影院级画幅）
                     if let spotlight = spotlightPost {
                         ForumHeroBillboard(
                             post: spotlight,
                             onEnter: { PlayerCoordinator.shared.openForumPost(spotlight) },
                             onCycle: {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                                     spotlightIndex = (spotlightIndex + 1) % max(1, repo.posts.count)
                                 }
                             }
@@ -553,32 +536,31 @@ public struct ForumScreen: View {
                         Spacer().frame(height: 60)
                     }
 
-                    // 2. Apple TV 核心层级：精选社区板块（Channels 货架）
                     ForumBoardsShelf(
                         selectedBoardFid: repo.selectedBoardFid,
                         onSelect: { fid in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                                 repo.selectBoard(fid)
                             }
                         }
                     )
 
-                    // 3. 热门精华讨论（规范宽幅图文卡，拔除生硬的 1234 排行大字）
                     if !top10Posts.isEmpty {
                         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                             HStack(spacing: AuroraMetrics.spacingS) {
-                                Text("热门精华")
+                                Text("forum.hot_picks".localized)
                                     .font(.title2)
                                     .fontWeight(.bold)
                                     .foregroundStyle(AuroraColor.textPrimary)
+                                    .accessibilityAddTraits(.isHeader)
 
                                 Text("FEATURED")
                                     .font(.caption2)
                                     .fontWeight(.black)
-                                    .foregroundStyle(AuroraColor.forestGreen)
+                                    .foregroundStyle(.white)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
-                                    .background(AuroraColor.forestGreen.opacity(0.12), in: Capsule())
+                                    .background(AuroraColor.forestGreen, in: Capsule())
                             }
                             .padding(.horizontal, AuroraMetrics.contentInset)
 
@@ -590,6 +572,7 @@ public struct ForumScreen: View {
                                         } label: {
                                             ForumFeaturedCard(post: post)
                                         }
+                                        .auroraZoomSource("forum:\(post.id)")
                                         .buttonStyle(AppleSpringCardButtonStyle())
                                     }
                                 }
@@ -598,17 +581,17 @@ public struct ForumScreen: View {
                         }
                     }
 
-                    // 4. 板块讨论信息流
                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                         HStack(spacing: AuroraMetrics.spacingS) {
-                            Text("\(currentBoardTitle) 讨论")
+                            Text("forum.board_discussion".localized(currentBoardTitle))
                                 .font(.title3)
                                 .fontWeight(.bold)
                                 .foregroundStyle(AuroraColor.textPrimary)
+                                .accessibilityAddTraits(.isHeader)
 
                             Spacer()
 
-                            Text("\(repo.posts.count) 篇主题")
+                            Text("forum.topics_count".localized(repo.posts.count))
                                 .font(.subheadline)
                                 .foregroundStyle(AuroraColor.textSecondary)
                         }
@@ -617,7 +600,6 @@ public struct ForumScreen: View {
                         forumContent
                     }
 
-                    // Keep clear of floating tab bar
                     Spacer().frame(height: max(AuroraMetrics.spacingXXL, 96))
                 }
             }
@@ -633,24 +615,23 @@ public struct ForumScreen: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground((isScrolled || spotlightPost == nil) ? .visible : .hidden, for: .navigationBar)
-        .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 NetgreyMarkView(width: 20, height: 28)
             }
+            .sharedBackgroundVisibility(.hidden)
+
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: AuroraMetrics.spacingM) {
-                    Button(action: onOpenSearch) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.body)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.primary)
-                    }
-                    .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-                    .contentShape(Rectangle())
-                    .accessibilityLabel("搜索社区")
+                Button(action: onOpenSearch) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.primary)
                 }
+                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                .contentShape(Rectangle())
+                .hoverEffect(.highlight)
+                .accessibilityLabel("forum.search_a11y".localized)
             }
         }
         .onAppear {
@@ -665,24 +646,24 @@ public struct ForumScreen: View {
                 .frame(maxWidth: .infinity, minHeight: 240)
         } else if repo.posts.isEmpty, let errorMessage = repo.errorMessage {
             ContentUnavailableView {
-                Label("加载失败", systemImage: "wifi.exclamationmark")
+                Label("forum.load_failed".localized, systemImage: "wifi.exclamationmark")
             } description: {
                 Text(errorMessage)
             } actions: {
-                Button("重试", systemImage: "arrow.clockwise") {
+                Button("common.retry".localized, systemImage: "arrow.clockwise") {
                     repo.loadPosts()
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(AuroraColor.brand)
+                .tint(AuroraColor.brandSolid)
             }
             .frame(maxWidth: .infinity, minHeight: 280)
         } else if repo.posts.isEmpty {
             ContentUnavailableView {
-                Label("暂无帖子", systemImage: "text.bubble")
+                Label("forum.empty_title".localized, systemImage: "text.bubble")
             } description: {
-                Text("当前板块没有可显示的帖子。")
+                Text("forum.empty_desc".localized)
             } actions: {
-                Button("刷新", systemImage: "arrow.clockwise") {
+                Button("common.refresh".localized, systemImage: "arrow.clockwise") {
                     repo.loadPosts()
                 }
                 .buttonStyle(.bordered)
@@ -701,6 +682,7 @@ public struct ForumScreen: View {
                         } label: {
                             postCard(post)
                         }
+                        .auroraZoomSource("forum:\(post.id)")
                         .buttonStyle(AppleSpringCardButtonStyle())
                         .onAppear {
                             guard post.compositeID == repo.posts.last?.compositeID else { return }
@@ -709,11 +691,11 @@ public struct ForumScreen: View {
                     }
 
                     if repo.isLoadingNextPage {
-                        ProgressView("正在加载更多帖子…")
+                        ProgressView("home.loading_more".localized)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, AuroraMetrics.spacingM)
                     } else if repo.errorMessage != nil {
-                        Button("继续加载", systemImage: "arrow.clockwise") {
+                        Button("forum.continue_loading".localized, systemImage: "arrow.clockwise") {
                             Task { await repo.loadNextPage() }
                         }
                         .buttonStyle(.bordered)
@@ -726,7 +708,7 @@ public struct ForumScreen: View {
 
     private func partialFailureBanner(_ message: String) -> some View {
         HStack(alignment: .top, spacing: AuroraMetrics.spacingS) {
-            Label("部分板块暂不可用", systemImage: "exclamationmark.triangle")
+            Label("forum.partial_unavailable".localized, systemImage: "exclamationmark.triangle")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AuroraColor.textPrimary)
                 .labelStyle(.titleAndIcon)
@@ -744,7 +726,7 @@ public struct ForumScreen: View {
                     .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("重试加载论坛")
+            .accessibilityLabel("forum.retry_a11y".localized)
         }
         .padding(.horizontal, AuroraMetrics.contentInset)
         .padding(.vertical, AuroraMetrics.spacingS)
@@ -764,7 +746,7 @@ public struct ForumScreen: View {
                 let isT66y = post.boardName.contains("草榴") || post.boardName.contains("达盖尔") || post.fid == 100 || post.fid == 16
                 Text(post.boardName)
                     .font(.caption2.weight(.heavy))
-                    .foregroundStyle(AuroraColor.textOnBrand)
+                    .foregroundStyle(.white)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 3)
                     .background(
@@ -799,6 +781,5 @@ public struct ForumScreen: View {
                         .stroke(AuroraColor.hairline, lineWidth: 1)
                 }
         }
-        .contentShape(RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
     }
 }

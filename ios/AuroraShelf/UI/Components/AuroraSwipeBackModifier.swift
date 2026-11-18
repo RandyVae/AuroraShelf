@@ -8,21 +8,30 @@ import UIKit
 public struct AuroraSwipeBackModifier: ViewModifier {
     public let isEnabled: Bool
     public let allowsContentSwipe: Bool
+    public let interceptsPopWithCustomDismiss: Bool
     public let onDismiss: () -> Void
 
     public init(
         isEnabled: Bool = true,
         allowsContentSwipe: Bool = true,
+        interceptsPopWithCustomDismiss: Bool = false,
         onDismiss: @escaping () -> Void = {}
     ) {
         self.isEnabled = isEnabled
         self.allowsContentSwipe = allowsContentSwipe
+        self.interceptsPopWithCustomDismiss = interceptsPopWithCustomDismiss
         self.onDismiss = onDismiss
     }
 
     public func body(content: Content) -> some View {
         content
-            .background(NavigationPopGestureEnabler(isEnabled: isEnabled, allowsContentSwipe: allowsContentSwipe))
+            .background(
+                NavigationPopGestureEnabler(
+                    isEnabled: isEnabled && !interceptsPopWithCustomDismiss,
+                    allowsContentSwipe: allowsContentSwipe,
+                    onCustomEdgeSwipeBack: (isEnabled && interceptsPopWithCustomDismiss) ? onDismiss : nil
+                )
+            )
     }
 }
 
@@ -61,11 +70,14 @@ public final class PopGestureEnablerController: UIViewController {
     weak var coordinator: NavigationPopCoordinator?
     var isEnabled: Bool = true
     var allowsContentSwipe: Bool = true
+    var onCustomEdgeSwipeBack: (() -> Void)?
     private weak var attachedNavigationController: UINavigationController?
     private weak var previousPopDelegate: UIGestureRecognizerDelegate?
     private var previousPopEnabled: Bool?
     private weak var previousContentPopDelegate: UIGestureRecognizerDelegate?
     private var previousContentPopEnabled: Bool?
+    private weak var attachedWindowView: UIView?
+    private var customEdgeRecognizer: UIScreenEdgePanGestureRecognizer?
 
     public override func viewDidLoad() {
         super.viewDidLoad()
@@ -76,33 +88,78 @@ public final class PopGestureEnablerController: UIViewController {
     public override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         attachPopGesture()
+        attachCustomEdgeGestureIfNeeded()
     }
 
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         attachPopGesture()
+        attachCustomEdgeGestureIfNeeded()
     }
 
     public override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
+        detachCustomEdgeGesture()
         restorePopGesture()
     }
 
     public override func didMove(toParent parent: UIViewController?) {
         super.didMove(toParent: parent)
         if parent == nil {
+            detachCustomEdgeGesture()
             restorePopGesture()
         } else {
             attachPopGesture()
+            attachCustomEdgeGestureIfNeeded()
         }
     }
 
-    func updatePopState(isEnabled: Bool, allowsContentSwipe: Bool = true) {
+    func updatePopState(
+        isEnabled: Bool,
+        allowsContentSwipe: Bool = true,
+        onCustomEdgeSwipeBack: (() -> Void)? = nil
+    ) {
         self.isEnabled = isEnabled
         self.allowsContentSwipe = allowsContentSwipe
+        self.onCustomEdgeSwipeBack = onCustomEdgeSwipeBack
         coordinator?.isEnabled = isEnabled
         coordinator?.allowsContentSwipe = allowsContentSwipe
         attachPopGesture()
+        attachCustomEdgeGestureIfNeeded()
+    }
+
+    private func attachCustomEdgeGestureIfNeeded() {
+        guard onCustomEdgeSwipeBack != nil else {
+            detachCustomEdgeGesture()
+            return
+        }
+        guard let hostView = parent?.view else { return }
+        if attachedWindowView === hostView, customEdgeRecognizer != nil {
+            return
+        }
+        detachCustomEdgeGesture()
+        let edgePan = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleCustomEdgePan(_:)))
+        edgePan.edges = .left
+        hostView.addGestureRecognizer(edgePan)
+        attachedWindowView = hostView
+        customEdgeRecognizer = edgePan
+    }
+
+    private func detachCustomEdgeGesture() {
+        if let rec = customEdgeRecognizer, let host = attachedWindowView {
+            host.removeGestureRecognizer(rec)
+        }
+        customEdgeRecognizer = nil
+        attachedWindowView = nil
+    }
+
+    @objc private func handleCustomEdgePan(_ recognizer: UIScreenEdgePanGestureRecognizer) {
+        guard recognizer.state == .ended, let host = attachedWindowView else { return }
+        let translation = recognizer.translation(in: host).x
+        let velocity = recognizer.velocity(in: host).x
+        if translation > 64 || velocity > 420 {
+            onCustomEdgeSwipeBack?()
+        }
     }
 
     private func attachPopGesture() {
@@ -203,10 +260,16 @@ public final class PopGestureEnablerController: UIViewController {
 public struct NavigationPopGestureEnabler: UIViewControllerRepresentable {
     public let isEnabled: Bool
     public let allowsContentSwipe: Bool
+    public let onCustomEdgeSwipeBack: (() -> Void)?
 
-    public init(isEnabled: Bool = true, allowsContentSwipe: Bool = true) {
+    public init(
+        isEnabled: Bool = true,
+        allowsContentSwipe: Bool = true,
+        onCustomEdgeSwipeBack: (() -> Void)? = nil
+    ) {
         self.isEnabled = isEnabled
         self.allowsContentSwipe = allowsContentSwipe
+        self.onCustomEdgeSwipeBack = onCustomEdgeSwipeBack
     }
 
     public func makeUIViewController(context: Context) -> PopGestureEnablerController {
@@ -214,12 +277,17 @@ public struct NavigationPopGestureEnabler: UIViewControllerRepresentable {
         controller.coordinator = context.coordinator
         controller.isEnabled = isEnabled
         controller.allowsContentSwipe = allowsContentSwipe
+        controller.onCustomEdgeSwipeBack = onCustomEdgeSwipeBack
         return controller
     }
 
     public func updateUIViewController(_ uiViewController: PopGestureEnablerController, context: Context) {
         uiViewController.coordinator = context.coordinator
-        uiViewController.updatePopState(isEnabled: isEnabled, allowsContentSwipe: allowsContentSwipe)
+        uiViewController.updatePopState(
+            isEnabled: isEnabled,
+            allowsContentSwipe: allowsContentSwipe,
+            onCustomEdgeSwipeBack: onCustomEdgeSwipeBack
+        )
     }
 
     public func makeCoordinator() -> NavigationPopCoordinator {
@@ -300,11 +368,13 @@ extension View {
     public func enableSwipeBack(
         isEnabled: Bool = true,
         allowsContentSwipe: Bool = true,
+        interceptsPopWithCustomDismiss: Bool = false,
         onDismiss: @escaping () -> Void = {}
     ) -> some View {
         modifier(AuroraSwipeBackModifier(
             isEnabled: isEnabled,
             allowsContentSwipe: allowsContentSwipe,
+            interceptsPopWithCustomDismiss: interceptsPopWithCustomDismiss,
             onDismiss: onDismiss
         ))
     }

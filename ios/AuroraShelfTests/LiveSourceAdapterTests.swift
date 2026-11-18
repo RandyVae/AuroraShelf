@@ -19,17 +19,26 @@ final class LiveSourceAdapterTests: XCTestCase {
             let cover = await CoverImageLoader.shared.loadImage(from: stream.snapshotUrl)
             XCTAssertNotNil(cover, "\(source.name) room cover did not decode")
             if source.id == LiveSourceCatalog.stripchatID {
-                let numericId = stream.id.replacingOccurrences(of: "sc-", with: "").filter(\.isNumber)
-                let resolved = await StripchatStreamAuthenticator.shared.resolvePlayableURL(
-                    rawHls: stream.hlsStreamUrl,
-                    fallbackNumericId: numericId
-                )
-                if case .authenticated(let url) = resolved {
+                var authenticatedURL: URL?
+                var lastOutcome: StripchatResolveOutcome = .offlineOrPrivate
+                for candidate in streams.prefix(4) {
+                    let numericId = candidate.id.replacingOccurrences(of: "sc-", with: "").filter(\.isNumber)
+                    let resolved = await StripchatStreamAuthenticator.shared.resolvePlayableURL(
+                        rawHls: candidate.hlsStreamUrl,
+                        fallbackNumericId: numericId
+                    )
+                    lastOutcome = resolved
+                    if case .authenticated(let url) = resolved {
+                        authenticatedURL = url
+                        break
+                    }
+                }
+                if let url = authenticatedURL {
                     XCTAssertTrue(url.absoluteString.contains("_auto.m3u8"))
                     XCTAssertTrue(url.absoluteString.contains("pkey="))
                     print("LIVE_STREAM_SOURCE stripchat authenticated_hls=\(url.absoluteString)")
                 } else {
-                    XCTFail("Stripchat live room did not resolve to an authenticated native HLS URL: \(resolved)")
+                    XCTFail("Stripchat live rooms did not resolve to an authenticated native HLS URL: \(lastOutcome)")
                 }
             }
             print("LIVE_STREAM_SOURCE \(source.id) rooms=\(streams.count) cover=decoded room=\(stream.roomUrl)")

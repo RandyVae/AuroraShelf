@@ -8,6 +8,10 @@ public struct UpNextCard: View {
     public let onRemove: () -> Void
     public var onDetail: (() -> Void)? = nil
 
+    @ObservedObject private var locManager = LocalizationManager.shared
+    @Environment(\.auroraContainerSize) private var containerSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
     public init(
         record: PlaybackRecord,
         onPlay: @escaping () -> Void,
@@ -25,7 +29,6 @@ public struct UpNextCard: View {
     public var body: some View {
         Button(action: onPlay) {
             VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                // 1. 16:9 黄金画幅封面与进度指示器
                 ZStack(alignment: .bottomLeading) {
                     AuroraCoverImage(
                         url: record.video.coverUrl,
@@ -41,12 +44,11 @@ public struct UpNextCard: View {
                             .stroke(AuroraColor.hairline, lineWidth: 1)
                     )
 
-                    // 右上角来源角标胶囊
                     VStack {
                         HStack {
                             Spacer()
                             Text(record.sourceName)
-                                .font(.system(size: 10, weight: .bold))
+                                .font(.caption2.weight(.bold))
                                 .foregroundStyle(.white)
                                 .padding(.horizontal, 7)
                                 .padding(.vertical, 3)
@@ -56,7 +58,6 @@ public struct UpNextCard: View {
                         Spacer()
                     }
 
-                    // 底部 3pt 线性播放进度条
                     if record.progressRatio > 0.01 {
                         GeometryReader { proxy in
                             ZStack(alignment: .leading) {
@@ -75,56 +76,55 @@ public struct UpNextCard: View {
                 }
                 .frame(width: cardWidth, height: cardWidth * (9.0 / 16.0))
 
-                // 2. 影视标题与进度信息
                 VStack(alignment: .leading, spacing: 2) {
                     Text(record.video.title)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AuroraColor.textPrimary)
                         .lineLimit(1)
 
                     HStack(spacing: 4) {
                         Text("\(Int(record.progressRatio * 100))%")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundStyle(AuroraColor.brand)
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(AuroraColor.brandLabel)
 
                         Text("·")
-                            .font(.system(size: 11))
+                            .font(.caption2)
                             .foregroundStyle(AuroraColor.textTertiary)
 
                         Text(formattedRemainingTime)
-                            .font(.system(size: 11))
+                            .font(.caption2)
                             .foregroundStyle(AuroraColor.textSecondary)
                     }
                 }
                 .frame(width: cardWidth, alignment: .leading)
             }
         }
+        .auroraZoomSource("video:\(record.video.id)")
         .buttonStyle(AppleSpringCardButtonStyle())
-        .hoverEffect(.lift)
         .contextMenu {
             if let onDetail = onDetail {
                 Button {
                     onDetail()
                 } label: {
-                    Label("查看详情", systemImage: "info.circle")
+                    Label("hero.details_a11y".localized, systemImage: "info.circle")
                 }
             }
 
             Button {
                 onMarkCompleted()
             } label: {
-                Label("标记为已观看", systemImage: "checkmark.circle")
+                Label("card.mark_watched".localized, systemImage: "checkmark.circle")
             }
 
             Button(role: .destructive) {
                 onRemove()
             } label: {
-                Label("从待播清单移除", systemImage: "xmark.circle")
+                Label("card.remove_up_next".localized, systemImage: "xmark.circle")
             }
 
             if let url = URL(string: record.video.playbackUrl), !record.video.playbackUrl.isEmpty {
                 ShareLink(item: url) {
-                    Label("分享视频", systemImage: "square.and.arrow.up")
+                    Label("card.share_video".localized, systemImage: "square.and.arrow.up")
                 }
             }
         } preview: {
@@ -140,10 +140,8 @@ public struct UpNextCard: View {
         }
     }
 
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-
     private var cardWidth: CGFloat {
-        let form = DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
+        let form = DeviceLayout.resolveCurrent(containerSize: containerSize, horizontalSizeClass: horizontalSizeClass)
         return DeviceLayout.upNextCardWidth(for: form)
     }
 
@@ -151,11 +149,11 @@ public struct UpNextCard: View {
         let remainingSeconds = max((record.durationMs - record.positionMs) / 1000, 0)
         let minutes = remainingSeconds / 60
         if minutes > 60 {
-            return "剩余 \(minutes / 60)小时\(minutes % 60)分"
+            return "upnext.remaining_hm".localized(minutes / 60, minutes % 60)
         } else if minutes > 0 {
-            return "剩余 \(minutes)分钟"
+            return "upnext.remaining_m".localized(minutes)
         } else {
-            return "即将播完"
+            return "upnext.almost_done".localized
         }
     }
 }

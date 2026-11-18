@@ -20,6 +20,7 @@ public struct LiveInlineCommentsView: View {
     public var isCommentBridgeActive: Bool = false
     @Binding public var isExpanded: Bool
     public var maxBodyHeight: CGFloat?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         stream: LiveStreamItem,
@@ -47,20 +48,21 @@ public struct LiveInlineCommentsView: View {
 
     private var status: String {
         if isBridgeConnected {
-            return "已连接"
+            return "live.connected".localized
         }
-        return isLivePlaying ? "点击「聊天室」互动" : "等待连接…"
+        return isLivePlaying ? "live.tap_chat_hint".localized : "live.waiting_connect".localized
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: isExpanded ? AuroraMetrics.spacingS : 0) {
             Button {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                AuroraHaptics.selection()
+                AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
                     isExpanded.toggle()
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Label("实时评论", systemImage: "bubble.left.and.bubble.right.fill")
+                    Label("live.inline_comments".localized, systemImage: "bubble.left.and.bubble.right.fill")
                         .font(.headline)
                         .foregroundStyle(AuroraColor.textPrimary)
                     if !comments.isEmpty {
@@ -78,18 +80,20 @@ public struct LiveInlineCommentsView: View {
                     Text(status)
                         .font(.caption)
                         .foregroundStyle(AuroraColor.textSecondary)
+                        .lineLimit(1)
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AuroraColor.textSecondary)
                 }
+                .frame(minHeight: AuroraMetrics.minTouchTarget)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isExpanded ? "收起实时评论" : "展开实时评论")
+            .accessibilityLabel(isExpanded ? "live.collapse_comments".localized : "live.expand_comments".localized)
 
             if isExpanded {
                 if comments.isEmpty {
-                    Text(isBridgeConnected ? "暂无新评论…" : "原生直连低延迟播放中，轻点上方「聊天室」可进入官方实时聊天室")
+                    Text(isBridgeConnected ? "live.no_new_comments".localized : "live.native_low_latency_hint".localized)
                         .font(.subheadline)
                         .foregroundStyle(AuroraColor.textSecondary)
                         .multilineTextAlignment(.center)
@@ -105,7 +109,8 @@ public struct LiveInlineCommentsView: View {
                 }
             }
         }
-        .padding(AuroraMetrics.spacingL)
+        .padding(.horizontal, AuroraMetrics.spacingL)
+        .padding(.vertical, AuroraMetrics.spacingS)
         .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
     }
 
@@ -124,5 +129,6 @@ public struct LiveInlineCommentsView: View {
                 }
             }
         }
+        .padding(.bottom, AuroraMetrics.spacingS)
     }
 }

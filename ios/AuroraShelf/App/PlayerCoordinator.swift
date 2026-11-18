@@ -16,6 +16,14 @@ public final class PlayerCoordinator {
     public static let shared = PlayerCoordinator()
 
     public var activeRoute: AppImmersiveRoute?
+    public var requestedTab: MainTab?
+    public var requestedSearchQuery: String?
+    public var requestedSearchScope: String?
+    public var openSearchTrigger: Int = 0
+    public var openWatchlistTrigger: Int = 0
+    public var refreshActiveTabTrigger: Int = 0
+    public var togglePlayPauseTrigger: Int = 0
+    public var toggleFullScreenTrigger: Int = 0
 
     public var activeVideo: VideoItem? {
         get {
@@ -53,5 +61,35 @@ public final class PlayerCoordinator {
 
     public func dismiss() {
         activeRoute = nil
+    }
+
+    public func switchTab(_ tab: MainTab) {
+        activeRoute = nil
+        requestedTab = tab
+    }
+
+    public func openSearch(query: String = "", scopeRawValue: String? = nil) {
+        activeRoute = nil
+        requestedSearchQuery = query
+        requestedSearchScope = scopeRawValue
+        openSearchTrigger &+= 1
+    }
+
+    public func openWatchlist() {
+        activeRoute = nil
+        requestedTab = .profile
+        openWatchlistTrigger &+= 1
+    }
+
+    public func triggerRefreshActiveTab() {
+        refreshActiveTabTrigger &+= 1
+    }
+
+    public func triggerPlayPause() {
+        togglePlayPauseTrigger &+= 1
+    }
+
+    public func triggerToggleFullScreen() {
+        toggleFullScreenTrigger &+= 1
     }
 }

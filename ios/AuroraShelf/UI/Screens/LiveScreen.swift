@@ -15,14 +15,12 @@ public struct LiveVisualSpec: Sendable {
     public static func forSource(_ id: String) -> LiveVisualSpec {
         switch id {
         case "stripchat":
-            // Stripchat：深邃午夜蓝至电光洋红渐变
             return LiveVisualSpec(
                 iconName: "video.fill",
                 gradientColors: [Color(rgb: 0x0D1B2A), Color(rgb: 0xC2185B)],
                 accentColor: Color(rgb: 0xFF4081)
             )
         case LiveSourceCatalog.hornyStudentsID, "chaturbate":
-            // HornyStudents / Chaturbate：黑曜石炭黑至耀金渐变
             return LiveVisualSpec(
                 iconName: "flame.fill",
                 gradientColors: [Color(rgb: 0x1A1A1A), Color(rgb: 0xEF6C00)],
@@ -54,17 +52,16 @@ public struct LivePlatformsShelf: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
             HStack(spacing: AuroraMetrics.spacingS) {
-                Text("直播平台")
-                    .font(.title3)
-                    .fontWeight(.bold)
+                Text("live.platforms_title".localized)
+                    .font(.title3.bold())
                     .foregroundStyle(AuroraColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
-                Text("精选全球源")
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundStyle(AuroraColor.brand)
+                Text("live.platforms_subtitle".localized)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(AuroraColor.brandLabel)
             }
             .padding(.horizontal, AuroraMetrics.contentInset)
 
@@ -79,7 +76,6 @@ public struct LivePlatformsShelf: View {
                         } label: {
                             VStack(spacing: 8) {
                                 ZStack {
-                                    // 1. 底层品牌专属色彩渐变（选中态全量释放；未选态透出微光）
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                                         .fill(
                                             LinearGradient(
@@ -95,7 +91,6 @@ public struct LivePlatformsShelf: View {
                                             .fill(AuroraColor.surfaceCard.opacity(0.65))
                                     }
 
-                                    // 2. 苹果官方材质级高光斜切（Apple TV Specular Bevel Highlight）
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                                         .fill(
                                             LinearGradient(
@@ -109,15 +104,14 @@ public struct LivePlatformsShelf: View {
                                             )
                                         )
 
-                                    // 3. 核心官方 SF Symbol 原生液态玻璃徽章与 LIVE 呼吸小红点
                                     ZStack {
                                         Circle()
                                             .fill(.white.opacity(isSelected ? 0.18 : 0.08))
                                             .overlay(Circle().stroke(.white.opacity(isSelected ? 0.35 : 0.16), lineWidth: 0.8))
-                                        
+
                                         HStack(spacing: 4) {
                                             Image(systemName: spec.iconName)
-                                                .font(.system(size: 16, weight: .semibold))
+                                                .font(.subheadline.weight(.semibold))
                                                 .symbolRenderingMode(.hierarchical)
                                                 .foregroundStyle(isSelected ? .white : spec.accentColor)
 
@@ -129,7 +123,6 @@ public struct LivePlatformsShelf: View {
                                     .frame(width: 44, height: 36)
                                     .shadow(color: .black.opacity(isSelected ? 0.28 : 0.12), radius: 3, y: 1)
 
-                                    // 4. 外轮廓高亮微光描边
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                                         .stroke(
                                             isSelected
@@ -146,15 +139,23 @@ public struct LivePlatformsShelf: View {
                                     y: 3
                                 )
 
-                                Text(source.name)
-                                    .font(.system(size: 11, weight: isSelected ? .bold : .medium, design: .rounded))
+                                Text(LiveSourceCatalog.name(for: source.id))
+                                    .font(.caption2.weight(isSelected ? .bold : .medium))
+                                    .fontDesign(.rounded)
                                     .foregroundStyle(isSelected ? AuroraColor.textPrimary : AuroraColor.textSecondary)
                                     .lineLimit(1)
                                     .frame(width: 100)
                             }
                         }
                         .buttonStyle(AppleSpringCardButtonStyle())
-                        .accessibilityLabel("直播平台 \(source.name)，\(isSelected ? "当前正在观看" : "轻点切换")")
+                        .sensoryFeedback(.selection, trigger: isSelected)
+                        .accessibilityLabel(
+                            String(
+                                format: "live.platform_a11y".localized,
+                                source.name,
+                                isSelected ? "live.status_watching".localized : "channels.status_tap".localized
+                            )
+                        )
                     }
                 }
                 .padding(.horizontal, AuroraMetrics.contentInset)
@@ -164,7 +165,6 @@ public struct LivePlatformsShelf: View {
 }
 
 /// 原生 Apple TV / 流媒体风格的精选直播卡片
-/// 严格采用 4:3 原生直播比例（180 × 135 pt），展示实时 LIVE 状态、在线人数与主播头像，杜绝生硬的 1234 排行大字
 public struct LiveFeaturedCard: View {
     public let stream: LiveStreamItem
     public let onSelect: () -> Void
@@ -201,24 +201,24 @@ public struct LiveFeaturedCard: View {
                         RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
                             .stroke(AuroraColor.hairline, lineWidth: 1)
                     )
+                    .auroraZoomSource("live:\(stream.id)")
 
-                    // LIVE 状态与在线人数微型胶囊
                     HStack(spacing: 4) {
                         Circle()
                             .fill(Color.red)
                             .frame(width: 6, height: 6)
-                        Text("LIVE")
-                            .font(.system(size: 10, weight: .black))
-                            .foregroundStyle(.primary)
+                        Text("live.badge_live".localized)
+                            .font(.caption2.weight(.black))
+                            .foregroundStyle(.white)
                         if let viewCount = stream.viewCount.value {
                             Text("\(viewCount)")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.secondary)
+                                .font(.caption2.weight(.bold).monospacedDigit())
+                                .foregroundStyle(.white.opacity(0.88))
                         }
                     }
-                    .padding(.horizontal, 6)
+                    .padding(.horizontal, 7)
                     .padding(.vertical, 3)
-                    .background(.regularMaterial, in: Capsule())
+                    .background(Color.black.opacity(0.72), in: Capsule())
                     .padding(6)
                 }
 
@@ -238,12 +238,11 @@ public struct LiveFeaturedCard: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text(stream.username)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(AuroraColor.textPrimary)
                             .lineLimit(1, reservesSpace: true)
 
-                        Text(stream.tags.isEmpty ? "精彩直播" : stream.tags.prefix(2).joined(separator: " · "))
+                        Text(stream.tags.isEmpty ? "card.fallback_live".localized : stream.tags.prefix(2).joined(separator: " · "))
                             .font(.caption2)
                             .foregroundStyle(AuroraColor.textSecondary)
                             .lineLimit(1, reservesSpace: true)
@@ -257,12 +256,12 @@ public struct LiveFeaturedCard: View {
             Button {
                 onSelect()
             } label: {
-                Label("进入直播间", systemImage: "play.circle.fill")
+                Label("live.enter_room".localized, systemImage: "play.circle.fill")
             }
 
             if let url = URL(string: stream.roomUrl), !stream.roomUrl.isEmpty {
                 ShareLink(item: url) {
-                    Label("分享直播间", systemImage: "square.and.arrow.up")
+                    Label("live.share_room".localized, systemImage: "square.and.arrow.up")
                 }
             }
         } preview: {
@@ -281,7 +280,7 @@ public struct LiveFeaturedCard: View {
                     Text(stream.username)
                         .font(.headline)
                         .foregroundStyle(AuroraColor.textPrimary)
-                    Text("\(stream.viewCount.value ?? 0) 人在线观看 · 即时直播")
+                    Text(String(format: "live.watching_now".localized, stream.viewCount.value ?? 0))
                         .font(.caption)
                         .foregroundStyle(AuroraColor.textSecondary)
                 }
@@ -290,7 +289,9 @@ public struct LiveFeaturedCard: View {
             }
             .background(AuroraColor.canvas)
         }
-        .accessibilityLabel("直播间 \(stream.username)，\(stream.viewCount.value ?? 0) 人在看")
+        .accessibilityLabel(
+            String(format: "live.room_a11y".localized, stream.username, stream.viewCount.value ?? 0)
+        )
     }
 }
 
@@ -304,6 +305,7 @@ public struct LiveHeroBanner: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.auroraContainerSize) private var containerSize
 
     public init(
         stream: LiveStreamItem,
@@ -318,15 +320,11 @@ public struct LiveHeroBanner: View {
     }
 
     private var formFactor: DeviceFormFactor {
-        DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
+        DeviceLayout.resolve(size: containerSize, horizontalSizeClass: horizontalSizeClass)
     }
 
     private var heroHeight: CGFloat {
-        DeviceLayout.heroHeight(for: formFactor, screenHeight: DeviceLayout.currentWindowSize.height)
-    }
-
-    private var isWideAspect: Bool {
-        formFactor.isWide
+        DeviceLayout.heroHeight(for: formFactor, screenHeight: containerSize.height)
     }
 
     public var body: some View {
@@ -344,6 +342,7 @@ public struct LiveHeroBanner: View {
                 .frame(height: heroHeight)
                 .frame(maxWidth: .infinity)
                 .clipped()
+                .auroraZoomSource("live:\(stream.id)")
 
             VStack(spacing: 0) {
                 LinearGradient(
@@ -371,8 +370,7 @@ public struct LiveHeroBanner: View {
 
             VStack(spacing: AuroraMetrics.spacingM) {
                 Text(stream.username)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.title2.bold())
                     .foregroundStyle(AuroraColor.textPrimary)
                     .multilineTextAlignment(.center)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
@@ -383,10 +381,12 @@ public struct LiveHeroBanner: View {
                 metadataView
                     .shadow(color: colorScheme == .dark ? .black.opacity(0.75) : .clear, radius: 6, x: 0, y: 2)
 
-                HStack(spacing: AuroraMetrics.spacingM) {
-                    watchButton
-                        .frame(maxWidth: formFactor.isWide ? 220 : .infinity)
-                    cycleButton
+                GlassEffectContainer(spacing: AuroraMetrics.spacingM) {
+                    HStack(spacing: AuroraMetrics.spacingM) {
+                        watchButton
+                            .frame(maxWidth: formFactor.isWide ? 220 : .infinity)
+                        cycleButton
+                    }
                 }
                 .frame(maxWidth: DeviceLayout.heroActionsMaxWidth(for: formFactor) ?? .infinity)
                 .padding(.horizontal, AuroraMetrics.contentInset)
@@ -400,18 +400,18 @@ public struct LiveHeroBanner: View {
         HStack(spacing: AuroraMetrics.spacingS) {
             HStack(spacing: 4) {
                 Circle()
-                    .fill(Color.red)
+                    .fill(Color.white)
                     .frame(width: 6, height: 6)
-                Text("LIVE 直播中")
+                Text("live.badge_live".localized)
                     .font(.caption2.bold())
                     .foregroundStyle(.white)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Color.red.opacity(0.85), in: Capsule())
+            .background(Color.red.opacity(0.90), in: Capsule())
 
             if let viewCount = stream.viewCount.value {
-                Text("\(viewCount) 人在线")
+                Text(String(format: "live.online_count".localized, "\(viewCount)"))
                     .font(.caption.bold())
                     .foregroundStyle(AuroraColor.textPrimary)
                 Text("•")
@@ -440,7 +440,7 @@ public struct LiveHeroBanner: View {
             HStack(spacing: 6) {
                 Image(systemName: "play.fill")
                     .font(.headline)
-                Text("立即观看")
+                Text("live.watch_now".localized)
                     .font(.headline.weight(.bold))
             }
             .frame(maxWidth: .infinity, minHeight: 46)
@@ -455,20 +455,18 @@ public struct LiveHeroBanner: View {
             HStack(spacing: 6) {
                 Image(systemName: "shuffle")
                     .font(.headline)
-                Text("换个主播")
+                Text("live.shuffle_streamer".localized)
                     .font(.headline.weight(.semibold))
+                    .lineLimit(1)
             }
-            .frame(minHeight: 46)
-            .padding(.horizontal, 16)
-            .background(.ultraThinMaterial, in: Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(AuroraColor.hairline, lineWidth: 1)
-            )
-            .foregroundStyle(AuroraColor.textPrimary)
+            .frame(minHeight: 34)
+            .padding(.horizontal, 6)
+            .fixedSize(horizontal: true, vertical: false)
         }
-        .buttonStyle(AppleSpringCardButtonStyle())
-        .accessibilityHint("切换另一位推荐主播")
+        .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
+        .tint(AuroraColor.textPrimary)
+        .accessibilityHint("live.shuffle_hint".localized)
     }
 }
 
@@ -479,7 +477,8 @@ public struct LiveScreen: View {
     @State private var isScrolled: Bool = false
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    
+    @Environment(\.auroraContainerSize) private var containerSize
+
     public init(onOpenSearch: @escaping () -> Void = {}) {
         self.onOpenSearch = onOpenSearch
     }
@@ -495,23 +494,23 @@ public struct LiveScreen: View {
     }
 
     private var currentSourceName: String {
-        LiveSourceCatalog.allSources.first(where: { $0.id == repo.selectedSourceID })?.name ?? "全球直播"
+        LiveSourceCatalog.name(for: repo.selectedSourceID)
     }
-    
+
     public var body: some View {
         ZStack {
             AuroraColor.canvas.ignoresSafeArea()
-            
+
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: AuroraMetrics.spacingXL) {
-                    // 1. 顶部 Live Hero 聚焦大卡（Apple TV 影院级画幅）
                     if let spotlight = spotlightStream {
                         LiveHeroBanner(
                             stream: spotlight,
                             sourceName: currentSourceName,
                             onWatch: { openLiveStream(spotlight) },
                             onCycle: {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                AuroraHaptics.selection()
+                                AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                                     spotlightIndex = (spotlightIndex + 1) % max(1, filteredStreams.count)
                                 }
                             }
@@ -522,37 +521,34 @@ public struct LiveScreen: View {
                         Spacer().frame(height: 60)
                     }
 
-                    // 2. Apple TV 核心层级：精选直播平台（Channels 货架）
                     LivePlatformsShelf(
                         selectedSourceID: repo.selectedSourceID,
                         onSelect: { sourceID in
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            AuroraMotion.perform(AuroraMotion.snappy, reduceMotion: reduceMotion) {
                                 repo.selectSource(sourceID)
                             }
                         }
                     )
 
-                    // 3. 热门精选直播（标准 4:3 原生画幅，实时状态与在线人数，拔除生硬的 1234 排行大字）
                     if !top10Streams.isEmpty {
                         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                             HStack(spacing: AuroraMetrics.spacingS) {
-                                Text("热门推荐")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
+                                Text("live.hot_featured".localized)
+                                    .font(.title2.bold())
                                     .foregroundStyle(AuroraColor.textPrimary)
+                                    .accessibilityAddTraits(.isHeader)
 
                                 HStack(spacing: 4) {
                                     Circle()
-                                        .fill(Color.red)
+                                        .fill(AuroraColor.brandLabel)
                                         .frame(width: 6, height: 6)
-                                    Text("FEATURED")
-                                        .font(.caption2)
-                                        .fontWeight(.black)
-                                        .foregroundStyle(AuroraColor.accentRed)
+                                    Text("live.featured".localized.uppercased())
+                                        .font(.caption2.weight(.black))
+                                        .foregroundStyle(AuroraColor.brandLabel)
                                 }
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(AuroraColor.accentRed.opacity(0.12), in: Capsule())
+                                .background(AuroraColor.brandLabel.opacity(0.12), in: Capsule())
                             }
                             .padding(.horizontal, AuroraMetrics.contentInset)
 
@@ -569,17 +565,16 @@ public struct LiveScreen: View {
                         }
                     }
 
-                    // 4. 原生分类胶囊筛选条（女性主播/情侣/男性/跨性别）
                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                         HStack(spacing: AuroraMetrics.spacingS) {
-                            Text("热门直播")
-                                .font(.title3)
-                                .fontWeight(.bold)
+                            Text("live.hot_streams".localized)
+                                .font(.title3.bold())
                                 .foregroundStyle(AuroraColor.textPrimary)
+                                .accessibilityAddTraits(.isHeader)
 
                             Spacer()
 
-                            Text("\(filteredStreams.count) 位在线")
+                            Text(String(format: "live.streamers_online".localized, filteredStreams.count))
                                 .font(.subheadline)
                                 .foregroundStyle(AuroraColor.textSecondary)
                         }
@@ -595,7 +590,6 @@ public struct LiveScreen: View {
 
                         feedState
 
-                        // 主播网格
                         LazyVGrid(columns: liveGridColumns, spacing: AuroraMetrics.spacingL) {
                             ForEach(filteredStreams) { item in
                                 Button {
@@ -616,25 +610,24 @@ public struct LiveScreen: View {
                                                 RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
                                                     .stroke(AuroraColor.hairline, lineWidth: 1)
                                             )
+                                            .auroraZoomSource("live:\(item.id)")
 
                                             HStack(spacing: 4) {
                                                 Circle()
                                                     .fill(Color.red)
                                                     .frame(width: 6, height: 6)
-                                                Text("LIVE")
-                                                    .font(.caption2)
-                                                    .fontWeight(.black)
-                                                    .foregroundStyle(.primary)
+                                                Text("live.badge_live".localized)
+                                                    .font(.caption2.weight(.black))
+                                                    .foregroundStyle(.white)
                                                 if let viewCount = item.viewCount.value {
                                                     Text("\(viewCount)")
-                                                        .font(.caption2)
-                                                        .fontWeight(.bold)
-                                                        .foregroundStyle(.secondary)
+                                                        .font(.caption2.weight(.bold).monospacedDigit())
+                                                        .foregroundStyle(.white.opacity(0.88))
                                                 }
                                             }
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 4)
-                                            .background(.regularMaterial, in: Capsule())
+                                            .background(Color.black.opacity(0.72), in: Capsule())
                                             .padding(AuroraMetrics.spacingS)
                                         }
                                         .frame(minWidth: 0, maxWidth: .infinity)
@@ -653,13 +646,12 @@ public struct LiveScreen: View {
                                             .clipped()
 
                                             Text(item.username)
-                                                .font(.subheadline)
-                                                .fontWeight(.semibold)
+                                                .font(.subheadline.weight(.semibold))
                                                 .foregroundStyle(AuroraColor.textPrimary)
                                                 .lineLimit(1, reservesSpace: true)
                                         }
 
-                                        Text(item.title.isEmpty ? (item.tags.first ?? "精彩直播中") : item.title)
+                                        Text(item.localizedSubtitle.isEmpty ? (item.tags.first ?? "live.streaming_now".localized) : item.localizedSubtitle)
                                             .font(.caption)
                                             .foregroundStyle(AuroraColor.textSecondary)
                                             .lineLimit(1, reservesSpace: true)
@@ -669,7 +661,7 @@ public struct LiveScreen: View {
                                 .buttonStyle(AppleSpringCardButtonStyle())
                                 .accessibilityElement(children: .combine)
                                 .accessibilityLabel(liveCardAccessibilityLabel(for: item))
-                                .accessibilityHint("打开直播间播放并查看实时聊天")
+                                .accessibilityHint("live.open_room_hint".localized)
                                 .onAppear {
                                     if item.id == filteredStreams.last?.id, repo.canLoadMore, !repo.isLoadingNextPage {
                                         Task { await repo.loadNextPage() }
@@ -683,7 +675,7 @@ public struct LiveScreen: View {
 
                         if repo.isLoadingNextPage {
                             HStack(spacing: AuroraMetrics.spacingS) {
-                                ProgressView().tint(AuroraColor.brand)
+                                ProgressView().tint(AuroraColor.brandLabel)
                                 Text("home.loading_more".localized)
                                     .font(.caption)
                                     .foregroundStyle(AuroraColor.textSecondary)
@@ -693,11 +685,17 @@ public struct LiveScreen: View {
                         }
                     }
 
-                    // Keep clear of floating tab bar
                     Spacer().frame(height: max(AuroraMetrics.spacingXXL, 96))
                 }
             }
             .ignoresSafeArea(edges: .top)
+            .refreshable {
+                repo.loadStreams()
+                try? await Task.sleep(for: .milliseconds(150))
+                while repo.isLoading {
+                    try? await Task.sleep(for: .milliseconds(80))
+                }
+            }
             .onScrollGeometryChange(for: Bool.self) { geo in
                 geo.contentOffset.y > 60
             } action: { _, newValue in
@@ -707,11 +705,12 @@ public struct LiveScreen: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground((isScrolled || spotlightStream == nil) ? .visible : .hidden, for: .navigationBar)
-        .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 NetgreyMarkView(width: 20, height: 28)
             }
+            .sharedBackgroundVisibility(.hidden)
+
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: AuroraMetrics.spacingM) {
                     AirPlayRoutePicker()
@@ -719,13 +718,12 @@ public struct LiveScreen: View {
 
                     Button(action: onOpenSearch) {
                         Image(systemName: "magnifyingglass")
-                            .font(.body)
-                            .fontWeight(.semibold)
+                            .font(.body.weight(.semibold))
                             .foregroundStyle(.primary)
                     }
                     .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
                     .contentShape(Rectangle())
-                    .accessibilityLabel("搜索直播")
+                    .accessibilityLabel("live.search_a11y".localized)
                 }
             }
         }
@@ -757,7 +755,7 @@ public struct LiveScreen: View {
             if repo.liveStreams.isEmpty && repo.isLoading {
                 VStack(spacing: AuroraMetrics.spacingM) {
                     ProgressView()
-                        .tint(AuroraColor.brand)
+                        .tint(AuroraColor.brandLabel)
                     Text("live.loading".localized)
                         .font(.subheadline)
                         .foregroundStyle(AuroraColor.textSecondary)
@@ -765,7 +763,7 @@ public struct LiveScreen: View {
                 .frame(maxWidth: .infinity, minHeight: 300)
             } else if repo.liveStreams.isEmpty, let error = repo.loadErrorMessage {
                 ContentUnavailableView {
-                    Label("无法加载直播", systemImage: "wifi.exclamationmark")
+                    Label("live.load_failed".localized, systemImage: "wifi.exclamationmark")
                 } description: {
                     Text(error)
                 } actions: {
@@ -776,7 +774,7 @@ public struct LiveScreen: View {
                 ContentUnavailableView {
                     Label("live.empty".localized, systemImage: "antenna.radiowaves.left.and.right.slash")
                 } description: {
-                    Text("当前直播源没有正在进行的公开直播。")
+                    Text("live.empty_desc".localized)
                 } actions: {
                     retryButton
                 }
@@ -788,22 +786,23 @@ public struct LiveScreen: View {
                             .font(.caption)
                             .foregroundStyle(AuroraColor.warning)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Button("重试", systemImage: "arrow.clockwise") {
+                        Button("common.retry".localized, systemImage: "arrow.clockwise") {
                             repo.loadStreams()
                         }
                         .labelStyle(.iconOnly)
+                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                     }
                     .padding(.horizontal, AuroraMetrics.contentInset)
                 }
 
                 if filteredStreams.isEmpty {
                     ContentUnavailableView {
-                        Label("该分类暂无直播", systemImage: "person.slash")
+                        Label("live.category_empty_title".localized, systemImage: "person.slash")
                     } description: {
-                        Text("当前直播列表中没有符合所选分类的主播。")
+                        Text("live.category_empty_desc".localized)
                     } actions: {
-                        Button("显示全部", systemImage: "arrow.uturn.backward") {
-                            withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                        Button("live.show_all".localized, systemImage: "arrow.uturn.backward") {
+                            AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                                 repo.selectGender("全部")
                             }
                         }
@@ -816,9 +815,9 @@ public struct LiveScreen: View {
     }
 
     private func liveCardAccessibilityLabel(for item: LiveStreamItem) -> String {
-        let titleSegment = item.title.isEmpty ? "" : "，\(item.title)"
-        let viewerSegment = item.viewCount.value.map { "，在线人数 \($0)" } ?? ""
-        return "主播 \(item.username)\(titleSegment)\(viewerSegment)"
+        let titleSegment = item.title.isEmpty ? "" : ", \(item.title)"
+        let viewerSegment = item.viewCount.value.map { String(format: "live.viewer_count_segment".localized, $0) } ?? ""
+        return String(format: "live.streamer_a11y".localized, item.username, titleSegment, viewerSegment)
     }
 
     private var filteredStreams: [LiveStreamItem] {
@@ -831,10 +830,10 @@ public struct LiveScreen: View {
     }
 
     private var retryButton: some View {
-        Button("重试", systemImage: "arrow.clockwise") {
+        Button("common.retry".localized, systemImage: "arrow.clockwise") {
             repo.loadStreams()
         }
         .buttonStyle(.borderedProminent)
-        .tint(AuroraColor.brand)
+        .tint(AuroraColor.brandSolid)
     }
 }

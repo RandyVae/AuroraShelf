@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct AccountView: View {
     @ObservedObject private var service = AccountService.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
     @Environment(\.dismiss) private var dismiss
     @State private var isRegister = false
     @State private var email = ""
@@ -23,12 +24,20 @@ public struct AccountView: View {
         isEmailValid && password.count >= 8
     }
 
+    private var hasUnsavedDraft: Bool {
+        service.profile == nil && (
+            !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+            !password.isEmpty ||
+            !displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        )
+    }
+
     private func planDisplayLabel(for status: String) -> String {
         switch status.lowercased() {
         case "pro", "active", "vip":
-            return "PRO 会员"
+            return "account.pro_member".localized
         default:
-            return "免费版"
+            return "account.free_plan".localized
         }
     }
 
@@ -36,18 +45,21 @@ public struct AccountView: View {
         NavigationStack {
             Form {
                 if let profile = service.profile {
-                    Section("当前账号") {
-                        LabeledContent("昵称", value: profile.displayName)
-                        LabeledContent("邮箱", value: profile.email)
-                        LabeledContent("状态", value: profile.isVerified ? "邮箱已验证" : "邮箱待验证")
-                        LabeledContent("计划", value: planDisplayLabel(for: profile.subscriptionStatus))
+                    Section("account.section_current".localized) {
+                        LabeledContent("account.nickname".localized, value: profile.displayName)
+                        LabeledContent("account.email".localized, value: profile.email)
+                        LabeledContent(
+                            "account.status".localized,
+                            value: profile.isVerified ? "account.verified".localized : "account.unverified".localized
+                        )
+                        LabeledContent("account.plan".localized, value: planDisplayLabel(for: profile.subscriptionStatus))
                         if !profile.isVerified {
                             Button {
                                 localValidationMessage = nil
                                 Task { await service.requestVerification() }
                             } label: {
                                 HStack {
-                                    Text("重新发送验证邮件")
+                                    Text("account.resend_email".localized)
                                     if service.isLoading {
                                         Spacer()
                                         ProgressView()
@@ -56,12 +68,12 @@ public struct AccountView: View {
                             }
                             .disabled(service.isLoading)
                         }
-                        Button("刷新账号状态") {
+                        Button("account.refresh_status".localized) {
                             localValidationMessage = nil
                             Task { await service.refresh() }
                         }
                         .disabled(service.isLoading)
-                        Button("退出登录", role: .destructive) {
+                        Button("account.logout".localized, role: .destructive) {
                             localValidationMessage = nil
                             service.signOut()
                         }
@@ -69,24 +81,24 @@ public struct AccountView: View {
                 } else {
                     Section {
                         if isRegister {
-                            TextField("昵称（选填）", text: $displayName)
+                            TextField("account.nickname_optional".localized, text: $displayName)
                                 .textContentType(.nickname)
                                 .autocorrectionDisabled()
                         }
-                        TextField("邮箱", text: $email)
+                        TextField("account.email".localized, text: $email)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
                             .keyboardType(.emailAddress)
                             .textContentType(.emailAddress)
-                        SecureField("密码（至少 8 位）", text: $password)
+                        SecureField("account.password_hint".localized, text: $password)
                             .textContentType(isRegister ? .newPassword : .password)
                         Button {
                             guard isEmailValid else {
-                                localValidationMessage = "请输入有效的邮箱地址"
+                                localValidationMessage = "account.invalid_email".localized
                                 return
                             }
                             guard password.count >= 8 else {
-                                localValidationMessage = "密码长度至少需要 8 位"
+                                localValidationMessage = "account.short_password".localized
                                 return
                             }
                             localValidationMessage = nil
@@ -99,7 +111,7 @@ public struct AccountView: View {
                             }
                         } label: {
                             HStack {
-                                Text(isRegister ? "注册" : "登录")
+                                Text(isRegister ? "account.register".localized : "account.login".localized)
                                     .fontWeight(.semibold)
                                 if service.isLoading {
                                     Spacer()
@@ -109,17 +121,17 @@ public struct AccountView: View {
                         }
                         .disabled(service.isLoading || !isFormValid)
 
-                        Button(isRegister ? "已有账号？去登录" : "没有账号？免费注册") {
+                        Button(isRegister ? "account.switch_to_login".localized : "account.switch_to_register".localized) {
                             isRegister.toggle()
                             localValidationMessage = nil
                             service.message = nil
                         }
                         .buttonStyle(.plain)
-                        .foregroundStyle(AuroraColor.brand)
+                        .foregroundStyle(AuroraColor.brandLabel)
 
-                        Button("忘记密码") {
+                        Button("account.forgot_password".localized) {
                             guard isEmailValid else {
-                                localValidationMessage = "请先在上方输入有效的注册邮箱"
+                                localValidationMessage = "account.enter_email_first".localized
                                 return
                             }
                             localValidationMessage = nil
@@ -128,9 +140,9 @@ public struct AccountView: View {
                         .buttonStyle(.plain)
                         .disabled(service.isLoading)
                     } header: {
-                        Text(isRegister ? "注册免费账号" : "登录账号")
+                        Text(isRegister ? "account.register_free_title".localized : "account.login_title".localized)
                     } footer: {
-                        Text("片单、播放进度与离线下载保存在本机存储中，不依赖云端登录。")
+                        Text("account.local_storage_note".localized)
                     }
                 }
 
@@ -146,14 +158,39 @@ public struct AccountView: View {
                     }
                 }
             }
-            .navigationTitle("账号")
+            .navigationTitle("account.title".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { dismiss() }
-                        .frame(minWidth: 44, minHeight: 44)
+                    Button("common.done".localized) { dismiss() }
+                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                 }
             }
+            .modifier(AccountDraftDismissalGuard(hasUnsavedDraft: hasUnsavedDraft, onDiscard: { dismiss() }))
+        }
+    }
+}
+
+private struct AccountDraftDismissalGuard: ViewModifier {
+    let hasUnsavedDraft: Bool
+    let onDiscard: () -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 27.0, *) {
+            content
+                .interactiveDismissDisabled(hasUnsavedDraft)
+                .dismissalConfirmationDialog(
+                    Text("dialog.discard_title".localized),
+                    shouldPresent: hasUnsavedDraft
+                ) {
+                    Button("dialog.discard_confirm".localized, role: .destructive) {
+                        onDiscard()
+                    }
+                    Button("dialog.keep_editing".localized, role: .cancel) {}
+                }
+        } else {
+            content
+                .interactiveDismissDisabled(hasUnsavedDraft)
         }
     }
 }

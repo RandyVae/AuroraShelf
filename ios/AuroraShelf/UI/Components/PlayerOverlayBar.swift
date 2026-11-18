@@ -39,13 +39,12 @@ public struct PlayerOverlayBar<TrailingContent: View>: View {
                 HStack(spacing: AuroraMetrics.spacingM) {
                     PlayerGlassIconButton(
                         systemName: "chevron.left",
-                        accessibilityTitle: "返回",
+                        accessibilityTitle: "common.back".localized,
                         visualDiameter: 40,
                         symbolSize: 16,
                         symbolWeight: .bold
                     ) {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
+                        AuroraHaptics.medium()
                         onDismiss()
                     }
 

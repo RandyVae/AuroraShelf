@@ -38,10 +38,10 @@ public struct AuroraCoverImage: View {
 
     private var placeholderLabel: String {
         switch resolvedPlaceholderStyle {
-        case .live: return "精彩直播"
-        case .comic: return "精选漫画"
-        case .video: return "精选视频"
-        case .forum: return "社区精华"
+        case .live: return "card.fallback_live".localized
+        case .comic: return "card.fallback_comic".localized
+        case .video: return "card.fallback_video".localized
+        case .forum: return "card.fallback_forum".localized
         }
     }
     
@@ -152,28 +152,28 @@ public struct AuroraCoverImage: View {
                         VStack(spacing: 8) {
                             Spacer()
                             Image(systemName: placeholderIconName)
-                                .font(.system(size: 22))
+                                .font(.title3)
                                 .foregroundStyle(AuroraColor.brand.opacity(0.8))
                             Text(t)
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.footnote.weight(.bold))
                                 .foregroundStyle(.white)
                                 .multilineTextAlignment(.center)
                                 .lineLimit(3)
                                 .padding(.horizontal, 6)
                             Spacer()
                             Text(placeholderLabel)
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.45))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.5))
                                 .padding(.bottom, 6)
                         }
                     } else {
                         VStack(spacing: 6) {
                             Image(systemName: placeholderIconName)
-                                .font(.system(size: 26, weight: .light))
+                                .font(.title2.weight(.light))
                                 .foregroundStyle(AuroraColor.brand.opacity(0.7))
                             Text(placeholderLabel)
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.45))
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.white.opacity(0.5))
                         }
                     }
                 }

@@ -1,5 +1,17 @@
 # Existing Architectural Decisions
 
+## iOS 27 / iPadOS 27 SDK & Apple HIG 28-Item Audit Remediation Architecture (v2.17.6 Build 273)
+
+Date: 2026-11-19
+
+Status: Implemented across all 3 phases, zero-warning Xcode 27.2 Release verified across iPhone/iPad/Android simulators, and published in `v2.17.6 (Build 273)`.
+
+Decisions:
+1. **WCAG 2.2 AA+ Adaptive Brand Tokens (`AuroraDesignTokens.swift`)**: Keep `AuroraColor.brand` (`#FF4F7B`) strictly for decorative accents over dark media, and route all interactive text/icon labels on light/dark surfaces to `AuroraColor.brandLabel` (`#B20A14` in Light = `6.31:1`, `#FF5C86` in Dark = `6.30:1`, `#8B0000`/`#FF91AC` in Increased Contrast) and solid selected capsule fills to `AuroraColor.brandSolid` (`#C8103E` / `#D81B4C`, `>= 5.10:1` with white text).
+2. **Size-Class-Adaptive iOS 27 Search Tab Routing (`MainContainerView.swift` + `SearchSheetView.swift`)**: Expose the 6th `Tab(value: MainTab.search, role: .search)` exclusively when `horizontalSizeClass == .regular` (iPadOS 27 floating top TabBar / Sidebar) while keeping the 5 core tabs on Compact iPhone and presenting `SearchSheetView` via sheet, preventing UIKit's legacy `UIMoreNavigationController` (`More ...`) from hiding `Community` and `Library` on Compact width; use `.searchable(..., placement: .navigationBarDrawer(displayMode: .always))` so the search field is immediately visible without a redundant toolbar search button or dimming scrim.
+3. **UIKit-Backed Native Zoom Transition Source Registry (`ZoomTransitionSourceRegistry.swift` + `MainContainerView.swift`)**: Bridge SwiftUI cards into `ImmersiveNavigationHost`'s `UIHostingController.preferredTransition = .zoom` via weak `UIView` anchor probes (`.auroraZoomSource(_:)`) keyed by route identity, automatically evicting deallocated views and falling back to standard push when `UIAccessibility.isReduceMotionEnabled` is active.
+4. **Unified iOS 27 Parametric Motion, Haptics & System Surface Integration (`AuroraDesignTokens.swift`, `AuroraAppCommands.swift`, `AuroraAppIntents.swift`)**: Standardize all UI springs on iOS 27 `Spring(duration:bounce:)` gated through `AuroraMotion.perform(..., reduceMotion:)`, consolidate haptics into `.sensoryFeedback` + pre-warmed `AuroraHaptics`, and expose iPadOS 27 Menu Bar `Commands` (`⌘1`–`⌘5`, `⌘F`, `⌘R`, `⌘B`, `⇧⌘P`, `⌃⌘F`) plus `AppIntents` (`AppShortcutsProvider`).
+
 ## iOS/iPadOS Video Player Optical Glass 2.0, Apple TV 3-Tier Deck & Aspect-Aware Gravity Orientation Engine (v2.17.5 Build 272)
 
 Date: 2026-11-18

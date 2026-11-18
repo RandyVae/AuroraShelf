@@ -31,6 +31,8 @@ public struct LivePlayerView: View {
     @State private var showRoomChat = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
+    private var coordinator: PlayerCoordinator { PlayerCoordinator.shared }
 
     public init(
         stream: LiveStreamItem,
@@ -67,17 +69,14 @@ public struct LivePlayerView: View {
             let needsTopOffset = !isFullScreen && (!isLandscape || isPad)
 
             ZStack(alignment: .top) {
-                // 背景纯黑
                 Color.black
 
                 VStack(spacing: 0) {
-                    // 非全屏竖屏嵌入态：顶部垫入 safeTop 高度的纯黑安全区隔离底衬，使视频物理起始于灵动岛/状态栏下方，彻底杜绝向上位移
                     if needsTopOffset {
                         Color.black.frame(height: safeTop)
                     }
 
                     ZStack {
-                        // 核心播放视口层：优先采用原生 AVPlayer 硬件解码秒开（0.3s 直连）
                         if let player = player {
                             AuroraPlayerSurface(
                                 player: player,
@@ -85,7 +84,6 @@ public struct LivePlayerView: View {
                                 allowsPictureInPicture: false
                             )
                         } else if isWebFallbackActive && liveError == nil {
-                            // 纯净无头 WebRTC 视口（原生 AVPlayer 403 握手受限自动平滑降级，或平台专属推流）
                             let fallbackURL: URL? = {
                                 if let url = URL(string: stream.roomUrl), !stream.roomUrl.isEmpty { return url }
                                 let encodedUser = stream.username.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? ""
@@ -113,34 +111,15 @@ public struct LivePlayerView: View {
                             } else {
                                 Color.clear.onAppear {
                                     isLoadingLive = false
-                                    liveError = "直播间地址无效"
+                                    liveError = "live.invalid_url".localized
                                 }
                             }
                         }
 
-                        // 原生手势感知层（双击切换画幅、单击唤出控制栏）
                         if liveError == nil {
-                            Color.clear
-                                .contentShape(Rectangle())
-                                .onTapGesture(count: 2) {
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
-                                    withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
-                                        isFillMode.toggle()
-                                    }
-                                    onToggleHUD?(isFillMode ? "已切换为填满全屏（无黑边）" : "已切换为自适应画幅（原片比例）")
-                                }
-                                .onTapGesture(count: 1) {
-                                    withAnimation(reduceMotion ? nil : AuroraMotion.quick) {
-                                        showControls.toggle()
-                                    }
-                                    if showControls {
-                                        scheduleHideControls()
-                                    }
-                                }
+                            liveGestureOverlay(in: geo)
                         }
 
-                        // 加载中过渡底图与 Spinner（视频起播后平滑淡出）
                         if isLoadingLive && liveError == nil {
                             ZStack {
                                 AuroraCoverImage(url: stream.snapshotUrl, aspectRatio: nil, contentMode: .fill, cornerRadius: 0)
@@ -149,10 +128,10 @@ public struct LivePlayerView: View {
 
                                 VStack(spacing: AuroraMetrics.spacingL) {
                                     ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
+                                        .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brandSolid))
                                         .scaleEffect(1.4)
 
-                                    Text("正在连接 \(stream.username) 的直播流…")
+                                    Text(String(format: "live.connecting_user".localized, stream.username))
                                         .font(.headline)
                                         .foregroundStyle(.white)
                                 }
@@ -162,14 +141,13 @@ public struct LivePlayerView: View {
                             .allowsHitTesting(false)
                         }
 
-                        // 错误提示状态层（向下避让顶栏控制按键，杜绝视觉穿透与重叠）
                         if let error = liveError {
                             VStack(spacing: AuroraMetrics.spacingL) {
                                 Image(systemName: "tv.slash.fill")
-                                    .font(.system(size: 40))
-                                    .foregroundStyle(AuroraColor.brand)
+                                    .font(.largeTitle)
+                                    .foregroundStyle(AuroraColor.brandSolid)
 
-                                Text("直播暂不可用")
+                                Text("live.stream_unavailable".localized)
                                     .font(.title3.bold())
                                     .foregroundStyle(.white)
 
@@ -182,15 +160,15 @@ public struct LivePlayerView: View {
                                 Button(action: {
                                     fetchAndStartLiveStream()
                                 }) {
-                                    Text("重新连接")
+                                    Text("category.reconnect".localized)
                                         .font(.headline)
                                         .padding(.horizontal, AuroraMetrics.spacingL)
                                         .padding(.vertical, AuroraMetrics.spacingXS)
                                 }
                                 .buttonStyle(.glassProminent)
                                 .buttonBorderShape(.capsule)
-                                .tint(AuroraColor.brand)
-                                .accessibilityLabel("重新连接直播流")
+                                .tint(AuroraColor.brandSolid)
+                                .accessibilityLabel("live.reconnect_a11y".localized)
                             }
                             .padding(.top, safeTop + 44)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -200,8 +178,7 @@ public struct LivePlayerView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
-                // 浮动控制栏（带磨砂与柔和暗调渐变避让）
-                if showControls || isLoadingLive || liveError != nil {
+                if showControls || isLoadingLive || liveError != nil || voiceOverEnabled {
                     topControlsBar(in: geo)
                         .transition(.opacity)
                         .zIndex(20)
@@ -214,11 +191,29 @@ public struct LivePlayerView: View {
             PictureInPictureManager.shared.stopAndReleasePiPIfNeeded()
             fetchAndStartLiveStream()
         }
+        .onChange(of: coordinator.togglePlayPauseTrigger) { _, _ in
+            guard let player else { return }
+            if isPlaying {
+                player.pause()
+                isPlaying = false
+                onToggleHUD?("player.pause".localized)
+            } else {
+                player.play()
+                isPlaying = true
+                onToggleHUD?("player.play".localized)
+            }
+        }
         .onChange(of: isPlaying) { _, playing in
             UIApplication.shared.isIdleTimerDisabled = playing
         }
         .onChange(of: isWebFallbackActive) { _, active in
             onCommentBridgeStateChange?(active)
+        }
+        .onChange(of: voiceOverEnabled) { _, enabled in
+            if enabled {
+                hideControlsTask?.cancel()
+                showControls = true
+            }
         }
         .onDisappear {
             cleanupLivePlayer()
@@ -253,7 +248,6 @@ public struct LivePlayerView: View {
         let bottomPadding: CGFloat = isFullScreen ? max(16, DeviceLayout.safeAreaBottom) : 10
 
         ZStack {
-            // 仅在极底部留柔和暗角，移除顶部 0.85 黑幕，释放 Glass.clear 视频色彩折射
             VStack {
                 Spacer()
                 LinearGradient(
@@ -267,16 +261,14 @@ public struct LivePlayerView: View {
 
             VStack {
                 HStack(spacing: AuroraMetrics.spacingS) {
-                    // 左侧：返回 / 收起全屏（Glass.clear 水滴圆钮）
                     PlayerGlassIconButton(
                         systemName: isFullScreen ? "chevron.down" : "chevron.left",
-                        accessibilityTitle: isFullScreen ? "退出全屏" : "返回",
+                        accessibilityTitle: isFullScreen ? "live.exit_fullscreen".localized : "common.back".localized,
                         visualDiameter: 40,
                         symbolSize: 16,
                         symbolWeight: .bold
                     ) {
-                        let impact = UIImpactFeedbackGenerator(style: .medium)
-                        impact.impactOccurred()
+                        AuroraHaptics.impact(.medium)
                         if isFullScreen {
                             toggleAdaptiveFullscreen(in: geo)
                         } else {
@@ -286,7 +278,6 @@ public struct LivePlayerView: View {
                         }
                     }
 
-                    // 主播信息与 LIVE 状态（严格单行）
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Text(stream.username)
@@ -297,9 +288,9 @@ public struct LivePlayerView: View {
                                 .truncationMode(.tail)
 
                             HStack(spacing: 3) {
-                                Circle().fill(Color.red).frame(width: 5, height: 5)
-                                Text("LIVE")
-                                    .font(.system(size: 9, weight: .black))
+                                Circle().fill(Color.white).frame(width: 5, height: 5)
+                                Text("live.badge_live".localized)
+                                    .font(.caption2.weight(.black))
                                     .foregroundStyle(.white)
                             }
                             .padding(.horizontal, 5)
@@ -319,7 +310,7 @@ public struct LivePlayerView: View {
                                     .font(.caption2)
                                     .foregroundStyle(Color.white.opacity(0.6))
 
-                                Text("在线 \(viewers)")
+                                Text(String(format: "live.online_count".localized, "\(viewers)"))
                                     .font(.caption2)
                                     .foregroundStyle(Color.white.opacity(0.85))
                                     .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
@@ -331,10 +322,12 @@ public struct LivePlayerView: View {
 
                     Spacer(minLength: 4)
 
-                    // 右上角精简控制组：聊天室 + AirPlay
                     GlassEffectContainer(spacing: 8) {
                         HStack(spacing: 8) {
-                            controlCircleButton(systemImage: "bubble.left.and.bubble.right", label: "打开聊天室") {
+                            controlCircleButton(
+                                systemImage: "bubble.left.and.bubble.right",
+                                label: "live.open_chat_a11y".localized
+                            ) {
                                 if let isChatPresented {
                                     isChatPresented.wrappedValue = true
                                 } else {
@@ -352,45 +345,44 @@ public struct LivePlayerView: View {
 
                 Spacer()
 
-                // 底部右侧黄金控制锚点：画幅缩放 + 旋转（全屏态） + 右下角进入/退出全屏
                 HStack {
                     Spacer()
                     GlassEffectContainer(spacing: 8) {
                         HStack(spacing: 8) {
                             controlCircleButton(
                                 systemImage: isFillMode ? "rectangle.arrowtriangle.2.inward" : "rectangle.arrowtriangle.2.outward",
-                                label: isFillMode ? "自适应画幅" : "填满全屏"
+                                label: isFillMode ? "live.aspect_fit_btn".localized : "live.aspect_fill_btn".localized
                             ) {
-                                let impact = UIImpactFeedbackGenerator(style: .medium)
-                                impact.impactOccurred()
-                                withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                                AuroraHaptics.impact(.medium)
+                                AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                                     isFillMode.toggle()
                                 }
-                                onToggleHUD?(isFillMode ? "已切换为填满全屏" : "已切换为原片比例")
+                                onToggleHUD?(isFillMode ? "live.hud_fill_short".localized : "live.hud_fit_short".localized)
                             }
 
                             if isFullScreen && !isPad {
                                 controlCircleButton(
                                     systemImage: "rotate.right",
-                                    label: isLandscape ? "切换竖屏" : "切换横屏"
+                                    label: isLandscape ? "live.switch_portrait".localized : "live.switch_landscape".localized
                                 ) {
-                                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                                    impact.impactOccurred()
+                                    AuroraHaptics.impact(.medium)
                                     let nextLandscape = !isLandscape
                                     PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: nextLandscape)
-                                    withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+                                    AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: reduceMotion) {
                                         isLandscape = nextLandscape
                                     }
-                                    onToggleHUD?(nextLandscape ? "已切换为横屏沉浸" : "已切换为竖屏模式")
+                                    onToggleHUD?(nextLandscape ? "live.hud_landscape".localized : "live.hud_portrait".localized)
                                 }
+                                .glassEffectTransition(.materialize)
                             }
 
                             controlCircleButton(
                                 systemImage: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
-                                label: isFullScreen ? "退出全屏" : "自适应全屏"
+                                label: isFullScreen ? "live.exit_fullscreen".localized : "live.auto_fullscreen".localized
                             ) {
                                 toggleAdaptiveFullscreen(in: geo)
                             }
+                            .glassEffectTransition(.matchedGeometry)
                         }
                     }
                 }
@@ -402,28 +394,62 @@ public struct LivePlayerView: View {
         }
     }
 
+    @ViewBuilder
+    private func liveGestureOverlay(in geo: GeometryProxy) -> some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .onTapGesture(count: 2) {
+                AuroraHaptics.impact(.medium)
+                AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
+                    isFillMode.toggle()
+                }
+                let msg = isFillMode ? "live.hud_fill_full".localized : "live.hud_fit_full".localized
+                onToggleHUD?(msg)
+            }
+            .onTapGesture(count: 1) {
+                AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
+                    showControls.toggle()
+                }
+                if showControls {
+                    scheduleHideControls()
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 40)
+                    .onEnded { value in
+                        let dy = value.translation.height
+                        let dx = value.translation.width
+                        guard abs(dy) > abs(dx) * 1.3 else { return }
+                        if dy < -56 && !isFullScreen {
+                            toggleAdaptiveFullscreen(in: geo)
+                        } else if dy > 56 && isFullScreen {
+                            toggleAdaptiveFullscreen(in: geo)
+                        }
+                    }
+            )
+    }
+
     private func toggleAdaptiveFullscreen(in geo: GeometryProxy) {
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+        AuroraHaptics.impact(.medium)
         if isFullScreen {
             PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: false)
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+            AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: reduceMotion) {
                 isFullScreen = false
                 isLandscape = false
             }
-            onToggleHUD?("已退出全屏")
+            onToggleHUD?("live.hud_exited_fullscreen".localized)
         } else {
             let isPad = UIDevice.current.userInterfaceIdiom == .pad
             let targetLandscape = !isPad && !isPortraitStream
             PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: targetLandscape)
-            withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+            AuroraMotion.perform(AuroraMotion.cinema, reduceMotion: reduceMotion) {
                 isFullScreen = true
                 isLandscape = targetLandscape
             }
             if isPortraitStream {
-                onToggleHUD?("自适应全屏 · 纵向铺满")
+                onToggleHUD?("live.hud_portrait_fullscreen".localized)
             } else {
-                onToggleHUD?(targetLandscape ? "自适应全屏 · 横屏沉浸" : "自适应全屏 · 铺满")
+                onToggleHUD?(targetLandscape ? "live.hud_landscape_fullscreen".localized : "live.hud_fill_fullscreen".localized)
             }
         }
     }
@@ -441,8 +467,10 @@ public struct LivePlayerView: View {
 
     private func scheduleHideControls() {
         hideControlsTask?.cancel()
+        guard !voiceOverEnabled else { return }
         let task = DispatchWorkItem {
-            withAnimation(.easeInOut(duration: 0.25)) {
+            guard !self.voiceOverEnabled else { return }
+            AuroraMotion.perform(AuroraMotion.quick, reduceMotion: self.reduceMotion) {
                 self.showControls = false
             }
         }
@@ -494,7 +522,7 @@ public struct LivePlayerView: View {
                 self.player = nil
                 self.isLoadingLive = false
                 self.isWebFallbackActive = false
-                self.liveError = "主播当前已离线、下播或正在进行私密秀"
+                self.liveError = "live.err_offline_or_private".localized
             case .webFallback:
                 self.player = nil
                 self.isLoadingLive = false
@@ -510,11 +538,10 @@ public struct LivePlayerView: View {
               let apiUrl = URL(string: "https://chaturbate.com/api/chatvideocontext/\(username)/") else {
             self.isLoadingLive = false
             self.isWebFallbackActive = false
-            self.liveError = "无效的主播用户名"
+            self.liveError = "live.err_invalid_user".localized
             return
         }
 
-        // 10 秒短生命周期内存缓存拦截：避免切房重复建立流解析往返
         if let cached = Self.streamContextCache[username], Date().timeIntervalSince(cached.timestamp) < 10.0 {
             startNativePlayback(hlsUrl: cached.url, referer: "https://chaturbate.com/", requestID: requestID)
             return
@@ -530,7 +557,6 @@ public struct LivePlayerView: View {
             do {
                 var hlsFoundUrl: URL? = nil
 
-                // 1. 优先直接请求官方轻量 JSON 接口（~2KB，响应耗时 <200ms），秒级识别开播与私密秀状态
                 var apiReq = URLRequest(url: apiUrl, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10.0)
                 apiReq.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
                 apiReq.setValue("https://chaturbate.com/\(username)/", forHTTPHeaderField: "Referer")
@@ -547,17 +573,17 @@ public struct LivePlayerView: View {
                     if status == "private" {
                         self.isLoadingLive = false
                         self.isWebFallbackActive = false
-                        self.liveError = "主播当前正在进行私密秀（需付费观看）"
+                        self.liveError = "live.err_private_show".localized
                         return
                     } else if status == "offline" {
                         self.isLoadingLive = false
                         self.isWebFallbackActive = false
-                        self.liveError = "主播当前已离线或暂未开播"
+                        self.liveError = "live.err_offline".localized
                         return
                     } else if status == "away" {
                         self.isLoadingLive = false
                         self.isWebFallbackActive = false
-                        self.liveError = "主播暂时离开，请稍后刷新"
+                        self.liveError = "live.err_away".localized
                         return
                     }
 
@@ -567,7 +593,6 @@ public struct LivePlayerView: View {
                     }
                 }
 
-                // 2. 备用线路：当 API 受限时，解析 HTML 页面中的 window.initialRoomDossier
                 if hlsFoundUrl == nil {
                     let candidatePages = [
                         URL(string: "https://chaturbate.com/\(username)/"),
@@ -586,14 +611,13 @@ public struct LivePlayerView: View {
                             try Task.checkCancellation()
                             guard activeStreamRequestID == requestID else { return }
 
-                            // 2.1 状态检测（规避进入私密秀房间陷入无限加载）
                             if rawHtml.contains(#""room_status": "private""#) ||
                                rawHtml.contains(#""room_status":"private""#) ||
                                rawHtml.contains(#"\u0022room_status\u0022: \u0022private\u0022"#) ||
                                rawHtml.contains(#"\u0022room_status\u0022:\u0022private\u0022"#) {
                                 self.isLoadingLive = false
                                 self.isWebFallbackActive = false
-                                self.liveError = "主播当前正在进行私密秀（需付费观看）"
+                                self.liveError = "live.err_private_show".localized
                                 return
                             }
                             if rawHtml.contains(#""room_status": "offline""#) ||
@@ -602,7 +626,7 @@ public struct LivePlayerView: View {
                                rawHtml.contains(#"\u0022room_status\u0022:\u0022offline\u0022"#) {
                                 self.isLoadingLive = false
                                 self.isWebFallbackActive = false
-                                self.liveError = "主播当前已离线或暂未开播"
+                                self.liveError = "live.err_offline".localized
                                 return
                             }
                             if rawHtml.contains(#""room_status": "away""#) ||
@@ -611,11 +635,10 @@ public struct LivePlayerView: View {
                                rawHtml.contains(#"\u0022room_status\u0022:\u0022away\u0022"#) {
                                 self.isLoadingLive = false
                                 self.isWebFallbackActive = false
-                                self.liveError = "主播暂时离开，请稍后刷新"
+                                self.liveError = "live.err_away".localized
                                 return
                             }
 
-                            // 2.2 解码 Unicode 转义符并提取 hls_source
                             let unescaped = Self.unescapeUnicodeEntities(rawHtml)
                             if let hlsRegex = try? NSRegularExpression(pattern: #""hls_source"\s*:\s*"(https?:\/\/[^"\s\\]+?\.m3u8[^"\s\\]*)""#),
                                let mMatch = hlsRegex.firstMatch(in: unescaped, range: NSRange(location: 0, length: (unescaped as NSString).length)) {
@@ -629,7 +652,6 @@ public struct LivePlayerView: View {
                 }
 
                 guard let finalHlsUrl = hlsFoundUrl else {
-                    // 未直接嗅探到可用直链且主播在线，平滑降级至纯净 WebRTC 视口起播
                     self.player = nil
                     self.isLoadingLive = false
                     self.isWebFallbackActive = true
@@ -641,7 +663,6 @@ public struct LivePlayerView: View {
                 startNativePlayback(hlsUrl: finalHlsUrl, referer: "https://chaturbate.com/", requestID: requestID)
             } catch {
                 guard !Task.isCancelled, activeStreamRequestID == requestID else { return }
-                // 发生异常时平滑降级至纯净 WebRTC 视口起播
                 self.player = nil
                 self.isLoadingLive = false
                 self.isWebFallbackActive = true
@@ -707,7 +728,7 @@ public struct LivePlayerView: View {
         self.player = avPlayer
 
         itemStatusObserver = playerItem.observe(\.status, options: [.new, .initial]) { item, _ in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 guard self.player?.currentItem === item else { return }
                 if item.status == .readyToPlay {
                     if self.playbackStartedAt == nil {
@@ -723,7 +744,6 @@ public struct LivePlayerView: View {
                     avPlayer.play()
                     self.scheduleHideControls()
                 } else if item.status == .failed {
-                    // 原生直链解码失败或 MMCDN 403 握手受限时，全量平滑降级至纯净 WebRTC 视口起播
                     self.itemStatusObserver?.invalidate()
                     self.itemStatusObserver = nil
                     self.presentationSizeObserver?.invalidate()
@@ -744,19 +764,21 @@ public struct LivePlayerView: View {
             object: playerItem,
             queue: .main
         ) { _ in
-            guard self.player?.currentItem === playerItem else { return }
-            let elapsed = self.playbackStartedAt.map { Date().timeIntervalSince($0) } ?? 0
-            self.cleanupLivePlayer(cancelRequest: false)
-            self.isLoadingLive = false
-            if elapsed < 25.0 {
-                self.isWebFallbackActive = true
-            } else {
-                self.liveError = "主播当前已离线或暂未开播"
+            Task { @MainActor in
+                guard self.player?.currentItem === playerItem else { return }
+                let elapsed = self.playbackStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+                self.cleanupLivePlayer(cancelRequest: false)
+                self.isLoadingLive = false
+                if elapsed < 25.0 {
+                    self.isWebFallbackActive = true
+                } else {
+                    self.liveError = "live.err_offline".localized
+                }
             }
         }
 
         presentationSizeObserver = playerItem.observe(\.presentationSize, options: [.new]) { item, _ in
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 let size = item.presentationSize
                 if size.width > 0 && size.height > 0 {
                     self.isPortraitStream = (size.height > size.width)

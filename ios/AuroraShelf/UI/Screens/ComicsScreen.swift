@@ -37,70 +37,60 @@ public struct ComicVisualSpec: Sendable {
     public static func forSource(_ id: String) -> ComicVisualSpec {
         switch id {
         case "baozi":
-            // 包子漫画：温暖活力暖橙渐变
             return ComicVisualSpec(
                 iconName: "doc.richtext.fill",
                 gradientColors: [Color(rgb: 0xE65100), Color(rgb: 0xF57C00)],
                 accentColor: Color(rgb: 0xFFB74D)
             )
         case "picacg":
-            // 哔咔漫画：霓虹玫瑰粉洋红
             return ComicVisualSpec(
                 iconName: "heart.text.square.fill",
                 gradientColors: [Color(rgb: 0x880E4F), Color(rgb: 0xD81B60)],
                 accentColor: Color(rgb: 0xF48FB1)
             )
         case "jm":
-            // 禁漫天堂：烈焰炽红渐变
             return ComicVisualSpec(
                 iconName: "flame.fill",
                 gradientColors: [Color(rgb: 0xB71C1C), Color(rgb: 0xE53935)],
                 accentColor: Color(rgb: 0xFF8A80)
             )
         case "komiic":
-            // Komiic：蔚蓝天青极光
             return ComicVisualSpec(
                 iconName: "bookmark.fill",
                 gradientColors: [Color(rgb: 0x01579B), Color(rgb: 0x0288D1)],
                 accentColor: Color(rgb: 0x81D4FA)
             )
         case "copy", "copycomic":
-            // 拷贝漫画：暗曜紫罗兰
             return ComicVisualSpec(
                 iconName: "books.vertical.fill",
                 gradientColors: [Color(rgb: 0x311B92), Color(rgb: 0x5E35B1)],
                 accentColor: Color(rgb: 0xB39DDB)
             )
         case "dongman91", "91dongman":
-            // 91动漫：二次元电光紫品红
             return ComicVisualSpec(
                 iconName: "sparkles.tv.fill",
                 gradientColors: [Color(rgb: 0x4A148C), Color(rgb: 0x8E24AA)],
                 accentColor: Color(rgb: 0xCE93D8)
             )
         case "8muses", "eightMuses":
-            // 8Muses：暗夜翡翠森林绿
             return ComicVisualSpec(
                 iconName: "photo.on.rectangle.angled",
                 gradientColors: [Color(rgb: 0x1B5E20), Color(rgb: 0x388E3C)],
                 accentColor: Color(rgb: 0xA5D6A7)
             )
         case "gedecomix", "gedeComix":
-            // GedeComix：黑曜石现代极简灰
             return ComicVisualSpec(
                 iconName: "square.grid.2x2.fill",
                 gradientColors: [Color(rgb: 0x212121), Color(rgb: 0x424242)],
                 accentColor: Color(rgb: 0xEEEEEE)
             )
         case "ikmmh":
-            // 爱看漫：深海孔雀绿
             return ComicVisualSpec(
                 iconName: "book.closed.fill",
                 gradientColors: [Color(rgb: 0x004D40), Color(rgb: 0x00796B)],
                 accentColor: Color(rgb: 0x80CBC4)
             )
         case "ehentai":
-            // E-Hentai：复古羊皮铜金
             return ComicVisualSpec(
                 iconName: "archivebox.fill",
                 gradientColors: [Color(rgb: 0x4E342E), Color(rgb: 0x6D4C41)],
@@ -120,6 +110,7 @@ public struct ComicVisualSpec: Sendable {
 public struct ComicPlatformsShelf: View {
     public let currentSource: ComicSourceDefinition
     public let onSelect: (ComicSourceDefinition) -> Void
+    @ObservedObject private var locManager = LocalizationManager.shared
 
     public init(
         currentSource: ComicSourceDefinition,
@@ -132,17 +123,18 @@ public struct ComicPlatformsShelf: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
             HStack(spacing: AuroraMetrics.spacingS) {
-                Text("漫画平台")
+                Text("comics.platforms_title".localized)
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundStyle(AuroraColor.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
 
                 Spacer()
 
-                Text("精选 \(ComicSourceCatalog.allSources.count) 平台")
+                Text("comics.platforms_count".localized(ComicSourceCatalog.allSources.count))
                     .font(.subheadline)
                     .fontWeight(.medium)
-                    .foregroundStyle(AuroraColor.brand)
+                    .foregroundStyle(AuroraColor.brandLabel)
             }
             .padding(.horizontal, AuroraMetrics.contentInset)
 
@@ -160,7 +152,6 @@ public struct ComicPlatformsShelf: View {
                         } label: {
                             VStack(spacing: 8) {
                                 ZStack {
-                                    // 1. 底层品牌专属色彩渐变（选中态全量释放；未选态透出微光）
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                                         .fill(
                                             LinearGradient(
@@ -176,7 +167,6 @@ public struct ComicPlatformsShelf: View {
                                             .fill(AuroraColor.surfaceCard.opacity(0.65))
                                     }
 
-                                    // 2. 苹果官方材质级高光斜切（Apple TV Specular Bevel Highlight）
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                                         .fill(
                                             LinearGradient(
@@ -190,20 +180,18 @@ public struct ComicPlatformsShelf: View {
                                             )
                                         )
 
-                                    // 3. 核心官方 SF Symbol 原生液态玻璃徽章
                                     ZStack {
                                         Circle()
                                             .fill(.white.opacity(isSelected ? 0.18 : 0.08))
                                             .overlay(Circle().stroke(.white.opacity(isSelected ? 0.35 : 0.16), lineWidth: 0.8))
                                         Image(systemName: spec.iconName)
-                                            .font(.system(size: 19, weight: .semibold))
+                                            .font(.body.weight(.semibold))
                                             .symbolRenderingMode(.hierarchical)
                                             .foregroundStyle(isSelected ? .white : spec.accentColor)
                                     }
                                     .frame(width: 36, height: 36)
                                     .shadow(color: .black.opacity(isSelected ? 0.28 : 0.12), radius: 3, y: 1)
 
-                                    // 4. 外轮廓高亮微光描边
                                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                                         .stroke(
                                             isSelected
@@ -213,12 +201,12 @@ public struct ComicPlatformsShelf: View {
                                         )
 
                                     if !isSupported {
-                                        Text("即将推出")
-                                            .font(.system(size: 9, weight: .bold))
-                                            .foregroundStyle(.white.opacity(0.8))
+                                        Text("comics.coming_soon".localized)
+                                            .font(.caption2.weight(.bold))
+                                            .foregroundStyle(.white.opacity(0.88))
                                             .padding(.horizontal, 4)
                                             .padding(.vertical, 2)
-                                            .background(Color.black.opacity(0.6), in: Capsule())
+                                            .background(Color.black.opacity(0.62), in: Capsule())
                                             .offset(y: 18)
                                     }
                                 }
@@ -239,7 +227,14 @@ public struct ComicPlatformsShelf: View {
                         }
                         .buttonStyle(AppleSpringCardButtonStyle())
                         .disabled(!isSupported)
-                        .accessibilityLabel("漫画平台 \(source.name)，\(isSelected ? "当前正在浏览" : (isSupported ? "轻点切换" : "即将支持"))")
+                        .accessibilityLabel(
+                            "comics.platform_a11y".localized(
+                                source.name,
+                                isSelected
+                                    ? "comics.status_browsing".localized
+                                    : (isSupported ? "channels.status_tap".localized : "comics.coming_soon".localized)
+                            )
+                        )
                     }
                 }
                 .padding(.horizontal, AuroraMetrics.contentInset)
@@ -249,15 +244,18 @@ public struct ComicPlatformsShelf: View {
 }
 
 /// 原生 Apple Books / 流媒体风格的精选漫画卡片
-/// 尺寸与全 App 影视分类货架严格统一为标准 2:3 海报（140 × 210 pt），具备作品标题与更新信息，拔除粗糙的 1234 排行大字
 public struct ComicFeaturedCard: View {
     public let comic: ComicItem
     public let onSelect: () -> Void
 
+    @Environment(\.auroraContainerSize) private var containerSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var cardWidth: CGFloat {
-        dynamicTypeSize.isAccessibilitySize ? 180 : AuroraMetrics.posterCardWidth
+        let form = DeviceLayout.resolveCurrent(containerSize: containerSize, horizontalSizeClass: horizontalSizeClass)
+        let base = DeviceLayout.posterCardWidth(for: form)
+        return dynamicTypeSize.isAccessibilitySize ? max(base, 180) : base
     }
 
     private var cardHeight: CGFloat {
@@ -272,7 +270,6 @@ public struct ComicFeaturedCard: View {
     public var body: some View {
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                // 标准 2:3 纵向海报封面（140 × 210 pt，与主页完全一致）
                 ZStack(alignment: .topTrailing) {
                     AuroraCoverImage(
                         url: comic.coverUrl,
@@ -292,15 +289,14 @@ public struct ComicFeaturedCard: View {
                         Text(comic.latestChapterTitle)
                             .font(.caption2)
                             .fontWeight(.bold)
-                            .foregroundStyle(AuroraColor.textOnBrand)
+                            .foregroundStyle(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(AuroraColor.brand, in: Capsule())
+                            .background(AuroraColor.brandSolid, in: Capsule())
                             .padding(AuroraMetrics.spacingS)
                     }
                 }
 
-                // 作品书名（固定锁定两行空间，消除上下高低错位）
                 Text(comic.title)
                     .font(.subheadline)
                     .fontWeight(.semibold)
@@ -309,7 +305,6 @@ public struct ComicFeaturedCard: View {
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // 作者与更新状态（统一高度）
                 HStack(spacing: 4) {
                     Text(comic.author.isEmpty ? comic.sourceName : comic.author)
                         .font(.caption2)
@@ -332,8 +327,9 @@ public struct ComicFeaturedCard: View {
             .frame(width: cardWidth)
             .contentShape(Rectangle())
         }
+        .auroraZoomSource("comic:\(comic.id)")
         .buttonStyle(AppleSpringCardButtonStyle())
-        .accessibilityLabel("漫画 \(comic.title)，\(comic.author)")
+        .accessibilityLabel("comics.card_a11y".localized(comic.title, comic.author))
     }
 }
 
@@ -344,6 +340,7 @@ public struct ComicHeroBanner: View {
     public let onRead: () -> Void
     public let onCycle: () -> Void
 
+    @ObservedObject private var locManager = LocalizationManager.shared
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.colorScheme) private var colorScheme
@@ -370,10 +367,6 @@ public struct ComicHeroBanner: View {
         return DeviceLayout.heroHeight(for: formFactor, screenHeight: effectiveHeight)
     }
 
-    private var isWideAspect: Bool {
-        formFactor.isWide
-    }
-
     public var body: some View {
         ZStack(alignment: .bottom) {
             Color.clear
@@ -393,7 +386,7 @@ public struct ComicHeroBanner: View {
 
             VStack(spacing: 0) {
                 LinearGradient(
-                    colors: [Color.black.opacity(0.7), Color.clear],
+                    colors: [Color.black.opacity(0.65), Color.clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -423,16 +416,16 @@ public struct ComicHeroBanner: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .shadow(color: colorScheme == .dark ? .black.opacity(0.95) : .white.opacity(0.75), radius: 8, x: 0, y: 2)
                     .padding(.horizontal, AuroraMetrics.contentInset)
 
                 metadataView
-                    .shadow(color: colorScheme == .dark ? .black.opacity(0.9) : .clear, radius: 6, x: 0, y: 2)
 
-                HStack(spacing: AuroraMetrics.spacingM) {
-                    readButton
-                        .frame(maxWidth: formFactor.isWide ? 220 : .infinity)
-                    cycleButton
+                GlassEffectContainer(spacing: AuroraMetrics.spacingM) {
+                    HStack(spacing: AuroraMetrics.spacingM) {
+                        readButton
+                            .frame(maxWidth: formFactor.isWide ? 220 : .infinity)
+                        cycleButton
+                    }
                 }
                 .frame(maxWidth: DeviceLayout.heroActionsMaxWidth(for: formFactor) ?? .infinity)
                 .padding(.horizontal, AuroraMetrics.contentInset)
@@ -443,24 +436,20 @@ public struct ComicHeroBanner: View {
 
     @ViewBuilder
     private var metadataView: some View {
-        let primaryMetaColor: Color = colorScheme == .dark ? .white : AuroraColor.textPrimary
-        let secondaryMetaColor: Color = colorScheme == .dark ? .white.opacity(0.85) : AuroraColor.textSecondary
-        let dotColor: Color = colorScheme == .dark ? .white.opacity(0.6) : AuroraColor.textTertiary
-
         HStack(spacing: AuroraMetrics.spacingS) {
-            Text("精品漫画")
+            Text("comics.featured_badge".localized)
                 .font(.caption2.bold())
                 .foregroundStyle(.white)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(.purple.opacity(colorScheme == .dark ? 0.55 : 0.85), in: Capsule())
+                .background(Color.purple.opacity(0.85), in: Capsule())
 
             if !comic.author.isEmpty {
                 Text(comic.author)
                     .font(.caption.bold())
-                    .foregroundStyle(primaryMetaColor)
+                    .foregroundStyle(AuroraColor.textPrimary)
                 Text("•")
-                    .foregroundStyle(dotColor)
+                    .foregroundStyle(AuroraColor.textTertiary)
             }
 
             Text(sourceName)
@@ -469,10 +458,10 @@ public struct ComicHeroBanner: View {
 
             if !comic.latestChapterTitle.isEmpty {
                 Text("•")
-                    .foregroundStyle(dotColor)
+                    .foregroundStyle(AuroraColor.textTertiary)
                 Text(comic.latestChapterTitle)
                     .font(.caption2)
-                    .foregroundStyle(secondaryMetaColor)
+                    .foregroundStyle(AuroraColor.textSecondary)
                     .lineLimit(1)
             }
         }
@@ -485,13 +474,14 @@ public struct ComicHeroBanner: View {
             HStack(spacing: 6) {
                 Image(systemName: "book.fill")
                     .font(.headline)
-                Text("开始阅读")
+                Text("comics.start_reading".localized)
                     .font(.headline.weight(.bold))
             }
             .frame(maxWidth: .infinity, minHeight: 46)
-            .background(colorScheme == .dark ? Color.white : AuroraColor.brand, in: Capsule())
-            .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
+            .background(AuroraColor.textPrimary, in: Capsule())
+            .foregroundStyle(AuroraColor.canvas)
         }
+        .auroraZoomSource("comic:\(comic.id)")
         .buttonStyle(AppleSpringCardButtonStyle())
     }
 
@@ -500,30 +490,26 @@ public struct ComicHeroBanner: View {
             HStack(spacing: 6) {
                 Image(systemName: "shuffle")
                     .font(.headline)
-                Text("换一部")
+                Text("comics.shuffle".localized)
                     .font(.headline.weight(.semibold))
+                    .lineLimit(1)
             }
-            .frame(minHeight: 46)
-            .padding(.horizontal, 16)
-            .background(.ultraThinMaterial, in: Capsule())
-            .background(
-                (colorScheme == .dark ? Color.black.opacity(0.35) : AuroraColor.surfaceHigh.opacity(0.88)),
-                in: Capsule()
-            )
-            .overlay(
-                Capsule()
-                    .stroke(colorScheme == .dark ? Color.white.opacity(0.25) : AuroraColor.hairline, lineWidth: 1)
-            )
-            .foregroundStyle(colorScheme == .dark ? Color.white : AuroraColor.textPrimary)
+            .frame(minHeight: 34)
+            .padding(.horizontal, 6)
+            .fixedSize(horizontal: true, vertical: false)
         }
-        .buttonStyle(AppleSpringCardButtonStyle())
-        .accessibilityHint("切换另一部推荐漫画")
+        .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
+        .tint(AuroraColor.textPrimary)
+        .hoverEffect(.highlight)
+        .accessibilityHint("comics.shuffle_hint".localized)
     }
 }
 
 public struct ComicsScreen: View {
     @ObservedObject public var repo = ComicRepository.shared
     @ObservedObject private var comicDownloadManager = ComicDownloadManager.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
     public let onOpenSearch: () -> Void
     public let onPlayVideo: (VideoItem) -> Void
     @State private var detailTask: Task<Void, Never>?
@@ -543,7 +529,7 @@ public struct ComicsScreen: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.auroraContainerSize) private var containerSize
-    
+
     public init(
         onOpenSearch: @escaping () -> Void = {},
         onPlayVideo: @escaping (VideoItem) -> Void = { _ in }
@@ -561,21 +547,24 @@ public struct ComicsScreen: View {
     private var top10Comics: [ComicItem] {
         Array(repo.comics.prefix(10))
     }
-    
+
+    private var hasPicacgDraft: Bool {
+        !picacgAccount.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !picacgPassword.isEmpty
+    }
+
     public var body: some View {
         ZStack {
             AuroraColor.canvas.ignoresSafeArea()
-            
+
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: AuroraMetrics.spacingXL) {
-                    // 1. 顶部 Comic Hero 聚焦大卡（Apple TV 影院级画幅）
                     if let spotlight = spotlightComic {
                         ComicHeroBanner(
                             comic: spotlight,
                             sourceName: repo.currentSource.name,
                             onRead: { openComic(spotlight) },
                             onCycle: {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                                     spotlightIndex = (spotlightIndex + 1) % max(1, repo.comics.count)
                                 }
                             }
@@ -586,18 +575,16 @@ public struct ComicsScreen: View {
                         Spacer().frame(height: 60)
                     }
 
-                    // 2. Apple TV 核心层级：精选漫画平台（Channels 货架）
                     ComicPlatformsShelf(
                         currentSource: repo.currentSource,
                         onSelect: { source in
                             cancelComicDetailsLoad()
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                                 repo.switchSource(to: source)
                             }
                         }
                     )
 
-                    // 2.5 漫画源官方分类横向胶囊导航栏（解锁各漫画平台完整分类筛选与无限翻页）
                     if repo.currentSource.categories.count > 1 {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: AuroraMetrics.spacingS) {
@@ -605,18 +592,18 @@ public struct ComicsScreen: View {
                                     let isSelected = (repo.selectedCategory == cat)
                                     Button {
                                         guard repo.selectedCategory != cat else { return }
-                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                                        withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                                        AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                                             repo.switchCategory(to: cat)
                                         }
                                     } label: {
-                                        Text(cat)
+                                        Text(cat.localizedCategoryLabel)
                                             .font(.subheadline.weight(isSelected ? .bold : .medium))
                                             .foregroundStyle(isSelected ? Color.white : AuroraColor.textPrimary)
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 8)
+                                            .frame(minHeight: AuroraMetrics.minTouchTarget)
                                             .background(
-                                                isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                                isSelected ? AuroraColor.brandSolid : AuroraColor.surfaceCard,
                                                 in: Capsule()
                                             )
                                             .overlay(
@@ -625,28 +612,29 @@ public struct ComicsScreen: View {
                                             )
                                     }
                                     .buttonStyle(.plain)
-                                    .frame(minHeight: AuroraMetrics.minTouchTarget)
-                                    .accessibilityLabel("漫画分类 \(cat)")
+                                    .hoverEffect(.highlight)
+                                    .accessibilityLabel("comics.category_a11y".localized(cat.localizedCategoryLabel))
                                     .accessibilityAddTraits(isSelected ? .isSelected : [])
                                 }
                             }
                             .padding(.horizontal, AuroraMetrics.contentInset)
                         }
+                        .sensoryFeedback(.selection, trigger: repo.selectedCategory)
                     }
 
-                    // 3. 人气精选漫画（标准 2:3 海报画幅，与主页完全统一，拔除粗糙的 1234 排行大字）
                     if !top10Comics.isEmpty {
                         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                             HStack(spacing: AuroraMetrics.spacingS) {
-                                Text("人气精选")
+                                Text("comics.popular".localized)
                                     .font(.title2)
                                     .fontWeight(.bold)
                                     .foregroundStyle(AuroraColor.textPrimary)
+                                    .accessibilityAddTraits(.isHeader)
 
                                 Text("TRENDING")
                                     .font(.caption2)
                                     .fontWeight(.black)
-                                    .foregroundStyle(AuroraColor.brand)
+                                    .foregroundStyle(AuroraColor.brandLabel)
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 2)
                                     .background(AuroraColor.brand.opacity(0.12), in: Capsule())
@@ -666,10 +654,8 @@ public struct ComicsScreen: View {
                         }
                     }
 
-                    // 4. 平台推荐漫画流
                     comicsContent
 
-                    // Keep clear of floating tab bar
                     Spacer().frame(height: max(AuroraMetrics.spacingXXL, 96))
                 }
             }
@@ -681,16 +667,17 @@ public struct ComicsScreen: View {
             }
             .refreshable {
                 repo.loadComics(for: repo.currentSource)
+                try? await Task.sleep(nanoseconds: 500_000_000)
             }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground((isScrolled || spotlightComic == nil) ? .visible : .hidden, for: .navigationBar)
-        .toolbarBackground(.regularMaterial, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 NetgreyMarkView(width: 20, height: 28)
             }
+            .sharedBackgroundVisibility(.hidden)
+
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: AuroraMetrics.spacingM) {
                     Button {
@@ -700,22 +687,23 @@ public struct ComicsScreen: View {
                             Image(systemName: comicDownloadManager.activeChapters.isEmpty ? "arrow.down.circle" : "arrow.down.circle.fill")
                                 .font(.body)
                                 .fontWeight(.semibold)
-                                .foregroundStyle(comicDownloadManager.activeChapters.isEmpty ? Color.primary : AuroraColor.brand)
+                                .foregroundStyle(comicDownloadManager.activeChapters.isEmpty ? Color.primary : AuroraColor.brandLabel)
 
                             if !comicDownloadManager.activeChapters.isEmpty {
                                 Text("\(comicDownloadManager.activeChapters.count)")
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.caption2.weight(.bold))
                                     .foregroundStyle(.white)
                                     .padding(.horizontal, 4)
                                     .padding(.vertical, 1)
-                                    .background(AuroraColor.brand, in: Capsule())
+                                    .background(AuroraColor.brandSolid, in: Capsule())
                                     .offset(x: 6, y: -5)
                             }
                         }
                     }
                     .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
                     .contentShape(Rectangle())
-                    .accessibilityLabel("漫画下载进度")
+                    .hoverEffect(.highlight)
+                    .accessibilityLabel("comics.downloads_a11y".localized)
 
                     Button(action: onOpenSearch) {
                         Image(systemName: "magnifyingglass")
@@ -725,22 +713,23 @@ public struct ComicsScreen: View {
                     }
                     .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
                     .contentShape(Rectangle())
-                    .accessibilityLabel("搜索漫画")
+                    .hoverEffect(.highlight)
+                    .accessibilityLabel("comics.search_a11y".localized)
                 }
             }
         }
-        .alert("无法打开漫画", isPresented: Binding(
+        .alert("comics.open_error_title".localized, isPresented: Binding(
             get: { detailError != nil },
             set: { if !$0 { detailError = nil } }
         )) {
-            Button("取消", role: .cancel) { detailError = nil }
-            Button("重试") {
+            Button("common.cancel".localized, role: .cancel) { detailError = nil }
+            Button("common.retry".localized) {
                 if let comic = selectedComicForRetry {
                     openComic(comic)
                 }
             }
         } message: {
-            Text(detailError ?? "请稍后重试。")
+            Text(detailError ?? "hero.try_again_later".localized)
         }
         .overlay {
             if detailLoadingState.isLoading {
@@ -751,7 +740,7 @@ public struct ComicsScreen: View {
                         .onTapGesture { }
 
                     VStack(spacing: AuroraMetrics.spacingM) {
-                        ProgressView("正在加载章节…")
+                        ProgressView("comics.loading_chapters".localized)
                         if let title = selectedComicForRetry?.title, !title.isEmpty {
                             Text(title)
                                 .font(.caption)
@@ -759,14 +748,14 @@ public struct ComicsScreen: View {
                                 .lineLimit(2)
                                 .multilineTextAlignment(.center)
                         }
-                        Button("取消", role: .cancel) {
+                        Button("common.cancel".localized, role: .cancel) {
                             cancelComicDetailsLoad()
                         }
                         .buttonStyle(.bordered)
                     }
                     .frame(maxWidth: 260)
                     .padding(AuroraMetrics.spacingXL)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius))
+                    .glassEffect(.regular, in: .rect(cornerRadius: AuroraMetrics.cardRadius))
                 }
             }
         }
@@ -829,65 +818,66 @@ public struct ComicsScreen: View {
     private var comicsContent: some View {
         if repo.currentSource.id == ComicSourceCatalog.picacg.id && !ComicProtocolSecrets.hasPicacgConfiguration {
             ContentUnavailableView {
-                Label("未配置哔咔协议", systemImage: "key.slash")
+                Label("comics.picacg_unconfigured_title".localized, systemImage: "key.slash")
             } description: {
-                Text("此构建未配置哔咔协议参数（API Key 与签名密钥）。请在 SourceSecrets.plist 中配置后使用。")
+                Text("comics.picacg_unconfigured_desc".localized)
             }
             .frame(maxWidth: .infinity, minHeight: 300)
         } else if repo.currentSource.id == ComicSourceCatalog.picacg.id && !repo.isPicacgAuthenticated {
             ContentUnavailableView {
-                Label("需要哔咔账号", systemImage: "person.badge.key")
+                Label("comics.picacg_account_needed".localized, systemImage: "person.badge.key")
             } description: {
-                Text(repo.errorMessage ?? "登录后使用哔咔官方接口浏览漫画。登录令牌仅保存在本机钥匙串中。")
+                Text(repo.errorMessage ?? "comics.picacg_account_desc".localized)
             } actions: {
-                Button("登录哔咔", systemImage: "person.crop.circle.badge.checkmark") {
+                Button("comics.picacg_login_btn".localized, systemImage: "person.crop.circle.badge.checkmark") {
                     showPicacgLogin = true
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(AuroraColor.brand)
+                .tint(AuroraColor.brandSolid)
             }
             .frame(maxWidth: .infinity, minHeight: 300)
         } else if repo.isLoading && repo.comics.isEmpty {
-            ProgressView("正在加载漫画…")
+            ProgressView("comics.loading".localized)
                 .frame(maxWidth: .infinity, minHeight: 240)
         } else if repo.comics.isEmpty, let errorMessage = repo.errorMessage {
             ContentUnavailableView {
-                Label("漫画暂不可用", systemImage: "wifi.exclamationmark")
+                Label("comics.unavailable".localized, systemImage: "wifi.exclamationmark")
             } description: {
                 Text(errorMessage)
             } actions: {
-                Button("重试", systemImage: "arrow.clockwise") {
+                Button("common.retry".localized, systemImage: "arrow.clockwise") {
                     repo.loadComics(for: repo.currentSource)
                 }
                 .buttonStyle(.borderedProminent)
             }
-            .tint(AuroraColor.brand)
+            .tint(AuroraColor.brandSolid)
             .frame(maxWidth: .infinity, minHeight: 300)
         } else if repo.comics.isEmpty {
             ContentUnavailableView(
-                "暂无漫画",
+                "comics.empty_title".localized,
                 systemImage: "books.vertical",
-                description: Text("当前来源暂时没有可显示的内容。")
+                description: Text("comics.empty_desc".localized)
             )
             .frame(maxWidth: .infinity, minHeight: 300)
         } else {
             VStack(spacing: AuroraMetrics.spacingM) {
                 HStack(spacing: AuroraMetrics.spacingS) {
-                    Text("\(repo.currentSource.name) 热门连载")
+                    Text("comics.hot_serials".localized(repo.currentSource.name))
                         .font(.title3)
                         .fontWeight(.bold)
                         .foregroundStyle(AuroraColor.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
 
                     Spacer()
 
-                    Text("\(repo.comics.count) 部作品")
+                    Text("comics.works_count".localized(repo.comics.count))
                         .font(.subheadline)
                         .foregroundStyle(AuroraColor.textSecondary)
                 }
                 .padding(.horizontal, AuroraMetrics.contentInset)
 
                 if repo.isLoading {
-                    ProgressView("正在刷新…")
+                    ProgressView("comics.refreshing".localized)
                         .font(.caption)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, AuroraMetrics.contentInset)
@@ -903,67 +893,16 @@ public struct ComicsScreen: View {
                     .foregroundStyle(AuroraColor.warning)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .overlay(alignment: .trailing) {
-                        Button("重试") { repo.loadComics(for: repo.currentSource) }
+                        Button("common.retry".localized) { repo.loadComics(for: repo.currentSource) }
                             .font(.caption.weight(.semibold))
+                            .frame(minHeight: AuroraMetrics.minTouchTarget)
                     }
                     .padding(.horizontal, AuroraMetrics.contentInset)
                 }
 
                 LazyVGrid(columns: comicGridColumns, spacing: AuroraMetrics.spacingL) {
                     ForEach(repo.comics) { comic in
-                        Button {
-                            openComic(comic)
-                        } label: {
-                            VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
-                                AuroraCoverImage(
-                                    url: comic.coverUrl,
-                                    title: comic.title,
-                                    sourceBaseURL: comic.coverBaseURL,
-                                    aspectRatio: AuroraMetrics.posterAspect,
-                                    contentMode: .fill,
-                                    cornerRadius: AuroraMetrics.cardRadius,
-                                    placeholderStyle: .comic
-                                )
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
-                                        .stroke(AuroraColor.hairline, lineWidth: 1)
-                                }
-
-                                Text(comic.title)
-                                    .font(.subheadline)
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(AuroraColor.textPrimary)
-                                    .lineLimit(2, reservesSpace: true)
-                                    .multilineTextAlignment(.leading)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                                VStack(alignment: .leading, spacing: AuroraMetrics.spacingXS) {
-                                    Text(comic.author.isEmpty ? comic.sourceName : comic.author)
-                                        .font(.caption)
-                                        .foregroundStyle(AuroraColor.textSecondary)
-                                        .lineLimit(1, reservesSpace: true)
-
-                                    Text(comic.latestChapterTitle.isEmpty ? "最新章节" : comic.latestChapterTitle)
-                                        .font(.caption2)
-                                        .fontWeight(.medium)
-                                        .foregroundStyle(comic.latestChapterTitle.isEmpty ? AuroraColor.textTertiary : AuroraColor.brandLabel)
-                                        .lineLimit(1, reservesSpace: true)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .topLeading)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(AppleSpringCardButtonStyle())
-                        .onAppear {
-                            if comic.id == repo.comics.last?.id {
-                                Task {
-                                    await repo.loadNextPage()
-                                }
-                            }
-                        }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityLabel("\(comic.title), \(comic.author.isEmpty ? "" : "作者 " + comic.author + ", ")\(comic.latestChapterTitle.isEmpty ? "" : "最新 " + comic.latestChapterTitle)")
-                        .accessibilityHint("打开漫画阅读器")
+                        comicGridCard(comic)
                     }
                 }
                 .padding(.horizontal, AuroraMetrics.contentInset)
@@ -974,7 +913,7 @@ public struct ComicsScreen: View {
                     HStack(spacing: AuroraMetrics.spacingM) {
                         ProgressView()
                             .controlSize(.regular)
-                            .tint(AuroraColor.brand)
+                            .tint(AuroraColor.brandLabel)
                         Text("comics.loading_more".localized)
                             .font(.footnote)
                             .foregroundStyle(AuroraColor.textSecondary)
@@ -995,13 +934,13 @@ public struct ComicsScreen: View {
     private var picacgLoginSheet: some View {
         NavigationStack {
             Form {
-                Section("哔咔账号") {
-                    TextField("邮箱或账号", text: $picacgAccount)
+                Section("comics.picacg_section".localized) {
+                    TextField("comics.picacg_account_placeholder".localized, text: $picacgAccount)
                         .textContentType(.username)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
 
-                    SecureField("密码", text: $picacgPassword)
+                    SecureField("comics.picacg_password_placeholder".localized, text: $picacgPassword)
                         .textContentType(.password)
                 }
 
@@ -1019,22 +958,32 @@ public struct ComicsScreen: View {
                         HStack {
                             Spacer()
                             if isPicacgLoginInProgress { ProgressView() }
-                            Text(isPicacgLoginInProgress ? "正在登录…" : "登录")
+                            Text(isPicacgLoginInProgress ? "comics.logging_in".localized : "account.login".localized)
                             Spacer()
                         }
                     }
                     .disabled(isPicacgLoginInProgress || picacgAccount.isEmpty || picacgPassword.isEmpty)
                 } footer: {
-                    Text("账号密码只用于此次认证请求；认证成功后仅保存服务令牌。")
+                    Text("comics.picacg_privacy_note".localized)
                 }
             }
-            .navigationTitle("哔咔登录")
+            .navigationTitle("comics.picacg_nav_title".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("取消") { showPicacgLogin = false }
+                    Button("common.cancel".localized) {
+                        picacgAccount = ""
+                        picacgPassword = ""
+                        showPicacgLogin = false
+                    }
+                    .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
                 }
             }
+            .modifier(PicacgDraftDismissalGuard(hasDraft: hasPicacgDraft) {
+                picacgAccount = ""
+                picacgPassword = ""
+                showPicacgLogin = false
+            })
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
@@ -1080,7 +1029,7 @@ public struct ComicsScreen: View {
                 guard !Task.isCancelled, detailLoadingState.finishRequest(requestID) else { return }
                 detailTask = nil
                 if detailedComic.chapters.isEmpty {
-                    detailError = "此漫画来源没有提供章节列表。"
+                    detailError = "comics.no_chapters_error".localized
                 } else {
                     PlayerCoordinator.shared.openComic(detailedComic)
                 }
@@ -1092,9 +1041,93 @@ public struct ComicsScreen: View {
         }
     }
 
+    @ViewBuilder
+    private func comicGridCard(_ comic: ComicItem) -> some View {
+        let authorSuffix = comic.author.isEmpty ? "" : (", " + "comics.author_prefix".localized(comic.author))
+        let latestSuffix = comic.latestChapterTitle.isEmpty ? "" : (", " + "comics.latest_prefix".localized(comic.latestChapterTitle))
+        let a11yLabel = comic.title + authorSuffix + latestSuffix
+
+        Button {
+            openComic(comic)
+        } label: {
+            VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
+                AuroraCoverImage(
+                    url: comic.coverUrl,
+                    title: comic.title,
+                    sourceBaseURL: comic.coverBaseURL,
+                    aspectRatio: AuroraMetrics.posterAspect,
+                    contentMode: .fill,
+                    cornerRadius: AuroraMetrics.cardRadius,
+                    placeholderStyle: .comic
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                        .stroke(AuroraColor.hairline, lineWidth: 1)
+                }
+
+                Text(comic.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(AuroraColor.textPrimary)
+                    .lineLimit(2, reservesSpace: true)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                VStack(alignment: .leading, spacing: AuroraMetrics.spacingXS) {
+                    Text(comic.author.isEmpty ? comic.sourceName : comic.author)
+                        .font(.caption)
+                        .foregroundStyle(AuroraColor.textSecondary)
+                        .lineLimit(1, reservesSpace: true)
+
+                    Text(comic.latestChapterTitle.isEmpty ? "comics.latest_chapter".localized : comic.latestChapterTitle)
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(comic.latestChapterTitle.isEmpty ? AuroraColor.textTertiary : AuroraColor.brandLabel)
+                        .lineLimit(1, reservesSpace: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .contentShape(Rectangle())
+        }
+        .auroraZoomSource("comic:\(comic.id)")
+        .buttonStyle(AppleSpringCardButtonStyle())
+        .onAppear {
+            if comic.id == repo.comics.last?.id {
+                Task {
+                    await repo.loadNextPage()
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(a11yLabel)
+        .accessibilityHint("comics.open_reader_hint".localized)
+    }
+
     private func cancelComicDetailsLoad() {
         detailTask?.cancel()
         detailTask = nil
         detailLoadingState.cancelRequest()
+    }
+}
+
+private struct PicacgDraftDismissalGuard: ViewModifier {
+    let hasDraft: Bool
+    let onDiscard: () -> Void
+
+    func body(content: Content) -> some View {
+        if #available(iOS 27.0, *) {
+            content
+                .interactiveDismissDisabled(hasDraft)
+                .dismissalConfirmationDialog(
+                    Text("dialog.discard_title".localized),
+                    shouldPresent: hasDraft
+                ) {
+                    Button("dialog.discard_confirm".localized, role: .destructive) {
+                        onDiscard()
+                    }
+                    Button("dialog.keep_editing".localized, role: .cancel) {}
+                }
+        } else {
+            content
+                .interactiveDismissDisabled(hasDraft)
+        }
     }
 }

@@ -53,6 +53,16 @@ public struct LiveStreamItem: Identifiable, Hashable, Codable, Sendable {
         self.isPrivateShow = isPrivateShow
         self.hlsStreamUrl = hlsStreamUrl
     }
+
+    public var localizedSubtitle: String {
+        guard !title.isEmpty else { return "" }
+        for legacyToken in ["正在直播中", "正在直播", "Streaming Live"] {
+            if title.contains(legacyToken) {
+                return title.replacingOccurrences(of: legacyToken, with: "live.streaming_now".localized)
+            }
+        }
+        return title
+    }
 }
 
 @MainActor
@@ -481,7 +491,7 @@ private final class HornyStudentsRSSParserDelegate: NSObject, XMLParserDelegate 
             id: "hs-\(username)",
             sourceID: LiveSourceCatalog.hornyStudentsID,
             username: username,
-            title: "\(location) · 正在直播",
+            title: "\(location) · \("live.streaming_now".localized)",
             roomUrl: "https://chaturbate.com/\(username)/",
             avatarUrl: imgUrl,
             snapshotUrl: imgUrl,
@@ -534,7 +544,7 @@ enum LiveSourceAdapter {
             guard let thumbnail else { return nil }
             let viewers = (model["viewersCount"] as? Int).flatMap { $0 >= 0 ? $0 : nil }
             let gender = model["gender"] as? String ?? ""
-            let title = model["country"] as? String ?? "Stripchat · 正在直播"
+            let title = model["country"] as? String ?? "Stripchat · \("live.streaming_now".localized)"
             let rawHls = model["hlsPlaylist"] as? String
             let numericId = (model["id"] as? Int).map { String($0) } ?? (model["id"] as? String)
             let streamName = (model["streamName"] as? String).flatMap {
@@ -598,7 +608,10 @@ public enum LiveSourceCatalog {
     public static let validSourceIDs = Set(allSources.map(\.id))
 
     public static func name(for id: String) -> String {
-        allSources.first(where: { $0.id == id })?.name ?? id
+        if id == allSourcesID {
+            return "home.all".localized
+        }
+        return allSources.first(where: { $0.id == id })?.name ?? id
     }
 }
 

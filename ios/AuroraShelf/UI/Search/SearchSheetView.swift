@@ -1,26 +1,40 @@
 import SwiftUI
 
 public struct SearchSheetView: View {
+    private static let allSourceToken = "__all__"
+
     public enum SearchScope: String, CaseIterable, Identifiable, Sendable {
-        case video = "视频"
-        case comic = "漫画"
-        case live = "直播"
-        case forum = "社区"
+        case video = "video"
+        case comic = "comic"
+        case live = "live"
+        case forum = "forum"
 
         public var id: String { rawValue }
+
+        public var displayTitle: String {
+            switch self {
+            case .video: return "downloads.tab_video".localized
+            case .comic: return "downloads.tab_comic".localized
+            case .live: return "tab.live".localized
+            case .forum: return "tab.forum".localized
+            }
+        }
     }
 
+    public let isEmbeddedInTab: Bool
     public let onPlayVideo: (VideoItem) -> Void
     public let onSelectComic: ((ComicItem) -> Void)?
     public let onSelectLive: ((LiveStreamItem) -> Void)?
     public let onSelectForumPost: ((ForumPostItem) -> Void)?
     public let onDismiss: () -> Void
-    
+
+    @ObservedObject private var locManager = LocalizationManager.shared
     @ObservedObject private var repo = VideoRepository.shared
     @ObservedObject private var comicRepo = ComicRepository.shared
     @ObservedObject private var liveRepo = LiveRepository.shared
     @ObservedObject private var forumRepo = ForumRepository.shared
     @ObservedObject private var watchlist = WatchlistStore.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var query: String = ""
     @State private var activeScope: SearchScope = .video
     @State private var comicSearchResults: [ComicItem] = []
@@ -29,14 +43,22 @@ public struct SearchSheetView: View {
     @State private var searchTask: Task<Void, Never>?
     @FocusState private var isSearchFocused: Bool
     @AppStorage("recent_video_searches") private var recentSearchesRaw: String = ""
-    @State private var selectedSourceFilter: String = "全部"
+    @State private var selectedSourceFilter: String = SearchSheetView.allSourceToken
     @State private var isGridView: Bool = false
     @State private var selectedDetailVideo: VideoItem? = nil
 
-    private let trendingKeywords = [
-        "4K 超清", "最新电影", "热门连续剧", "经典港片",
-        "热血动漫", "高分综艺", "悬疑惊悚", "科幻大片"
-    ]
+    private var trendingKeywords: [String] {
+        [
+            "search.trending_1".localized,
+            "search.trending_2".localized,
+            "search.trending_3".localized,
+            "search.trending_4".localized,
+            "search.trending_5".localized,
+            "search.trending_6".localized,
+            "search.trending_7".localized,
+            "search.trending_8".localized
+        ]
+    }
 
     private var recentSearches: [String] {
         recentSearchesRaw
@@ -56,7 +78,7 @@ public struct SearchSheetView: View {
     }
 
     private var availableSources: [String] {
-        var sources = ["全部"]
+        var sources = [Self.allSourceToken]
         let uniqueSources = Set(repo.searchResults.map { $0.sourceName }).sorted { lhs, rhs in
             let lRank = sourceDisplayRank(lhs)
             let rRank = sourceDisplayRank(rhs)
@@ -68,7 +90,7 @@ public struct SearchSheetView: View {
     }
 
     private var filteredResults: [VideoItem] {
-        if selectedSourceFilter == "全部" {
+        if selectedSourceFilter == Self.allSourceToken {
             return repo.searchResults
         }
         return repo.searchResults.filter { $0.sourceName == selectedSourceFilter }
@@ -99,10 +121,10 @@ public struct SearchSheetView: View {
         guard !items.isEmpty else { return [] }
 
         var shelves: [(title: String, items: [VideoItem])] = []
-        
+
         let topCount = min(4, items.count)
         let topResults = Array(items.prefix(topCount))
-        shelves.append((title: "热门匹配", items: topResults))
+        shelves.append((title: "search.hot_matches".localized, items: topResults))
 
         let sourceGroups = Dictionary(grouping: items) { $0.sourceName }
         if sourceGroups.count > 1 {
@@ -114,28 +136,29 @@ public struct SearchSheetView: View {
                 return lhs.key < rhs.key
             }
             for (source, groupItems) in sortedSources {
-                shelves.append((title: "\(source) 结果", items: groupItems))
+                shelves.append((title: "search.source_results".localized(source), items: groupItems))
             }
         } else {
             let categoryGroups = Dictionary(grouping: items) { item -> String in
                 let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines)
-                return cat.isEmpty ? "精选推荐" : cat
+                return cat.isEmpty ? "comics.featured".localized : cat
             }
             if categoryGroups.count > 1 {
                 for (cat, groupItems) in categoryGroups.sorted(by: { $0.value.count > $1.value.count }) {
                     shelves.append((title: cat, items: groupItems))
                 }
             } else {
-                shelves.append((title: "全部精选", items: items))
+                shelves.append((title: "search.all_featured".localized, items: items))
             }
         }
 
         return shelves
     }
-    
+
     public init(
         initialQuery: String = "",
         initialScope: SearchScope = .video,
+        isEmbeddedInTab: Bool = false,
         onPlayVideo: @escaping (VideoItem) -> Void,
         onSelectComic: ((ComicItem) -> Void)? = nil,
         onSelectLive: ((LiveStreamItem) -> Void)? = nil,
@@ -144,19 +167,20 @@ public struct SearchSheetView: View {
     ) {
         self._query = State(initialValue: initialQuery)
         self._activeScope = State(initialValue: initialScope)
+        self.isEmbeddedInTab = isEmbeddedInTab
         self.onPlayVideo = onPlayVideo
         self.onSelectComic = onSelectComic
         self.onSelectLive = onSelectLive
         self.onSelectForumPost = onSelectForumPost
         self.onDismiss = onDismiss
     }
-    
+
     public var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("搜索范围", selection: $activeScope) {
+                Picker("search.scope_picker".localized, selection: $activeScope) {
                     ForEach(SearchScope.allCases) { scope in
-                        Text(scope.rawValue).tag(scope)
+                        Text(scope.displayTitle).tag(scope)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -182,13 +206,14 @@ public struct SearchSheetView: View {
                 }
             }
             .background(AuroraColor.canvas.ignoresSafeArea())
-            .navigationTitle("search.placeholder".localized)
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("tab.search".localized)
+            .navigationBarTitleDisplayMode(isEmbeddedInTab ? .large : .inline)
             .searchable(
                 text: $query,
                 placement: .navigationBarDrawer(displayMode: .always),
                 prompt: "search.placeholder".localized
             )
+            .searchFocused($isSearchFocused)
             .onSubmit(of: .search) {
                 submitSearch()
             }
@@ -198,14 +223,16 @@ public struct SearchSheetView: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("common.done".localized) {
-                        onDismiss()
+                if !isEmbeddedInTab {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("common.done".localized) {
+                            onDismiss()
+                        }
+                        .font(.body.bold())
+                        .foregroundStyle(AuroraColor.brandLabel)
+                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+                        .contentShape(Rectangle())
                     }
-                    .font(.body.bold())
-                    .foregroundStyle(AuroraColor.brand)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .contentShape(Rectangle())
                 }
             }
             .sheet(item: $selectedDetailVideo) { video in
@@ -214,7 +241,9 @@ public struct SearchSheetView: View {
                     onPlay: { v in
                         selectedDetailVideo = nil
                         onPlayVideo(v)
-                        onDismiss()
+                        if !isEmbeddedInTab {
+                            onDismiss()
+                        }
                     },
                     onDismiss: {
                         selectedDetailVideo = nil
@@ -224,6 +253,10 @@ public struct SearchSheetView: View {
             .onAppear {
                 if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     submitSearch()
+                } else if !isEmbeddedInTab {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        isSearchFocused = true
+                    }
                 }
             }
             .onDisappear {
@@ -237,12 +270,12 @@ public struct SearchSheetView: View {
         if repo.isSearching && repo.searchResults.isEmpty {
             VStack(spacing: AuroraMetrics.spacingL) {
                 ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
+                    .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brandLabel))
                     .scaleEffect(1.3)
-                
+
                 Text("search.concurrent_hint".localized(searchableSourceCount))
                     .font(.subheadline)
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(AuroraColor.textSecondary)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !repo.searchResults.isEmpty {
@@ -252,8 +285,8 @@ public struct SearchSheetView: View {
                         HStack(spacing: 8) {
                             ProgressView()
                                 .controlSize(.small)
-                                .tint(AuroraColor.brand)
-                            Text("已优先显示命中结果，正在同步其余视频源…")
+                                .tint(AuroraColor.brandLabel)
+                            Text("search.streaming_partial_hint".localized)
                                 .font(.caption)
                                 .foregroundStyle(AuroraColor.textSecondary)
                         }
@@ -265,47 +298,61 @@ public struct SearchSheetView: View {
                             HStack(spacing: AuroraMetrics.spacingS) {
                                 ForEach(availableSources, id: \.self) { src in
                                     let isSelected = (selectedSourceFilter == src)
+                                    let displayTitle = src == Self.allSourceToken ? "home.all".localized : src
                                     Button {
-                                        selectedSourceFilter = src
+                                        AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
+                                            selectedSourceFilter = src
+                                        }
                                     } label: {
                                         HStack(spacing: 4) {
-                                            Text(src)
+                                            Text(displayTitle)
                                                 .font(.caption.bold())
-                                            let count = src == "全部" ? repo.searchResults.count : repo.searchResults.filter { $0.sourceName == src }.count
+                                            let count = src == Self.allSourceToken
+                                                ? repo.searchResults.count
+                                                : repo.searchResults.filter { $0.sourceName == src }.count
                                             Text("\(count)")
-                                                .font(.system(size: 10, weight: .bold))
-                                                .padding(.horizontal, 4)
+                                                .font(.caption2.bold())
+                                                .padding(.horizontal, 5)
                                                 .padding(.vertical, 1)
-                                                .background(isSelected ? Color.white.opacity(0.25) : Color.black.opacity(0.15), in: Capsule())
+                                                .background(
+                                                    isSelected ? Color.white.opacity(0.24) : Color.primary.opacity(0.10),
+                                                    in: Capsule()
+                                                )
                                         }
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 6)
+                                        .padding(.horizontal, 12)
+                                        .frame(minHeight: AuroraMetrics.minTouchTarget - 8)
                                         .background(
-                                            isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                            isSelected ? AuroraColor.brandSolid : AuroraColor.surfaceCard,
                                             in: Capsule()
                                         )
                                         .foregroundStyle(isSelected ? .white : AuroraColor.textPrimary)
                                     }
                                     .buttonStyle(.plain)
+                                    .frame(minHeight: AuroraMetrics.minTouchTarget)
+                                    .contentShape(Rectangle())
+                                    .hoverEffect(.highlight)
                                 }
                             }
                         }
-                        
+
                         Spacer()
-                        
+
                         Button {
-                            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                            AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
                                 isGridView.toggle()
                             }
                         } label: {
                             Image(systemName: isGridView ? "rectangle.grid.2x2" : "rectangle.stack")
                                 .font(.caption.bold())
                                 .foregroundStyle(AuroraColor.textPrimary)
-                                .frame(width: 32, height: 32)
+                                .frame(width: 36, height: 36)
                                 .background(AuroraColor.surfaceCard, in: Circle())
+                                .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+                                .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel(isGridView ? "切换为货架视图" : "切换为网格视图")
+                        .hoverEffect(.highlight)
+                        .accessibilityLabel(isGridView ? "search.shelf_toggle_a11y".localized : "search.grid_toggle_a11y".localized)
                     }
                     .padding(.horizontal, AuroraMetrics.contentInset)
                     .padding(.top, AuroraMetrics.spacingS)
@@ -340,12 +387,13 @@ public struct SearchSheetView: View {
                                         .font(.title3)
                                         .fontWeight(.bold)
                                         .foregroundStyle(AuroraColor.textPrimary)
-                                    
+                                        .accessibilityAddTraits(.isHeader)
+
                                     Spacer()
-                                    
-                                    Text("共 \(shelf.items.count) 部")
+
+                                    Text("search.items_count".localized(shelf.items.count))
                                         .font(.caption.bold())
-                                        .foregroundStyle(AuroraColor.brand)
+                                        .foregroundStyle(AuroraColor.brandLabel)
                                 }
                                 .padding(.horizontal, AuroraMetrics.contentInset)
 
@@ -366,11 +414,11 @@ public struct SearchSheetView: View {
             }
         } else if !query.isEmpty, let searchError = repo.searchError {
             ContentUnavailableView {
-                Label("搜索失败", systemImage: "wifi.exclamationmark")
+                Label("search.failed".localized, systemImage: "wifi.exclamationmark")
             } description: {
                 Text(searchError)
             } actions: {
-                Button("重试", systemImage: "arrow.clockwise") {
+                Button("common.retry".localized, systemImage: "arrow.clockwise") {
                     submitSearch()
                 }
                 .buttonStyle(.borderedProminent)
@@ -388,7 +436,7 @@ public struct SearchSheetView: View {
         if isSearchingComics && comicSearchResults.isEmpty {
             VStack(spacing: AuroraMetrics.spacingL) {
                 ProgressView()
-                    .tint(AuroraColor.brand)
+                    .tint(AuroraColor.brandLabel)
                 Text("comics.loading".localized)
                     .font(.subheadline)
                     .foregroundStyle(AuroraColor.textSecondary)
@@ -398,11 +446,11 @@ public struct SearchSheetView: View {
             landingExploreContent
         } else if comicSearchResults.isEmpty, let err = comicSearchError {
             ContentUnavailableView {
-                Label("搜索失败", systemImage: "wifi.exclamationmark")
+                Label("search.failed".localized, systemImage: "wifi.exclamationmark")
             } description: {
                 Text(err)
             } actions: {
-                Button("重试", systemImage: "arrow.clockwise") {
+                Button("common.retry".localized, systemImage: "arrow.clockwise") {
                     submitSearch()
                 }
                 .buttonStyle(.borderedProminent)
@@ -418,7 +466,9 @@ public struct SearchSheetView: View {
                     ForEach(comicSearchResults) { comic in
                         Button {
                             onSelectComic?(comic)
-                            onDismiss()
+                            if !isEmbeddedInTab {
+                                onDismiss()
+                            }
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
                                 AuroraCoverImage(
@@ -439,6 +489,7 @@ public struct SearchSheetView: View {
                                     .lineLimit(1)
                             }
                         }
+                        .auroraZoomSource("comic:\(comic.id)")
                         .buttonStyle(AppleSpringCardButtonStyle())
                     }
                 }
@@ -464,11 +515,13 @@ public struct SearchSheetView: View {
                     ForEach(matches) { stream in
                         Button {
                             onSelectLive?(stream)
-                            onDismiss()
+                            if !isEmbeddedInTab {
+                                onDismiss()
+                            }
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
                                 AuroraCoverImage(
-                                    url: stream.avatarUrl,
+                                    url: stream.snapshotUrl.isEmpty ? stream.avatarUrl : stream.snapshotUrl,
                                     title: stream.username,
                                     aspectRatio: AuroraMetrics.liveAspect,
                                     contentMode: .fill,
@@ -478,12 +531,13 @@ public struct SearchSheetView: View {
                                     .font(.caption.bold())
                                     .foregroundStyle(AuroraColor.textPrimary)
                                     .lineLimit(1)
-                                Text(stream.title.isEmpty ? LiveSourceCatalog.name(for: stream.sourceID) : stream.title)
+                                Text(stream.localizedSubtitle.isEmpty ? LiveSourceCatalog.name(for: stream.sourceID) : stream.localizedSubtitle)
                                     .font(.caption2)
                                     .foregroundStyle(AuroraColor.textSecondary)
                                     .lineLimit(1)
                             }
                         }
+                        .auroraZoomSource("live:\(stream.id)")
                         .buttonStyle(AppleSpringCardButtonStyle())
                     }
                 }
@@ -504,7 +558,9 @@ public struct SearchSheetView: View {
             List(matches) { post in
                 Button {
                     onSelectForumPost?(post)
-                    onDismiss()
+                    if !isEmbeddedInTab {
+                        onDismiss()
+                    }
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(post.title)
@@ -529,6 +585,7 @@ public struct SearchSheetView: View {
                     .padding(.vertical, 4)
                 }
                 .buttonStyle(.plain)
+                .hoverEffect(.highlight)
                 .listRowBackground(AuroraColor.surface)
             }
             .listStyle(.plain)
@@ -546,15 +603,18 @@ public struct SearchSheetView: View {
                             Text("search.history".localized)
                                 .font(.headline)
                                 .foregroundStyle(AuroraColor.textPrimary)
+                                .accessibilityAddTraits(.isHeader)
                             Spacer()
                             Button("search.clear_history".localized) {
                                 clearRecentSearches()
                             }
                             .font(.subheadline)
-                            .foregroundStyle(AuroraColor.brand)
+                            .foregroundStyle(AuroraColor.brandLabel)
+                            .frame(minHeight: AuroraMetrics.minTouchTarget)
+                            .contentShape(Rectangle())
                         }
 
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 164), spacing: 8)], spacing: 8) {
                             ForEach(recentSearches, id: \.self) { item in
                                 Button {
                                     query = item
@@ -566,26 +626,28 @@ public struct SearchSheetView: View {
                                         Text(item)
                                             .font(.subheadline)
                                             .lineLimit(1)
+                                            .minimumScaleFactor(0.88)
                                     }
                                     .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .frame(maxWidth: .infinity)
+                                    .frame(maxWidth: .infinity, minHeight: AuroraMetrics.minTouchTarget)
                                     .background(AuroraColor.surfaceCard, in: Capsule())
                                     .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
                                     .foregroundStyle(AuroraColor.textSecondary)
                                 }
                                 .buttonStyle(.plain)
+                                .hoverEffect(.highlight)
                             }
                         }
                     }
                 }
 
                 VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-                    Text("热门探索")
+                    Text("search.trending_explore".localized)
                         .font(.headline)
                         .foregroundStyle(AuroraColor.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
 
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 8) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 164), spacing: 8)], spacing: 8) {
                         ForEach(trendingKeywords, id: \.self) { keyword in
                             Button {
                                 query = keyword
@@ -594,14 +656,14 @@ public struct SearchSheetView: View {
                                 HStack(spacing: 5) {
                                     Image(systemName: "sparkle")
                                         .font(.caption2)
-                                        .foregroundStyle(AuroraColor.brand)
+                                        .foregroundStyle(AuroraColor.brandLabel)
                                     Text(keyword)
                                         .font(.subheadline.weight(.medium))
                                         .lineLimit(1)
+                                        .minimumScaleFactor(0.88)
                                 }
                                 .padding(.horizontal, 12)
-                                .padding(.vertical, 9)
-                                .frame(maxWidth: .infinity)
+                                .frame(maxWidth: .infinity, minHeight: AuroraMetrics.minTouchTarget)
                                 .background(AuroraColor.surfaceCard, in: Capsule())
                                 .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
                                 .foregroundStyle(AuroraColor.textPrimary)
@@ -623,6 +685,7 @@ public struct SearchSheetView: View {
             }
             .padding(.horizontal, AuroraMetrics.contentInset)
             .padding(.top, AuroraMetrics.spacingL)
+            .safeAreaPadding(.bottom, AuroraMetrics.spacingXXL)
         }
     }
 
@@ -648,11 +711,11 @@ public struct SearchSheetView: View {
                     )
 
                     Text(item.sourceName)
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(AuroraColor.brandLabel)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.black.opacity(0.65), in: Capsule())
+                        .background(Color.black.opacity(0.68), in: Capsule())
                         .padding(6)
                 }
 
@@ -666,17 +729,17 @@ public struct SearchSheetView: View {
                         if !item.rating.isEmpty {
                             HStack(spacing: 2) {
                                 Image(systemName: "star.fill")
-                                    .font(.system(size: 8))
+                                    .font(.caption2)
                                     .foregroundStyle(.yellow)
                                 Text(item.rating)
-                                    .font(.system(size: 9, weight: .bold))
+                                    .font(.caption2.weight(.bold))
                                     .foregroundStyle(AuroraColor.textPrimary)
                             }
                         }
 
                         if !item.duration.isEmpty {
                             Text(item.duration)
-                                .font(.system(size: 9))
+                                .font(.caption2)
                                 .foregroundStyle(AuroraColor.textTertiary)
                         }
                     }
@@ -684,26 +747,32 @@ public struct SearchSheetView: View {
                 .frame(width: width, alignment: .leading)
             }
         }
+        .auroraZoomSource("video:\(item.id)")
         .buttonStyle(AppleSpringCardButtonStyle())
         .contextMenu {
             Button {
                 onPlayVideo(item)
-                onDismiss()
+                if !isEmbeddedInTab {
+                    onDismiss()
+                }
             } label: {
-                Label("立即播放", systemImage: "play.fill")
+                Label("search.play_now".localized, systemImage: "play.fill")
             }
 
             let isBookmarked = watchlist.contains(item)
             Button {
                 try? watchlist.setBookmarked(!isBookmarked, for: item)
             } label: {
-                Label(isBookmarked ? "从片单中移除" : "加入待播片单", systemImage: isBookmarked ? "bookmark.fill" : "bookmark")
+                Label(
+                    isBookmarked ? "watchlist.remove".localized : "watchlist.add".localized,
+                    systemImage: isBookmarked ? "bookmark.fill" : "bookmark"
+                )
             }
 
             Button {
                 selectedDetailVideo = item
             } label: {
-                Label("查看影片详情", systemImage: "info.circle")
+                Label("hero.details_a11y".localized, systemImage: "info.circle")
             }
         }
     }
@@ -727,7 +796,7 @@ public struct SearchSheetView: View {
         searchTask?.cancel()
         let submittedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !submittedQuery.isEmpty else { return }
-        selectedSourceFilter = "全部"
+        selectedSourceFilter = Self.allSourceToken
         addRecentSearch(submittedQuery)
         switch activeScope {
         case .video:

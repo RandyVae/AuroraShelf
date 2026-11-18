@@ -13,19 +13,26 @@ public struct HeroBanner: View {
     }
 
     @ObservedObject private var watchlist = WatchlistStore.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
     @State private var currentIndex: Int = 0
     @State private var watchlistError: String?
+    @Environment(\.auroraContainerSize) private var containerSize
+    @Environment(\.appearsActive) private var appearsActive
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
 
+    private var effectiveSize: CGSize {
+        (containerSize.width > 0 && containerSize.height > 0) ? containerSize : DeviceLayout.currentWindowSize
+    }
+
     private var formFactor: DeviceFormFactor {
-        DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
+        DeviceLayout.resolveCurrent(containerSize: containerSize, horizontalSizeClass: horizontalSizeClass)
     }
 
     private var heroHeight: CGFloat {
-        DeviceLayout.heroHeight(for: formFactor, screenHeight: DeviceLayout.currentWindowSize.height)
+        DeviceLayout.heroHeight(for: formFactor, screenHeight: effectiveSize.height)
     }
 
     private var isWideAspect: Bool {
@@ -76,12 +83,12 @@ public struct HeroBanner: View {
                 HStack(spacing: 6) {
                     ForEach(0..<videos.count, id: \.self) { idx in
                         Capsule()
-                            .fill(currentIndex == idx ? AuroraColor.brand : AuroraColor.textPrimary.opacity(0.35))
+                            .fill(currentIndex == idx ? AuroraColor.brandSolid : AuroraColor.textPrimary.opacity(0.35))
                             .frame(width: currentIndex == idx ? 22 : 6, height: 6)
-                            .shadow(color: currentIndex == idx ? AuroraColor.brand.opacity(0.5) : Color.clear, radius: 4)
-                            .animation(AuroraMotion.smooth, value: currentIndex)
+                            .shadow(color: currentIndex == idx ? AuroraColor.brand.opacity(0.45) : Color.clear, radius: 4)
+                            .animation(AuroraMotion.smooth(reduceMotion: reduceMotion), value: currentIndex)
                             .onTapGesture {
-                                withAnimation(AuroraMotion.smooth) {
+                                AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                                     currentIndex = idx
                                 }
                             }
@@ -92,18 +99,18 @@ public struct HeroBanner: View {
         }
         .frame(maxWidth: .infinity, maxHeight: heroHeight + activePull)
         .onReceive(Timer.publish(every: 6.5, on: .main, in: .common).autoconnect()) { _ in
-            guard videos.count > 1, !reduceMotion, !voiceOverEnabled else { return }
-            withAnimation(AuroraMotion.smooth) {
+            guard videos.count > 1, appearsActive, !reduceMotion, !voiceOverEnabled else { return }
+            AuroraMotion.perform(AuroraMotion.smooth, reduceMotion: reduceMotion) {
                 currentIndex = (currentIndex + 1) % videos.count
             }
         }
-        .alert("未能保存片单", isPresented: Binding(
+        .alert("hero.watchlist_error_title".localized, isPresented: Binding(
             get: { watchlistError != nil },
             set: { if !$0 { watchlistError = nil } }
         )) {
-            Button("好", role: .cancel) { watchlistError = nil }
+            Button("common.ok".localized, role: .cancel) { watchlistError = nil }
         } message: {
-            Text(watchlistError ?? "请稍后重试。")
+            Text(watchlistError ?? "hero.try_again_later".localized)
         }
     }
 
@@ -113,7 +120,6 @@ public struct HeroBanner: View {
     }
 
     public static func presentationStyle(imagePixelSize: CGSize, containerSize: CGSize) -> PresentationStyle {
-        // 顶部 Hero 海报统一全幅铺满（与 .fill 居中裁切一致），避免横图退化为局部小卡片
         return .fullBleed
     }
 
@@ -121,7 +127,6 @@ public struct HeroBanner: View {
     private func heroSlide(for videoItem: VideoItem, pull: CGFloat) -> some View {
         let targetUrl = videoItem.heroCoverUrl ?? videoItem.coverUrl
         ZStack(alignment: .bottom) {
-            // 背景封面海报：所有横图/竖图统一全幅铺满顶部视口（居中 .fill 裁切，边缘无留白）
             Color.clear
                 .overlay(
                     AuroraCoverImage(
@@ -139,10 +144,9 @@ public struct HeroBanner: View {
                 .offset(y: -pull)
                 .clipped()
 
-            // 多层渐变可读性遮罩（Apple TV 自然五阶衰减，无痕融合画布底色）
             VStack(spacing: 0) {
                 LinearGradient(
-                    colors: [Color.black.opacity(0.7), Color.clear],
+                    colors: [Color.black.opacity(0.65), Color.clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -153,9 +157,9 @@ public struct HeroBanner: View {
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: 0.0),
-                        .init(color: AuroraColor.canvas.opacity(0.15), location: 0.40),
-                        .init(color: AuroraColor.canvas.opacity(0.55), location: 0.65),
-                        .init(color: AuroraColor.canvas.opacity(0.88), location: 0.85),
+                        .init(color: AuroraColor.canvas.opacity(0.18), location: 0.40),
+                        .init(color: AuroraColor.canvas.opacity(0.62), location: 0.68),
+                        .init(color: AuroraColor.canvas.opacity(0.90), location: 0.86),
                         .init(color: AuroraColor.canvas, location: 1.0)
                     ],
                     startPoint: .top,
@@ -166,9 +170,7 @@ public struct HeroBanner: View {
             .frame(maxWidth: .infinity, maxHeight: heroHeight + pull)
             .offset(y: -pull)
 
-            // 底部内容信息与操作区
             VStack(spacing: AuroraMetrics.spacingM) {
-                // 标题（语义样式 .title2 + .bold，自适应浅色/深色高对比度）
                 Text(videoItem.title)
                     .font(.title2)
                     .fontWeight(.bold)
@@ -178,15 +180,15 @@ public struct HeroBanner: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, AuroraMetrics.contentInset)
 
-                // 元信息行（4K · 评分 · 来源）
                 metadataView(for: videoItem)
 
-                // Apple TV 标志性三元动作按钮栏（[ 播放 ] + [ 片单 ] + [ 详情 ]）
-                HStack(spacing: AuroraMetrics.spacingM) {
-                    playButton(for: videoItem)
-                        .frame(maxWidth: formFactor.isWide ? 220 : .infinity)
-                    watchlistButton(for: videoItem)
-                    detailButton(for: videoItem)
+                GlassEffectContainer(spacing: AuroraMetrics.spacingM) {
+                    HStack(spacing: AuroraMetrics.spacingM) {
+                        playButton(for: videoItem)
+                            .frame(maxWidth: formFactor.isWide ? 220 : .infinity)
+                        watchlistButton(for: videoItem)
+                        detailButton(for: videoItem)
+                    }
                 }
                 .frame(maxWidth: DeviceLayout.heroActionsMaxWidth(for: formFactor) ?? .infinity)
                 .padding(.horizontal, AuroraMetrics.contentInset)
@@ -207,7 +209,7 @@ public struct HeroBanner: View {
                     .foregroundStyle(AuroraColor.textPrimary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(AuroraColor.surfaceCard.opacity(0.85), in: Capsule())
+                    .background(AuroraColor.surfaceCard.opacity(0.88), in: Capsule())
             }
 
             if !targetVideo.rating.isEmpty {
@@ -232,7 +234,7 @@ public struct HeroBanner: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    // Apple TV 核心：白底黑字高对比主播放胶囊
+    // Apple TV 核心：深浅色自适应高对比主播放胶囊（深色白底黑字 21:1，浅色黑底白字 17.2:1）
     private func playButton(for targetVideo: VideoItem) -> some View {
         Button {
             onPlayVideo(targetVideo)
@@ -244,44 +246,42 @@ public struct HeroBanner: View {
                     .font(.headline.weight(.bold))
             }
             .frame(maxWidth: .infinity, minHeight: 46)
-            .background(Color.white, in: Capsule())
-            .foregroundStyle(Color.black)
+            .background(AuroraColor.textPrimary, in: Capsule())
+            .foregroundStyle(AuroraColor.canvas)
         }
+        .auroraZoomSource("video:\(targetVideo.id)")
         .buttonStyle(AppleSpringCardButtonStyle())
-        .hoverEffect(.highlight)
     }
 
-    // Apple TV 次要操作：毛玻璃片单胶囊
+    // Apple TV 次要操作：iOS 27 原生 Liquid Glass 片单胶囊（消除手写黑灰叠加）
     private func watchlistButton(for targetVideo: VideoItem) -> some View {
-        Button {
+        let isSaved = watchlist.contains(targetVideo)
+        return Button {
             do {
-                try watchlist.setBookmarked(!watchlist.contains(targetVideo), for: targetVideo)
+                try watchlist.setBookmarked(!isSaved, for: targetVideo)
             } catch {
                 watchlistError = error.localizedDescription
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: watchlist.contains(targetVideo) ? "checkmark" : "plus")
+                Image(systemName: isSaved ? "checkmark" : "plus")
                     .font(.headline)
-                Text(watchlist.contains(targetVideo) ? "watchlist.in_list".localized : "home.watchlist".localized)
+                Text(isSaved ? "watchlist.in_list".localized : "home.watchlist".localized)
                     .font(.headline.weight(.semibold))
+                    .lineLimit(1)
             }
-            .frame(minHeight: 46)
-            .padding(.horizontal, 16)
-            .background(.ultraThinMaterial, in: Capsule())
-            .background(Color.black.opacity(0.35), in: Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
-            )
-            .foregroundStyle(.white)
+            .frame(minHeight: 34)
+            .padding(.horizontal, 6)
+            .fixedSize(horizontal: true, vertical: false)
         }
-        .buttonStyle(AppleSpringCardButtonStyle())
+        .buttonStyle(.glass)
+        .buttonBorderShape(.capsule)
+        .tint(isSaved ? AuroraColor.brandLabel : AuroraColor.textPrimary)
         .hoverEffect(.highlight)
-        .accessibilityHint(watchlist.contains(targetVideo) ? "从我的片单移除" : "添加到我的片单")
+        .accessibilityHint(isSaved ? "hero.remove_hint".localized : "hero.add_hint".localized)
     }
 
-    // Apple TV 详情圆形胶囊
+    // Apple TV 详情圆形原生 Liquid Glass 胶囊
     private func detailButton(for targetVideo: VideoItem) -> some View {
         Button {
             onDetailVideo(targetVideo)
@@ -289,16 +289,11 @@ public struct HeroBanner: View {
             Image(systemName: "info.circle")
                 .font(.title3)
                 .frame(width: 46, height: 46)
-                .background(.ultraThinMaterial, in: .circle)
-                .background(Color.black.opacity(0.35), in: .circle)
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
-                )
-                .foregroundStyle(.white)
         }
-        .buttonStyle(AppleSpringCardButtonStyle())
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .tint(AuroraColor.textPrimary)
         .hoverEffect(.highlight)
-        .accessibilityLabel("查看详情")
+        .accessibilityLabel("hero.details_a11y".localized)
     }
 }

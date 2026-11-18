@@ -6,6 +6,7 @@ public struct ForumPostDetailView: View {
     public let post: ForumPostItem
     public let onDismiss: (() -> Void)?
     @ObservedObject private var imageSaver = ForumImageSaver.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
     @State private var loadedPost: ForumPostItem?
     @State private var loadError: String?
     @State private var isLoading = false
@@ -14,6 +15,7 @@ public struct ForumPostDetailView: View {
     @State private var showPhotoPermissionAlert = false
     @State private var showOriginalPostSafari = false
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(post: ForumPostItem, onDismiss: (() -> Void)? = nil) {
         self.post = post
@@ -43,6 +45,7 @@ public struct ForumPostDetailView: View {
                     .font(.title2.bold())
                     .foregroundStyle(AuroraColor.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
 
                 metadata
 
@@ -52,16 +55,16 @@ public struct ForumPostDetailView: View {
                 if let batch = activeBatchProgress {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Label("正在下载论坛图片 \(batch.completed) / \(batch.total)", systemImage: "arrow.down.circle.fill")
+                            Label("forum.downloading_images".localized(batch.completed, batch.total), systemImage: "arrow.down.circle.fill")
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AuroraColor.brand)
+                                .foregroundStyle(AuroraColor.brandLabel)
                             Spacer()
                             Text("\(Int(Double(batch.completed) / Double(max(1, batch.total)) * 100))%")
                                 .font(.caption.monospacedDigit().bold())
                                 .foregroundStyle(AuroraColor.textSecondary)
                         }
                         ProgressView(value: Double(batch.completed), total: Double(max(1, batch.total)))
-                            .tint(AuroraColor.brand)
+                            .tint(AuroraColor.brandSolid)
                     }
                     .padding(AuroraMetrics.spacingM)
                     .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius))
@@ -72,19 +75,23 @@ public struct ForumPostDetailView: View {
                 }
 
                 if isLoading {
-                    ProgressView("正在加载帖子正文…")
+                    ProgressView("forum.loading_body".localized)
                         .frame(maxWidth: .infinity)
                 } else if let loadError {
                     ContentUnavailableView {
-                        Label("正文加载失败", systemImage: "wifi.exclamationmark")
+                        Label("forum.body_failed".localized, systemImage: "wifi.exclamationmark")
                     } description: {
                         Text(loadError)
                     } actions: {
-                        Button("重试", systemImage: "arrow.clockwise") { Task { await loadDetail() } }
+                        Button("common.retry".localized, systemImage: "arrow.clockwise") { Task { await loadDetail() } }
                             .buttonStyle(.borderedProminent)
                     }
                 } else if displayPost.contentText.isEmpty && displayPost.contentImageUrls.isEmpty {
-                    ContentUnavailableView("正文暂不可用", systemImage: "doc.text", description: Text("论坛源没有返回帖子正文。"))
+                    ContentUnavailableView(
+                        "forum.body_unavailable".localized,
+                        systemImage: "doc.text",
+                        description: Text("forum.body_unavailable_desc".localized)
+                    )
                 } else if !displayPost.contentText.isEmpty {
                     Text(displayPost.contentText)
                         .font(.body)
@@ -115,6 +122,7 @@ public struct ForumPostDetailView: View {
             .padding(AuroraMetrics.contentInset)
             .frame(maxWidth: 720, alignment: .leading)
             .frame(maxWidth: .infinity)
+            .safeAreaPadding(.bottom, AuroraMetrics.spacingXXL)
         }
         .background(AuroraColor.canvas)
         .overlay(alignment: .bottom) {
@@ -124,91 +132,19 @@ public struct ForumPostDetailView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 10)
-                    .background(Color.black.opacity(0.84), in: Capsule())
+                    .glassEffect(.regular, in: .capsule)
+                    .environment(\.colorScheme, .dark)
                     .padding(.bottom, 24)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(.opacity)
             }
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.85), value: saveFeedbackMessage)
+        .animation(AuroraMotion.smooth(reduceMotion: reduceMotion), value: saveFeedbackMessage)
         .navigationTitle(post.boardName)
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .task(id: post.id) { await loadDetail() }
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: { closeDetail() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .accessibilityLabel("返回")
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 8) {
-                    if !detailImageURLs.isEmpty {
-                        Button {
-                            Task {
-                                let urls = detailImageURLs
-                                let result = await imageSaver.saveAllImages(
-                                    urls,
-                                    referer: post.threadUrl,
-                                    postKey: post.compositeID
-                                )
-                                if result.succeeded == 0 {
-                                    showFeedback("图片下载失败，请检查网络连接")
-                                } else if result.savedToPhotoLibraryCount > 0 {
-                                    showFeedback("已保存 \(result.succeeded)/\(result.total) 张原图到相册与文档")
-                                } else {
-                                    showFeedback("已缓存 \(result.succeeded)/\(result.total) 张原图到本地文档")
-                                }
-                                if result.photoPermissionDenied {
-                                    showPhotoPermissionAlert = true
-                                }
-                            }
-                        } label: {
-                            if let batch = activeBatchProgress {
-                                HStack(spacing: 4) {
-                                    ProgressView()
-                                        .controlSize(.mini)
-                                    Text("\(batch.completed)/\(batch.total)")
-                                        .font(.caption.monospacedDigit().bold())
-                                }
-                            } else {
-                                Label("下载图片(\(detailImageURLs.count))", systemImage: "arrow.down.circle")
-                                    .font(.caption.weight(.semibold))
-                            }
-                        }
-                        .disabled(activeBatchProgress != nil)
-                        .accessibilityLabel("下载本帖全部 \(detailImageURLs.count) 张图片")
-                    }
-
-                    if originalThreadURL != nil {
-                        Button {
-                            showOriginalPostSafari = true
-                        } label: {
-                            Image(systemName: "safari")
-                                .font(.subheadline.weight(.semibold))
-                                .frame(width: 36, height: 36)
-                        }
-                        .accessibilityLabel("forum.original_post".localized)
-                    }
-
-                    Text(post.boardName)
-                        .font(.caption.bold())
-                        .foregroundStyle(post.boardName.contains("草榴") ? AuroraColor.forestGreen : AuroraColor.brand)
-                        .padding(.horizontal, AuroraMetrics.spacingS)
-                        .padding(.vertical, AuroraMetrics.spacingXS)
-                        .background(
-                            (post.boardName.contains("草榴") ? AuroraColor.forestGreen : AuroraColor.brand).opacity(0.18),
-                            in: .capsule
-                        )
-                        .accessibilityHidden(true)
-                }
-            }
+            detailToolbarContent
         }
         .sheet(isPresented: $showOriginalPostSafari) {
             if let url = originalThreadURL {
@@ -216,15 +152,15 @@ public struct ForumPostDetailView: View {
                     .ignoresSafeArea()
             }
         }
-        .alert("无法写入系统相册", isPresented: $showPhotoPermissionAlert) {
-            Button("前往设置") {
+        .alert("forum.photo_perm_title".localized, isPresented: $showPhotoPermissionAlert) {
+            Button("common.open_settings".localized) {
                 if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(settingsURL)
                 }
             }
             Button("common.cancel".localized, role: .cancel) {}
         } message: {
-            Text("原图已缓存至应用本地文档。若需同步存入系统相册，请在设置中开启「照片（仅添加）」权限。")
+            Text("forum.photo_perm_desc".localized)
         }
         .enableSwipeBack {
             closeDetail()
@@ -232,6 +168,97 @@ public struct ForumPostDetailView: View {
         .onDisappear {
             feedbackDismissTask?.cancel()
         }
+    }
+
+    @ToolbarContentBuilder
+    private var detailToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button(action: { closeDetail() }) {
+                Image(systemName: "chevron.left")
+                    .font(.body.weight(.bold))
+                    .foregroundStyle(.primary)
+                    .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .hoverEffect(.highlight)
+            .accessibilityLabel("common.back".localized)
+        }
+
+        if #available(iOS 27.0, *) {
+            if !detailImageURLs.isEmpty {
+                ToolbarItem(placement: .topBarPinnedTrailing) {
+                    saveAllImagesButton
+                }
+            }
+            if originalThreadURL != nil {
+                ToolbarOverflowMenu {
+                    Button {
+                        showOriginalPostSafari = true
+                    } label: {
+                        Label("forum.original_post".localized, systemImage: "safari")
+                    }
+                }
+            }
+        } else {
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 8) {
+                    if !detailImageURLs.isEmpty {
+                        saveAllImagesButton
+                    }
+                    if originalThreadURL != nil {
+                        Button {
+                            showOriginalPostSafari = true
+                        } label: {
+                            Image(systemName: "safari")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                                .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("forum.original_post".localized)
+                    }
+                }
+            }
+        }
+    }
+
+    private var saveAllImagesButton: some View {
+        Button {
+            Task {
+                let urls = detailImageURLs
+                let result = await imageSaver.saveAllImages(
+                    urls,
+                    referer: post.threadUrl,
+                    postKey: post.compositeID
+                )
+                if result.succeeded == 0 {
+                    showFeedback("forum.img_download_failed".localized)
+                } else if result.savedToPhotoLibraryCount > 0 {
+                    showFeedback("forum.img_saved_photos".localized(result.succeeded, result.total))
+                } else {
+                    showFeedback("forum.img_saved_docs".localized(result.succeeded, result.total))
+                }
+                if result.photoPermissionDenied {
+                    showPhotoPermissionAlert = true
+                }
+            }
+        } label: {
+            if let batch = activeBatchProgress {
+                HStack(spacing: 4) {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text("\(batch.completed)/\(batch.total)")
+                        .font(.caption.monospacedDigit().bold())
+                }
+                .frame(minHeight: AuroraMetrics.minTouchTarget)
+            } else {
+                Label("forum.download_all_btn".localized(detailImageURLs.count), systemImage: "arrow.down.circle")
+                    .font(.caption.weight(.semibold))
+                    .frame(minHeight: AuroraMetrics.minTouchTarget)
+            }
+        }
+        .disabled(activeBatchProgress != nil)
+        .accessibilityLabel("forum.download_all_a11y".localized(detailImageURLs.count))
     }
 
     private func showFeedback(_ message: String) {
@@ -283,7 +310,7 @@ public struct ForumPostDetailView: View {
             HStack(alignment: .top, spacing: AuroraMetrics.spacingM) {
                 if let author = post.author {
                     Circle()
-                        .fill(AuroraColor.brand.opacity(0.25))
+                        .fill(AuroraColor.brand.opacity(0.22))
                         .frame(width: 36, height: 36)
                         .overlay {
                             Text(String(author.prefix(1)))
@@ -294,10 +321,22 @@ public struct ForumPostDetailView: View {
                 }
 
                 VStack(alignment: .leading, spacing: AuroraMetrics.spacingXS) {
-                    if let author = post.author {
-                        Text(author)
-                            .font(.subheadline.bold())
-                            .foregroundStyle(AuroraColor.textPrimary)
+                    HStack(spacing: AuroraMetrics.spacingS) {
+                        if let author = post.author {
+                            Text(author)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(AuroraColor.textPrimary)
+                        }
+                        let isT66y = post.boardName.contains("草榴") || post.boardName.contains("达盖尔") || post.fid == 100 || post.fid == 16
+                        Text(post.boardName)
+                            .font(.caption2.bold())
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                isT66y ? AuroraColor.forestGreen : AuroraColor.accentRed,
+                                in: .capsule
+                            )
                     }
 
                     if post.postTime != nil || post.views != nil || post.replies != nil {
@@ -305,8 +344,8 @@ public struct ForumPostDetailView: View {
                             metadataLine
                             VStack(alignment: .leading, spacing: AuroraMetrics.spacingXS) {
                                 if let postTime = post.postTime { Text(postTime) }
-                                if let views = post.views { Text("\(views) 次浏览") }
-                                if let replies = post.replies { Text("\(replies) 条回复") }
+                                if let views = post.views { Text("forum.views_count".localized(views)) }
+                                if let replies = post.replies { Text("forum.replies_detail".localized(replies)) }
                             }
                         }
                         .font(.caption)
@@ -324,11 +363,11 @@ public struct ForumPostDetailView: View {
             }
             if let views = post.views {
                 if post.postTime != nil { Text("·") }
-                Text("\(views) 次浏览")
+                Text("forum.views_count".localized(views))
             }
             if let replies = post.replies {
                 if post.postTime != nil || post.views != nil { Text("·") }
-                Text("\(replies) 条回复")
+                Text("forum.replies_detail".localized(replies))
             }
         }
     }
@@ -381,43 +420,46 @@ private struct ForumPostImage: View {
                                         .tint(.white)
                                 } else if isSaved {
                                     Image(systemName: "checkmark.circle.fill")
-                                        .font(.system(size: 18, weight: .bold))
+                                        .font(.body.weight(.bold))
                                         .foregroundStyle(.green)
                                 } else {
                                     Image(systemName: "arrow.down.to.line")
-                                        .font(.system(size: 15, weight: .bold))
+                                        .font(.subheadline.weight(.bold))
                                         .foregroundStyle(.white)
                                 }
                             }
                             .frame(width: 40, height: 40)
-                            .background(.ultraThinMaterial, in: Circle())
-                            .background(Color.black.opacity(0.35), in: Circle())
-                            .overlay(Circle().stroke(Color.white.opacity(0.22), lineWidth: 0.75))
+                            .glassEffect(.clear.interactive(), in: .circle)
+                            .environment(\.colorScheme, .dark)
                             .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
                             .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .hoverEffect(.highlight)
                         .disabled(isSaving)
                         .padding(6)
-                        .accessibilityLabel(isSaved ? "原图已保存" : "下载原图")
+                        .accessibilityLabel(isSaved ? "forum.img_saved_a11y".localized : "forum.img_download_a11y".localized)
                     }
                     .contextMenu {
                         Button {
                             triggerSave()
                         } label: {
-                            Label(isSaved ? "重新保存原图" : "保存原图到相册", systemImage: "square.and.arrow.down")
+                            Label(
+                                isSaved ? "forum.img_resave".localized : "forum.img_save_photos".localized,
+                                systemImage: "square.and.arrow.down"
+                            )
                         }
                         if let localURL = saver.savedLocalURLs[url.absoluteString] {
                             ShareLink(item: localURL) {
-                                Label("分享原图", systemImage: "square.and.arrow.up")
+                                Label("forum.img_share".localized, systemImage: "square.and.arrow.up")
                             }
                         }
                         Button {
                             UIPasteboard.general.string = url.absoluteString
-                            onSaveCompleted("已复制图片链接", false)
+                            onSaveCompleted("forum.img_link_copied".localized, false)
                         } label: {
-                            Label("复制图片链接", systemImage: "doc.on.doc")
+                            Label("forum.img_copy_link".localized, systemImage: "doc.on.doc")
                         }
                     }
             } else if didFail {
@@ -425,15 +467,15 @@ private struct ForumPostImage: View {
                     Image(systemName: "photo.badge.exclamationmark")
                         .font(.title2)
                         .foregroundStyle(AuroraColor.textSecondary)
-                    Text("图片无法加载")
+                    Text("forum.img_load_failed".localized)
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(AuroraColor.textPrimary)
-                    Button("重试", systemImage: "arrow.clockwise") {
+                    Button("common.retry".localized, systemImage: "arrow.clockwise") {
                         didFail = false
                         reloadToken = UUID()
                     }
                     .buttonStyle(.bordered)
-                    .tint(AuroraColor.brand)
+                    .tint(AuroraColor.brandLabel)
                 }
                 .frame(maxWidth: .infinity, minHeight: 160)
                 .padding(AuroraMetrics.spacingM)
@@ -458,9 +500,9 @@ private struct ForumPostImage: View {
             do {
                 let outcome = try await saver.saveImage(urlString: url.absoluteString, referer: referer)
                 if outcome.savedToPhotoLibrary {
-                    onSaveCompleted("图片已保存到系统相册", false)
+                    onSaveCompleted("forum.img_saved_toast".localized, false)
                 } else {
-                    onSaveCompleted("已保存到本地文档", outcome.photoPermissionDenied)
+                    onSaveCompleted("forum.img_saved_local_toast".localized, outcome.photoPermissionDenied)
                 }
             } catch {
                 onSaveCompleted(error.localizedDescription, false)

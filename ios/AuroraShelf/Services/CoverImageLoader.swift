@@ -151,60 +151,56 @@ public actor CoverImageLoader {
         let aesKey = self.aesKey
         let aesIv = self.aesIv
         let task = Task<UIImage?, Never> {
-            do {
-                let initialReferer = requestReferer ?? baseURL?.absoluteString
-                let request = Self.imageRequest(for: url, referer: initialReferer)
-                var rawData: Data?
+            let initialReferer = requestReferer ?? baseURL?.absoluteString
+            let request = Self.imageRequest(for: url, referer: initialReferer)
+            var rawData: Data?
 
-                if let (data, response) = try? await session.data(for: request),
+            if let (data, response) = try? await session.data(for: request),
+               let httpResp = response as? HTTPURLResponse,
+               (200...299).contains(httpResp.statusCode),
+               !data.isEmpty {
+                rawData = data
+            } else {
+                // 防盗链与 CDN 容灾重试：尝试无 Referer 纯净拉取，或 MissAV 旧域名 fourhoi.com 切换至 fourhoi.mrstcdn.store
+                let noRefererRequest = Self.imageRequest(for: url, referer: nil, forceNoReferer: true)
+                if let (data, response) = try? await session.data(for: noRefererRequest),
                    let httpResp = response as? HTTPURLResponse,
                    (200...299).contains(httpResp.statusCode),
                    !data.isEmpty {
                     rawData = data
-                } else {
-                    // 防盗链与 CDN 容灾重试：尝试无 Referer 纯净拉取，或 MissAV 旧域名 fourhoi.com 切换至 fourhoi.mrstcdn.store
-                    let noRefererRequest = Self.imageRequest(for: url, referer: nil, forceNoReferer: true)
-                    if let (data, response) = try? await session.data(for: noRefererRequest),
+                } else if let fallbackMissAvURL = Self.missAvFallbackURL(for: url) {
+                    let fallbackRequest = Self.imageRequest(for: fallbackMissAvURL, referer: "https://missav.media/")
+                    if let (data, response) = try? await session.data(for: fallbackRequest),
                        let httpResp = response as? HTTPURLResponse,
                        (200...299).contains(httpResp.statusCode),
                        !data.isEmpty {
                         rawData = data
-                    } else if let fallbackMissAvURL = Self.missAvFallbackURL(for: url) {
-                        let fallbackRequest = Self.imageRequest(for: fallbackMissAvURL, referer: "https://missav.media/")
-                        if let (data, response) = try? await session.data(for: fallbackRequest),
-                           let httpResp = response as? HTTPURLResponse,
-                           (200...299).contains(httpResp.statusCode),
-                           !data.isEmpty {
-                            rawData = data
-                        }
                     }
                 }
+            }
 
-                guard let data = rawData, !data.isEmpty else {
-                    return nil
-                }
-
-                var finalData = data
-                var parsedImage: UIImage? = Self.decodeForDisplay(data)
-
-                // 檢查是否為 AES 加密數據（91動漫/黃果二進制加密封面）
-                if parsedImage == nil && (Self.requiresAESDecryption(url: url) || Self.isPossibleEncryptedImage(data)) {
-                    if let decrypted = Self.decryptAES128CBC(data: data, key: aesKey, iv: aesIv),
-                       let decImg = Self.decodeForDisplay(decrypted) {
-                        parsedImage = decImg
-                        finalData = decrypted
-                    }
-                }
-
-                guard let image = parsedImage else {
-                    return nil
-                }
-
-                try? finalData.write(to: diskPath, options: .atomic)
-                return image
-            } catch {
+            guard let data = rawData, !data.isEmpty else {
                 return nil
             }
+
+            var finalData = data
+            var parsedImage: UIImage? = Self.decodeForDisplay(data)
+
+            // 檢查是否為 AES 加密數據（91動漫/黃果二進制加密封面）
+            if parsedImage == nil && (Self.requiresAESDecryption(url: url) || Self.isPossibleEncryptedImage(data)) {
+                if let decrypted = Self.decryptAES128CBC(data: data, key: aesKey, iv: aesIv),
+                   let decImg = Self.decodeForDisplay(decrypted) {
+                    parsedImage = decImg
+                    finalData = decrypted
+                }
+            }
+
+            guard let image = parsedImage else {
+                return nil
+            }
+
+            try? finalData.write(to: diskPath, options: .atomic)
+            return image
         }
 
         inFlightTasks[cacheKey] = (id: taskToken, task: task)

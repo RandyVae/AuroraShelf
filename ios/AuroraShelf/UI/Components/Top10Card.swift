@@ -11,11 +11,12 @@ public struct Top10Card: View {
     public let onSelect: () -> Void
     public var onDetail: (() -> Void)? = nil
 
+    @Environment(\.auroraContainerSize) private var containerSize
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var formFactor: DeviceFormFactor {
-        DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
+        DeviceLayout.resolveCurrent(containerSize: containerSize, horizontalSizeClass: horizontalSizeClass)
     }
 
     private var dynamicRankSize: CGFloat {
@@ -90,7 +91,6 @@ public struct Top10Card: View {
                                 .stroke(AuroraColor.hairline, lineWidth: 1)
                         )
 
-                        // 评分胶囊
                         if !video.rating.isEmpty {
                             HStack(spacing: 3) {
                                 Image(systemName: "star.fill")
@@ -99,11 +99,12 @@ public struct Top10Card: View {
                                 Text(video.rating)
                                     .font(.caption2)
                                     .fontWeight(.bold)
-                                    .foregroundStyle(.primary)
+                                    .foregroundStyle(.white)
                             }
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(.regularMaterial, in: Capsule())
+                            .background(Color.black.opacity(0.65), in: Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
                             .padding(AuroraMetrics.spacingS)
                             .allowsHitTesting(false)
                         }
@@ -111,9 +112,9 @@ public struct Top10Card: View {
                 }
                 .contentShape(Rectangle())
             }
+            .auroraZoomSource("video:\(video.id)")
             .buttonStyle(AppleSpringCardButtonStyle())
-            .hoverEffect(.lift)
-            .accessibilityLabel("排行第 \(rank)，播放 \(video.title)")
+            .accessibilityLabel("card.top10_a11y".localized(rank, video.title))
 
             // 标题文本（与分类货架卡片保持完全对齐的排版）
             Button(action: onSelect) {
@@ -155,7 +156,7 @@ public struct Top10Card: View {
                 Button {
                     onDetail()
                 } label: {
-                    Label("查看详情", systemImage: "info.circle")
+                    Label("hero.details_a11y".localized, systemImage: "info.circle")
                 }
             }
         } preview: {

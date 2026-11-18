@@ -1,9 +1,9 @@
 import SwiftUI
-import UIKit
 
 /// Apple TV / iOS 27 原生风格无旋钮流体膨胀液态胶囊进度条（Fluid Expanding Capsule Scrubber）
 /// - 常态为 6pt 半透明流光胶囊轨（含缓冲进度轨与纯白已播进度）；
-/// - 触控拖拽瞬间整条轨道弹性膨胀至 12~14pt 高亮液态胶囊，上方浮现 `Glass.clear` 单宽时间戳预览气泡。
+/// - 触控拖拽瞬间整条轨道弹性膨胀至 12~14pt 高亮液态胶囊，上方浮现 `Glass.clear` 单宽时间戳预览气泡；
+/// - 使用 SwiftUI `.sensoryFeedback(.selection, trigger:)` 替代值类型 View 内重复分配 `UISelectionFeedbackGenerator`，并保证 44pt 最小触控热区。
 public struct PlayerScrubberBar: View {
     @Binding public var currentTime: Double
     public let bufferedTime: Double
@@ -11,11 +11,12 @@ public struct PlayerScrubberBar: View {
     public let onSeek: (Double) -> Void
     public var onEditingChanged: ((Bool) -> Void)?
 
+    @Environment(\.auroraContainerSize) private var containerSize
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isScrubbing: Bool = false
     @State private var scrubProgress: CGFloat = 0
     @State private var lastHapticStep: Int = 0
-
-    private let hapticGenerator = UISelectionFeedbackGenerator()
 
     public init(
         currentTime: Binding<Double>,
@@ -39,9 +40,12 @@ public struct PlayerScrubberBar: View {
     }
 
     public var body: some View {
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
-        let restingHeight: CGFloat = isPad ? 7 : 6
-        let activeHeight: CGFloat = isPad ? 14 : 12
+        let isWide = DeviceLayout.resolveCurrent(
+            containerSize: containerSize,
+            horizontalSizeClass: horizontalSizeClass
+        ).isWide
+        let restingHeight: CGFloat = isWide ? 7 : 6
+        let activeHeight: CGFloat = isWide ? 14 : 12
         let trackHeight: CGFloat = isScrubbing ? activeHeight : restingHeight
 
         GeometryReader { geo in
@@ -60,7 +64,6 @@ public struct PlayerScrubberBar: View {
             let activeX = max(0, min(width * progress, width))
 
             ZStack(alignment: .leading) {
-                // 1. 液态玻璃底轨（半透明高透胶囊底衬）
                 Capsule()
                     .fill(Color.white.opacity(isScrubbing ? 0.30 : 0.22))
                     .overlay(
@@ -69,14 +72,12 @@ public struct PlayerScrubberBar: View {
                     )
                     .frame(height: trackHeight)
 
-                // 2. 已缓冲轨道
                 if bufferedFraction > 0 {
                     Capsule()
                         .fill(Color.white.opacity(isScrubbing ? 0.42 : 0.34))
                         .frame(width: max(trackHeight, width * bufferedFraction), height: trackHeight)
                 }
 
-                // 3. 已播放流光高亮胶囊轨（Apple TV 纯白高对比流体柱，拖拽时微光扩散）
                 if progress > 0 {
                     Capsule()
                         .fill(Color.white.opacity(isScrubbing ? 1.0 : 0.92))
@@ -84,29 +85,29 @@ public struct PlayerScrubberBar: View {
                         .shadow(color: Color.white.opacity(isScrubbing ? 0.42 : 0.0), radius: 6, x: 0, y: 0)
                 }
 
-                // 4. Apple TV 标志性 `Glass.clear` 悬浮时间戳气泡
                 if isScrubbing {
                     Text(formatTime(displayTime))
-                        .font(.system(size: isPad ? 13 : 12, weight: .bold, design: .monospaced))
+                        .font(.system(.caption, design: .monospaced).weight(.bold))
+                        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
                         .glassEffect(.clear, in: .capsule)
                         .shadow(color: .black.opacity(0.28), radius: 8, x: 0, y: 3)
                         .offset(x: max(0, min(activeX - 34, max(0, width - 68))), y: -34)
-                        .transition(.scale(scale: 0.86).combined(with: .opacity))
+                        .transition(.opacity)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isScrubbing)
+            .animation(AuroraMotion.quick(reduceMotion: reduceMotion), value: isScrubbing)
+            .sensoryFeedback(.selection, trigger: lastHapticStep)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
                         if !isScrubbing {
                             isScrubbing = true
                             onEditingChanged?(true)
-                            hapticGenerator.prepare()
                         }
                         let clampedX = min(max(value.location.x, 0), width)
                         let percent = width > 0 ? clampedX / width : 0
@@ -115,7 +116,6 @@ public struct PlayerScrubberBar: View {
                         let currentStep = Int(percent * 100)
                         if currentStep != lastHapticStep {
                             lastHapticStep = currentStep
-                            hapticGenerator.selectionChanged()
                         }
                     }
                     .onEnded { value in
@@ -129,7 +129,7 @@ public struct PlayerScrubberBar: View {
                     }
             )
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("播放进度条")
+            .accessibilityLabel("player.scrubber_a11y".localized)
             .accessibilityValue(formatTime(displayTime))
             .accessibilityAdjustableAction { direction in
                 let step = 10.0
@@ -143,7 +143,7 @@ public struct PlayerScrubberBar: View {
                 }
             }
         }
-        .frame(height: isPad ? 40 : 34)
+        .frame(height: AuroraMetrics.minTouchTarget)
     }
 
     private func formatTime(_ seconds: Double) -> String {

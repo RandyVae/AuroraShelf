@@ -5,7 +5,8 @@ struct LiveChatSheet: View {
     let stream: LiveStreamItem
     @Environment(\.dismiss) private var dismiss
     @State private var reloadID = UUID()
-    @State private var chatStatus = "正在连接官方聊天室…"
+    @State private var chatStatus = "live.chat_connecting".localized
+    @State private var isChatConnected = false
 
     var body: some View {
         NavigationStack {
@@ -14,7 +15,7 @@ struct LiveChatSheet: View {
                     VStack(spacing: 0) {
                         HStack(spacing: 8) {
                             Circle()
-                                .fill(chatStatus.hasPrefix("已连接") ? .green : .secondary)
+                                .fill(isChatConnected ? .green : .secondary)
                                 .frame(width: 8, height: 8)
                             Text(chatStatus)
                                 .font(.caption)
@@ -26,13 +27,14 @@ struct LiveChatSheet: View {
                         .padding(.vertical, 8)
                         .background(.bar)
 
-                        LiveRoomWebView(roomURL: roomURL, reloadID: reloadID) { status in
+                        LiveRoomWebView(roomURL: roomURL, reloadID: reloadID) { status, connected in
                             chatStatus = status
+                            isChatConnected = connected
                         }
                     }
                     .ignoresSafeArea(edges: .bottom)
                 } else {
-                    ContentUnavailableView("聊天室地址无效", systemImage: "bubble.left.and.bubble.right")
+                    ContentUnavailableView("live.chat_invalid_url".localized, systemImage: "bubble.left.and.bubble.right")
                 }
             }
             .navigationTitle("\(stream.username) · \("live.chat".localized)")
@@ -42,8 +44,8 @@ struct LiveChatSheet: View {
                     Button("common.close".localized, systemImage: "xmark") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("重新加载", systemImage: "arrow.clockwise") { reloadID = UUID() }
-                        .accessibilityLabel("重新加载官方聊天室")
+                    Button("common.reload".localized, systemImage: "arrow.clockwise") { reloadID = UUID() }
+                        .accessibilityLabel("live.chat_reload_a11y".localized)
                 }
             }
         }
@@ -53,7 +55,7 @@ struct LiveChatSheet: View {
 private struct LiveRoomWebView: UIViewRepresentable {
     let roomURL: URL
     let reloadID: UUID
-    let onStatus: @MainActor (String) -> Void
+    let onStatus: @MainActor (String, Bool) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onStatus: onStatus) }
 
@@ -89,7 +91,6 @@ private struct LiveRoomWebView: UIViewRepresentable {
             }
         }
 
-        // 移除年龄门禁并强制静音页面内视频/音频节点，避免与主直播播放器重音
         let autoAcceptAndMuteSource = """
         (() => {
             const muteMedia = () => {
@@ -139,10 +140,10 @@ private struct LiveRoomWebView: UIViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate {
         var reloadID = UUID()
-        private let onStatus: @MainActor (String) -> Void
+        private let onStatus: @MainActor (String, Bool) -> Void
         nonisolated(unsafe) private var pollTimer: Timer?
 
-        init(onStatus: @escaping @MainActor (String) -> Void) {
+        init(onStatus: @escaping @MainActor (String, Bool) -> Void) {
             self.onStatus = onStatus
         }
 
@@ -156,7 +157,7 @@ private struct LiveRoomWebView: UIViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            onStatus("已连接 · 正在监听消息")
+            onStatus("live.chat_listening".localized, true)
             webView.pauseAllMediaPlayback()
             pollTimer?.invalidate()
             pollTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self, weak webView] _ in
@@ -174,28 +175,21 @@ private struct LiveRoomWebView: UIViewRepresentable {
 
                       const selectors = '[class*=message],[class*=chat],[data-testid*=message],[data-testid*=chat]';
                       const nodes = document.querySelectorAll(selectors).length;
-                      const text = (document.body?.innerText || '').length;
-                      return JSON.stringify({nodes, text});
+                      return JSON.stringify({nodes});
                     })()
                     """
-                    webView.evaluateJavaScript(script) { [weak self] result, _ in
-                        let jsonStr = result as? String
-                        Task { @MainActor [weak self] in
-                            guard let self,
-                                  let json = jsonStr,
-                                  let data = json.data(using: .utf8),
-                                  let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                                  let nodes = payload["nodes"] as? Int,
-                                  let text = payload["text"] as? Int else { return }
-                            self.onStatus("已连接 · 实时消息节点 \(nodes) · 文本 \(text) 字")
-                        }
+                    if let jsonStr = (try? await webView.evaluateJavaScript(script)) as? String,
+                       let data = jsonStr.data(using: .utf8),
+                       let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let nodes = payload["nodes"] as? Int {
+                        self.onStatus(String(format: "live.chat_nodes_status".localized, nodes), true)
                     }
                 }
             }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            onStatus("聊天室加载失败，可重新加载")
+            onStatus("live.chat_load_failed".localized, false)
         }
 
         func webView(

@@ -1,19 +1,35 @@
 import SwiftUI
 
 public enum OfflineTab: String, CaseIterable, Identifiable {
-    case video = "视频"
-    case comic = "漫画"
-    
+    case video = "video"
+    case comic = "comic"
+
     public var id: String { rawValue }
+
+    public var displayTitle: String {
+        switch self {
+        case .video: return "downloads.tab_video".localized
+        case .comic: return "downloads.tab_comic".localized
+        }
+    }
 }
 
 public enum OfflineStatusFilter: String, CaseIterable, Identifiable {
-    case all = "全部"
-    case downloading = "下载中"
-    case completed = "已完成"
-    case failed = "失败"
+    case all = "all"
+    case downloading = "downloading"
+    case completed = "completed"
+    case failed = "failed"
 
     public var id: String { rawValue }
+
+    public var displayTitle: String {
+        switch self {
+        case .all: return "home.all".localized
+        case .downloading: return "downloads.filter_downloading".localized
+        case .completed: return "downloads.filter_completed".localized
+        case .failed: return "downloads.filter_failed".localized
+        }
+    }
 
     func matches(videoStatus: OfflineDownloadStatus) -> Bool {
         switch self {
@@ -42,15 +58,17 @@ public enum OfflineStatusFilter: String, CaseIterable, Identifiable {
 public struct OfflineDownloadsScreen: View {
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
     @ObservedObject private var comicDownloadManager = ComicDownloadManager.shared
+    @ObservedObject private var locManager = LocalizationManager.shared
     public let showCloseButton: Bool
     public let onPlayVideo: (VideoItem) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedTab: OfflineTab
     @State private var statusFilter: OfflineStatusFilter = .all
     @State private var showingClearAlert = false
     @State private var editMode: EditMode = .inactive
     @State private var selectedItemIDs = Set<String>()
-    
+
     public init(
         initialTab: OfflineTab = .video,
         showCloseButton: Bool = false,
@@ -91,174 +109,224 @@ public struct OfflineDownloadsScreen: View {
             return comicDownloadManager.chapters.filter { filter.matches(comicStatus: $0.status) }.count
         }
     }
-    
+
+    private var hasItemsInSelectedTab: Bool {
+        selectedTab == .video ? !downloadManager.items.isEmpty : !comicDownloadManager.chapters.isEmpty
+    }
+
     public var body: some View {
         VStack(spacing: 0) {
-                downloadOverviewCard
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 4)
-
-                // 分段选择器（视频 / 漫画）
-                Picker("下载类型", selection: $selectedTab) {
-                    Text("视频 (\(downloadManager.items.count))").tag(OfflineTab.video)
-                    Text("漫画 (\(comicDownloadManager.chapters.count))").tag(OfflineTab.comic)
-                }
-                .pickerStyle(.segmented)
+            downloadOverviewCard
                 .padding(.horizontal, 16)
-                .padding(.vertical, 6)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            Picker("downloads.type_picker".localized, selection: $selectedTab) {
+                Text("downloads.video_tab_count".localized(downloadManager.items.count)).tag(OfflineTab.video)
+                Text("downloads.comic_tab_count".localized(comicDownloadManager.chapters.count)).tag(OfflineTab.comic)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+            .background(AuroraColor.canvas)
+
+            statusFilterStrip
+                .padding(.bottom, 6)
                 .background(AuroraColor.canvas)
 
-                statusFilterStrip
-                    .padding(.bottom, 6)
-                    .background(AuroraColor.canvas)
-                
-                Group {
-                    switch selectedTab {
-                    case .video:
-                        if downloadManager.items.isEmpty {
-                            emptyStateView(
-                                icon: "video.slash",
-                                title: "暂无离线视频",
-                                description: "在视频二级详情页轻点「缓存」按钮，即可将视频下载至本地，无网络也能随时流畅观看。"
-                            )
-                        } else if filteredVideoItems.isEmpty {
-                            emptyStateView(
-                                icon: "line.3.horizontal.decrease.circle",
-                                title: "当前筛选无视频任务",
-                                description: "可切换上方状态筛选查看进行中、已完成或失败的视频下载记录。"
-                            )
-                        } else {
-                            videoDownloadsListView
-                        }
-                    case .comic:
-                        if comicDownloadManager.chapters.isEmpty {
-                            emptyStateView(
-                                icon: "book.closed",
-                                title: "暂无离线漫画",
-                                description: "在漫画阅读器顶栏轻点「下载」按钮，即可将单话或全本漫画离线至沙盒，断网也能秒开畅读。"
-                            )
-                        } else if filteredComicChapters.isEmpty {
-                            emptyStateView(
-                                icon: "line.3.horizontal.decrease.circle",
-                                title: "当前筛选无漫画任务",
-                                description: "可切换上方状态筛选查看进行中、已完成或失败的漫画下载记录。"
-                            )
-                        } else {
-                            comicDownloadsListView
-                        }
+            Group {
+                switch selectedTab {
+                case .video:
+                    if downloadManager.items.isEmpty {
+                        emptyStateView(
+                            icon: "video.slash",
+                            title: "downloads.empty_video_title".localized,
+                            description: "downloads.empty_video_desc".localized
+                        )
+                    } else if filteredVideoItems.isEmpty {
+                        emptyStateView(
+                            icon: "line.3.horizontal.decrease.circle",
+                            title: "downloads.empty_video_filter_title".localized,
+                            description: "downloads.empty_video_filter_desc".localized
+                        )
+                    } else {
+                        videoDownloadsListView
+                    }
+                case .comic:
+                    if comicDownloadManager.chapters.isEmpty {
+                        emptyStateView(
+                            icon: "book.closed",
+                            title: "downloads.empty_comic_title".localized,
+                            description: "downloads.empty_comic_desc".localized
+                        )
+                    } else if filteredComicChapters.isEmpty {
+                        emptyStateView(
+                            icon: "line.3.horizontal.decrease.circle",
+                            title: "downloads.empty_comic_filter_title".localized,
+                            description: "downloads.empty_comic_filter_desc".localized
+                        )
+                    } else {
+                        comicDownloadsListView
                     }
                 }
             }
-            .onChange(of: selectedTab) { _, _ in
-                editMode = .inactive
-                selectedItemIDs.removeAll()
-            }
-            .onChange(of: statusFilter) { _, _ in
-                editMode = .inactive
-                selectedItemIDs.removeAll()
-            }
-            .navigationTitle("下载与离线中心")
-            .navigationBarTitleDisplayMode(.inline)
-            .environment(\.editMode, $editMode)
-            .toolbar {
-                if showCloseButton {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("关闭") { dismiss() }
-                            .font(.body)
-                    }
+        }
+        .onChange(of: selectedTab) { _, _ in
+            editMode = .inactive
+            selectedItemIDs.removeAll()
+        }
+        .onChange(of: statusFilter) { _, _ in
+            editMode = .inactive
+            selectedItemIDs.removeAll()
+        }
+        .navigationTitle("downloads.nav_title".localized)
+        .navigationBarTitleDisplayMode(.inline)
+        .environment(\.editMode, $editMode)
+        .toolbar {
+            downloadsToolbarContent
+        }
+        .alert("downloads.clear_alert_title".localized, isPresented: $showingClearAlert) {
+            Button("common.clear".localized, role: .destructive) {
+                if selectedTab == .video {
+                    downloadManager.removeAll()
+                } else {
+                    comicDownloadManager.removeAll()
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    let hasItems = selectedTab == .video ? !downloadManager.items.isEmpty : !comicDownloadManager.chapters.isEmpty
-                    if hasItems {
-                        HStack(spacing: 12) {
-                            if editMode == .active {
-                                if !selectedItemIDs.isEmpty {
-                                    Button(role: .destructive) {
-                                        if selectedTab == .video {
-                                            for id in selectedItemIDs {
-                                                downloadManager.removeDownload(id: id)
-                                            }
-                                        } else {
-                                            for id in selectedItemIDs {
-                                                comicDownloadManager.removeDownload(id: id)
-                                            }
-                                        }
-                                        selectedItemIDs.removeAll()
-                                        editMode = .inactive
-                                    } label: {
-                                        Text("删除 (\(selectedItemIDs.count))")
-                                            .font(.body.bold())
-                                            .foregroundStyle(AuroraColor.accentRed)
-                                    }
-                                }
-                                Button("完成") {
-                                    editMode = .inactive
-                                    selectedItemIDs.removeAll()
-                                }
-                                .font(.body.bold())
-                                .foregroundStyle(AuroraColor.brand)
-                            } else {
-                                Button("编辑") {
-                                    editMode = .active
-                                }
-                                .font(.body)
-                                .foregroundStyle(AuroraColor.textPrimary)
+            }
+            Button("common.cancel".localized, role: .cancel) {}
+        } message: {
+            Text(selectedTab == .video ? "downloads.clear_video_desc".localized : "downloads.clear_comic_desc".localized)
+        }
+    }
 
-                                Button(role: .destructive) {
-                                    showingClearAlert = true
-                                } label: {
-                                    Text("清空")
-                                        .font(.body.bold())
-                                        .foregroundStyle(AuroraColor.brand)
-                                        .frame(minWidth: 44, minHeight: 44)
-                                        .contentShape(Rectangle())
-                                }
+    @ToolbarContentBuilder
+    private var downloadsToolbarContent: some ToolbarContent {
+        if showCloseButton {
+            ToolbarItem(placement: .topBarLeading) {
+                Button("common.close".localized) { dismiss() }
+                    .font(.body)
+                    .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+            }
+        }
+
+        if hasItemsInSelectedTab {
+            if #available(iOS 27.0, *) {
+                ToolbarItem(placement: .topBarPinnedTrailing) {
+                    primaryEditToolbarButton
+                }
+                ToolbarOverflowMenu {
+                    if editMode == .active, !selectedItemIDs.isEmpty {
+                        Button(role: .destructive, action: deleteSelectedItems) {
+                            Label("downloads.delete_selected".localized(selectedItemIDs.count), systemImage: "trash")
+                        }
+                    }
+                    Button(role: .destructive) {
+                        showingClearAlert = true
+                    } label: {
+                        Label("common.clear".localized, systemImage: "trash.slash")
+                    }
+                }
+            } else {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 12) {
+                        if editMode == .active, !selectedItemIDs.isEmpty {
+                            Button(role: .destructive, action: deleteSelectedItems) {
+                                Text("downloads.delete_selected".localized(selectedItemIDs.count))
+                                    .font(.body.bold())
+                                    .foregroundStyle(AuroraColor.accentRed)
+                            }
+                        }
+                        primaryEditToolbarButton
+                        if editMode != .active {
+                            Button(role: .destructive) {
+                                showingClearAlert = true
+                            } label: {
+                                Text("common.clear".localized)
+                                    .font(.body.bold())
+                                    .foregroundStyle(AuroraColor.brandLabel)
+                                    .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+                                    .contentShape(Rectangle())
                             }
                         }
                     }
                 }
             }
-            .alert("清空所有离线缓存？", isPresented: $showingClearAlert) {
-                Button("清空", role: .destructive) {
-                    if selectedTab == .video {
-                        downloadManager.removeAll()
-                    } else {
-                        comicDownloadManager.removeAll()
-                    }
-                }
-                Button("取消", role: .cancel) {}
-            } message: {
-                Text(selectedTab == .video ? "此操作将删除所有已下载的视频文件，释放本地存储空间。" : "此操作将删除所有已下载的离线漫画页面，释放本地存储空间。")
-            }
+        }
     }
-    
+
+    @ViewBuilder
+    private var primaryEditToolbarButton: some View {
+        if editMode == .active {
+            Button("common.done".localized) {
+                editMode = .inactive
+                selectedItemIDs.removeAll()
+            }
+            .font(.body.bold())
+            .foregroundStyle(AuroraColor.brandLabel)
+            .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+        } else {
+            Button("common.edit".localized) {
+                editMode = .active
+            }
+            .font(.body)
+            .foregroundStyle(AuroraColor.textPrimary)
+            .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+        }
+    }
+
+    private func deleteSelectedItems() {
+        if selectedTab == .video {
+            for id in selectedItemIDs {
+                downloadManager.removeDownload(id: id)
+            }
+        } else {
+            for id in selectedItemIDs {
+                comicDownloadManager.removeDownload(id: id)
+            }
+        }
+        selectedItemIDs.removeAll()
+        editMode = .inactive
+    }
+
     private var downloadOverviewCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Image(systemName: totalActiveCount > 0 ? "arrow.down.circle.fill" : "internaldrive.fill")
                     .font(.title3)
-                    .foregroundStyle(AuroraColor.brand)
+                    .foregroundStyle(AuroraColor.brandLabel)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(totalActiveCount > 0 ? "正在后台下载 \(totalActiveCount) 项任务" : "下载与本地存储总览")
-                        .font(.subheadline.bold())
-                        .foregroundStyle(AuroraColor.textPrimary)
-                    Text("视频 \(downloadManager.completedItems.count)/\(downloadManager.items.count) (\(downloadManager.formattedTotalSpace())) · 漫画 \(comicDownloadManager.completedChapters.count)/\(comicDownloadManager.chapters.count) (\(comicDownloadManager.formattedTotalSpace()))")
-                        .font(.caption)
-                        .foregroundStyle(AuroraColor.textSecondary)
-                        .lineLimit(1)
+                    Text(
+                        totalActiveCount > 0
+                            ? "downloads.active_header".localized(totalActiveCount)
+                            : "downloads.overview_header".localized
+                    )
+                    .font(.subheadline.bold())
+                    .foregroundStyle(AuroraColor.textPrimary)
+                    Text(
+                        "downloads.summary_stats".localized(
+                            downloadManager.completedItems.count,
+                            downloadManager.items.count,
+                            downloadManager.formattedTotalSpace(),
+                            comicDownloadManager.completedChapters.count,
+                            comicDownloadManager.chapters.count,
+                            comicDownloadManager.formattedTotalSpace()
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(AuroraColor.textSecondary)
+                    .lineLimit(1)
                 }
                 Spacer(minLength: 4)
                 if totalActiveCount > 0 {
                     Text("\(Int(combinedActiveProgress * 100))%")
                         .font(.caption.monospacedDigit().bold())
-                        .foregroundStyle(AuroraColor.brand)
+                        .foregroundStyle(AuroraColor.brandLabel)
                 }
             }
 
             if totalActiveCount > 0 {
                 ProgressView(value: combinedActiveProgress)
-                    .tint(AuroraColor.brand)
+                    .tint(AuroraColor.brandSolid)
             }
         }
         .padding(12)
@@ -276,36 +344,43 @@ public struct OfflineDownloadsScreen: View {
                     let count = filterCount(for: filter)
                     let isSelected = statusFilter == filter
                     Button {
-                        statusFilter = filter
+                        AuroraMotion.perform(AuroraMotion.quick, reduceMotion: reduceMotion) {
+                            statusFilter = filter
+                        }
                     } label: {
-                        Text("\(filter.rawValue) (\(count))")
+                        Text("\(filter.displayTitle) (\(count))")
                             .font(.caption.weight(isSelected ? .bold : .medium))
                             .foregroundStyle(isSelected ? Color.white : AuroraColor.textSecondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 14)
+                            .frame(minHeight: AuroraMetrics.minTouchTarget - 6)
                             .background(
-                                isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                isSelected ? AuroraColor.brandSolid : AuroraColor.surfaceCard,
                                 in: Capsule()
                             )
                     }
                     .buttonStyle(.plain)
+                    .frame(minHeight: AuroraMetrics.minTouchTarget)
+                    .contentShape(Rectangle())
+                    .hoverEffect(.highlight)
                 }
             }
             .padding(.horizontal, 16)
         }
+        .sensoryFeedback(.selection, trigger: statusFilter)
     }
 
     private func emptyStateView(icon: String, title: String, description: String) -> some View {
         VStack(spacing: AuroraMetrics.spacingL) {
             Image(systemName: icon)
-                .font(.system(size: 64, weight: .light))
-                .foregroundStyle(AuroraColor.brand.opacity(0.8))
+                .font(.largeTitle.weight(.light))
+                .imageScale(.large)
+                .foregroundStyle(AuroraColor.brandLabel.opacity(0.85))
                 .padding(.bottom, AuroraMetrics.spacingS)
-            
+
             Text(title)
                 .font(.title3.bold())
                 .foregroundStyle(AuroraColor.textPrimary)
-            
+
             Text(description)
                 .font(.subheadline)
                 .foregroundStyle(AuroraColor.textSecondary)
@@ -315,22 +390,22 @@ public struct OfflineDownloadsScreen: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AuroraColor.canvas)
     }
-    
+
     // MARK: - 视频下载列表
-    
+
     private var videoDownloadsListView: some View {
         List(selection: $selectedItemIDs) {
-            // 顶部 Apple TV 风格多段彩色容量仪表盘
             Section {
                 StorageUsageBarView()
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
             }
-            
-            Section(header: Text("视频缓存列表 (\(filteredVideoItems.count))")) {
+
+            Section(header: Text("downloads.video_section".localized(filteredVideoItems.count)).accessibilityAddTraits(.isHeader)) {
                 ForEach(filteredVideoItems) { item in
                     downloadVideoRow(item: item)
                         .contentShape(Rectangle())
+                        .accessibilityAddTraits(.isButton)
                         .onTapGesture {
                             guard editMode == .inactive else { return }
                             if item.status.isCompleted {
@@ -347,7 +422,7 @@ public struct OfflineDownloadsScreen: View {
                             Button(role: .destructive) {
                                 downloadManager.removeDownload(id: item.id)
                             } label: {
-                                Label("删除", systemImage: "trash")
+                                Label("common.delete".localized, systemImage: "trash")
                             }
                         }
                 }
@@ -356,7 +431,7 @@ public struct OfflineDownloadsScreen: View {
         .listStyle(.insetGrouped)
         .background(AuroraColor.canvas)
     }
-    
+
     @ViewBuilder
     private func downloadVideoRow(item: OfflineDownloadItem) -> some View {
         HStack(spacing: AuroraMetrics.spacingM) {
@@ -368,13 +443,13 @@ public struct OfflineDownloadsScreen: View {
                 cornerRadius: 8
             )
             .frame(width: 96, height: 54)
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.displayTitle)
                     .font(.subheadline.bold())
                     .foregroundStyle(AuroraColor.textPrimary)
                     .lineLimit(2)
-                
+
                 HStack(spacing: 6) {
                     Text(item.sourceName)
                         .font(.caption2.bold())
@@ -382,29 +457,29 @@ public struct OfflineDownloadsScreen: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(AuroraColor.brand.opacity(0.12), in: Capsule())
-                    
+
                     if item.totalBytes > 0 {
                         Text(ByteCountFormatter.string(fromByteCount: item.totalBytes, countStyle: .file))
                             .font(.caption2)
                             .foregroundStyle(AuroraColor.textSecondary)
                     }
                 }
-                
+
                 switch item.status {
                 case .queued, .resolving:
                     HStack(spacing: 4) {
                         ProgressView().scaleEffect(0.6)
-                        Text("正在准备下载…")
+                        Text("downloads.preparing".localized)
                             .font(.caption2)
-                            .foregroundStyle(AuroraColor.brand)
+                            .foregroundStyle(AuroraColor.brandLabel)
                     }
                 case .downloading(let progress, let written, let total):
                     VStack(alignment: .leading, spacing: 2) {
                         ProgressView(value: progress)
-                            .tint(AuroraColor.brand)
+                            .tint(AuroraColor.brandSolid)
                         let writtenStr = ByteCountFormatter.string(fromByteCount: written, countStyle: .file)
                         let totalStr = total > 0 ? " / \(ByteCountFormatter.string(fromByteCount: total, countStyle: .file))" : ""
-                        Text("正在下载 \(Int(progress * 100))% · \(writtenStr)\(totalStr)")
+                        Text("downloads.downloading_progress".localized(Int(progress * 100), writtenStr, totalStr))
                             .font(.caption2)
                             .foregroundStyle(AuroraColor.textSecondary)
                     }
@@ -413,52 +488,54 @@ public struct OfflineDownloadsScreen: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.caption2)
                             .foregroundStyle(.green)
-                        Text("已完成 · 点击播放")
+                        Text("downloads.completed_play".localized)
                             .font(.caption2)
                             .foregroundStyle(.green)
                     }
                 case .paused:
-                    Text("已暂停")
+                    Text("downloads.paused".localized)
                         .font(.caption2)
                         .foregroundStyle(AuroraColor.warning)
                 case .failed(let msg):
-                    Text("下载失败: \(msg)")
+                    Text("downloads.failed_msg".localized(msg))
                         .font(.caption2)
                         .foregroundStyle(AuroraColor.warning)
                         .lineLimit(1)
                 }
             }
-            
+
             Spacer()
-            
+
             if item.status.isCompleted {
                 Image(systemName: "play.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(AuroraColor.brand)
+                    .foregroundStyle(AuroraColor.brandLabel)
             } else if case .failed = item.status {
                 Button {
                     downloadManager.retryDownload(id: item.id)
                 } label: {
                     Image(systemName: "arrow.clockwise.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(AuroraColor.brand)
+                        .foregroundStyle(AuroraColor.brandLabel)
+                        .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("重试视频下载")
+                .accessibilityLabel("downloads.retry_video_a11y".localized)
             }
         }
         .padding(.vertical, 4)
     }
 
     // MARK: - 漫画下载列表
-    
+
     private var comicDownloadsListView: some View {
         List(selection: $selectedItemIDs) {
             Section {
                 HStack {
                     Image(systemName: "book.fill")
-                        .foregroundStyle(AuroraColor.brand)
-                    Text("已下载漫画占用")
+                        .foregroundStyle(AuroraColor.brandLabel)
+                    Text("downloads.comic_space_used".localized)
                         .font(.subheadline)
                         .foregroundStyle(AuroraColor.textSecondary)
                     Spacer()
@@ -469,10 +546,11 @@ public struct OfflineDownloadsScreen: View {
                 .padding(.vertical, 4)
             }
 
-            Section(header: Text("已缓存章节 (\(filteredComicChapters.count))")) {
+            Section(header: Text("downloads.comic_section".localized(filteredComicChapters.count)).accessibilityAddTraits(.isHeader)) {
                 ForEach(filteredComicChapters) { item in
                     downloadComicRow(item: item)
                         .contentShape(Rectangle())
+                        .accessibilityAddTraits(.isButton)
                         .onTapGesture {
                             guard editMode == .inactive else { return }
                             if item.status.isCompleted {
@@ -485,7 +563,7 @@ public struct OfflineDownloadsScreen: View {
                             Button(role: .destructive) {
                                 comicDownloadManager.removeDownload(id: item.id)
                             } label: {
-                                Label("删除", systemImage: "trash")
+                                Label("common.delete".localized, systemImage: "trash")
                             }
                         }
                 }
@@ -519,7 +597,7 @@ public struct OfflineDownloadsScreen: View {
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
-                    Text("\(item.downloadedPages)/\(max(item.totalPages, item.downloadedPages)) 页")
+                    Text("downloads.pages_progress".localized(item.downloadedPages, max(item.totalPages, item.downloadedPages)))
                         .font(.caption2.bold())
                         .foregroundStyle(AuroraColor.textSecondary)
 
@@ -534,15 +612,15 @@ public struct OfflineDownloadsScreen: View {
                 case .queued, .resolving:
                     HStack(spacing: 4) {
                         ProgressView().scaleEffect(0.6)
-                        Text("准备下载…")
+                        Text("downloads.preparing".localized)
                             .font(.caption2)
-                            .foregroundStyle(AuroraColor.brand)
+                            .foregroundStyle(AuroraColor.brandLabel)
                     }
                 case .downloading(let progress, let done, let total):
                     VStack(alignment: .leading, spacing: 2) {
                         ProgressView(value: progress)
-                            .tint(AuroraColor.brand)
-                        Text("下载中 \(done)/\(max(total, done)) (\(Int(progress * 100))%)")
+                            .tint(AuroraColor.brandSolid)
+                        Text("downloads.comic_downloading".localized(done, max(total, done), Int(progress * 100)))
                             .font(.caption2)
                             .foregroundStyle(AuroraColor.textSecondary)
                     }
@@ -551,16 +629,16 @@ public struct OfflineDownloadsScreen: View {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.caption2)
                             .foregroundStyle(.green)
-                        Text("已完成 · 点击阅读")
+                        Text("downloads.completed_read".localized)
                             .font(.caption2)
                             .foregroundStyle(.green)
                     }
                 case .paused:
-                    Text("已暂停")
+                    Text("downloads.paused".localized)
                         .font(.caption2)
                         .foregroundStyle(AuroraColor.warning)
                 case .failed(let msg):
-                    Text("失败: \(msg)")
+                    Text("downloads.comic_failed_msg".localized(msg))
                         .font(.caption2)
                         .foregroundStyle(AuroraColor.warning)
                         .lineLimit(1)
@@ -572,17 +650,19 @@ public struct OfflineDownloadsScreen: View {
             if item.status.isCompleted {
                 Image(systemName: "book.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(AuroraColor.brand)
+                    .foregroundStyle(AuroraColor.brandLabel)
             } else if case .failed = item.status {
                 Button {
                     comicDownloadManager.retryDownload(id: item.id)
                 } label: {
                     Image(systemName: "arrow.clockwise.circle.fill")
                         .font(.title2)
-                        .foregroundStyle(AuroraColor.brand)
+                        .foregroundStyle(AuroraColor.brandLabel)
+                        .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("重试漫画下载")
+                .accessibilityLabel("downloads.retry_comic_a11y".localized)
             }
         }
         .padding(.vertical, 4)
