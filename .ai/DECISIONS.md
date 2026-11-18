@@ -1,5 +1,16 @@
 # Existing Architectural Decisions
 
+## iOS/iPadOS Video Player Optical Glass 2.0, Apple TV 3-Tier Deck & Aspect-Aware Gravity Orientation Engine (v2.17.5 Build 272)
+
+Date: 2026-11-18
+
+Status: Implemented, dual-platform Release verified, and published in `v2.17.5 (Build 272)`.
+
+Decisions:
+1. **iOS 27 `Glass.clear.interactive()` Optical Engine (`LiquidGlassPlayerControls.swift` + `VideoDetailPlaybackScreen.swift` + `PlayerScrubberBar.swift`)**: Replace murky frosted `Glass.regular` (`.buttonStyle(.glass)`) and solid brand-tinted center transport buttons over `85%` opaque black scrims with `Glass.clear.interactive()` (`@available(iOS 26.1, *)` `.buttonStyle(.glass(.clear.interactive()))` with `iOS 26.0` `.glassEffect(.clear.interactive())` fallback), `0%` top/center scrims, untinted crystal water-droplet center transport lenses (`44/48pt` skip + `68/76pt` play/pause), and a knob-less Apple TV fluid expanding liquid capsule scrubber (`6pt -> 12/14pt` on drag with a `Glass.clear` floating timestamp bubble).
+2. **YouTube Aspect-Aware & Gravity Orientation State Machine (`VideoAspectProfile.swift` + `PlayerOrientationCoordinator.swift` + `AuroraAppDelegate`)**: Observe `AVPlayerItem.presentationSize` via KVO to classify `.landscape` (`> 1.05`), `.square`, and `.portrait` (`< 0.85`) streams; adapt inline stage height across iPhone (`393pt`), iPhone Duo Folded (`466×678pt`), Duo Unfolded (`669×951pt`), and iPad Split/Stacked with `.onScrollGeometryChange` sticky collapse; drive real `UIWindowScene.requestGeometryUpdate` bidirectional `.landscape` (`[.landscapeLeft, .landscapeRight]`) fullscreen on iPhone for horizontal videos while preserving portrait fullscreen for `9:16` short dramas, paired with `PlayerGravityRotationStateMachine` (`hasAlignedWithPhysicalLandscape` guard) for automatic physical landscape fullscreen entry and upright portrait exit; extend real window rotation to `LiveDetailView` and `LivePlayerView`.
+3. **Apple TV 3-Tier Cinema Deck & Orthogonal Secondary Action Rail (`VideoDetailPlaybackScreen.swift` + `AuroraPlayerSurface.swift`)**: Reorganize fullscreen bottom chrome into 3 non-overlapping tiers (metadata badge/title -> fluid liquid scrubber -> compact `Glass.clear` utility pills + bottom-right fullscreen toggle, moving iPhone's manual rotate trigger to the top-left cluster so `393pt` portrait fullscreen has zero horizontal clipping); unify secondary detail page actions into a single orthogonal capsule rail (`[⛶ 全屏观影]` + `[+ 加入片单]` + `[↓ 离线缓存]` + `[选集]` + `[分享]`); add zero-delay `0.42s` `UILongPressGestureRecognizer` on `AuroraPlayerSurface` for hold-to-`2.0x` playback boost alongside swipe-up/down fullscreen and pinch Fit/Fill.
+
 ## Native Virtualized Android Forum Reader & Edge-Isolated Swipe-Back (v2.17.4 Build 271)
 
 Date: 2026-11-18

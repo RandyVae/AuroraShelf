@@ -311,6 +311,11 @@ final class ImmersiveNavigationController: UINavigationController {
     override var childForStatusBarHidden: UIViewController? { topViewController }
     override var childForStatusBarStyle: UIViewController? { topViewController }
     override var childForHomeIndicatorAutoHidden: UIViewController? { topViewController }
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        PlayerOrientationCoordinator.shared.supportedInterfaceOrientations(
+            for: UIDevice.current.userInterfaceIdiom
+        )
+    }
 
     override func viewWillTransition(
         to size: CGSize,

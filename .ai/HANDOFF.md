@@ -1,4 +1,15 @@
-## 最新交接：2026-11-18 — Android 论坛帖子内滑动阻滞根治（24dp 左边缘精准放行手势 + 逐块虚拟化原生 120Hz LazyColumn 阅读器）及全通道同步上线 · v2.17.4 (Build 271)
+## 最新交接：2026-11-18 — iOS / iPadOS 视频播放器重构（iOS 27 `Glass.clear.interactive()` 光学引擎 2.0 + Apple TV 三层影院控制坞 + YouTube 画幅与重力横竖屏引擎）及全通道同步上线 · v2.17.5 (Build 272)
+
+### 本次完成
+1. **iOS / iPadOS 视频播放器自然交互与原生液态玻璃重构**：
+   - **光学层（[LiquidGlassPlayerControls.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/LiquidGlassPlayerControls.swift) + [PlayerScrubberBar.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/PlayerScrubberBar.swift) + [VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift)）**：弃用灰雾磨砂 `Glass.regular`（`.buttonStyle(.glass)`）与 `85%` 黑色渐变底衬及实心粉红播放钮，全面切换至 `Glass.clear.interactive()`（`iOS 26.1+/27` 原生清透高折射水滴玻璃，向下兼容 `iOS 26.0` `.glassEffect(.clear.interactive())`），移除顶/中区黑遮罩让动态视频帧直接穿过水滴圆镜产生边缘色散与高光折射，并将进度条升级为 Apple TV 无圆球流体膨胀胶囊（`6pt -> 12/14pt` + `Glass.clear` 悬浮时间胶囊）。
+   - **画幅与重力横竖屏层（[VideoAspectProfile.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/VideoAspectProfile.swift) + [PlayerOrientationCoordinator.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/PlayerOrientationCoordinator.swift) + [AuroraShelfApp.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/App/AuroraShelfApp.swift) + [MainContainerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/MainContainerView.swift)）**：KVO 监听 `AVPlayerItem.presentationSize` 区分横屏/方屏/竖屏画幅；内嵌态为 `9:16` 短剧提供高纵向舞台与 `.onScrollGeometryChange` 滚动吸顶收敛（覆盖 iPhone、Duo 折叠/展开与 iPad）；横屏视频全屏自动调用 `UIWindowScene.requestGeometryUpdate` 解锁双向 `.landscape` 真正横屏铺满，`9:16` 竖屏视频保持竖屏全屏，配合 `PlayerGravityRotationStateMachine` 支持横握自动横屏全屏与竖握自动回退内嵌；同步接入 [LiveDetailView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LiveDetailView.swift) 与 [LivePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LivePlayerView.swift)。
+   - **层级与手势层（[VideoDetailPlaybackScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailPlaybackScreen.swift) + [AuroraPlayerSurface.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/AuroraPlayerSurface.swift)）**：内嵌右下角锚定全屏按钮、二级页收敛为单排正交胶囊栏、全屏底部采用 Apple TV 三层控制坞（iPhone 手动旋转移入左上簇确保 `393pt` 竖屏全屏零裁切，缓冲态自动隐藏中央三联钮防重叠），新增 `0.42s` 零延迟长按 `2.0x` 倍速、上下滑进出全屏与双指捏合 Fit/Fill。
+2. **全量验证与三通道同步发布（`v2.17.5 Build 272`）**：
+   - 新增单测 [VideoPlayerNaturalUXTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/VideoPlayerNaturalUXTests.swift) 并修复 [verify-fixes.js](file:///Users/itou/Documents/ChatGPT/91pron/scripts/verify-fixes.js) 动态读取版本号；iOS 离线单测、iPad 旋转单测、iOS 在线全源审计（`59/59`）及 Android 单测/Lint/在线全源探针全部通过。
+   - `iPhone 18 Pro`、`iPad Pro 13-inch (M5)` 与 Android `emulator-5554` 正式 Release 包全模块（视频、短剧、直播、漫画、论坛、《Lust Goddess》`Version 2.17.5`）实测通过；网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,487,977` B、`Netgrey.ipa` `140,162,204` B，`/` 剩 `11G`）、TestFlight `Build 272` 与 GitHub Release `v2.17.5` 同步上线。
+
+## 历史交接：2026-11-18 — Android 论坛帖子内滑动阻滞根治（24dp 左边缘精准放行手势 + 逐块虚拟化原生 120Hz LazyColumn 阅读器）及全通道同步上线 · v2.17.4 (Build 271)
 
 ### 本次完成
 1. **Android 论坛打开帖子「划不动」三大根因确诊与根治**：

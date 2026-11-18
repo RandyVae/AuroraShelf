@@ -714,11 +714,17 @@ if (battleJs.includes('this.spine.views.forEach')) {
   console.log('✓ (f) LGAudio pause/resume non-muting behavior & 8-channel pool key eviction verified');
 }
 
-// 11. Verify index.html version string (v2.17.0), deduplicated videos.json & deleted Disable audio directory
+// 11. Verify index.html version string matches app/build.gradle.kts versionName, deduplicated videos.json & deleted Disable audio directory
 {
+  const gradleText = fs.readFileSync('app/build.gradle.kts', 'utf8');
+  const verMatch = gradleText.match(/versionName\s*=\s*"([^"]+)"/);
+  if (!verMatch) {
+    throw new Error('Failed to parse versionName from app/build.gradle.kts');
+  }
+  const expectedVer = `Version ${verMatch[1]}`;
   const indexHtml = fs.readFileSync('app/src/main/assets/www/index.html', 'utf8');
-  if (!indexHtml.includes('Version 2.17.0') || indexHtml.includes('2.16.40')) {
-    throw new Error('index.html version text must be updated to Version 2.17.0 with no stale 2.16.40');
+  if (!indexHtml.includes(expectedVer) || indexHtml.includes('2.16.40')) {
+    throw new Error(`index.html version text must be updated to ${expectedVer} with no stale 2.16.40`);
   }
   const videos = JSON.parse(fs.readFileSync('app/src/main/assets/www/data/videos.json', 'utf8'));
   if (new Set(videos).size !== videos.length) {
@@ -727,7 +733,7 @@ if (battleJs.includes('this.spine.views.forEach')) {
   if (fs.existsSync('app/src/main/assets/www/assets/audio/Disable')) {
     throw new Error('Dead audio folder app/src/main/assets/www/assets/audio/Disable must be deleted');
   }
-  console.log('✓ index.html Version 2.17.0, deduplicated videos.json & removed Disable/ audio verified');
+  console.log(`✓ index.html ${expectedVer}, deduplicated videos.json & removed Disable/ audio verified`);
 }
 
 console.log('All automated verifications PASSED!');

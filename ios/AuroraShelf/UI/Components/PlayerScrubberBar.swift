@@ -1,41 +1,51 @@
 import SwiftUI
 import UIKit
 
-/// 原生播放器进度拖拽条（Apple HIG 规范：支持高灵敏度轻点与滑动、Apple TV 悬浮时间气泡、机械顿挫触觉与弹性放大）
+/// Apple TV / iOS 27 原生风格无旋钮流体膨胀液态胶囊进度条（Fluid Expanding Capsule Scrubber）
+/// - 常态为 6pt 半透明流光胶囊轨（含缓冲进度轨与纯白已播进度）；
+/// - 触控拖拽瞬间整条轨道弹性膨胀至 12~14pt 高亮液态胶囊，上方浮现 `Glass.clear` 单宽时间戳预览气泡。
 public struct PlayerScrubberBar: View {
     @Binding public var currentTime: Double
+    public let bufferedTime: Double
     public let duration: Double
     public let onSeek: (Double) -> Void
     public var onEditingChanged: ((Bool) -> Void)?
-    
+
     @State private var isScrubbing: Bool = false
     @State private var scrubProgress: CGFloat = 0
     @State private var lastHapticStep: Int = 0
-    
+
     private let hapticGenerator = UISelectionFeedbackGenerator()
-    
+
     public init(
         currentTime: Binding<Double>,
+        bufferedTime: Double = 0,
         duration: Double,
         onSeek: @escaping (Double) -> Void,
         onEditingChanged: ((Bool) -> Void)? = nil
     ) {
         self._currentTime = currentTime
+        self.bufferedTime = bufferedTime
         self.duration = duration
         self.onSeek = onSeek
         self.onEditingChanged = onEditingChanged
     }
-    
+
     private var displayTime: Double {
         if isScrubbing {
             return Double(scrubProgress) * max(duration, 0)
         }
         return currentTime
     }
-    
+
     public var body: some View {
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        let restingHeight: CGFloat = isPad ? 7 : 6
+        let activeHeight: CGFloat = isPad ? 14 : 12
+        let trackHeight: CGFloat = isScrubbing ? activeHeight : restingHeight
+
         GeometryReader { geo in
-            let width = geo.size.width
+            let width = max(geo.size.width, 1)
             let progress: CGFloat = {
                 if isScrubbing {
                     return scrubProgress
@@ -43,52 +53,53 @@ public struct PlayerScrubberBar: View {
                 guard duration > 0 else { return 0 }
                 return min(max(CGFloat(currentTime / duration), 0), 1)
             }()
-            
-            let knobX = max(0, min(width * progress, width))
-            
-            ZStack(alignment: .leading) {
-                // 背景轨道（半透明磨砂白）
-                Capsule()
-                    .fill(Color.white.opacity(0.24))
-                    .frame(height: isScrubbing ? 8 : 4)
-                
-                // 已播放进度轨道（品牌色至亮红渐变）
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [AuroraColor.brand, Color(rgb: 0xFF5252)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: max(0, width * progress), height: isScrubbing ? 8 : 4)
-                
-                // 滑块旋钮（白色微光圆点，拖动时弹性放大至 18pt）
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: isScrubbing ? 18 : 10, height: isScrubbing ? 18 : 10)
-                    .shadow(color: .black.opacity(0.6), radius: 4, x: 0, y: 1.5)
-                    .offset(x: max(0, min(width * progress - (isScrubbing ? 9 : 5), width - (isScrubbing ? 18 : 10))))
+            let bufferedFraction: CGFloat = {
+                guard duration > 0, bufferedTime > 0 else { return 0 }
+                return min(max(CGFloat(bufferedTime / duration), progress), 1)
+            }()
+            let activeX = max(0, min(width * progress, width))
 
-                // Apple TV 标志性悬浮时间戳气泡（拖拽激活时浮显在旋钮正上方，跟随手指位移）
+            ZStack(alignment: .leading) {
+                // 1. 液态玻璃底轨（半透明高透胶囊底衬）
+                Capsule()
+                    .fill(Color.white.opacity(isScrubbing ? 0.30 : 0.22))
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(Color.white.opacity(isScrubbing ? 0.34 : 0.16), lineWidth: 0.6)
+                    )
+                    .frame(height: trackHeight)
+
+                // 2. 已缓冲轨道
+                if bufferedFraction > 0 {
+                    Capsule()
+                        .fill(Color.white.opacity(isScrubbing ? 0.42 : 0.34))
+                        .frame(width: max(trackHeight, width * bufferedFraction), height: trackHeight)
+                }
+
+                // 3. 已播放流光高亮胶囊轨（Apple TV 纯白高对比流体柱，拖拽时微光扩散）
+                if progress > 0 {
+                    Capsule()
+                        .fill(Color.white.opacity(isScrubbing ? 1.0 : 0.92))
+                        .frame(width: max(trackHeight, activeX), height: trackHeight)
+                        .shadow(color: Color.white.opacity(isScrubbing ? 0.42 : 0.0), radius: 6, x: 0, y: 0)
+                }
+
+                // 4. Apple TV 标志性 `Glass.clear` 悬浮时间戳气泡
                 if isScrubbing {
                     Text(formatTime(displayTime))
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .font(.system(size: isPad ? 13 : 12, weight: .bold, design: .monospaced))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(
-                            Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.5)
-                        )
-                        .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 2)
-                        .offset(x: max(0, min(knobX - 32, width - 64)), y: -34)
-                        .transition(.scale(scale: 0.85).combined(with: .opacity))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .glassEffect(.clear, in: .capsule)
+                        .shadow(color: .black.opacity(0.28), radius: 8, x: 0, y: 3)
+                        .offset(x: max(0, min(activeX - 34, max(0, width - 68))), y: -34)
+                        .transition(.scale(scale: 0.86).combined(with: .opacity))
                 }
             }
-            .frame(maxHeight: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .contentShape(Rectangle())
-            .animation(.spring(response: 0.22, dampingFraction: 0.8), value: isScrubbing)
+            .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isScrubbing)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
@@ -101,7 +112,6 @@ public struct PlayerScrubberBar: View {
                         let percent = width > 0 ? clampedX / width : 0
                         scrubProgress = percent
 
-                        // 机械旋钮般的极细微触觉顿挫（每滑动 1% 或 15 秒触发一次）
                         let currentStep = Int(percent * 100)
                         if currentStep != lastHapticStep {
                             lastHapticStep = currentStep
@@ -111,7 +121,7 @@ public struct PlayerScrubberBar: View {
                     .onEnded { value in
                         let clampedX = min(max(value.location.x, 0), width)
                         let percent = width > 0 ? clampedX / width : 0
-                        let targetTime = Double(percent) * duration
+                        let targetTime = Double(percent) * max(duration, 0)
                         currentTime = targetTime
                         isScrubbing = false
                         onEditingChanged?(false)
@@ -125,19 +135,17 @@ public struct PlayerScrubberBar: View {
                 let step = 10.0
                 switch direction {
                 case .increment:
-                    let target = min(currentTime + step, duration)
-                    onSeek(target)
+                    onSeek(min(currentTime + step, duration))
                 case .decrement:
-                    let target = max(currentTime - step, 0)
-                    onSeek(target)
+                    onSeek(max(currentTime - step, 0))
                 @unknown default:
                     break
                 }
             }
         }
-        .frame(height: 32)
+        .frame(height: isPad ? 40 : 34)
     }
-    
+
     private func formatTime(_ seconds: Double) -> String {
         guard seconds.isFinite && seconds >= 0 else { return "00:00" }
         let total = Int(seconds)

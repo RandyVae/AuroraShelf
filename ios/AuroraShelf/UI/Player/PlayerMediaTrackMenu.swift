@@ -1,27 +1,29 @@
 import AVKit
 import SwiftUI
 
-/// Apple TV 风格字幕与多音轨选择器（Liquid Glass 原生菜单按钮）
+/// Apple TV 风格字幕与多音轨选择器（iOS 27 `Glass.clear` 原生高透液态玻璃菜单按钮）
 public struct PlayerMediaTrackMenu: View {
     public let playerItem: AVPlayerItem
     public let subtitleGroup: AVMediaSelectionGroup?
     public let audioGroup: AVMediaSelectionGroup?
+    public var showLabelText: Bool = false
 
     @State private var selectionRevision = 0
 
     public init(
         playerItem: AVPlayerItem,
         subtitleGroup: AVMediaSelectionGroup?,
-        audioGroup: AVMediaSelectionGroup?
+        audioGroup: AVMediaSelectionGroup?,
+        showLabelText: Bool = false
     ) {
         self.playerItem = playerItem
         self.subtitleGroup = subtitleGroup
         self.audioGroup = audioGroup
+        self.showLabelText = showLabelText
     }
 
     public var body: some View {
         let _ = selectionRevision
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
         Menu {
             if let subtitleGroup, !subtitleGroup.options.isEmpty {
                 Section("字幕") {
@@ -55,16 +57,41 @@ public struct PlayerMediaTrackMenu: View {
                 }
             }
         } label: {
-            Image(systemName: selectedSubtitle != nil ? "captions.bubble.fill" : "captions.bubble")
-                .font(.system(size: isPad ? 15 : 13, weight: .bold))
+            if showLabelText {
+                HStack(spacing: 5) {
+                    Image(systemName: selectedSubtitle != nil ? "captions.bubble.fill" : "captions.bubble")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("音轨字幕")
+                        .font(.system(size: 13, weight: .semibold))
+                        .lineLimit(1)
+                }
                 .foregroundStyle(.white)
-                .frame(width: isPad ? 32 : 26, height: isPad ? 32 : 26)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .fixedSize(horizontal: true, vertical: false)
+            } else {
+                Image(systemName: selectedSubtitle != nil ? "captions.bubble.fill" : "captions.bubble")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+            }
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .frame(minWidth: 44, minHeight: 44)
+        .modifier(MediaTrackGlassModifier(isCapsule: showLabelText))
+        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
         .accessibilityLabel("字幕与音轨")
         .accessibilityHint("选择可用的字幕或音频轨道")
+    }
+
+    private struct MediaTrackGlassModifier: ViewModifier {
+        let isCapsule: Bool
+
+        func body(content: Content) -> some View {
+            if isCapsule {
+                content.playerClearGlassCapsuleButton()
+            } else {
+                content.playerClearGlassCircleButton()
+            }
+        }
     }
 
     private var selectedSubtitle: AVMediaSelectionOption? {

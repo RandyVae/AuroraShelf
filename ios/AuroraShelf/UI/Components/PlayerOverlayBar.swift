@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// 沉浸式浮层与全屏播放器统一顶栏组件（遵循 Apple HIG 与 iOS 26+ 原生 Liquid Glass 规范）
+/// 沉浸式浮层与全屏阅读器统一顶栏组件（遵循 Apple HIG 与 iOS 27 原生 `Glass.clear` 高透液态玻璃规范）
 public struct PlayerOverlayBar<TrailingContent: View>: View {
     public let title: String
     public let subtitle: String?
     public let customTopPadding: CGFloat?
     public let onDismiss: () -> Void
     public let trailingContent: TrailingContent
-    
+
     public init(
         title: String,
         subtitle: String? = nil,
@@ -21,46 +21,46 @@ public struct PlayerOverlayBar<TrailingContent: View>: View {
         self.onDismiss = onDismiss
         self.trailingContent = trailingContent()
     }
-    
+
     public var body: some View {
         let topPadding = customTopPadding ?? (DeviceLayout.safeAreaTop + 6)
 
         ZStack(alignment: .top) {
-            // 暗调渐变底衬，确保文字与按钮在任何背景（如漫画白底）上均清晰可读
+            // 极轻柔可读性暗角（避免厚重黑幕吞噬 Glass.clear 边缘折射高光）
             LinearGradient(
-                colors: [Color.black.opacity(0.85), Color.black.opacity(0.4), Color.clear],
+                colors: [Color.black.opacity(0.38), Color.black.opacity(0.14), Color.clear],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .frame(height: max(topPadding + 54, 120))
+            .frame(height: max(topPadding + 52, 108))
             .allowsHitTesting(false)
 
             GlassEffectContainer(spacing: AuroraMetrics.spacingM) {
                 HStack(spacing: AuroraMetrics.spacingM) {
-                    Button(action: {
+                    PlayerGlassIconButton(
+                        systemName: "chevron.left",
+                        accessibilityTitle: "返回",
+                        visualDiameter: 40,
+                        symbolSize: 16,
+                        symbolWeight: .bold
+                    ) {
                         let impact = UIImpactFeedbackGenerator(style: .medium)
                         impact.impactOccurred()
                         onDismiss()
-                    }) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 17, weight: .bold))
-                            .frame(width: 28, height: 28)
                     }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .accessibilityLabel("返回")
-                    
+
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title)
                             .font(.headline)
                             .foregroundStyle(.white)
+                            .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
                             .lineLimit(1)
 
                         if let subtitle, !subtitle.isEmpty {
                             Text(subtitle)
                                 .font(.caption)
-                                .foregroundStyle(Color.white.opacity(0.75))
+                                .foregroundStyle(Color.white.opacity(0.82))
+                                .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
                                 .lineLimit(1)
                         }
                     }

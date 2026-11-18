@@ -45,6 +45,7 @@ public struct LiveDetailView: View {
             let recommendationWidth = columns.recommendationWidth(for: screenGeo.size.width)
             let isPhysicallyLandscape = screenGeo.size.width > screenGeo.size.height
             let isRotated = !isPad && isFullScreen && isLandscape && !isPhysicallyLandscape
+                && PlayerOrientationCoordinator.shared.needsViewRotationFallback
             let containerWidth = isSplitMode ? playerWidth : screenGeo.size.width
             let targetWidth = isRotated ? screenGeo.size.height : containerWidth
             let safeTop = DeviceLayout.safeAreaTop(in: screenGeo.size)
@@ -138,16 +139,10 @@ public struct LiveDetailView: View {
                 )
                 .zIndex(10)
 
-                // 全局 HUD 提示胶囊（画幅模式、旋转模式与全屏状态浮层）
+                // 全局 HUD 提示胶囊（iOS 27 Glass.clear 浮层）
                 if let hud = hudMessage {
-                    Text(hud)
-                        .font(.callout.bold())
-                        .foregroundStyle(AuroraColor.textPrimary)
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 10)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
-                        .shadow(color: .black.opacity(0.28), radius: 8, y: 3)
+                    PlayerLiquidGlassHUD(icon: nil, message: hud)
+                        .environment(\.colorScheme, .dark)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                         .transition(.scale(scale: 0.9).combined(with: .opacity))
                         .zIndex(30)
@@ -166,15 +161,20 @@ public struct LiveDetailView: View {
             if args.contains("--live-landscape") {
                 isFullScreen = true
                 isLandscape = true
+                PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: true)
             }
             if args.contains("--live-fill") {
                 isFillMode = true
             }
         }
+        .onDisappear {
+            PlayerOrientationCoordinator.shared.resetToPortraitIfNeeded()
+        }
         .sheet(isPresented: $showChat) {
             LiveChatSheet(stream: stream)
         }
         .enableSwipeBack(isEnabled: !isFullScreen) {
+            PlayerOrientationCoordinator.shared.resetToPortraitIfNeeded()
             onDismiss()
         }
     }

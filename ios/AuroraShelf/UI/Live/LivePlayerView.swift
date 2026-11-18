@@ -238,145 +238,166 @@ public struct LivePlayerView: View {
         }
     }
 
-    // MARK: - 顶部控制栏
+    // MARK: - 顶部与右下角控制栏（iOS 27 Glass.clear 液态玻璃 + Apple TV 拓扑）
     @ViewBuilder
     private func topControlsBar(in geo: GeometryProxy) -> some View {
         let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        let isPhysicallyLandscape = geo.size.width > geo.size.height
         let safeTop = max(topSafeArea, DeviceLayout.safeAreaTop(in: geo.size))
-        let topPadding: CGFloat = isPad ? max(20, safeTop + 6) : (isLandscape ? 16 : (safeTop + 6))
-        let gradientHeight: CGFloat = max(topPadding + 64, 130)
+        let topPadding: CGFloat = isPad
+            ? max(20, safeTop + 6)
+            : ((isFullScreen && isPhysicallyLandscape) ? 14 : (safeTop + 6))
+        let horizontalInset: CGFloat = isPad
+            ? 20
+            : ((isFullScreen && isPhysicallyLandscape) ? max(18, DeviceLayout.safeAreaHorizontalInsets.leading + 4) : 12)
+        let bottomPadding: CGFloat = isFullScreen ? max(16, DeviceLayout.safeAreaBottom) : 10
 
-        ZStack(alignment: .top) {
-            // 暗调渐变底，确保强对比度与清晰度
-            LinearGradient(
-                colors: [Color.black.opacity(0.85), Color.black.opacity(0.35), Color.clear],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: gradientHeight)
+        ZStack {
+            // 仅在极底部留柔和暗角，移除顶部 0.85 黑幕，释放 Glass.clear 视频色彩折射
+            VStack {
+                Spacer()
+                LinearGradient(
+                    colors: [Color.clear, Color.black.opacity(0.28)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 64)
+            }
             .allowsHitTesting(false)
 
-            HStack(spacing: AuroraMetrics.spacingS) {
-                // 左侧：返回 / 退出全屏按钮（iOS 27 原生 Liquid Glass 按键样式）
-                Button(action: {
-                    let impact = UIImpactFeedbackGenerator(style: .medium)
-                    impact.impactOccurred()
-                    if isFullScreen {
-                        toggleAdaptiveFullscreen(in: geo)
-                    } else {
-                        cleanupLivePlayer()
-                        onDismiss()
-                    }
-                }) {
-                    Image(systemName: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "chevron.left")
-                        .font(.system(size: 16, weight: .bold))
-                        .frame(width: 26, height: 26)
-                }
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .frame(minWidth: 44, minHeight: 44)
-                .accessibilityLabel(isFullScreen ? "退出全屏" : "返回")
-
-                // 主播信息与 LIVE 状态（严格单行、杜绝换行挤压）
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(stream.username)
-                            .font(.subheadline.bold())
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-
-                        HStack(spacing: 3) {
-                            Circle().fill(Color.red).frame(width: 5, height: 5)
-                            Text("LIVE")
-                                .font(.system(size: 9, weight: .black))
-                                .foregroundStyle(.white)
-                        }
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(Color.red.opacity(0.85), in: Capsule())
-                    }
-
-                    HStack(spacing: 4) {
-                        Text(LiveSourceCatalog.name(for: stream.sourceID))
-                            .font(.caption2.bold())
-                            .foregroundStyle(AuroraColor.brandLabel)
-                            .lineLimit(1)
-
-                        if let viewers = stream.viewCount.value {
-                            Text("•")
-                                .font(.caption2)
-                                .foregroundStyle(Color.white.opacity(0.5))
-
-                            Text("在线 \(viewers)")
-                                .font(.caption2)
-                                .foregroundStyle(Color.white.opacity(0.8))
-                                .lineLimit(1)
-                        }
-                    }
-                }
-                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-
-                Spacer(minLength: 4)
-
-                // 右侧功能键区（iOS 27 GlassEffectContainer 融合按键群组）
-                GlassEffectContainer(spacing: 4) {
-                    HStack(spacing: 4) {
-                        // 1. 聊天室按钮（与外层 LiveDetailView 共享单一 Sheet 状态）
-                        controlCircleButton(systemImage: "bubble.left.and.bubble.right", label: "打开聊天室") {
-                            if let isChatPresented {
-                                isChatPresented.wrappedValue = true
-                            } else {
-                                showRoomChat = true
-                            }
-                        }
-
-                        // 2. 画幅切换（Fit / Fill）
-                        controlCircleButton(
-                            systemImage: isFillMode ? "arrow.down.forward.and.arrow.up.backward" : "arrow.up.left.and.arrow.down.right",
-                            label: isFillMode ? "自适应画幅" : "填满全屏"
-                        ) {
-                            let impact = UIImpactFeedbackGenerator(style: .medium)
-                            impact.impactOccurred()
-                            withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
-                                isFillMode.toggle()
-                            }
-                            onToggleHUD?(isFillMode ? "已切换为填满全屏（无黑边）" : "已切换为自适应画幅（原片比例）")
-                        }
-
-                        // 3. 全屏模式下的横竖屏手动微调旋转
+            VStack {
+                HStack(spacing: AuroraMetrics.spacingS) {
+                    // 左侧：返回 / 收起全屏（Glass.clear 水滴圆钮）
+                    PlayerGlassIconButton(
+                        systemName: isFullScreen ? "chevron.down" : "chevron.left",
+                        accessibilityTitle: isFullScreen ? "退出全屏" : "返回",
+                        visualDiameter: 40,
+                        symbolSize: 16,
+                        symbolWeight: .bold
+                    ) {
+                        let impact = UIImpactFeedbackGenerator(style: .medium)
+                        impact.impactOccurred()
                         if isFullScreen {
+                            toggleAdaptiveFullscreen(in: geo)
+                        } else {
+                            PlayerOrientationCoordinator.shared.resetToPortraitIfNeeded()
+                            cleanupLivePlayer()
+                            onDismiss()
+                        }
+                    }
+
+                    // 主播信息与 LIVE 状态（严格单行）
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text(stream.username)
+                                .font(.subheadline.bold())
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+
+                            HStack(spacing: 3) {
+                                Circle().fill(Color.red).frame(width: 5, height: 5)
+                                Text("LIVE")
+                                    .font(.system(size: 9, weight: .black))
+                                    .foregroundStyle(.white)
+                            }
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.red.opacity(0.88), in: Capsule())
+                        }
+
+                        HStack(spacing: 4) {
+                            Text(LiveSourceCatalog.name(for: stream.sourceID))
+                                .font(.caption2.bold())
+                                .foregroundStyle(.white.opacity(0.88))
+                                .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
+                                .lineLimit(1)
+
+                            if let viewers = stream.viewCount.value {
+                                Text("•")
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+
+                                Text("在线 \(viewers)")
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.white.opacity(0.85))
+                                    .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+
+                    Spacer(minLength: 4)
+
+                    // 右上角精简控制组：聊天室 + AirPlay
+                    GlassEffectContainer(spacing: 8) {
+                        HStack(spacing: 8) {
+                            controlCircleButton(systemImage: "bubble.left.and.bubble.right", label: "打开聊天室") {
+                                if let isChatPresented {
+                                    isChatPresented.wrappedValue = true
+                                } else {
+                                    showRoomChat = true
+                                }
+                            }
+
+                            AirPlayRoutePicker(tint: .white)
+                                .frame(width: 38, height: 38)
+                                .glassEffect(.clear.interactive(), in: .circle)
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
+                    }
+                }
+
+                Spacer()
+
+                // 底部右侧黄金控制锚点：画幅缩放 + 旋转（全屏态） + 右下角进入/退出全屏
+                HStack {
+                    Spacer()
+                    GlassEffectContainer(spacing: 8) {
+                        HStack(spacing: 8) {
                             controlCircleButton(
-                                systemImage: isLandscape ? "iphone" : "iphone.landscape",
-                                label: isLandscape ? "切换竖屏" : "切换横屏"
+                                systemImage: isFillMode ? "rectangle.arrowtriangle.2.inward" : "rectangle.arrowtriangle.2.outward",
+                                label: isFillMode ? "自适应画幅" : "填满全屏"
                             ) {
                                 let impact = UIImpactFeedbackGenerator(style: .medium)
                                 impact.impactOccurred()
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                    isLandscape.toggle()
+                                withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                                    isFillMode.toggle()
                                 }
-                                onToggleHUD?(isLandscape ? "已切换为横屏沉浸" : "已切换为竖屏模式")
+                                onToggleHUD?(isFillMode ? "已切换为填满全屏" : "已切换为原片比例")
+                            }
+
+                            if isFullScreen && !isPad {
+                                controlCircleButton(
+                                    systemImage: "rotate.right",
+                                    label: isLandscape ? "切换竖屏" : "切换横屏"
+                                ) {
+                                    let impact = UIImpactFeedbackGenerator(style: .medium)
+                                    impact.impactOccurred()
+                                    let nextLandscape = !isLandscape
+                                    PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: nextLandscape)
+                                    withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
+                                        isLandscape = nextLandscape
+                                    }
+                                    onToggleHUD?(nextLandscape ? "已切换为横屏沉浸" : "已切换为竖屏模式")
+                                }
+                            }
+
+                            controlCircleButton(
+                                systemImage: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
+                                label: isFullScreen ? "退出全屏" : "自适应全屏"
+                            ) {
+                                toggleAdaptiveFullscreen(in: geo)
                             }
                         }
-
-                        // 4. 自适应全屏按钮（纵向流纵向全屏，横向流横向全屏）
-                        controlCircleButton(
-                            systemImage: isFullScreen ? "arrow.down.right.and.arrow.up.left" : "viewfinder",
-                            label: isFullScreen ? "退出全屏" : "自适应全屏"
-                        ) {
-                            toggleAdaptiveFullscreen(in: geo)
-                        }
-
-                        // 5. AirPlay 原生投屏
-                        AirPlayRoutePicker(tint: .white)
-                            .frame(width: 38, height: 38)
-                            .glassEffect(.regular.interactive(), in: .circle)
-                            .frame(minWidth: 44, minHeight: 44)
                     }
                 }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, horizontalInset)
             .padding(.top, topPadding)
+            .padding(.bottom, bottomPadding)
             .environment(\.colorScheme, .dark)
         }
     }
@@ -384,37 +405,38 @@ public struct LivePlayerView: View {
     private func toggleAdaptiveFullscreen(in geo: GeometryProxy) {
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            if isFullScreen {
+        if isFullScreen {
+            PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: false)
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
                 isFullScreen = false
                 isLandscape = false
-                onToggleHUD?("已退出全屏")
-            } else {
+            }
+            onToggleHUD?("已退出全屏")
+        } else {
+            let isPad = UIDevice.current.userInterfaceIdiom == .pad
+            let targetLandscape = !isPad && !isPortraitStream
+            PlayerOrientationCoordinator.shared.applyPhoneOrientation(landscape: targetLandscape)
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.86)) {
                 isFullScreen = true
-                if isPortraitStream {
-                    // 纵向直播流：自适应纵向全屏，不旋转
-                    isLandscape = false
-                    onToggleHUD?("自适应全屏 · 纵向铺满")
-                } else {
-                    // 横向直播流：如果是在手机竖屏下，自动横向全屏；若在 iPad 或横握时无需强制旋转
-                    let isPhonePortrait = geo.size.width < geo.size.height
-                    isLandscape = isPhonePortrait
-                    onToggleHUD?(isLandscape ? "自适应全屏 · 横屏沉浸" : "自适应全屏 · 铺满")
-                }
+                isLandscape = targetLandscape
+            }
+            if isPortraitStream {
+                onToggleHUD?("自适应全屏 · 纵向铺满")
+            } else {
+                onToggleHUD?(targetLandscape ? "自适应全屏 · 横屏沉浸" : "自适应全屏 · 铺满")
             }
         }
     }
 
     private func controlCircleButton(systemImage: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 14, weight: .bold))
-                .frame(width: 26, height: 26)
-        }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
-        .frame(minWidth: 44, minHeight: 44)
-        .accessibilityLabel(label)
+        PlayerGlassIconButton(
+            systemName: systemImage,
+            accessibilityTitle: label,
+            visualDiameter: 38,
+            symbolSize: 14,
+            symbolWeight: .semibold,
+            action: action
+        )
     }
 
     private func scheduleHideControls() {

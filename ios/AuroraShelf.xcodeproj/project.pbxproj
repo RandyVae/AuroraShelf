@@ -27,6 +27,7 @@
 		350F697F2B0F12E180A930A1 /* ComicDownloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF4F33A276B45953D294FB9D /* ComicDownloadManager.swift */; };
 		3BAF2994714155B634531B9B /* VideoSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92FFBE07F719CB94824F5732 /* VideoSourceCatalog.swift */; };
 		41477A9ED3386E83546FC5FF /* StripchatDOMAuditTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B638FBCEE4D5EC639E7D4C03 /* StripchatDOMAuditTests.swift */; };
+		46E466751DCB33C45B7B1C7C /* VideoPlayerNaturalUXTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0F326C82D523A0DEA976594 /* VideoPlayerNaturalUXTests.swift */; };
 		471B153BC19DC524A249BB28 /* PictureInPictureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBED9B8B4797A4CF0C9EF4FB /* PictureInPictureManager.swift */; };
 		4A0AC55008952D930FFA495A /* NetgreyLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60F11EC0D8152B62A7DC3805 /* NetgreyLogoView.swift */; };
 		4C47BFDB53CC7416F9B6ED43 /* ChannelVisualSpecTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30508D92E37F464A86E4F1B0 /* ChannelVisualSpecTests.swift */; };
@@ -63,6 +64,7 @@
 		82DE26D28A7F50B2DDD1E14D /* LiveSourceCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2EDA28E1A7594F0287AA717 /* LiveSourceCatalog.swift */; };
 		847C66B1EF176BC87E33F428 /* AccountService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71591C37AE59CF89B2DB7EF /* AccountService.swift */; };
 		8757BB73DF214D96AE1A3207 /* StorageUsageBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D69B08C76DF38E2E1E44D738 /* StorageUsageBarView.swift */; };
+		8A4B10968C94F1FCA222CC40 /* PlayerOrientationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 419678CA0A684A0699ACB748 /* PlayerOrientationCoordinator.swift */; };
 		8B9EF6F87FBE58550181F6B1 /* X134SourceServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B79C396CFD7CC837F361675 /* X134SourceServiceTests.swift */; };
 		903A163A0D4C6D077549BE02 /* LiveInlineCommentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F1DD373C73DD1FC817BCD50 /* LiveInlineCommentsView.swift */; };
 		90ABA578FB1CE018A17F97F5 /* ComicReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 813C4C5BB8EB3EA6A44A32E6 /* ComicReaderView.swift */; };
@@ -71,6 +73,7 @@
 		979C0CA84CD987FEE9CF744D /* SourceFilterBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D31E97B53BDBAA540B54C92D /* SourceFilterBar.swift */; };
 		9852D95598FFF9309144A5E7 /* HeroBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 335CE5C09D1A36F7F502A73A /* HeroBanner.swift */; };
 		A016DA2AC7DFEBB146E7A180 /* UpNextCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 92871B1E246B150EE1E59D9C /* UpNextCard.swift */; };
+		A02AA65C17D25F05CF38F52D /* LiquidGlassPlayerControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFEE18AA09CC5014080A650B /* LiquidGlassPlayerControls.swift */; };
 		A1431C436B8D2271F5551D54 /* ForumRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D6C5197F2E80F654A2D450 /* ForumRepositoryTests.swift */; };
 		A1680532CD1C4507A5B43DF8 /* DeviceLayoutProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 104EB3FCC937BDA5953815CB /* DeviceLayoutProfile.swift */; };
 		AAFC6C439F783AF3878F198A /* PlayerOverlayBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E60EBF848E0C761394D57E83 /* PlayerOverlayBar.swift */; };
@@ -92,6 +95,7 @@
 		CBF2D9E8E2D0F7056683563C /* OfflineDownloadsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = F62769745BBE61EE8AEDE167 /* OfflineDownloadsScreen.swift */; };
 		D00758CC43753672D596DE61 /* LiveScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 613ABA539A826B76628526F3 /* LiveScreen.swift */; };
 		D7193EA2BED9E64C6F9EFD41 /* VideoDetailPlaybackScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97256BC3A26DF5B484A1247A /* VideoDetailPlaybackScreen.swift */; };
+		D738259594F492F82447009F /* VideoAspectProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE5E7F036CDDC0D5738437A4 /* VideoAspectProfile.swift */; };
 		D7537AB469AFD0B836CE8B0D /* LiveSourceAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67E37DCF0FE7DFC37F1EADFF /* LiveSourceAdapterTests.swift */; };
 		D98777E6AD053DFE98636A68 /* GameSaveStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D5FC49A9B200846C489DA2C /* GameSaveStore.swift */; };
 		DA2ECD59515AD4C37AC17D2B /* VideoPreloadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57E508008FB81FF7A5CC8B78 /* VideoPreloadManager.swift */; };
@@ -159,6 +163,7 @@
 		3EA7BF7B28AF21767A84BE16 /* vi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = vi; path = vi.lproj/Localizable.strings; sourceTree = "<group>"; };
 		40CCFCDEBDA584EBD485134A /* UniversalVideoEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalVideoEngine.swift; sourceTree = "<group>"; };
 		416C023188BD71D379651DCC /* AirPlayRoutePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AirPlayRoutePicker.swift; sourceTree = "<group>"; };
+		419678CA0A684A0699ACB748 /* PlayerOrientationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerOrientationCoordinator.swift; sourceTree = "<group>"; };
 		4583DB479E89E3ED421E6886 /* ChannelsShelf.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsShelf.swift; sourceTree = "<group>"; };
 		4653F968F8CF917D9D5E9BBA /* LiveChatSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveChatSheet.swift; sourceTree = "<group>"; };
 		494E7C8A2B763FB2C3C1E1A8 /* OfflineDownloadManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineDownloadManagerTests.swift; sourceTree = "<group>"; };
@@ -227,9 +232,11 @@
 		A8F8C860B6CDCD64B5D5FDCF /* LocalizationManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManagerTests.swift; sourceTree = "<group>"; };
 		AB26D6D3D0A481EC32270C03 /* WatchlistScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchlistScreen.swift; sourceTree = "<group>"; };
 		AEEB04B9A850FF3CCC032FE8 /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManager.swift; sourceTree = "<group>"; };
+		B0F326C82D523A0DEA976594 /* VideoPlayerNaturalUXTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoPlayerNaturalUXTests.swift; sourceTree = "<group>"; };
 		B149D48BEF4DE02FF6CBA669 /* AuroraPlayerSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuroraPlayerSurface.swift; sourceTree = "<group>"; };
 		B638FBCEE4D5EC639E7D4C03 /* StripchatDOMAuditTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StripchatDOMAuditTests.swift; sourceTree = "<group>"; };
 		BC8A5B737EB00CBCC1E2AE4B /* InSightSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InSightSheetView.swift; sourceTree = "<group>"; };
+		BE5E7F036CDDC0D5738437A4 /* VideoAspectProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAspectProfile.swift; sourceTree = "<group>"; };
 		BF57FF9C43BC88622C8B9ECA /* id */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = id; path = id.lproj/Localizable.strings; sourceTree = "<group>"; };
 		C15F0D0C87A034F3C112DC9B /* OfflineDownloadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineDownloadManager.swift; sourceTree = "<group>"; };
 		C1EA971706DB5B142C628286 /* WatchlistStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchlistStore.swift; sourceTree = "<group>"; };
@@ -255,6 +262,7 @@
 		EDA8A965B0CBEB3AA554B7E0 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		EEE53A172C776FBF447BF3C4 /* AppleSpringCardButtonStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpringCardButtonStyle.swift; sourceTree = "<group>"; };
 		EF8049893611370D274210DF /* PicacgAuthStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PicacgAuthStore.swift; sourceTree = "<group>"; };
+		EFEE18AA09CC5014080A650B /* LiquidGlassPlayerControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassPlayerControls.swift; sourceTree = "<group>"; };
 		F15C962BC54424323599E239 /* id */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = id; path = id.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		F50A429402BC7F8745B96C96 /* PermissiveURLSessionDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissiveURLSessionDelegate.swift; sourceTree = "<group>"; };
 		F62769745BBE61EE8AEDE167 /* OfflineDownloadsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineDownloadsScreen.swift; sourceTree = "<group>"; };
@@ -450,6 +458,7 @@
 				B638FBCEE4D5EC639E7D4C03 /* StripchatDOMAuditTests.swift */,
 				9D148685D8675277BBE08D5B /* SwipeBackTests.swift */,
 				E31DFE8C275EFF015136D70B /* UniversalVideoEngineTests.swift */,
+				B0F326C82D523A0DEA976594 /* VideoPlayerNaturalUXTests.swift */,
 				76383B8549C83F79AC2A9C88 /* VideoPreloadManagerTests.swift */,
 				A072A76628F7FC2A7E1DEA59 /* WatchlistStoreTests.swift */,
 				3B79C396CFD7CC837F361675 /* X134SourceServiceTests.swift */,
@@ -558,8 +567,11 @@
 			isa = PBXGroup;
 			children = (
 				B149D48BEF4DE02FF6CBA669 /* AuroraPlayerSurface.swift */,
+				EFEE18AA09CC5014080A650B /* LiquidGlassPlayerControls.swift */,
 				CBED9B8B4797A4CF0C9EF4FB /* PictureInPictureManager.swift */,
 				32608864853A502C7F2377C2 /* PlayerMediaTrackMenu.swift */,
+				419678CA0A684A0699ACB748 /* PlayerOrientationCoordinator.swift */,
+				BE5E7F036CDDC0D5738437A4 /* VideoAspectProfile.swift */,
 			);
 			path = Player;
 			sourceTree = "<group>";
@@ -730,6 +742,7 @@
 				41477A9ED3386E83546FC5FF /* StripchatDOMAuditTests.swift in Sources */,
 				202600C015C485D9A40AA8B9 /* SwipeBackTests.swift in Sources */,
 				7451CF4695FAA641488589CD /* UniversalVideoEngineTests.swift in Sources */,
+				46E466751DCB33C45B7B1C7C /* VideoPlayerNaturalUXTests.swift in Sources */,
 				62876D495EF0E6BF39F21D8C /* VideoPreloadManagerTests.swift in Sources */,
 				965721297557E1D405AEEF0C /* WatchlistStoreTests.swift in Sources */,
 				8B9EF6F87FBE58550181F6B1 /* X134SourceServiceTests.swift in Sources */,
@@ -780,6 +793,7 @@
 				9852D95598FFF9309144A5E7 /* HeroBanner.swift in Sources */,
 				BB2002B6BC067E847BCDFBBC /* HomeScreen.swift in Sources */,
 				C5BC227D495B381109496DDD /* InSightSheetView.swift in Sources */,
+				A02AA65C17D25F05CF38F52D /* LiquidGlassPlayerControls.swift in Sources */,
 				B734FC1176A02B8D2113C3E2 /* LiveChatSheet.swift in Sources */,
 				E39336C05497D4E28953011D /* LiveDetailView.swift in Sources */,
 				903A163A0D4C6D077549BE02 /* LiveInlineCommentsView.swift in Sources */,
@@ -799,6 +813,7 @@
 				5358CCFF000B926522B01325 /* PlaybackProgressStore.swift in Sources */,
 				6894D8F5F0FC93870DA6F68D /* PlayerCoordinator.swift in Sources */,
 				63190032B484618AB6EBF3BA /* PlayerMediaTrackMenu.swift in Sources */,
+				8A4B10968C94F1FCA222CC40 /* PlayerOrientationCoordinator.swift in Sources */,
 				AAFC6C439F783AF3878F198A /* PlayerOverlayBar.swift in Sources */,
 				167F3309401F5892401FB651 /* PlayerScrubberBar.swift in Sources */,
 				FFEFAC413FD7E930F7153BA9 /* PosterCard.swift in Sources */,
@@ -814,6 +829,7 @@
 				F8A997F081414A41A1535249 /* UniversalVideoEngine.swift in Sources */,
 				A016DA2AC7DFEBB146E7A180 /* UpNextCard.swift in Sources */,
 				7C1B6BE741D06B59B9EA9FD4 /* UpNextShelf.swift in Sources */,
+				D738259594F492F82447009F /* VideoAspectProfile.swift in Sources */,
 				D7193EA2BED9E64C6F9EFD41 /* VideoDetailPlaybackScreen.swift in Sources */,
 				60C6580E84D1ED22FBF5CE0F /* VideoDetailSheet.swift in Sources */,
 				03A49E92E288CD637E04D863 /* VideoItem.swift in Sources */,
@@ -1043,7 +1059,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 271;
+				CURRENT_PROJECT_VERSION = 272;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1053,7 +1069,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.17.4;
+				MARKETING_VERSION = 2.17.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;
@@ -1069,7 +1085,7 @@
 				CODE_SIGNING_REQUIRED = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 271;
+				CURRENT_PROJECT_VERSION = 272;
 				DEVELOPMENT_TEAM = U4MXHLA3GF;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -1079,7 +1095,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.17.4;
+				MARKETING_VERSION = 2.17.5;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aurorashelf.app;
 				SDKROOT = iphoneos;
 				SWIFT_VERSION = 6.0;

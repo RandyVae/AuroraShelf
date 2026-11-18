@@ -112,7 +112,7 @@ public struct InSightSheetView: View {
                                 HStack {
                                     Label(
                                         isFillMode ? "画幅：裁切充满（Fill）" : "画幅：等比居中（Fit）",
-                                        systemImage: isFillMode ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right"
+                                        systemImage: isFillMode ? "rectangle.arrowtriangle.2.inward" : "rectangle.arrowtriangle.2.outward"
                                     )
                                     Spacer()
                                     Text(isFillMode ? "消除黑边" : "原始比例")

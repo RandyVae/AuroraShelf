@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct AuroraShelfApp: App {
+    @UIApplicationDelegateAdaptor(AuroraAppDelegate.self) private var appDelegate
+
     init() {
         // 确保 VideoRepository 单例按启动参数（如 --video-source）完成一次初始化
         _ = VideoRepository.shared
