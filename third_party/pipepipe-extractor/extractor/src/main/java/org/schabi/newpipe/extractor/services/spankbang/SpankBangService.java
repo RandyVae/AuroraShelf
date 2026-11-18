@@ -83,10 +83,12 @@ public final class SpankBangService extends StreamingService {
     @Override public KioskList getKioskList() throws ExtractionException {
         final KioskList kiosks = new KioskList(this);
         try {
-            kiosks.addKioskEntry((service, url, kioskId) -> new SpankBangKioskExtractor(
-                            service, SpankBangKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
-                    SpankBangKioskLinkHandlerFactory.INSTANCE, "latest");
-            kiosks.setDefaultKiosk("latest");
+            for (final String id : new String[] {"trending", "latest", "popular", "upcoming"}) {
+                kiosks.addKioskEntry((service, url, kioskId) -> new SpankBangKioskExtractor(
+                                service, SpankBangKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
+                        SpankBangKioskLinkHandlerFactory.INSTANCE, id);
+            }
+            kiosks.setDefaultKiosk("trending");
             return kiosks;
         } catch (final Exception e) {
             throw new ExtractionException("Could not initialize SpankBang kiosks", e);
@@ -141,9 +143,24 @@ final class SpankBangSearchExtractor extends SearchExtractor {
 
 final class SpankBangKioskLinkHandlerFactory extends ListLinkHandlerFactory {
     static final SpankBangKioskLinkHandlerFactory INSTANCE = new SpankBangKioskLinkHandlerFactory();
-    @Override public String getId(final String url) { return "latest"; }
+    @Override public String getId(final String url) {
+        if (url != null) {
+            if (url.contains("/new_videos")) return "latest";
+            if (url.contains("/most_popular")) return "popular";
+            if (url.contains("/upcoming")) return "upcoming";
+        }
+        return "trending";
+    }
     @Override public String getUrl(final String id, final List<FilterItem> content,
-                                   final List<FilterItem> sort) { return SpankBangParser.BASE_URL + "/"; }
+                                   final List<FilterItem> sort) {
+        switch (id == null ? "trending" : id) {
+            case "latest": return SpankBangParser.BASE_URL + "/new_videos/";
+            case "popular": return SpankBangParser.BASE_URL + "/most_popular/";
+            case "upcoming": return SpankBangParser.BASE_URL + "/upcoming/";
+            case "trending":
+            default: return SpankBangParser.BASE_URL + "/trending_videos/";
+        }
+    }
     @Override public boolean onAcceptUrl(final String url) {
         return url != null && url.startsWith(SpankBangParser.BASE_URL);
     }
@@ -155,15 +172,23 @@ final class SpankBangKioskExtractor extends KioskExtractor<org.schabi.newpipe.ex
                             final String kioskId) { super(service, handler, kioskId); }
     @Override public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException { document = SpankBangParser.fetch(getUrl()); }
-    @Nonnull @Override public String getName() { return "Latest"; }
+    @Nonnull @Override public String getName() { return getId(); }
     @Nonnull @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getInitialPage()
             throws ExtractionException {
         if (document == null) throw new ParsingException("SpankBang kiosk page was not fetched");
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-        for (final SpankBangItem item : SpankBangParser.cards(document, 40)) {
+        for (final SpankBangItem item : SpankBangParser.cards(document, 64)) {
             collector.commit(new SpankBangInfoItemExtractor(item));
         }
-        return new InfoItemsPage<>(collector, org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document));
+        Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document);
+        if (next == null && !collector.getItems().isEmpty()) {
+            final Matcher m = Pattern.compile("/(trending_videos|new_videos|most_popular|upcoming)(?:/(\\d+))?/?$").matcher(document.location());
+            if (m.find()) {
+                final int nextNum = m.group(2) == null ? 2 : Integer.parseInt(m.group(2)) + 1;
+                next = new Page(SpankBangParser.BASE_URL + "/" + m.group(1) + "/" + nextNum + "/");
+            }
+        }
+        return new InfoItemsPage<>(collector, next);
     }
     @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
         if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {

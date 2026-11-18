@@ -17,6 +17,7 @@ public struct AuroraNetworkResponse: Sendable {
 public enum AuroraNetworkError: LocalizedError, Sendable {
     case invalidResponse
     case httpStatus(Int, URL)
+    case cloudflareChallenge(URL)
     case validationFailed(URL)
     case allCandidatesFailed(String)
 
@@ -26,6 +27,8 @@ public enum AuroraNetworkError: LocalizedError, Sendable {
             return "源站未返回有效的 HTTP 响应。"
         case .httpStatus(let code, let url):
             return "源站请求失败（HTTP \(code) · \(url.host ?? "")）。"
+        case .cloudflareChallenge(let url):
+            return "源站触发 Cloudflare 人机验证保护（\(url.host ?? "")）。"
         case .validationFailed(let url):
             return "源站返回数据校验失败（\(url.host ?? "")）。"
         case .allCandidatesFailed(let detail):
@@ -103,6 +106,10 @@ public final class AuroraNetworkEngine: @unchecked Sendable {
                 registry.recordFailure(sourceKey: resolvedKey, urlOrHost: url.absoluteString, statusCode: http.statusCode, isHardBlock: isHardBlock)
                 if attempt == 0 && [502, 503, 504, 429].contains(http.statusCode) {
                     continue
+                }
+                if http.statusCode == 403,
+                   http.value(forHTTPHeaderField: "cf-mitigated")?.lowercased() == "challenge" {
+                    throw AuroraNetworkError.cloudflareChallenge(finalURL)
                 }
                 throw AuroraNetworkError.httpStatus(http.statusCode, finalURL)
             } catch let error as AuroraNetworkError {

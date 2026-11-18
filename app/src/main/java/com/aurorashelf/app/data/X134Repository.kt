@@ -92,6 +92,30 @@ internal object X134Repository {
             else -> null
         }
         val modeKey = ranking ?: "latest"
+        if (safePage > 1 && nextCursorCache["$modeKey:${safePage - 1}"] == null) {
+            var walkPage = (safePage - 1 downTo 1).firstOrNull { nextCursorCache["$modeKey:$it"] != null }?.plus(1) ?: 1
+            while (walkPage < safePage) {
+                val walkArgs = LinkedHashMap<String, Any?>().apply {
+                    put("page", walkPage)
+                    if (ranking != null) put("ranking", ranking)
+                    if (walkPage > 1) {
+                        nextCursorCache["$modeKey:${walkPage - 1}"]?.let { c ->
+                            put("cursor", c)
+                            put("direction", "next")
+                        }
+                    }
+                }
+                val walkRes = runCatching {
+                    callServerFnWithRefresh(
+                        fnSelector = { if (ranking == null) it.latest else it.ranking },
+                        data = walkArgs,
+                    )
+                }.getOrNull() ?: break
+                val walkedCursor = (walkRes["nextCursor"] as? String)?.takeIf { it.isNotBlank() } ?: break
+                nextCursorCache["$modeKey:$walkPage"] = walkedCursor
+                walkPage++
+            }
+        }
         val args = LinkedHashMap<String, Any?>().apply {
             put("page", safePage)
             if (ranking != null) {

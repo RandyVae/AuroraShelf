@@ -75,9 +75,13 @@ public final class OhentaiService extends StreamingService {
     @Override public KioskList getKioskList() throws ExtractionException {
         final KioskList kiosks = new KioskList(this);
         try {
-            kiosks.addKioskEntry((service, url, kioskId) -> new OhentaiKioskExtractor(
-                            service, OhentaiKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
-                    OhentaiKioskLinkHandlerFactory.INSTANCE, "latest");
+            for (final String id : new String[] {
+                    "latest", "popular", "recommended", "uncensored", "1080p", "3d"
+            }) {
+                kiosks.addKioskEntry((service, url, kioskId) -> new OhentaiKioskExtractor(
+                                service, OhentaiKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
+                        OhentaiKioskLinkHandlerFactory.INSTANCE, id);
+            }
             kiosks.setDefaultKiosk("latest");
             return kiosks;
         } catch (final Exception e) {
@@ -121,9 +125,28 @@ final class OhentaiSearchExtractor extends SearchExtractor {
 
 final class OhentaiKioskLinkHandlerFactory extends ListLinkHandlerFactory {
     static final OhentaiKioskLinkHandlerFactory INSTANCE = new OhentaiKioskLinkHandlerFactory();
-    @Override public String getId(final String url) { return "latest"; }
+    @Override public String getId(final String url) {
+        if (url != null) {
+            if (url.contains("sort=most_viewed")) return "popular";
+            if (url.contains("sort=most_liked")) return "recommended";
+            if (url.contains("tag=Uncensored")) return "uncensored";
+            if (url.contains("tag=1080p")) return "1080p";
+            if (url.contains("tag=3D")) return "3d";
+        }
+        return "latest";
+    }
     @Override public String getUrl(final String id, final List<FilterItem> content,
-                                   final List<FilterItem> sort) { return OhentaiParser.BASE + "/"; }
+                                   final List<FilterItem> sort) {
+        switch (id == null ? "latest" : id) {
+            case "popular": return OhentaiParser.BASE + "/index.php?sort=most_viewed";
+            case "recommended": return OhentaiParser.BASE + "/index.php?sort=most_liked";
+            case "uncensored": return OhentaiParser.BASE + "/tagsearch.php?tag=Uncensored";
+            case "1080p": return OhentaiParser.BASE + "/tagsearch.php?tag=1080p";
+            case "3d": return OhentaiParser.BASE + "/tagsearch.php?tag=3D";
+            case "latest":
+            default: return OhentaiParser.BASE + "/index.php?sort=publish_time";
+        }
+    }
     @Override public boolean onAcceptUrl(final String url) {
         return url != null && url.startsWith(OhentaiParser.BASE);
     }
@@ -135,7 +158,7 @@ final class OhentaiKioskExtractor extends KioskExtractor<org.schabi.newpipe.extr
                           final String kioskId) { super(service, handler, kioskId); }
     @Override public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException { document = OhentaiParser.fetch(getUrl()); }
-    @Nonnull @Override public String getName() { return "Latest"; }
+    @Nonnull @Override public String getName() { return getId(); }
     @Nonnull @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getInitialPage()
             throws ExtractionException {
         if (document == null) throw new ParsingException("OHentai kiosk page was not fetched");
@@ -143,7 +166,18 @@ final class OhentaiKioskExtractor extends KioskExtractor<org.schabi.newpipe.extr
         for (final OhentaiItem item : OhentaiParser.cards(document, 40)) {
             collector.commit(new OhentaiItemExtractor(item));
         }
-        return new InfoItemsPage<>(collector, org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document));
+        Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document);
+        if (next == null && !collector.getItems().isEmpty()) {
+            final String loc = document.location();
+            final Matcher m = Pattern.compile("([?&])p=(\\d+)").matcher(loc);
+            final String nextUrl = m.find()
+                    ? m.replaceFirst("$1p=" + (Integer.parseInt(m.group(2)) + 1))
+                    : loc + (loc.contains("?") ? "&p=2" : "?p=2");
+            if (org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(loc, nextUrl)) {
+                next = new Page(nextUrl);
+            }
+        }
+        return new InfoItemsPage<>(collector, next);
     }
     @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
         if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {

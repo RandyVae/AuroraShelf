@@ -43,11 +43,16 @@ class VideoRepositoryTest {
         val repository = VideoRepository()
         assertEquals("https://missav.ws/ja", repository.pageUrl("https://missav.ws", com.aurorashelf.app.model.FeedCategory.RECENT, 1))
         assertEquals("https://missav.ws/ja/release", repository.pageUrl("https://missav.ws", com.aurorashelf.app.model.FeedCategory.CURRENT_HOT, 1))
+        val officialCategories = com.aurorashelf.app.model.ContentSourceCatalog.sourceCategories("https://missav.ws")
+        assertEquals(9, officialCategories.size)
+        assertEquals(officialCategories.size, officialCategories.map { it.id }.distinct().size)
         assertEquals(
             listOf(
                 com.aurorashelf.app.model.FeedCategory.RECENT,
                 com.aurorashelf.app.model.FeedCategory.CURRENT_HOT,
                 com.aurorashelf.app.model.FeedCategory.MONTHLY_HOT,
+                com.aurorashelf.app.model.FeedCategory.FAVORITES,
+                com.aurorashelf.app.model.FeedCategory.ALL,
             ),
             com.aurorashelf.app.model.FeedCategory.availableFor("https://missav.ws"),
         )

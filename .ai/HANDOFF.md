@@ -1,4 +1,16 @@
-## 最新交接：2026-11-18 — 全栈 86 项优化审计问题全面整改、服务端安全部署、三端 Release 模拟器全规模验收与双通道同步上线 · v2.17.0 (Build 267)
+## 最新交接：2026-11-18 — 全量 18 视频源与漫画官方分类 1:1 对齐、全源多页分页死锁根治、91动漫新版播放器 API 适配、三端 Release 模拟器全规模验收与双通道同步上线 · v2.17.1 (Build 268)
+
+### 本次完成
+1. **18 视频源与漫画源官方分类对齐及多页分页死锁根治（Android + iPhone + iPad）**：
+   - **PipePipe 提取器层（`third_party/pipepipe-extractor`）**：修复 `TokyoMotion`（`?o=mr|bw|mv|tr|tf|lg` 6 频道）、`Pornhub`（5 频道 + `&page=N`）、`MissAV`（9 官方频道）、`EPORNER`（7 官方 API v2 频道，`per_page=40`）、`SpankBang`（4 频道）、`xHamster`（6 频道 + 桌面 UA 首屏 46 条）、`OHentai`（6 频道 + `&p=N` 分页）、`XNXX`（5 频道 + `0` 基路径分页与 `/best/YYYY-MM` 月度分页）、`MRDOUGA`（6 频道）与 `KissJAV`（路径分页兜底）。
+   - **Android 客户端**：更新 [ContentSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/ContentSource.kt)、[HuangguoEdgeGateway.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/HuangguoEdgeGateway.kt)、[VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt)（`MissAV` 双子页聚合 24 条/页、`Beeg` `limit=48`、`91动漫` 9 分类含泡面番、`华视影院` 15 分类、`91视频` 12 分类）、[X134Repository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/X134Repository.kt) 与 [PlaybackResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PlaybackResolver.kt)（同步适配 `91动漫` 2026-11-17 新上线的 `data-episode-id` + `POST /api/dm/anime/episodes/{id}/playback` 接口与 `data-episode-item` 选集）。
+   - **iOS / iPadOS 客户端**：更新 [VideoSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoSourceCatalog.swift)、[HTMLVideoSourceAdapter.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/HTMLVideoSourceAdapter.swift)、[UniversalVideoEngine.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/UniversalVideoEngine.swift)（修复 `EPORNER` 将中文分类名拼入 `query=` 导致返回 0 条的 Bug）、[X134SourceService.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/X134SourceService.swift) 与 [VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift)（修复华视「短剧」误用 `typeId=20` 港台综艺的 Bug、新增 `hydrateOverviewShelves` 后台拉取真实分类片单、适配 `91动漫` 新版播放 API 与 `xHamster` 桌面 UA 44 条）；在 [HomeScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/HomeScreen.swift) 增加官方分类横向胶囊条与触底无限加载，在 [CategoryDetailScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/CategoryDetailScreen.swift) 增加「全部」胶囊与分页重试，在 [ComicsScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/ComicsScreen.swift) 增加漫画分类横向胶囊条。
+2. **全量验证与双通道同步发布（`v2.17.1 Build 268`）**：
+   - Android：离线 276 项单测 0 失败、`lintDebug` 0 error、在线 `FullSystemSourceProbeTest` **18/18 视频源全通**（首屏 20–64 条 + 播放全 `OK`）；`emulator-5554` R8 APK 全模块与游戏 `Version 2.17.1` 实测 `0` 异常。
+   - iOS / iPadOS：离线 199 项单测 0 失败、在线全源 + 全源多页分页探针（`LiveVideoSourceAuditTests`、`ComicRepositoryTests`、`ForumRepositoryTests`、`LiveSourceAdapterTests`）全通；`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器全模块实测通过。
+   - 双通道上线：`https://bananarey.us`（`Netgrey.apk` `143,337,446` B、`Netgrey.ipa` `140,091,640` B、`manifest.plist` `2.17.1`、`source-manifest.json` `2.17.1` 均 `HTTP 200`，`/` 剩 `11G`）与 TestFlight `v2.17.1 (Build 268)` 同步上线。
+
+## 历史交接：2026-11-18 — 全栈 86 项优化审计问题全面整改、服务端安全部署、三端 Release 模拟器全规模验收与双通道同步上线 · v2.17.0 (Build 267)
 
 ### 本次完成
 1. **后端、OTA 与 PocketBase 全面加固并实部署上线（`SEC-01`、`SEC-02`、`SEC-11`、`OPS-01..10`）**：

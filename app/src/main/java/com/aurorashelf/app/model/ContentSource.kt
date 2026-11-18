@@ -153,12 +153,82 @@ object ContentSourceCatalog {
                 val legacy = FeedCategory.entries.firstOrNull { it.xvideosKioskId == kioskId }
                 SourceCategory(
                     id = kioskId,
-                    label = kioskLabel(kioskId),
+                    label = kioskLabelForService(source.extractorServiceName, kioskId),
                     path = legacy?.path,
                     kioskId = kioskId,
                     legacy = legacy,
                 )
             }
+        }
+
+        if (isHuavod(baseUrl)) {
+            return listOf(
+                SourceCategory("movie", "电影", path = "/vodshow/1.html", legacy = FeedCategory.RECENT),
+                SourceCategory("tv", "电视剧", path = "/vodshow/2.html", legacy = FeedCategory.CURRENT_HOT),
+                SourceCategory("variety", "综艺", path = "/vodshow/3.html", legacy = FeedCategory.MONTHLY_HOT),
+                SourceCategory("anime", "动漫", path = "/vodshow/4.html", legacy = FeedCategory.FAVORITES),
+                SourceCategory("short", "短剧", path = "/vodshow/5.html", legacy = FeedCategory.ALL),
+                SourceCategory("douban", "豆瓣高分", path = "/vodshow/1/by/douban.html"),
+                SourceCategory("cn-tv", "大陆剧", path = "/vodshow/14.html"),
+                SourceCategory("hk-tv", "港台剧", path = "/vodshow/15.html"),
+                SourceCategory("jk-tv", "日韩剧", path = "/vodshow/16.html"),
+                SourceCategory("us-tv", "欧美剧", path = "/vodshow/17.html"),
+                SourceCategory("scifi", "奇幻科幻", path = "/vodshow/6.html"),
+                SourceCategory("action", "动作冒险", path = "/vodshow/7.html"),
+                SourceCategory("thriller", "悬疑惊悚", path = "/vodshow/8.html"),
+                SourceCategory("comedy", "爱情喜剧", path = "/vodshow/9.html"),
+                SourceCategory("anim-movie", "动画电影", path = "/vodshow/11.html"),
+            )
+        }
+        if (isHuangguo(baseUrl)) {
+            return listOf(
+                SourceCategory("newest", "最近上新", path = "/newest", legacy = FeedCategory.RECENT),
+                SourceCategory("recommend", "热门推荐", path = "/recommend", legacy = FeedCategory.CURRENT_HOT),
+                SourceCategory("original", "黄果原创", path = "/original/"),
+                SourceCategory("duanju", "短剧", path = "/ai-duanju/", legacy = FeedCategory.ALL),
+                SourceCategory("manju", "漫剧", path = "/ai-manju/", legacy = FeedCategory.MONTHLY_HOT),
+            )
+        }
+        if (is91Dongman(baseUrl)) {
+            return listOf(
+                SourceCategory("lifan", "里番", path = "/anime/lifan/", legacy = FeedCategory.RECENT),
+                SourceCategory("paomian", "泡面番", path = "/anime/paomian/"),
+                SourceCategory("3d", "3D动漫", path = "/anime/3d/", legacy = FeedCategory.CURRENT_HOT),
+                SourceCategory("ai", "AI动漫", path = "/anime/ai/", legacy = FeedCategory.MONTHLY_HOT),
+                SourceCategory("ca", "纯爱", path = "/anime/tag/ca/"),
+                SourceCategory("jqx", "剧情向", path = "/anime/tag/jqx/"),
+                SourceCategory("dp", "短篇", path = "/anime/tag/dp/"),
+                SourceCategory("ranking", "热门排行", path = "/ranking/", legacy = FeedCategory.FAVORITES),
+                SourceCategory("all", "全部总览", path = "/anime/", legacy = FeedCategory.ALL),
+            )
+        }
+        if (is91(baseUrl)) {
+            return listOf(
+                SourceCategory("hot", "当前最热", path = "v.php?category=hot&viewtype=basic", legacy = FeedCategory.CURRENT_HOT),
+                SourceCategory("rf", "最近加精", path = "v.php?category=rf&viewtype=basic", legacy = FeedCategory.RECENT),
+                SourceCategory("ori", "91原创", path = "v.php?category=ori&viewtype=basic"),
+                SourceCategory("top", "本月最热", path = "v.php?category=top&viewtype=basic", legacy = FeedCategory.MONTHLY_HOT),
+                SourceCategory("top-prev", "上月最热", path = "v.php?category=top&m=-1&viewtype=basic"),
+                SourceCategory("long", "10分钟以上", path = "v.php?category=long&viewtype=basic"),
+                SourceCategory("longer", "20分钟以上", path = "v.php?category=longer&viewtype=basic"),
+                SourceCategory("tf", "收藏最多", path = "v.php?category=tf&viewtype=basic", legacy = FeedCategory.FAVORITES),
+                SourceCategory("mf", "本月收藏", path = "v.php?category=mf&viewtype=basic"),
+                SourceCategory("md", "本月讨论", path = "v.php?category=md&viewtype=basic"),
+                SourceCategory("hd", "高清", path = "v.php?category=hd&viewtype=basic"),
+                SourceCategory("all", "最新上传", path = "v.php?next=watch&viewtype=basic", legacy = FeedCategory.ALL),
+            )
+        }
+        if (isBeeg(baseUrl)) {
+            return listOf(
+                SourceCategory("index", "精选", path = "index", legacy = FeedCategory.RECENT),
+                SourceCategory("amateur", "自拍", path = "amateur", legacy = FeedCategory.CURRENT_HOT),
+                SourceCategory("japanese", "日本", path = "japanese", legacy = FeedCategory.MONTHLY_HOT),
+                SourceCategory("asian", "亚洲", path = "asian", legacy = FeedCategory.ALL),
+                SourceCategory("milf", "熟女", path = "milf", legacy = FeedCategory.FAVORITES),
+                SourceCategory("teen", "少女", path = "teen"),
+                SourceCategory("korean", "韩国", path = "korean"),
+                SourceCategory("european", "欧美", path = "european"),
+            )
         }
 
         val categories = FeedCategory.availableFor(baseUrl).map { category ->
@@ -192,11 +262,129 @@ object ContentSourceCatalog {
     }
 
     fun kioskLabel(baseUrl: String, category: FeedCategory): String? =
-        kioskId(baseUrl, category)?.let(::kioskLabel)
+        kioskId(baseUrl, category)?.let { kioskLabelForService(serviceName(baseUrl), it) }
+
+    fun kioskLabelForService(serviceName: String?, kioskId: String?): String = when (serviceName) {
+        "MissAV" -> when (kioskId) {
+            "latest" -> "最近更新"
+            "release" -> "新作上市"
+            "chinese-subtitle" -> "中文字幕"
+            "today-hot" -> "今日热门"
+            "weekly-hot" -> "本周热门"
+            "monthly-hot" -> "本月热门"
+            "uncensored-leak" -> "无码流出"
+            "siro" -> "素人 SIRO"
+            "fc2" -> "FC2"
+            else -> kioskLabel(kioskId)
+        }
+        "TOKYO Motion" -> when (kioskId) {
+            "latest" -> "最新上传"
+            "watching" -> "正在观看"
+            "popular" -> "最多观看"
+            "recommended" -> "最高评分"
+            "favorited" -> "最多收藏"
+            "longest" -> "最长片长"
+            else -> kioskLabel(kioskId)
+        }
+        "EPORNER" -> when (kioskId) {
+            "latest" -> "最新发布"
+            "popular" -> "最多观看"
+            "recommended" -> "最高评分"
+            "weekly" -> "本周热门"
+            "monthly" -> "本月热门"
+            "longest" -> "最长片长"
+            "4k" -> "4K 超清"
+            else -> kioskLabel(kioskId)
+        }
+        "SpankBang" -> when (kioskId) {
+            "trending" -> "热门趋势"
+            "latest" -> "最新上传"
+            "popular" -> "最受欢迎"
+            "upcoming" -> "即将热门"
+            else -> kioskLabel(kioskId)
+        }
+        "xHamster" -> when (kioskId) {
+            "best" -> "最佳热门"
+            "latest" -> "最新发布"
+            "4k" -> "4K 超清"
+            "hd" -> "高清 HD"
+            "full-length" -> "完整长片"
+            "subtitles" -> "带字幕"
+            else -> kioskLabel(kioskId)
+        }
+        "OHentai" -> when (kioskId) {
+            "latest" -> "最新发布"
+            "popular" -> "最多观看"
+            "recommended" -> "最多喜欢"
+            "uncensored" -> "无码精选"
+            "1080p" -> "1080P"
+            "3d" -> "3D 动画"
+            else -> kioskLabel(kioskId)
+        }
+        "XNXX" -> when (kioskId) {
+            "today" -> "今日精选"
+            "hits" -> "热门点击"
+            "weekly" -> "本周热门"
+            "monthly" -> "本月热门"
+            "best" -> "月度最佳"
+            else -> kioskLabel(kioskId)
+        }
+        "MRDOUGA" -> when (kioskId) {
+            "latest" -> "最新更新"
+            "today-hot" -> "今日热门"
+            "popular" -> "总热门"
+            "jav" -> "JAV 专区"
+            "jvip" -> "JVIP 精选"
+            "fc2ppv" -> "FC2PPV"
+            else -> kioskLabel(kioskId)
+        }
+        "Pornhub" -> when (kioskId) {
+            "trending" -> "当下热门"
+            "latest" -> "最新上线"
+            "popular" -> "最多观看"
+            "recommended" -> "最高评分"
+            "longest" -> "最长片长"
+            else -> kioskLabel(kioskId)
+        }
+        "KissJAV", "85po" -> when (kioskId) {
+            "latest" -> "最新更新"
+            "popular" -> "最受欢迎"
+            "recommended" -> "最高评分"
+            else -> kioskLabel(kioskId)
+        }
+        else -> kioskLabel(kioskId)
+    }
 
     fun kioskLabel(kioskId: String?): String = when (kioskId) {
         "latest" -> "最新"
         "best" -> "热门"
+        "trending" -> "当下热门"
+        "watching" -> "正在观看"
+        "favorited" -> "最多收藏"
+        "longest" -> "最长片长"
+        "weekly" -> "本周热门"
+        "monthly" -> "本月热门"
+        "today" -> "今日精选"
+        "hits" -> "热门点击"
+        "upcoming" -> "即将热门"
+        "release" -> "新作上市"
+        "chinese-subtitle" -> "中文字幕"
+        "today-hot" -> "今日热门"
+        "weekly-hot" -> "本周热门"
+        "monthly-hot" -> "本月热门"
+        "uncensored-leak" -> "无码流出"
+        "siro" -> "素人 SIRO"
+        "fc2" -> "FC2"
+        "4k" -> "4K 超清"
+        "hd" -> "高清 HD"
+        "full-length" -> "完整长片"
+        "subtitles" -> "带字幕"
+        "uncensored" -> "无码精选"
+        "1080p" -> "1080P"
+        "3d" -> "3D 动画"
+        "jav" -> "JAV 专区"
+        "jvip" -> "JVIP 精选"
+        "fc2ppv" -> "FC2PPV"
         "chinese" -> "中文"
         "amateur" -> "自拍"
         "asian" -> "亚洲"
@@ -252,7 +440,15 @@ object ContentSourceCatalog {
     }.getOrNull()
 
     private val KIOSK_ORDER = listOf(
-        "latest", "best", "chinese", "amateur", "asian", "verified",
+        "trending", "today", "hits", "best", "latest",
+        "release", "chinese-subtitle", "today-hot", "weekly-hot", "monthly-hot",
+        "uncensored-leak", "siro", "fc2",
+        "watching", "popular", "recommended", "favorited",
+        "weekly", "monthly", "longest", "upcoming",
+        "4k", "hd", "full-length", "subtitles",
+        "uncensored", "1080p", "3d",
+        "jav", "jvip", "fc2ppv",
+        "chinese", "amateur", "asian", "verified",
         "ai", "milf", "teen", "big-tits", "big-ass", "big-cock",
         "blowjob", "anal", "squirting", "creampie", "cumshot",
         "stockings", "lingerie", "blonde", "brunette", "redhead",
@@ -260,6 +456,5 @@ object ContentSourceCatalog {
         "lesbian", "bi", "femdom", "gangbang", "family",
         "cuckold", "bbw", "mature", "solo", "oiled",
         "fisting", "gapes", "cam", "asmr",
-        "popular", "recommended",
     )
 }

@@ -597,6 +597,43 @@ public struct ComicsScreen: View {
                         }
                     )
 
+                    // 2.5 漫画源官方分类横向胶囊导航栏（解锁各漫画平台完整分类筛选与无限翻页）
+                    if repo.currentSource.categories.count > 1 {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: AuroraMetrics.spacingS) {
+                                ForEach(repo.currentSource.categories, id: \.self) { cat in
+                                    let isSelected = (repo.selectedCategory == cat)
+                                    Button {
+                                        guard repo.selectedCategory != cat else { return }
+                                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                        withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                                            repo.switchCategory(to: cat)
+                                        }
+                                    } label: {
+                                        Text(cat)
+                                            .font(.subheadline.weight(isSelected ? .bold : .medium))
+                                            .foregroundStyle(isSelected ? Color.white : AuroraColor.textPrimary)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                                in: Capsule()
+                                            )
+                                            .overlay(
+                                                Capsule()
+                                                    .stroke(isSelected ? Color.clear : AuroraColor.hairline, lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .frame(minHeight: AuroraMetrics.minTouchTarget)
+                                    .accessibilityLabel("漫画分类 \(cat)")
+                                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                                }
+                            }
+                            .padding(.horizontal, AuroraMetrics.contentInset)
+                        }
+                    }
+
                     // 3. 人气精选漫画（标准 2:3 海报画幅，与主页完全统一，拔除粗糙的 1234 排行大字）
                     if !top10Comics.isEmpty {
                         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {

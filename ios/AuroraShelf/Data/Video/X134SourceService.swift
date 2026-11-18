@@ -307,6 +307,37 @@ public actor X134SourceService {
         }
 
         let modeKey = ranking ?? "latest"
+        if safePage > 1, nextCursorCache["\(modeKey):\(safePage - 1)"] == nil {
+            var walkPage = 1
+            for candidate in stride(from: safePage - 1, through: 1, by: -1) {
+                if nextCursorCache["\(modeKey):\(candidate)"] != nil {
+                    walkPage = candidate + 1
+                    break
+                }
+            }
+            while walkPage < safePage {
+                var walkFields: [String: X134SerovalValue] = [
+                    "page": .number(Double(walkPage))
+                ]
+                if let ranking {
+                    walkFields["ranking"] = .string(ranking)
+                }
+                if walkPage > 1, let prevCursor = nextCursorCache["\(modeKey):\(walkPage - 1)"] {
+                    walkFields["cursor"] = .string(prevCursor)
+                    walkFields["direction"] = .string("next")
+                }
+                guard let walkResult = try? await callServerFnWithRefresh(
+                    fnSelector: { ranking == nil ? $0.latest : $0.ranking },
+                    data: walkFields
+                ),
+                let walkedCursor = walkResult["nextCursor"]?.stringValue,
+                !walkedCursor.isEmpty else {
+                    break
+                }
+                recordCursor(key: "\(modeKey):\(walkPage)", cursor: walkedCursor)
+                walkPage += 1
+            }
+        }
         var dataFields: [String: X134SerovalValue] = [
             "page": .number(Double(safePage))
         ]

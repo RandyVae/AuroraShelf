@@ -78,10 +78,12 @@ public final class XnxxService extends StreamingService {
     @Override public KioskList getKioskList() throws ExtractionException {
         final KioskList kiosks = new KioskList(this);
         try {
-            kiosks.addKioskEntry((service, url, kioskId) -> new XnxxKioskExtractor(
-                            service, XnxxKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
-                    XnxxKioskLinkHandlerFactory.INSTANCE, "latest");
-            kiosks.setDefaultKiosk("latest");
+            for (final String id : new String[] {"today", "hits", "weekly", "monthly", "best"}) {
+                kiosks.addKioskEntry((service, url, kioskId) -> new XnxxKioskExtractor(
+                                service, XnxxKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
+                        XnxxKioskLinkHandlerFactory.INSTANCE, id);
+            }
+            kiosks.setDefaultKiosk("today");
             return kiosks;
         } catch (final Exception e) {
             throw new ExtractionException("Could not initialize XNXX kiosks", e);
@@ -132,9 +134,27 @@ final class XnxxSearchExtractor extends SearchExtractor {
 
 final class XnxxKioskLinkHandlerFactory extends ListLinkHandlerFactory {
     static final XnxxKioskLinkHandlerFactory INSTANCE = new XnxxKioskLinkHandlerFactory();
-    @Override public String getId(final String url) { return "latest"; }
+    @Override public String getId(final String url) {
+        if (url != null) {
+            if (url.contains("/hits/week")) return "weekly";
+            if (url.contains("/hits/month")) return "monthly";
+            if (url.contains("/hits")) return "hits";
+            if (url.contains("/best")) return "best";
+        }
+        return "today";
+    }
     @Override public String getUrl(final String id, final List<FilterItem> content,
-                                   final List<FilterItem> sort) { return XnxxParser.BASE + "/best/"; }
+                                   final List<FilterItem> sort) {
+        switch (id == null ? "today" : id) {
+            case "hits": return XnxxParser.BASE + "/hits";
+            case "weekly": return XnxxParser.BASE + "/hits/week";
+            case "monthly": return XnxxParser.BASE + "/hits/month";
+            case "best": return XnxxParser.BASE + "/best";
+            case "today":
+            case "latest":
+            default: return XnxxParser.BASE + "/todays-selection";
+        }
+    }
     @Override public boolean onAcceptUrl(final String url) {
         return url != null && url.startsWith(XnxxParser.BASE);
     }
@@ -146,7 +166,7 @@ final class XnxxKioskExtractor extends KioskExtractor<org.schabi.newpipe.extract
                        final String kioskId) { super(service, handler, kioskId); }
     @Override public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException { document = XnxxParser.fetch(getUrl()); }
-    @Nonnull @Override public String getName() { return "Latest"; }
+    @Nonnull @Override public String getName() { return getId(); }
     @Nonnull @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getInitialPage()
             throws ExtractionException {
         if (document == null) throw new ParsingException("XNXX kiosk page was not fetched");
@@ -154,7 +174,25 @@ final class XnxxKioskExtractor extends KioskExtractor<org.schabi.newpipe.extract
         for (final XnxxItem item : XnxxParser.cards(document, 48)) {
             collector.commit(new XnxxItemExtractor(item));
         }
-        return new InfoItemsPage<>(collector, org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document));
+        Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document);
+        if (next == null && !collector.getItems().isEmpty()) {
+            final String loc = document.location();
+            final Matcher mHits = Pattern.compile("/(todays-selection|hits/week|hits/month|hits)(?:/(\\d+))?/?$").matcher(loc);
+            if (mHits.find()) {
+                final int nextIdx = mHits.group(2) == null ? 1 : Integer.parseInt(mHits.group(2)) + 1;
+                next = new Page(XnxxParser.BASE + "/" + mHits.group(1) + "/" + nextIdx);
+            } else {
+                final Matcher mBest = Pattern.compile("/best(?:/(\\d{4})-(\\d{2}))?/?$").matcher(loc);
+                if (mBest.find()) {
+                    final java.time.YearMonth currentYm = mBest.group(1) != null
+                            ? java.time.YearMonth.of(Integer.parseInt(mBest.group(1)), Integer.parseInt(mBest.group(2)))
+                            : java.time.YearMonth.now();
+                    final java.time.YearMonth prevYm = currentYm.minusMonths(1);
+                    next = new Page(String.format(java.util.Locale.US, "%s/best/%04d-%02d", XnxxParser.BASE, prevYm.getYear(), prevYm.getMonthValue()));
+                }
+            }
+        }
+        return new InfoItemsPage<>(collector, next);
     }
     @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
         if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {

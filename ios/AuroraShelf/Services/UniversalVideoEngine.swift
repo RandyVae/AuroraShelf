@@ -4,6 +4,7 @@ public enum VideoFeedError: LocalizedError {
     case invalidURL(source: String)
     case invalidResponse(source: String)
     case httpStatus(source: String, statusCode: Int)
+    case cloudflareChallenge(source: String)
     case malformedResponse(source: String)
     case unsupportedSource(source: String)
 
@@ -15,6 +16,8 @@ public enum VideoFeedError: LocalizedError {
             return "\(source) 返回了无效响应。"
         case .httpStatus(let source, let statusCode):
             return "\(source) 请求失败（HTTP \(statusCode)）。"
+        case .cloudflareChallenge(let source):
+            return "\(source) 当前触发 Cloudflare 人机验证保护（HTTP 403）。"
         case .malformedResponse(let source):
             return "无法读取 \(source) 返回的内容。"
         case .unsupportedSource(let source):
@@ -171,12 +174,39 @@ public enum UniversalVideoEngine {
         return items
     }
 
+    public static func epornerQueryAndOrder(for category: String) -> (query: String, order: String) {
+        switch category {
+        case "最多观看", "热门":
+            return ("", "most-popular")
+        case "最高评分", "推荐":
+            return ("", "top-rated")
+        case "本周热门":
+            return ("", "top-weekly")
+        case "本月热门":
+            return ("", "top-monthly")
+        case "最长片长":
+            return ("", "longest")
+        case "4K 超清", "4K":
+            return ("4k", "latest")
+        case "全部", "最新", "最新发布":
+            return ("", "latest")
+        default:
+            return (category, "latest")
+        }
+    }
+
     public static func fetchEPORNERFeed(category: String, session: URLSession, page: Int = 1) async throws -> [VideoItem] {
         var components = URLComponents(string: "https://www.eporner.com/api/v2/video/search/")
+        let (query, order) = epornerQueryAndOrder(for: category)
         components?.queryItems = [
-            URLQueryItem(name: "query", value: category == "全部" ? "featured" : category),
-            URLQueryItem(name: "per_page", value: "24"),
-            URLQueryItem(name: "page", value: String(max(page, 1)))
+            URLQueryItem(name: "query", value: query),
+            URLQueryItem(name: "order", value: order),
+            URLQueryItem(name: "per_page", value: "40"),
+            URLQueryItem(name: "page", value: String(max(page, 1))),
+            URLQueryItem(name: "thumbsize", value: "medium"),
+            URLQueryItem(name: "gay", value: "0"),
+            URLQueryItem(name: "lq", value: "0"),
+            URLQueryItem(name: "format", value: "json")
         ]
         guard let url = components?.url else {
             throw VideoFeedError.invalidURL(source: "EPORNER")

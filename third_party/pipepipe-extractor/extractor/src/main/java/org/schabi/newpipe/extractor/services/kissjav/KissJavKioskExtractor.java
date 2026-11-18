@@ -55,7 +55,21 @@ public final class KissJavKioskExtractor extends KioskExtractor<StreamInfoItem> 
                 : KissJavParsingHelper.extractVideoCards(document, 40)) {
             collector.commit(new KissJavInfoItemExtractor(result));
         }
-        return new InfoItemsPage<>(collector, HtmlPagination.nextPage(document));
+        Page next = HtmlPagination.nextPage(document);
+        if (next == null && !collector.getItems().isEmpty()) {
+            final String loc = document.location();
+            final String pathPart = loc.contains("?") ? loc.substring(0, loc.indexOf('?')) : loc;
+            final String queryPart = loc.contains("?") ? loc.substring(loc.indexOf('?')) : "";
+            final java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(https://[^/]+/(?:latest-updates|most-popular))(?:/(\\d+))?/?$").matcher(pathPart);
+            if (m.find()) {
+                final int nextNum = m.group(2) == null ? 2 : Integer.parseInt(m.group(2)) + 1;
+                final String nextUrl = m.group(1) + "/" + nextNum + "/" + queryPart;
+                if (HtmlPagination.isSafeNext(loc, nextUrl)) {
+                    next = new Page(nextUrl);
+                }
+            }
+        }
+        return new InfoItemsPage<>(collector, next);
     }
 
     @Override

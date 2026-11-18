@@ -80,25 +80,17 @@ public final class PornhubService extends StreamingService {
     public KioskList getKioskList() throws ExtractionException {
         final KioskList list = new KioskList(this);
         try {
-            list.addKioskEntry((service, url, kioskId) -> new PornhubKioskExtractor(
-                            service,
-                            PornhubKioskLinkHandlerFactory.getInstance().fromId(kioskId),
-                            kioskId),
-                    PornhubKioskLinkHandlerFactory.getInstance(),
-                    "latest");
-            list.addKioskEntry((service, url, kioskId) -> new PornhubKioskExtractor(
-                            service,
-                            PornhubKioskLinkHandlerFactory.getInstance().fromId(kioskId),
-                            kioskId),
-                    PornhubKioskLinkHandlerFactory.getInstance(),
-                    "popular");
-            list.addKioskEntry((service, url, kioskId) -> new PornhubKioskExtractor(
-                            service,
-                            PornhubKioskLinkHandlerFactory.getInstance().fromId(kioskId),
-                            kioskId),
-                    PornhubKioskLinkHandlerFactory.getInstance(),
-                    "recommended");
-            list.setDefaultKiosk("latest");
+            for (final String id : new String[] {
+                    "trending", "latest", "popular", "recommended", "longest"
+            }) {
+                list.addKioskEntry((service, url, kioskId) -> new PornhubKioskExtractor(
+                                service,
+                                PornhubKioskLinkHandlerFactory.getInstance().fromId(kioskId),
+                                kioskId),
+                        PornhubKioskLinkHandlerFactory.getInstance(),
+                        id);
+            }
+            list.setDefaultKiosk("trending");
         } catch (final Exception e) {
             throw new ExtractionException("Could not initialize Pornhub kiosks", e);
         }

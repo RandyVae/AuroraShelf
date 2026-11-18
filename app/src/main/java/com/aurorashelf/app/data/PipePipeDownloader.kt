@@ -123,6 +123,9 @@ internal class PipePipeDownloader : Downloader() {
 
     private fun okhttp3.Response.toExtractorResponse(originalUrl: String): Response {
         if (code == 429) throw ReCaptchaException("站点要求进行人机验证", originalUrl)
+        if (code == 403 && header("cf-mitigated")?.equals("challenge", ignoreCase = true) == true) {
+            throw ReCaptchaException("站点触发 Cloudflare 人机验证保护", originalUrl)
+        }
         val bytes = body?.bytes() ?: ByteArray(0)
         return Response(
             code,

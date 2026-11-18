@@ -50,10 +50,14 @@ public final class XHamsterService extends StreamingService {
     @Override public KioskList getKioskList() throws ExtractionException {
         KioskList kiosks = new KioskList(this);
         try {
-            kiosks.addKioskEntry((service, url, kioskId) -> new XHamsterKiosk(
-                            service, XHamsterKioskLinks.INSTANCE.fromId(kioskId), kioskId),
-                    XHamsterKioskLinks.INSTANCE, "latest");
-            kiosks.setDefaultKiosk("latest");
+            for (final String id : new String[] {
+                    "best", "latest", "4k", "hd", "full-length", "subtitles"
+            }) {
+                kiosks.addKioskEntry((service, url, kioskId) -> new XHamsterKiosk(
+                                service, XHamsterKioskLinks.INSTANCE.fromId(kioskId), kioskId),
+                        XHamsterKioskLinks.INSTANCE, id);
+            }
+            kiosks.setDefaultKiosk("best");
             return kiosks;
         } catch (final Exception e) {
             throw new ExtractionException("Could not initialize xHamster kiosks", e);
@@ -88,25 +92,44 @@ final class XHamsterSearch extends SearchExtractor {
 }
 final class XHamsterKioskLinks extends ListLinkHandlerFactory {
     static final XHamsterKioskLinks INSTANCE=new XHamsterKioskLinks();
-    @Override public String getId(String url){return "latest";}
-    @Override public String getUrl(String id,List<FilterItem> c,List<FilterItem> s){return XHamsterParser.latestUrl();}
+    @Override public String getId(String url){
+        if (url != null) {
+            if (url.contains("/newest")) return "latest";
+            if (url.contains("/4k")) return "4k";
+            if (url.contains("/hd")) return "hd";
+            if (url.contains("/full-length")) return "full-length";
+            if (url.contains("/subtitles")) return "subtitles";
+        }
+        return "best";
+    }
+    @Override public String getUrl(String id,List<FilterItem> c,List<FilterItem> s){
+        switch (id == null ? "best" : id) {
+            case "latest": return XHamsterParser.BASE + "/newest";
+            case "4k": return XHamsterParser.BASE + "/4k";
+            case "hd": return XHamsterParser.BASE + "/hd";
+            case "full-length": return XHamsterParser.BASE + "/full-length";
+            case "subtitles": return XHamsterParser.BASE + "/subtitles";
+            case "best":
+            default: return XHamsterParser.BASE + "/best";
+        }
+    }
     @Override public boolean onAcceptUrl(String url){return url!=null&&url.startsWith(XHamsterParser.BASE);}
 }
 final class XHamsterKiosk extends KioskExtractor<StreamInfoItem> {
     private Document page;
     XHamsterKiosk(StreamingService s,ListLinkHandler h,String id){super(s,h,id);}
     @Override public void onFetchPage(@Nonnull Downloader d)throws IOException,ExtractionException{page=XHamsterParser.fetch(getUrl());}
-    @Nonnull @Override public String getName(){return "Latest";}
+    @Nonnull @Override public String getName(){return getId();}
     @Nonnull @Override public InfoItemsPage<StreamInfoItem> getInitialPage()throws ExtractionException{
         if(page==null)throw new ParsingException("xHamster kiosk page was not fetched");
         StreamInfoItemsCollector out=new StreamInfoItemsCollector(getServiceId());
-        for(XHamsterItem i:XHamsterParser.cards(page,40))out.commit(new XHamsterItemExtractor(i));
+        for(XHamsterItem i:XHamsterParser.cards(page,54))out.commit(new XHamsterItemExtractor(i));
         Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(page);
-        if (next == null) {
-            final Matcher matcher = Pattern.compile("/newest(?:/(\\d+))?/?$").matcher(page.location());
+        if (next == null && !out.getItems().isEmpty()) {
+            final Matcher matcher = Pattern.compile("/(best|newest|4k|hd|full-length|subtitles)(?:/(\\d+))?/?$").matcher(page.location());
             if (matcher.find()) {
-                final int number = matcher.group(1) == null ? 2 : Integer.parseInt(matcher.group(1)) + 1;
-                next = new Page(XHamsterParser.BASE + "/newest/" + number);
+                final int number = matcher.group(2) == null ? 2 : Integer.parseInt(matcher.group(2)) + 1;
+                next = new Page(XHamsterParser.BASE + "/" + matcher.group(1) + "/" + number);
             }
         }
         return new InfoItemsPage<>(out, next);
@@ -142,7 +165,7 @@ final class XHamsterParser {
     static final String BASE="https://jp.xhamster.com"; private static final Pattern HLS=Pattern.compile("https://[^\\\" ]+?_TPL_\\.(?:h264|av1)\\.mp4\\.m3u8"); private static final Pattern DUR=Pattern.compile("(\\d+):(\\d{2})(?::(\\d{2}))?");
     static String latestUrl(){return BASE+"/newest";}
     static Document fetch(String u)throws IOException,ExtractionException{Response r=NewPipe.getDownloader().get(u,headers());return Jsoup.parse(r.responseBody(),u);}
-    static Map<String,List<String>> headers(){Map<String,List<String>> h=new HashMap<>();h.put("Referer",Collections.singletonList(BASE+"/"));h.put("User-Agent",Collections.singletonList("Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 Chrome/120.0 Mobile Safari/537.36"));return h;}
+    static Map<String,List<String>> headers(){Map<String,List<String>> h=new HashMap<>();h.put("Referer",Collections.singletonList(BASE+"/"));h.put("User-Agent",Collections.singletonList("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"));return h;}
     static String id(String u)throws ParsingException{try{String p=URI.create(u).getPath();int n=p.indexOf("/videos/");if(n>=0)return p.substring(n+8).split("/",2)[0];}catch(Exception ignored){}throw new ParsingException("Could not extract xHamster id: "+u);}
     static String encode(String q){try{return URLEncoder.encode(q==null?"":q,StandardCharsets.UTF_8.name()).replace("+","%20");}catch(Exception e){throw new IllegalStateException(e);}}
     static String value(Document d,String s,String f){Element e=d.selectFirst(s);if(e==null)return f;String v=e.hasAttr("content")?e.attr("content"):e.text();return Jsoup.parse(v).text().trim();}

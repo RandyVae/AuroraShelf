@@ -85,9 +85,13 @@ public final class EpornerService extends StreamingService {
     @Override public KioskList getKioskList() throws ExtractionException {
         final KioskList kiosks = new KioskList(this);
         try {
-            kiosks.addKioskEntry((service, url, kioskId) -> new EpornerKioskExtractor(
-                            service, EpornerKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
-                    EpornerKioskLinkHandlerFactory.INSTANCE, "latest");
+            for (final String id : new String[] {
+                    "latest", "popular", "recommended", "weekly", "monthly", "longest", "4k"
+            }) {
+                kiosks.addKioskEntry((service, url, kioskId) -> new EpornerKioskExtractor(
+                                service, EpornerKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
+                        EpornerKioskLinkHandlerFactory.INSTANCE, id);
+            }
             kiosks.setDefaultKiosk("latest");
             return kiosks;
         } catch (final Exception e) {
@@ -145,41 +149,56 @@ final class EpornerSearchExtractor extends SearchExtractor {
 
 final class EpornerKioskLinkHandlerFactory extends ListLinkHandlerFactory {
     static final EpornerKioskLinkHandlerFactory INSTANCE = new EpornerKioskLinkHandlerFactory();
-    @Override public String getId(final String url) { return "latest"; }
+    @Override public String getId(final String url) {
+        if (url != null) {
+            if (url.contains("order=most-popular")) return "popular";
+            if (url.contains("order=top-rated")) return "recommended";
+            if (url.contains("order=top-weekly")) return "weekly";
+            if (url.contains("order=top-monthly")) return "monthly";
+            if (url.contains("order=longest")) return "longest";
+            if (url.contains("query=4k")) return "4k";
+        }
+        return "latest";
+    }
     @Override public String getUrl(final String id, final List<FilterItem> content,
-                                   final List<FilterItem> sort) { return EpornerParser.kioskUrl(); }
+                                   final List<FilterItem> sort) {
+        return EpornerParser.kioskApiUrl(id, 1);
+    }
     @Override public boolean onAcceptUrl(final String url) {
         return url != null && url.startsWith(EpornerParser.BASE);
     }
 }
 
 final class EpornerKioskExtractor extends KioskExtractor<org.schabi.newpipe.extractor.stream.StreamInfoItem> {
-    private Document document;
+    private EpornerSearchPage initialPage;
     EpornerKioskExtractor(final StreamingService service, final ListLinkHandler handler,
                           final String kioskId) { super(service, handler, kioskId); }
     @Override public void onFetchPage(@Nonnull final Downloader downloader)
             throws IOException, ExtractionException {
-        document = EpornerParser.fetch(getUrl());
-        if (EpornerParser.cards(document, 1).isEmpty()) {
-            document = EpornerParser.fetch(EpornerParser.homeUrl());
-        }
+        initialPage = EpornerParser.kiosk(getId(), 1);
     }
-    @Nonnull @Override public String getName() { return "Latest"; }
+    @Nonnull @Override public String getName() { return getId(); }
     @Nonnull @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getInitialPage()
             throws ExtractionException {
-        if (document == null) throw new ParsingException("Eporner kiosk page was not fetched");
-        final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-        for (final EpornerItem item : EpornerParser.cards(document, 40)) {
-            collector.commit(new EpornerItemExtractor(item));
-        }
-        return new InfoItemsPage<>(collector, org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document));
+        if (initialPage == null) throw new ParsingException("Eporner kiosk page was not fetched");
+        return buildPage(initialPage, 1);
     }
-    @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
-        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+    @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page)
+            throws IOException, ExtractionException {
+        if (page == null || page.getUrl() == null || !page.getUrl().startsWith(EpornerParser.BASE)) {
             throw new ParsingException("Invalid next page");
         }
-        document = EpornerParser.fetch(page.getUrl());
-        return getInitialPage();
+        final int pageNum = Math.max(2, EpornerParser.pageNumber(page.getUrl()));
+        return buildPage(EpornerParser.kiosk(getId(), pageNum), pageNum);
+    }
+    private InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> buildPage(
+            final EpornerSearchPage result, final int pageNum) {
+        final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
+        for (final EpornerItem item : result.items) {
+            collector.commit(new EpornerItemExtractor(item));
+        }
+        final Page next = result.hasNext ? new Page(EpornerParser.kioskApiUrl(getId(), pageNum + 1)) : null;
+        return new InfoItemsPage<>(collector, next);
     }
 }
 
@@ -313,6 +332,44 @@ final class EpornerParser {
     private EpornerParser() { }
     static String kioskUrl() { return BASE + "/cat/all/"; }
     static String homeUrl() { return BASE + "/"; }
+    static String kioskApiUrl(final String kioskId, final int page) {
+        final String order;
+        String query = "";
+        switch (kioskId == null ? "latest" : kioskId) {
+            case "popular": order = "most-popular"; break;
+            case "recommended": order = "top-rated"; break;
+            case "weekly": order = "top-weekly"; break;
+            case "monthly": order = "top-monthly"; break;
+            case "longest": order = "longest"; break;
+            case "4k": order = "latest"; query = "4k"; break;
+            case "latest":
+            default: order = "latest"; break;
+        }
+        return BASE + "/api/v2/video/search/?query=" + encode(query) + "&per_page=40&page="
+                + Math.max(1, page) + "&thumbsize=medium&order=" + order + "&gay=0&lq=0&format=json";
+    }
+    static EpornerSearchPage kiosk(final String kioskId, final int page) throws IOException, ExtractionException {
+        try {
+            final Response response = NewPipe.getDownloader().get(kioskApiUrl(kioskId, page), headers());
+            if (response.responseCode() == 200) {
+                final JsonObject root = JsonParser.object().from(response.responseBody());
+                final Object value = root.get("videos");
+                final List<EpornerItem> items = value instanceof JsonArray ? items((JsonArray) value, 40) : Collections.emptyList();
+                if (!items.isEmpty()) {
+                    final long total = longValue(root.get("total_count"));
+                    final long reportedPerPage = longValue(root.get("per_page"));
+                    final long perPage = reportedPerPage > 0 ? reportedPerPage : 40L;
+                    final long availablePages = longValue(root.get("available_pages"));
+                    final boolean hasNextPage = availablePages > page || total > (long) page * perPage;
+                    return new EpornerSearchPage(items, hasNextPage);
+                }
+            }
+        } catch (final Exception ignored) {
+        }
+        final Document doc = fetch(page <= 1 ? kioskUrl() : BASE + "/cat/all/" + page + "/");
+        final List<EpornerItem> cards = cards(doc, 40);
+        return new EpornerSearchPage(cards, !cards.isEmpty());
+    }
     static Document fetch(final String url) throws IOException, ExtractionException {
         final Response response = NewPipe.getDownloader().get(normalize(url), headers());
         return Jsoup.parse(response.responseBody(), normalize(url));

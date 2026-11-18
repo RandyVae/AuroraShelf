@@ -12,7 +12,7 @@
   3. 内屏双联展开态：460pt 剧院高度与 420pt 居中操作组、280pt 待播卡片与 3 列大图自适应流展，顶栏自动切为 `NetgreyMarkView`；
   4. 自动化测试：新增 `DeviceLayoutTests` 5 项测试，全量 101 项单元测试 100% 全部通过（0 failures, 5 skipped，耗时 4.277 秒）。
 
-# Netgrey · Android & iOS 2.16.3-dev · 跨 Agent 记忆
+# Netgrey · Android & iOS 2.17.1 · 跨 Agent 记忆
 
 > 本文件是所有 AI Agent（DSH / Codex / Claude / Hermes / Antigravity）进入本项目的统一入口。
 > 开工先读本文件，再按「权威来源」读细节；收工前更新「当前状态」。
@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `d74b418`（2026-11-18），未提交 0 个文件
+- Git：`main` @ `19e9633`（2026-11-18），未提交 0 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-18（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-18（今天）
@@ -36,19 +36,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-18 13:39 by `sync.py`
+- 最后同步：2026-11-18 15:38 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-18 · Build 267 / v2.17.0）：完成全栈 86 项优化审计问题全面整改、双端 Release 模拟器全规模验收、全渠道同步发布与生产环境 PocketBase / OTA 运维收口：(1) **后端、OTA 与 PocketBase 安全加固与运维收口（`SEC-01`、`SEC-02`、`SEC-11`、`OPS-01..07`）**：[ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 已从 `/var/www/netgrey/` 彻底迁至 `/usr/local/lib/netgrey-ota/ota_service.py`，将 `devices.json` / `testflight_invites.json` 迁至 `/var/lib/netgrey-ota/`（`0700`/`0600` 原子落盘并自动清理旧文件），接入口令门禁 + 10 分钟单次 HMAC-SHA256 `enrollment_token`（`/api/udid/enroll` -> `/api/udid/enroll.mobileconfig` -> `/api/receive-udid`），升级 `BoundedThreadingTCPServer(max_workers=16)`、LRU 限流桶与跨 IP 口令防爆；[publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 新增四端版本一致性预检、从 IPA 提取 `provisioned_udids.json`、远端 `>=5GB` 磁盘门禁与全文件单次事务原子切换，[index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 仅在设备 UDID 已签入当前 IPA 时解锁绿色直装按钮；[deploy_auth_backend.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/deploy_auth_backend.sh) 自动在 `/etc/netgrey-ota/pocketbase_admin.json`（`0600`）签发 CSPRNG 超级管理员并执行 `pocketbase superuser upsert` 彻底消除 `pbinstall` 临时安装令牌，配合 [1731900001_configure_app_meta_and_verification.js](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/pb_migrations/1731900001_configure_app_meta_and_verification.js) 与 [main.pb.js](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/pb_hooks/main.pb.js) 配置 `Netgrey` 品牌元数据、`X-Real-IP` 可信代理与限流、将存量 3 个未验证账号全部迁移为 `verified = 1`，并在 VPS 25 端口受阻未启用外部 SMTP 时自动完成新注册与 `request-verification`（`HTTP 204`）验证闭环；(2) **Android、iOS/iPadOS 与 Web 游戏全栈修复**：完成证书信任边界收窄、DLNA `LocalMediaProxy` 环回与 Header 白名单、Android 原生 PiP 与多窗口 `ON_STOP` 生命周期、iOS `HLSLoopbackRelayServer` 并发连接上限与 `PictureInPictureManager` 单例守卫、双端四模块（视频/漫画/直播/社区）真实分域搜索、账号验证邮件重发与 KeyStore 加密、浅色/深色/跟随系统三态外观与 12 语种本地化补齐、香港繁体词库校准、以及内置游戏《Lust Goddess》`v2.17.0` 跨端存档桥（`AuroraSaveBridge` / `GameSaveStore`）、`handleAppBack()` 防软锁、11 看板娘 Spine 完整映射与死音频清理；(3) **全量验证与双通道上线（v2.17.0 Build 267）**：Web 逻辑与资产校验全通，Node 探针 32 源 0 失败，Android 离线 43 套件 276 项（268 通/8 跳/0 失败）+ 在线全源探针 + `lintDebug`（0 error）+ `assembleRelease` 全通，iOS 离线与在线全源探针（18 视频 + 9 免登漫画 + 7 论坛 + 2 直播）全通，`emulator-5554` R8 APK、`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器全规模走查通过，OTA（`https://bananarey.us`）与 TestFlight Build `267`（Apple 已处理完成 `processingState: VALID` 并挂载至 `Internal` 测试组）同步上线。
-- 进行中：无阻塞任务；全部 86 项审计整改与服务端运维收口项已 100% 闭环。
+- 当前阶段（2026-11-18 · Build 268 / v2.17.1）：完成全量 18 视频源与漫画源官方分类 1:1 对齐、多页分页死锁根治、`91动漫` 新版播放器 API 适配、三端 Release 模拟器全规模验收与双通道同步上线：(1) **全源官方分类对齐与多页分页修复**：双端对齐 `华视影院`（15 频道并修正「短剧」`typeId=5`）、`黄果短剧`（5 频道并修复推荐/原创第 2 页起 HTML 续翻）、`91动漫`（9 频道补齐泡面番）、`91视频`（12 官方 `v.php` 频道）、`Beeg`（8 频道 `limit=48`）、`MissAV`（9 频道 + 双子页聚合 24 条/页）、`EPORNER`（7 官方 API v2 频道 `per_page=40`，修复 iOS 将中文分类名传给 `query=` 返回 0 条的问题）、`TokyoMotion`（6 频道 `?o=mr|bw|mv|tr|tf|lg`）、`Pornhub`（5 频道）、`SpankBang`（4 频道）、`xHamster`（6 频道 + 桌面 UA 恢复首屏 44–46 条）、`OHentai`（6 频道 + `&p=N` 分页）、`XNXX`（5 频道 + `0` 基路径分页与 `/best/YYYY-MM` 月度分页）、`MRDOUGA`（6 频道）与 `134X`（跨页游标补齐）；iOS [HomeScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/HomeScreen.swift) 与 [ComicsScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/ComicsScreen.swift) 新增官方分类横向胶囊条、独立分类货架水合与无限滚动加载；(2) **`91动漫` 源站新播放器 API 双端同步升级**：适配上游 `2026-11-17` 升级的 `data-episode-id` + `POST /api/dm/anime/episodes/{id}/playback` 与 `data-episode-item` 选集；(3) **全量验证与双通道上线（v2.17.1 Build 268）**：Android 离线 276 项 + 在线 18/18 视频源探针全通，iOS 离线 199 项 + 在线全源及 P1/P2 分页探针全通，`emulator-5554` R8 APK、`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 走查通过，OTA（`https://bananarey.us`）与 TestFlight Build `268` 同步上线。
+- 进行中：无阻塞任务；`v2.17.1 (Build 268)` 双通道发布与全源对齐已闭环。
 - 下一步：常规版本演进与线上源站日常监控。
 - 阻塞：无。
 - 最近一次更新：2026-11-18 by Antigravity (Gemini 4 Argon)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-18（Antigravity）：全量 18 视频源与漫画源官方分类 1:1 对齐、多页分页死锁根治并发布 `v2.17.1 (Build 268)`。(1) **根因修复**：此前多个源仅映射 1–5 个固定枚举分类、iOS 首页与漫画页缺少分类胶囊条且总览货架仅从首屏 20 条切分，叠加 `EPORNER` `query=最新` 返回 0 条、`OHentai` 忽略 `&page=`（实为 `&p=`）、`TokyoMotion` 忽略 `?sort=`（实为 `?o=`）、`XNXX` `0` 基路径分页、`xHamster` 移动 UA 仅渲染 5 条及华视 iOS「短剧」误配 `typeId=20`（港台综艺），导致用户看到分类与官网不一致且点开全部仅二十余条；双端重构为动态 `SourceCategory` / 官方频道列表、补齐 iOS 首页与漫画页分类胶囊条及 `hydrateOverviewShelves` 真实分类片单水合、打通全源第 2 页起确定性分页；(2) **实时捕获并修复上游变更**：发布前全源实网探针检出 `91动漫` 于 `2026-11-17` 将详情页播放器由 `data-video-url` 迁移至 `data-episode-id` + `POST /api/dm/anime/episodes/{id}/playback`，双端同步升级后恢复秒级解析出画。
 
 - 2026-11-18（Antigravity）：全栈落地《Netgrey v2.16.39 軟件全量缺陷與架構優化審計報告》全部 86 项根因整改并发布 `v2.17.0 (Build 267)`。(1) **OTA UDID 闭环与服务端零泄露**：将设备与邀请状态文件迁入 `/var/lib/netgrey-ota/`（Nginx 同步拦截静态 `.json`），UDID 描述文件下载接入邀请口令与 10 分钟单次 HMAC 令牌校验，打包时自动从 IPA 提取 `provisioned_udids.json`，前端依据 `provisioned` 状态诚实区分「已签入可直接安装」与「待重签引导 TestFlight」；(2) **跨平台游戏存档与返回栈统一**：新增 iOS [GameSaveStore.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Game/GameSaveStore.swift) 与 `window.AuroraSaveBridge` `.atDocumentStart` 注入，对齐 Android [GameSaveBridge.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/game/GameSaveBridge.kt) 与 [save.js](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/assets/www/js/save.js) 写前备份，根治 WebKit ITP 清空存档与 `handleAppBack()` 关闭抽屉后软锁；(3) **双端全模块真实搜索、外观三态与开源合规**：iOS [SearchSheetView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Search/SearchSheetView.swift) 与 Android [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt) / [ForumScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ForumScreen.kt) 补齐视频/漫画/直播/社区四域真实搜索，落地浅色/深色/跟随系统外观切换并修复浅色模式白字隐形，完善 [THIRD_PARTY_NOTICES.md](file:///Users/itou/Documents/ChatGPT/91pron/THIRD_PARTY_NOTICES.md) 并在双端设置页与 OTA 页脚公开展示。
 

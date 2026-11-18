@@ -14,53 +14,189 @@ enum HTMLVideoSourceAdapter {
         let route: String
         switch source.id {
         case "missav":
-            let isChinese = category.contains("中字") || category.contains("字幕") || category.contains("中文")
-            route = category.contains("热门") || category.contains("精选") ? "/cn/release" :
-                category.contains("推荐") ? "/cn" :
-                isChinese ? "/cn/chinese-subtitle" : "/cn/new"
+            switch category {
+            case "新作上市", "热门", "精选":
+                route = "/cn/release"
+            case "中文字幕":
+                route = "/cn/chinese-subtitle"
+            case "今日热门":
+                route = "/cn/today-hot"
+            case "本周热门":
+                route = "/cn/weekly-hot"
+            case "本月热门":
+                route = "/cn/monthly-hot"
+            case "无码流出":
+                route = "/cn/uncensored-leak"
+            case "素人 SIRO":
+                route = "/cn/siro"
+            case "FC2":
+                route = "/cn/fc2"
+            case "推荐":
+                route = "/cn/today-hot"
+            default:
+                route = "/cn/new"
+            }
         case "85po":
-            let base = category.contains("热") || category.contains("精选") ? "/ja/most-popular" : category.contains("推荐") ? "/ja/top-rated" : "/ja/latest-updates"
+            let base: String
+            if category.contains("最高评分") || category.contains("推荐") {
+                base = "/ja/top-rated"
+            } else if category.contains("热") || category.contains("最受欢迎") || category.contains("精选") {
+                base = "/ja/most-popular"
+            } else {
+                base = "/ja/latest-updates"
+            }
             route = page == 1 ? "\(base)/" : "\(base)/\(page)/"
         case "pornhub":
-            route = category.contains("热") ? "/video?o=mv&t=m" :
-                category.contains("推荐") ? "/video?o=tr&t=m" :
-                category.contains("4K") ? "/video?c=298" : "/video?o=cm"
+            if category.contains("当下热门") {
+                route = "/video?o=ht"
+            } else if category.contains("最多观看") || category == "热门" {
+                route = "/video?o=mv&t=m"
+            } else if category.contains("最高评分") || category.contains("推荐") {
+                route = "/video?o=tr&t=m"
+            } else if category.contains("最长") {
+                route = "/video?o=lg"
+            } else if category.contains("4K") {
+                route = "/video?c=298"
+            } else {
+                route = "/video?o=cm"
+            }
         case "tokyomotion":
-            route = category.contains("评分") || category.contains("收藏") || category.contains("推荐") ? "/videos?sort=rating" : category.contains("热") ? "/videos?sort=popular" : "/videos"
+            if category.contains("正在观看") {
+                route = "/videos?o=bw"
+            } else if category.contains("最多观看") || category.contains("热") {
+                route = "/videos?o=mv"
+            } else if category.contains("最高评分") || category.contains("推荐") {
+                route = "/videos?o=tr"
+            } else if category.contains("最多收藏") {
+                route = "/videos?o=tf"
+            } else if category.contains("最长") {
+                route = "/videos?o=lg"
+            } else {
+                route = "/videos?o=mr"
+            }
         case "kissjav":
-            let sortBy = category.contains("热") || category.contains("热门") ? "?sort_by=video_viewed" : category.contains("新") ? "" : "?sort_by=rating"
-            let pathPrefix = category.contains("新") ? "/latest-updates" : "/most-popular"
+            let sortBy: String
+            let pathPrefix: String
+            if category.contains("最高评分") || category.contains("推荐") {
+                pathPrefix = "/most-popular"
+                sortBy = "?sort_by=rating"
+            } else if category.contains("热") || category.contains("最受欢迎") || category.contains("最多观看") {
+                pathPrefix = "/most-popular"
+                sortBy = "?sort_by=video_viewed"
+            } else {
+                pathPrefix = "/latest-updates"
+                sortBy = ""
+            }
             route = page == 1 ? "\(pathPrefix)/\(sortBy)" : "\(pathPrefix)/\(page)/\(sortBy)"
         case "spankbang":
-            let base = category.contains("热门") ? "/hot" : category.contains("4K") ? "/4k" : ""
-            route = page == 1 ? (base.isEmpty ? "/" : "\(base)/") : (base.isEmpty ? "/new_videos/\(page)/" : "\(base)/\(page)/")
+            let slug: String
+            if category.contains("最新") {
+                slug = "new_videos"
+            } else if category.contains("最受欢迎") {
+                slug = "most_popular"
+            } else if category.contains("即将") {
+                slug = "upcoming"
+            } else {
+                slug = "trending_videos"
+            }
+            route = page == 1 ? "/\(slug)/" : "/\(slug)/\(page)/"
         case "xhamster":
-            let base = category.contains("新") ? "/newest" : (category.contains("本地") ? "" : "/best")
-            route = page == 1 ? (base.isEmpty ? "/" : "\(base)/") : (base.isEmpty ? "/best/\(page)" : "\(base)/\(page)")
+            let slug: String
+            if category.contains("最新") {
+                slug = "newest"
+            } else if category.contains("4K") {
+                slug = "4k"
+            } else if category.contains("高清") || category.contains("HD") {
+                slug = "hd"
+            } else if category.contains("长片") {
+                slug = "full-length"
+            } else if category.contains("字幕") {
+                slug = "subtitles"
+            } else {
+                slug = "best"
+            }
+            route = page == 1 ? "/\(slug)/" : "/\(slug)/\(page)"
         case "eporner":
             route = "/api/v2/video/search/"
         case "mrdouga":
-            let isPopular = category.contains("热")
-            let pathPrefix = isPopular ? "/most-popular" : "/latest-updates"
-            let query = isPopular ? "?sort_by=video_viewed" : ""
+            let pathPrefix: String
+            let query: String
+            if category.contains("今日热门") {
+                pathPrefix = "/most-popular"
+                query = "?sort_by=video_viewed_today"
+            } else if category.contains("总热门") || category == "热门" {
+                pathPrefix = "/most-popular"
+                query = "?sort_by=video_viewed"
+            } else if category.contains("JAV") {
+                pathPrefix = "/categories/jav"
+                query = ""
+            } else if category.contains("JVIP") {
+                pathPrefix = "/categories/jvip"
+                query = ""
+            } else if category.contains("FC2") {
+                pathPrefix = "/categories/fc2ppv"
+                query = ""
+            } else {
+                pathPrefix = "/latest-updates"
+                query = ""
+            }
             route = page == 1 ? "\(pathPrefix)/\(query)" : "\(pathPrefix)/\(page)/\(query)"
         case "ohentai":
-            route = "/"
+            if category.contains("最多观看") {
+                route = "/index.php?sort=most_viewed"
+            } else if category.contains("最多喜欢") {
+                route = "/index.php?sort=most_liked"
+            } else if category.contains("无码") {
+                route = "/tagsearch.php?tag=Uncensored"
+            } else if category.contains("1080") {
+                route = "/tagsearch.php?tag=1080p"
+            } else if category.contains("3D") {
+                route = "/tagsearch.php?tag=3D"
+            } else {
+                route = "/index.php?sort=publish_time"
+            }
         case "xnxx":
-            // XNXX's current kiosk is /best/; /new/ returns 404 on the live site.
-            // When page > 1, path-index as /best/\(page) without appending query parameters.
-            route = page == 1 ? "/best/" : "/best/\(page)"
+            if category.contains("月度最佳") {
+                if page == 1 {
+                    route = "/best/"
+                } else {
+                    let cal = Calendar(identifier: .gregorian)
+                    let targetDate = cal.date(byAdding: .month, value: -(page - 1), to: Date()) ?? Date()
+                    let comps = cal.dateComponents([.year, .month], from: targetDate)
+                    let yr = comps.year ?? 2026
+                    let mo = comps.month ?? 1
+                    route = String(format: "/best/%04d-%02d", yr, mo)
+                }
+            } else {
+                let base: String
+                if category.contains("本周") {
+                    base = "/hits/week"
+                } else if category.contains("本月") {
+                    base = "/hits/month"
+                } else if category.contains("热门点击") {
+                    base = "/hits"
+                } else {
+                    base = "/todays-selection"
+                }
+                route = page == 1 ? base : "\(base)/\(page - 1)"
+            }
         default:
             route = "/"
         }
 
         guard var components = URLComponents(string: baseURL(for: source) + route) else { return nil }
         if source.id == "eporner" {
+            let (query, order) = UniversalVideoEngine.epornerQueryAndOrder(for: category)
             components.queryItems = [
-                URLQueryItem(name: "query", value: category == "全部" ? "featured" : category),
-                URLQueryItem(name: "per_page", value: "24"),
+                URLQueryItem(name: "query", value: query),
+                URLQueryItem(name: "order", value: order),
+                URLQueryItem(name: "per_page", value: "40"),
                 URLQueryItem(name: "page", value: String(page))
             ]
+        } else if page > 1 && source.id == "ohentai" {
+            var queryItems = components.queryItems ?? []
+            queryItems.append(URLQueryItem(name: "p", value: String(page)))
+            components.queryItems = queryItems
         } else if page > 1 && queryPaginatedSourceIDs.contains(source.id) {
             var queryItems = components.queryItems ?? []
             queryItems.append(URLQueryItem(name: "page", value: String(page)))
@@ -70,7 +206,7 @@ enum HTMLVideoSourceAdapter {
     }
 
     private static let queryPaginatedSourceIDs: Set<String> = [
-        "missav", "pornhub", "tokyomotion", "ohentai"
+        "missav", "pornhub", "tokyomotion"
     ]
 
     static func searchURL(for source: VideoSourceDefinition, query: String, page: Int = 1) -> URL? {

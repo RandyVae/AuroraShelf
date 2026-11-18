@@ -222,63 +222,93 @@ final class UniversalVideoEngineTests: XCTestCase {
         XCTAssertEqual(videos.first?.coverUrl, "https://cdn.example/thumbnail.jpg")
     }
 
-    func testXNXXFeedUsesLiveBestListRouteInsteadOfEmptyHomeOr404LatestPath() throws {
+    func testXNXXFeedUsesLiveTodaysSelectionAndZeroIndexedHitsPagination() throws {
         let source = VideoSourceCatalog.xnxx
 
-        let allURL = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: source, category: "全部"))
+        let todayURL = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: source, category: "今日精选", page: 1))
+        XCTAssertEqual(todayURL.path, "/todays-selection")
 
-        XCTAssertEqual(allURL.path, "/best")
-        XCTAssertEqual(source.categories, ["最新"])
+        let todayPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: source, category: "今日精选", page: 2))
+        XCTAssertEqual(todayPage2.path, "/todays-selection/1")
+        XCTAssertNil(todayPage2.query)
+
+        let hitsPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: source, category: "热门点击", page: 2))
+        XCTAssertEqual(hitsPage2.path, "/hits/1")
+        XCTAssertNil(hitsPage2.query)
+
+        XCTAssertEqual(source.categories, ["今日精选", "热门点击", "本周热门", "本月热门", "月度最佳"])
     }
 
     func testVideoSourceCatalogKeepsSourceOwnedCategoryIDsUnique() {
+        for source in VideoSourceCatalog.allSources {
+            let defs = source.categoryDefinitions
+            XCTAssertFalse(defs.isEmpty, "\(source.name) categories should not be empty")
+            XCTAssertEqual(
+                Set(defs.map(\.id)).count,
+                defs.count,
+                "\(source.name) has duplicate category IDs: \(defs.map(\.id))"
+            )
+        }
         XCTAssertEqual(VideoSourceCatalog.xvideos.categoryDefinitions.count, 41)
-        XCTAssertEqual(
-            Set(VideoSourceCatalog.xvideos.categoryDefinitions.map(\.id)).count,
-            VideoSourceCatalog.xvideos.categoryDefinitions.count
-        )
-        XCTAssertEqual(VideoSourceCatalog.beeg.categories, ["精选", "自拍", "日本", "熟女", "亚洲"])
-        XCTAssertEqual(VideoSourceCatalog.spankbang.categories, ["最新"])
+        XCTAssertEqual(VideoSourceCatalog.beeg.categories, ["精选", "自拍", "日本", "亚洲", "熟女", "少女", "韩国", "欧美"])
+        XCTAssertEqual(VideoSourceCatalog.spankbang.categories, ["热门趋势", "最新上传", "最受欢迎", "即将热门"])
+        XCTAssertEqual(VideoSourceCatalog.eporner.categories.count, 7)
+        XCTAssertEqual(VideoSourceCatalog.missav.categories.count, 9)
     }
 
     func testHTMLVideoSourceAdapterPageTwoRoutesMatchSiteConventions() throws {
         // 85po uses trailing slash path pagination
-        let po85Latest = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.po85, category: "最近更新", page: 2))
+        let po85Latest = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.po85, category: "最新更新", page: 2))
         XCTAssertEqual(po85Latest.path, "/ja/latest-updates/2")
         XCTAssertTrue(po85Latest.absoluteString.hasSuffix("/ja/latest-updates/2/"))
         XCTAssertNil(po85Latest.query)
 
-        let po85Hot = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.po85, category: "精选热播", page: 2))
+        let po85Hot = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.po85, category: "最受欢迎", page: 2))
         XCTAssertEqual(po85Hot.path, "/ja/most-popular/2")
         XCTAssertTrue(po85Hot.absoluteString.hasSuffix("/ja/most-popular/2/"))
         XCTAssertNil(po85Hot.query)
 
-        // XNXX uses path indexing
-        let xnxxPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.xnxx, category: "全部", page: 2))
-        XCTAssertEqual(xnxxPage2.path, "/best/2")
-        XCTAssertNil(xnxxPage2.query)
+        // XNXX uses 0-indexed path pagination for hits/today and YYYY-MM archive for best
+        let xnxxHitsPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.xnxx, category: "热门点击", page: 2))
+        XCTAssertEqual(xnxxHitsPage2.path, "/hits/1")
+        XCTAssertNil(xnxxHitsPage2.query)
+
+        let xnxxBestPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.xnxx, category: "月度最佳", page: 2))
+        XCTAssertTrue(xnxxBestPage2.path.range(of: #"^/best/\d{4}-\d{2}$"#, options: .regularExpression) != nil)
 
         // KissJAV uses path before query
-        let kissjavPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.kissjav, category: "新片", page: 2))
+        let kissjavPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.kissjav, category: "最新更新", page: 2))
         XCTAssertEqual(kissjavPage2.path, "/latest-updates/2")
         XCTAssertTrue(kissjavPage2.absoluteString.hasSuffix("/latest-updates/2/"))
 
-        let kissjavHot = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.kissjav, category: "热门", page: 2))
+        let kissjavHot = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.kissjav, category: "最受欢迎", page: 2))
         XCTAssertEqual(kissjavHot.path, "/most-popular/2")
         XCTAssertTrue(kissjavHot.absoluteString.hasPrefix("https://kissjav.li/most-popular/2/?sort_by=video_viewed"))
         XCTAssertEqual(kissjavHot.query, "sort_by=video_viewed")
 
-        // SpankBang uses /hot/2/ and /new_videos/2/
-        let spankbangHot = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.spankbang, category: "热门", page: 2))
-        XCTAssertEqual(spankbangHot.path, "/hot/2")
-        XCTAssertTrue(spankbangHot.absoluteString.hasSuffix("/hot/2/"))
+        // SpankBang uses /trending_videos/2/ and /new_videos/2/
+        let spankbangHot = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.spankbang, category: "热门趋势", page: 2))
+        XCTAssertEqual(spankbangHot.path, "/trending_videos/2")
+        XCTAssertTrue(spankbangHot.absoluteString.hasSuffix("/trending_videos/2/"))
 
-        // xHamster uses /best/2
-        let xhamsterPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.xhamster, category: "全部", page: 2))
+        // xHamster uses /best/2 and /4k/2
+        let xhamsterPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.xhamster, category: "最佳热门", page: 2))
         XCTAssertEqual(xhamsterPage2.path, "/best/2")
+        let xhamster4KPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.xhamster, category: "4K 超清", page: 2))
+        XCTAssertEqual(xhamster4KPage2.path, "/4k/2")
+
+        // TOKYO Motion uses real ?o= ordering + &page=2
+        let tmPopularPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.tokyomotion, category: "最多观看", page: 2))
+        XCTAssertEqual(tmPopularPage2.path, "/videos")
+        XCTAssertEqual(tmPopularPage2.query, "o=mv&page=2")
+
+        // OHentai uses &p=2 instead of &page=2
+        let ohentaiPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.ohentai, category: "最新发布", page: 2))
+        XCTAssertEqual(ohentaiPage2.path, "/index.php")
+        XCTAssertEqual(ohentaiPage2.query, "sort=publish_time&p=2")
 
         // MissAV uses query pagination
-        let missavPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.missav, category: "最新发布", page: 2))
+        let missavPage2 = try XCTUnwrap(HTMLVideoSourceAdapter.feedURL(for: VideoSourceCatalog.missav, category: "最近更新", page: 2))
         XCTAssertEqual(missavPage2.path, "/cn/new")
         XCTAssertEqual(missavPage2.query, "page=2")
     }

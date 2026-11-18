@@ -80,24 +80,17 @@ public final class MissAvService extends StreamingService {
     public KioskList getKioskList() throws ExtractionException {
         final KioskList list = new KioskList(this);
         try {
-            list.addKioskEntry((service, url, kioskId) -> new MissAvKioskExtractor(
-                            service,
-                            MissAvKioskLinkHandlerFactory.getInstance().fromId(kioskId),
-                            kioskId),
-                    MissAvKioskLinkHandlerFactory.getInstance(),
-                    "latest");
-            list.addKioskEntry((service, url, kioskId) -> new MissAvKioskExtractor(
-                            service,
-                            MissAvKioskLinkHandlerFactory.getInstance().fromId(kioskId),
-                            kioskId),
-                    MissAvKioskLinkHandlerFactory.getInstance(),
-                    "popular");
-            list.addKioskEntry((service, url, kioskId) -> new MissAvKioskExtractor(
-                            service,
-                            MissAvKioskLinkHandlerFactory.getInstance().fromId(kioskId),
-                            kioskId),
-                    MissAvKioskLinkHandlerFactory.getInstance(),
-                    "recommended");
+            for (final String id : new String[] {
+                    "latest", "release", "chinese-subtitle", "today-hot",
+                    "weekly-hot", "monthly-hot", "uncensored-leak", "siro", "fc2"
+            }) {
+                list.addKioskEntry((service, url, kioskId) -> new MissAvKioskExtractor(
+                                service,
+                                MissAvKioskLinkHandlerFactory.getInstance().fromId(kioskId),
+                                kioskId),
+                        MissAvKioskLinkHandlerFactory.getInstance(),
+                        id);
+            }
             list.setDefaultKiosk("latest");
         } catch (final Exception e) {
             throw new ExtractionException("Could not initialize MissAV kiosks", e);

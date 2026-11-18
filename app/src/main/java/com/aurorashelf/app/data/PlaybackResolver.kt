@@ -28,6 +28,8 @@ import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Document
 import org.jsoup.parser.Parser
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 
 data class PlaybackSource(
     val url: String,
@@ -208,6 +210,57 @@ class PlaybackResolver {
     internal suspend fun resolve91Dongman(pageUrl: String, startedAtMs: Long): PlaybackSource {
         val document = fetch(pageUrl)
         val html = document.html()
+        val episodeId = document.selectFirst("[data-episode-id]")?.attr("data-episode-id")?.trim()?.takeIf(String::isNotBlank)
+            ?: Regex("""data-episode-id=["'](\d+)["']""").find(html)?.groupValues?.getOrNull(1)
+        if (episodeId != null) {
+            val pageUri = runCatching { URI(pageUrl) }.getOrNull()
+            val origin = if (pageUri?.scheme != null && pageUri.host != null) "${pageUri.scheme}://${pageUri.host}" else "https://91dongman.net"
+            val apiSource = runCatching {
+                val req = okhttp3.Request.Builder()
+                    .url("$origin/api/dm/anime/episodes/$episodeId/playback")
+                    .post("{}".toRequestBody("application/json; charset=utf-8".toMediaType()))
+                    .header("Accept", "application/json")
+                    .header("Referer", pageUrl)
+                    .header("Origin", origin)
+                    .header("User-Agent", VideoRepository.USER_AGENT)
+                    .build()
+                AuroraHttpClient.standardClient.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return@use null
+                    val bodyStr = resp.body?.string().orEmpty()
+                    val root = org.json.JSONObject(bodyStr)
+                    val dataObj = root.optJSONObject("data") ?: return@use null
+                    val streamsObj = dataObj.optJSONObject("streams") ?: return@use null
+                    val rawStream = streamsObj.optString("main").trim().ifBlank {
+                        streamsObj.optString("preview").trim().ifBlank {
+                            streamsObj.optString("hevc").trim()
+                        }
+                    }
+                    if (rawStream.isBlank()) return@use null
+                    val hdrs = linkedMapOf(
+                        "Referer" to "$origin/",
+                        "Origin" to origin,
+                    )
+                    val cdnObj = dataObj.optJSONObject("cdn")
+                    if (cdnObj != null && (cdnObj.optBoolean("m3u8Enabled") || cdnObj.optBoolean("otherEnabled"))) {
+                        val authKey = cdnObj.optString("authKey").trim()
+                        val authVal = cdnObj.optString("authValue").trim()
+                        val appVal = cdnObj.optString("app").trim()
+                        if (authKey.isNotBlank() && authVal.isNotBlank()) hdrs[authKey] = authVal
+                        if (appVal.isNotBlank()) hdrs["x-cdn-app"] = appVal
+                    }
+                    PlaybackSource(
+                        url = cleanHlsUrl(rawStream),
+                        referer = "$origin/",
+                        extraHeaders = hdrs,
+                    )
+                }
+            }.getOrNull()
+            if (apiSource != null) {
+                Log.i(TAG, "resolve 91dongman api host=${runCatching { URI(apiSource.url).host }.getOrNull()} type=${mediaType(apiSource.url)}")
+                return apiSource.rememberFor(pageUrl, startedAtMs)
+            }
+        }
+
         val videoUrlAttr = document.selectFirst("div[data-video-url]")?.attr("data-video-url")?.takeIf(String::isNotBlank)
             ?: Regex("""data-video-url=["']([^"']+)["']""").find(html)?.groupValues?.get(1)
             ?: Regex("""var\s+url\s*=\s*["']([^"']+\.m3u8[^"']*)["']""").find(html)?.groupValues?.get(1)
@@ -445,6 +498,19 @@ class PlaybackResolver {
     }.getOrDefault(false)
 
     internal fun parseEpisodes(page: Document, fallbackBaseUrl: String = page.baseUri()): List<PlaybackEpisode> {
+        val base = page.baseUri().ifBlank { fallbackBaseUrl }
+        val dmEpisodes = page.select("a[data-episode-item][href]")
+            .mapIndexedNotNull { idx, element ->
+                val number = (element.attr("data-episode-index").toIntOrNull() ?: idx) + 1
+                val address = SourceAddress.resolve(base, element.attr("href")) ?: return@mapIndexedNotNull null
+                val rawLabel = element.selectFirst(".dm-episode-name, .dm-episode-modal-card__title")?.text()?.trim()
+                    .orEmpty()
+                PlaybackEpisode(number, rawLabel.ifBlank { "第 ${number} 话" }, address)
+            }
+            .distinctBy { it.number }
+            .sortedBy { it.number }
+        if (dmEpisodes.isNotEmpty()) return dmEpisodes
+
         return page.select(".hg-web-detail__ep-grid a[data-ep-id], .hg-web-play__ep[data-ep-id]")
             .asSequence()
             .mapNotNull { element ->

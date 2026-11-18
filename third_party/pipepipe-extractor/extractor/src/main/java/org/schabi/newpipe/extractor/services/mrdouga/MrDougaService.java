@@ -81,12 +81,13 @@ public final class MrDougaService extends StreamingService {
     @Override public KioskList getKioskList() throws ExtractionException {
         final KioskList kiosks = new KioskList(this);
         try {
-            kiosks.addKioskEntry((service, url, kioskId) -> new MrDougaKioskExtractor(
-                            service, MrDougaKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
-                    MrDougaKioskLinkHandlerFactory.INSTANCE, "latest");
-            kiosks.addKioskEntry((service, url, kioskId) -> new MrDougaKioskExtractor(
-                            service, MrDougaKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
-                    MrDougaKioskLinkHandlerFactory.INSTANCE, "popular");
+            for (final String id : new String[] {
+                    "latest", "today-hot", "popular", "jav", "jvip", "fc2ppv"
+            }) {
+                kiosks.addKioskEntry((service, url, kioskId) -> new MrDougaKioskExtractor(
+                                service, MrDougaKioskLinkHandlerFactory.INSTANCE.fromId(kioskId), kioskId),
+                        MrDougaKioskLinkHandlerFactory.INSTANCE, id);
+            }
             kiosks.setDefaultKiosk("latest");
             return kiosks;
         } catch (final Exception e) {
@@ -136,11 +137,27 @@ final class MrDougaSearchExtractor extends SearchExtractor {
 
 final class MrDougaKioskLinkHandlerFactory extends ListLinkHandlerFactory {
     static final MrDougaKioskLinkHandlerFactory INSTANCE = new MrDougaKioskLinkHandlerFactory();
-    @Override public String getId(final String url) { return url != null && url.contains("most-popular") ? "popular" : "latest"; }
+    @Override public String getId(final String url) {
+        if (url != null) {
+            if (url.contains("video_viewed_today")) return "today-hot";
+            if (url.contains("most-popular")) return "popular";
+            if (url.contains("/categories/jav")) return "jav";
+            if (url.contains("/categories/jvip")) return "jvip";
+            if (url.contains("/categories/fc2ppv")) return "fc2ppv";
+        }
+        return "latest";
+    }
     @Override public String getUrl(final String id, final List<FilterItem> content,
                                    final List<FilterItem> sort) {
-        return "popular".equals(id) ? MrDougaParser.BASE + "/most-popular/?sort_by=video_viewed"
-                : MrDougaParser.BASE + "/latest-updates/";
+        switch (id == null ? "latest" : id) {
+            case "today-hot": return MrDougaParser.BASE + "/most-popular/?sort_by=video_viewed_today";
+            case "popular": return MrDougaParser.BASE + "/most-popular/?sort_by=video_viewed";
+            case "jav": return MrDougaParser.BASE + "/categories/jav/";
+            case "jvip": return MrDougaParser.BASE + "/categories/jvip/";
+            case "fc2ppv": return MrDougaParser.BASE + "/categories/fc2ppv/";
+            case "latest":
+            default: return MrDougaParser.BASE + "/latest-updates/";
+        }
     }
     @Override public boolean onAcceptUrl(final String url) { return url != null && MrDougaParser.normalize(url).contains("mrdouga.com/"); }
 }
@@ -149,12 +166,23 @@ final class MrDougaKioskExtractor extends KioskExtractor<StreamInfoItem> {
     private Document document;
     MrDougaKioskExtractor(final StreamingService service, final ListLinkHandler handler, final String kioskId) { super(service, handler, kioskId); }
     @Override public void onFetchPage(@Nonnull final Downloader downloader) throws IOException, ExtractionException { document = MrDougaParser.fetch(getUrl()); }
-    @Nonnull @Override public String getName() { return "popular".equals(getId()) ? "Popular" : "Latest"; }
+    @Nonnull @Override public String getName() { return getId(); }
     @Nonnull @Override public InfoItemsPage<StreamInfoItem> getInitialPage() throws IOException, ExtractionException {
         if (document == null) throw new ParsingException("MRDOUGA kiosk page was not fetched");
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
         for (final MrDougaItem item : MrDougaParser.cards(document, 40)) collector.commit(new MrDougaItemExtractor(item));
-        return new InfoItemsPage<>(collector, org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document));
+        Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document);
+        if (next == null && !collector.getItems().isEmpty()) {
+            final String loc = document.location();
+            final String pathPart = loc.contains("?") ? loc.substring(0, loc.indexOf('?')) : loc;
+            final String queryPart = loc.contains("?") ? loc.substring(loc.indexOf('?')) : "";
+            final Matcher m = Pattern.compile("^(https://[^/]+/(?:latest-updates|most-popular|categories/[a-z0-9_-]+))(?:/(\\d+))?/?$").matcher(pathPart);
+            if (m.find()) {
+                final int nextNum = m.group(2) == null ? 2 : Integer.parseInt(m.group(2)) + 1;
+                next = new Page(m.group(1) + "/" + nextNum + "/" + queryPart);
+            }
+        }
+        return new InfoItemsPage<>(collector, next);
     }
     @Override public InfoItemsPage<StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
         if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {

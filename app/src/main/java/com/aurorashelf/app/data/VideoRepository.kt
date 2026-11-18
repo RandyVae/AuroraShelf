@@ -37,14 +37,14 @@ class VideoRepository {
             require(page >= 1) { "页码必须从 1 开始" }
             val legacyCategory = category.legacy ?: FeedCategory.RECENT
             if (ContentSourceCatalog.isBeeg(baseUrl)) {
-                return@withContext loadBeegFeed(legacyCategory, page)
+                return@withContext loadBeegFeed(category, page)
             }
             if (ContentSourceCatalog.is134x(baseUrl)) {
                 return@withContext X134Repository.loadFeed(legacyCategory, page)
             }
             if (ContentSourceCatalog.isPipePipe(baseUrl)) {
                 // MissAV blocks the extractor's generic desktop request with a challenge page;
-                // keep its proven mobile HTML adapter as a transparent fallback.
+                // keep its proven mobile HTML adapter as a transparent fallback with 2x sub-page batching (24 items/page).
                 if (!ContentSourceCatalog.isMissAv(baseUrl)) {
                     val pipeItems = PipePipeBridge.loadFeed(baseUrl, category, page)
                     if (page == 1 && pipeItems.isEmpty()) {
@@ -52,10 +52,11 @@ class VideoRepository {
                     }
                     return@withContext pipeItems
                 }
-                val pipeItems = runCatching { PipePipeBridge.loadFeed(baseUrl, category, page) }
-                if (pipeItems.getOrNull()?.isNotEmpty() == true) {
-                    return@withContext pipeItems.getOrThrow()
+                val htmlBatched = runCatching { loadMissAvHtmlFeed(baseUrl, category, page) }
+                if (htmlBatched.getOrNull()?.isNotEmpty() == true) {
+                    return@withContext htmlBatched.getOrThrow()
                 }
+                return@withContext PipePipeBridge.loadFeed(baseUrl, category, page)
             }
             if (ContentSourceCatalog.isHuangguo(baseUrl)) {
                 val cacheKey = "${category.cacheKey}:$page"
@@ -63,7 +64,7 @@ class VideoRepository {
                 if (cached != null && System.currentTimeMillis() - cached.first < 10 * 60 * 1000L) {
                     return@withContext cached.second
                 }
-                val edgeItems = HuangguoEdgeGateway.fetchFeed(baseUrl, legacyCategory, page)
+                val edgeItems = HuangguoEdgeGateway.fetchFeedById(baseUrl, category.id, page)
                 if (edgeItems != null && edgeItems.isNotEmpty()) {
                     huangguoFeedCache[cacheKey] = Pair(System.currentTimeMillis(), edgeItems)
                     return@withContext edgeItems
@@ -355,9 +356,25 @@ class VideoRepository {
     }
 
     internal fun pageUrl(baseUrl: String, category: SourceCategory, page: Int): String {
+        val rawPath = category.path
+        if (!rawPath.isNullOrBlank()) {
+            if (ContentSourceCatalog.isHuavod(baseUrl)) {
+                val pagedPath = if (page <= 1) rawPath else "${rawPath.removeSuffix(".html")}/page/$page.html"
+                return URI("${baseUrl.trimEnd('/')}/").resolve(pagedPath).toString()
+            }
+            if (ContentSourceCatalog.is91Dongman(baseUrl)) {
+                val effectiveBase = if (page > 1 && rawPath.trim('/') == "anime") "/anime/lifan/" else rawPath
+                val pagedPath = if (page <= 1) effectiveBase else "${effectiveBase.trimEnd('/')}/page/$page/"
+                return URI("${baseUrl.trimEnd('/')}/").resolve(pagedPath).toString()
+            }
+            if (ContentSourceCatalog.isHuangguo(baseUrl)) {
+                val pagedPath = if (page <= 1) rawPath else "${rawPath.trimEnd('/')}/$page/"
+                return URI("${baseUrl.trimEnd('/')}/").resolve(pagedPath).toString()
+            }
+        }
         category.legacy?.let { return pageUrl(baseUrl, it, page) }
-        val rawPath = category.path ?: category.id
-        val categoryUrl = URI("$baseUrl/").resolve(rawPath)
+        val fallbackPath = rawPath ?: category.id
+        val categoryUrl = URI("$baseUrl/").resolve(fallbackPath)
         val params = categoryUrl.rawQuery.orEmpty().split('&').filter { it.isNotBlank() }
             .filterNot { it.substringBefore('=').equals("page", ignoreCase = true) }
             .toMutableList()
@@ -371,6 +388,32 @@ class VideoRepository {
             params.joinToString("&").takeIf { it.isNotBlank() },
             categoryUrl.rawFragment,
         ).toString()
+    }
+
+    private suspend fun loadMissAvHtmlFeed(baseUrl: String, category: SourceCategory, page: Int): List<VideoItem> = coroutineScope {
+        val route = when (category.kioskId ?: category.id) {
+            "release", "popular" -> "/cn/release"
+            "chinese-subtitle" -> "/cn/chinese-subtitle"
+            "today-hot" -> "/cn/today-hot"
+            "weekly-hot" -> "/cn/weekly-hot"
+            "monthly-hot" -> "/cn/monthly-hot"
+            "uncensored-leak" -> "/cn/uncensored-leak"
+            "siro" -> "/cn/siro"
+            "fc2" -> "/cn/fc2"
+            else -> "/cn/new"
+        }
+        val subPage1 = (page - 1) * 2 + 1
+        val subPage2 = subPage1 + 1
+        val url1 = URI("${baseUrl.trimEnd('/')}/").resolve(if (subPage1 <= 1) route else "$route?page=$subPage1").toString()
+        val url2 = URI("${baseUrl.trimEnd('/')}/").resolve("$route?page=$subPage2").toString()
+        val d1 = async { runCatching { parseDocument(fetchDocument(url1, baseUrl), baseUrl) }.getOrNull() }
+        val d2 = async { runCatching { parseDocument(fetchDocument(url2, baseUrl), baseUrl) }.getOrDefault(emptyList()) }
+        val p1Items = d1.await() ?: emptyList()
+        val merged = (p1Items + d2.await()).distinctBy(VideoItem::pageUrl)
+        if (page == 1 && merged.isEmpty()) {
+            throw IOException("MissAV 当前分类没有返回视频")
+        }
+        merged
     }
 
     private fun categoryPath(baseUrl: String, category: FeedCategory, page: Int): String {
@@ -865,16 +908,16 @@ class VideoRepository {
         )
     }
 
-    private suspend fun loadBeegFeed(category: FeedCategory, page: Int): List<VideoItem> = withContext(Dispatchers.IO) {
-        val tag = when (category) {
+    private suspend fun loadBeegFeed(category: SourceCategory, page: Int): List<VideoItem> = withContext(Dispatchers.IO) {
+        val tag = category.path?.takeIf(String::isNotBlank) ?: when (category.legacy) {
             FeedCategory.RECENT -> "index"
             FeedCategory.CURRENT_HOT -> "amateur"
             FeedCategory.MONTHLY_HOT -> "japanese"
             FeedCategory.FAVORITES -> "milf"
             FeedCategory.ALL -> "asian"
-            else -> "index"
+            else -> category.id.ifBlank { "index" }
         }
-        val limit = 20
+        val limit = 48
         val offset = (page - 1) * limit
         val url = "https://store.externulls.com/tag/videos/$tag?limit=$limit&offset=$offset"
         val jsonText = try {

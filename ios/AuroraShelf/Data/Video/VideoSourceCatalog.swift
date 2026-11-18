@@ -62,7 +62,11 @@ public enum VideoSourceCatalog {
         group: .direct,
         description: "影视分类列表 · 原站详情页解析",
         baseUrl: "https://huavod.com",
-        categories: ["全部", "电影", "电视剧", "综艺", "动漫", "短剧"],
+        categories: [
+            "全部", "电影", "电视剧", "综艺", "动漫", "短剧", "豆瓣高分",
+            "大陆剧", "港台剧", "日韩剧", "欧美剧",
+            "奇幻科幻", "动作冒险", "悬疑惊悚", "爱情喜剧", "动画电影"
+        ],
         isDirectConnect: true
     )
     
@@ -73,7 +77,7 @@ public enum VideoSourceCatalog {
         group: .direct,
         description: "短剧分类列表 · 原站详情页解析",
         baseUrl: "https://huangguoai.com",
-        categories: ["全部", "推荐", "最新", "AI漫剧", "AI换脸"],
+        categories: ["全部", "最近上新", "热门推荐", "黄果原创", "短剧", "漫剧"],
         isDirectConnect: true
     )
     
@@ -84,7 +88,10 @@ public enum VideoSourceCatalog {
         group: .direct,
         description: "视频分类列表 · 原站播放页解析",
         baseUrl: "https://h1014.sol148.com",
-        categories: ["全部", "当前最热", "非付费", "最近加精", "高清"],
+        categories: [
+            "当前最热", "最近加精", "91原创", "本月最热", "上月最热",
+            "10分钟以上", "20分钟以上", "收藏最多", "本月收藏", "本月讨论", "高清", "最新上传"
+        ],
         isDirectConnect: true
     )
     
@@ -95,7 +102,7 @@ public enum VideoSourceCatalog {
         group: .direct,
         description: "番剧分类列表 · 支持加密封面解码",
         baseUrl: "https://91dongman.net",
-        categories: ["全部", "里番", "3D动漫", "AI动漫", "排行"],
+        categories: ["里番", "泡面番", "3D动漫", "AI动漫", "纯爱", "剧情向", "短篇", "热门排行", "全部"],
         isDirectConnect: true
     )
     
@@ -106,7 +113,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "REST API 视频列表 · 原站播放信息",
         baseUrl: "https://beeg.com",
-        categories: ["精选", "自拍", "日本", "熟女", "亚洲"],
+        categories: ["精选", "自拍", "日本", "亚洲", "熟女", "少女", "韩国", "欧美"],
         isDirectConnect: false
     )
 
@@ -137,14 +144,17 @@ public enum VideoSourceCatalog {
         isDirectConnect: false
     )
     
-    // MISSPipe / NewPipe 13 个国际扩展源
+    // MISSPipe / NewPipe 国际扩展源（严格对齐各官网真实导航频道）
     public static let missav = VideoSourceDefinition(
         id: "missav",
         name: "MissAV",
         group: .overseas,
         description: "站点检索列表 · 原站详情页解析",
         baseUrl: "https://missav.media",
-        categories: ["最新", "热门", "推荐"],
+        categories: [
+            "最近更新", "新作上市", "中文字幕", "今日热门",
+            "本周热门", "本月热门", "无码流出", "素人 SIRO", "FC2"
+        ],
         isDirectConnect: false
     )
     
@@ -154,7 +164,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点检索列表 · 原站详情页解析",
         baseUrl: "https://kissjav.li",
-        categories: ["最新", "热门", "推荐"],
+        categories: ["最新更新", "最受欢迎", "最高评分"],
         isDirectConnect: false
     )
     
@@ -164,7 +174,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "日文列表与搜索 · 原站详情页解析",
         baseUrl: "https://www.85po.com",
-        categories: ["最新", "热门", "推荐"],
+        categories: ["最新更新", "最受欢迎", "最高评分"],
         isDirectConnect: false
     )
     
@@ -174,7 +184,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "区域站点列表与搜索 · 原站详情页解析",
         baseUrl: "https://jp.pornhub.com",
-        categories: ["最新", "热门", "推荐"],
+        categories: ["当下热门", "最新上线", "最多观看", "最高评分", "最长片长"],
         isDirectConnect: false
     )
     
@@ -184,7 +194,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "视频列表与搜索 · 原站详情页解析",
         baseUrl: "https://www.tokyomotion.net",
-        categories: ["最新", "热门", "推荐"],
+        categories: ["最新上传", "正在观看", "最多观看", "最高评分", "最多收藏", "最长片长"],
         isDirectConnect: false
     )
     
@@ -194,7 +204,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://www.spankbang.com",
-        categories: ["最新"],
+        categories: ["热门趋势", "最新上传", "最受欢迎", "即将热门"],
         isDirectConnect: false
     )
     
@@ -204,7 +214,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://xhamster.com",
-        categories: ["最新"],
+        categories: ["最佳热门", "最新发布", "4K 超清", "高清 HD", "完整长片", "带字幕"],
         isDirectConnect: false
     )
     
@@ -214,7 +224,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "JSON API 视频列表与搜索",
         baseUrl: "https://www.eporner.com",
-        categories: ["最新"],
+        categories: ["最新发布", "最多观看", "最高评分", "本周热门", "本月热门", "最长片长", "4K 超清"],
         isDirectConnect: false
     )
     
@@ -224,7 +234,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://mrdouga.com",
-        categories: ["最新", "热门"],
+        categories: ["最新更新", "今日热门", "总热门", "JAV 专区", "JVIP 精选", "FC2PPV"],
         isDirectConnect: false
     )
     
@@ -234,7 +244,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "站点搜索与分类 · 原站详情页解析",
         baseUrl: "https://ohentai.org",
-        categories: ["最新"],
+        categories: ["最新发布", "最多观看", "最多喜欢", "无码精选", "1080P", "3D 动画"],
         isDirectConnect: false
     )
     
@@ -244,7 +254,7 @@ public enum VideoSourceCatalog {
         group: .overseas,
         description: "官方榜单列表 · 原站详情页解析",
         baseUrl: "https://www.xnxx.com",
-        categories: ["最新"],
+        categories: ["今日精选", "热门点击", "本周热门", "本月热门", "月度最佳"],
         isDirectConnect: false
     )
     
@@ -303,10 +313,36 @@ public enum VideoSourceCatalog {
         }
         switch label {
         case "全部": return "all"
-        case "最新", "最新发布", "最近更新", "最新上线": return "latest"
-        case "热门", "热门中字", "热门榜单", "当下热门", "精选热播", "排行": return "popular"
-        case "推荐", "精选", "认证精选", "最高评分", "最受喜爱", "人气推荐": return "recommended"
-        default: return label.lowercased()
+        case "最新", "最新发布", "最近更新", "最新上线", "最新上传", "最近上新": return "latest"
+        case "热门", "热门中字", "热门榜单", "精选热播", "热门排行", "排行", "总热门", "最受欢迎", "最多观看", "热门推荐": return "popular"
+        case "当下热门", "热门趋势": return "trending"
+        case "今日热门": return "today-hot"
+        case "今日精选": return "today"
+        case "热门点击": return "hits"
+        case "本周热门": return "weekly"
+        case "本月热门", "本月最热": return "monthly"
+        case "月度最佳", "最佳热门": return "best"
+        case "正在观看": return "watching"
+        case "最多收藏": return "favorited"
+        case "最长片长": return "longest"
+        case "即将热门": return "upcoming"
+        case "新作上市": return "release"
+        case "中文字幕": return "chinese-subtitle"
+        case "无码流出": return "uncensored-leak"
+        case "素人 SIRO": return "siro"
+        case "FC2": return "fc2"
+        case "4K 超清": return "4k"
+        case "高清 HD", "高清": return "hd"
+        case "完整长片": return "full-length"
+        case "带字幕": return "subtitles"
+        case "无码精选": return "uncensored"
+        case "1080P": return "1080p"
+        case "3D 动画", "3D动漫": return "3d"
+        case "JAV 专区": return "jav"
+        case "JVIP 精选": return "jvip"
+        case "FC2PPV": return "fc2ppv"
+        case "推荐", "精选", "认证精选", "最高评分", "最受喜爱", "最多喜欢", "人气推荐": return "recommended"
+        default: return label.lowercased().replacingOccurrences(of: " ", with: "-")
         }
     }
     

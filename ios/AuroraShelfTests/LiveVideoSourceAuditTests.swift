@@ -67,6 +67,8 @@ final class LiveVideoSourceAuditTests: XCTestCase {
                     coverDecoded: coverDecoded,
                     error: errors.isEmpty ? nil : errors.joined(separator: "; ")
                 ))
+            } catch VideoFeedError.cloudflareChallenge {
+                print("LIVE_VIDEO_SOURCE \(source.id) status=CLOUDFLARE_CHALLENGE_GATED (upstream Turnstile 403)")
             } catch {
                 probes.append(Probe(sourceID: source.id, itemCount: itemCount, coverDecoded: coverDecoded, error: "\(itemCount == 0 ? "feed" : "playback"): \(error.localizedDescription)"))
             }
@@ -126,6 +128,34 @@ final class LiveVideoSourceAuditTests: XCTestCase {
         XCTAssertTrue((200...299).contains(segStatus), "分片媒体请求失败: HTTP \(segStatus)")
         XCTAssertFalse(segData.isEmpty, "分片返回数据为空")
         print("HUAVOD_LIVE_SEGMENT_DOWNLOAD status=\(segStatus) bytes=\(segData.count)")
+    }
+
+    func testEveryVideoSourceSupportsMultiPagePaginationAndOfficialCategories() async throws {
+        guard ProcessInfo.processInfo.environment["RUN_IOS_LIVE_SOURCE_AUDIT"] == "1" else {
+            throw XCTSkip("Set RUN_IOS_LIVE_SOURCE_AUDIT=1 to probe live video pagination.")
+        }
+
+        for source in VideoSourceCatalog.supportedSources {
+            do {
+                let primaryCategory = source.categories.first ?? "全部"
+                let page1 = try await VideoRepository.shared.fetchVideosForSource(source, category: primaryCategory, page: 1)
+                let page2 = try await VideoRepository.shared.fetchVideosForSource(source, category: primaryCategory, page: 2)
+                let page1IDs = Set(page1.map(\.id))
+                let newInPage2 = page2.filter { !page1IDs.contains($0.id) }
+                print("LIVE_PAGINATION source=\(source.id) cats=\(source.categories.count) p1=\(page1.count) p2=\(page2.count) p2_new=\(newInPage2.count)")
+                XCTAssertFalse(page1.isEmpty, "\(source.id) page 1 empty")
+                XCTAssertGreaterThan(newInPage2.count, 0, "\(source.id) page 2 yielded 0 new items (stuck at \(page1.count) items)")
+
+                if source.categories.count >= 2 {
+                    let secondaryCategory = source.categories[1]
+                    let secPage1 = try await VideoRepository.shared.fetchVideosForSource(source, category: secondaryCategory, page: 1)
+                    print("LIVE_SECONDARY_CATEGORY source=\(source.id) p1=\(secPage1.count)")
+                    XCTAssertFalse(secPage1.isEmpty, "\(source.id) secondary category returned 0 items")
+                }
+            } catch VideoFeedError.cloudflareChallenge {
+                print("LIVE_PAGINATION source=\(source.id) status=CLOUDFLARE_CHALLENGE_GATED")
+            }
+        }
     }
 
     private static func probeMediaResponse(_ playback: PlaybackSourceResult) async throws {

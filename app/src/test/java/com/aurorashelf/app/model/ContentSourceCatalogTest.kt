@@ -54,5 +54,11 @@ class ContentSourceCatalogTest {
             assertEquals(source.kioskIds, categories.mapNotNull(SourceCategory::kioskId))
             assertEquals(source.kioskIds.distinct().size, categories.size)
         }
+        assertTrue(ContentSourceCatalog.sourceCategories(ContentSourceCatalog.HUAVOD_BASE_URL).size >= 15)
+        assertEquals(5, ContentSourceCatalog.sourceCategories(ContentSourceCatalog.HUANGGUO_BASE_URL).size)
+        assertTrue(ContentSourceCatalog.sourceCategories(ContentSourceCatalog.HUANGGUO_BASE_URL).none { it.label.contains("换脸") })
+        assertEquals(9, ContentSourceCatalog.sourceCategories(ContentSourceCatalog.T91DONGMAN_BASE_URL).size)
+        assertEquals(12, ContentSourceCatalog.sourceCategories(ContentSourceCatalog.T91_BASE_URL).size)
+        assertEquals(8, ContentSourceCatalog.sourceCategories(ContentSourceCatalog.BEEG_BASE_URL).size)
     }
 }

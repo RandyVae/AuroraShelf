@@ -53,7 +53,18 @@ public final class PornhubKioskExtractor extends KioskExtractor<StreamInfoItem> 
         for (final PornhubSearchResult result : PornhubParsingHelper.extractVideoCards(document, 40)) {
             collector.commit(new PornhubInfoItemExtractor(result));
         }
-        return new InfoItemsPage<>(collector, HtmlPagination.nextPage(document));
+        Page next = HtmlPagination.nextPage(document);
+        if (next == null && !collector.getItems().isEmpty()) {
+            final String loc = document.location();
+            final java.util.regex.Matcher m = java.util.regex.Pattern.compile("([?&])page=(\\d+)").matcher(loc);
+            final String nextUrl = m.find()
+                    ? m.replaceFirst("$1page=" + (Integer.parseInt(m.group(2)) + 1))
+                    : loc + (loc.contains("?") ? "&page=2" : "?page=2");
+            if (HtmlPagination.isSafeNext(loc, nextUrl)) {
+                next = new Page(nextUrl);
+            }
+        }
+        return new InfoItemsPage<>(collector, next);
     }
 
     @Override

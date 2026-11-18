@@ -81,6 +81,44 @@ public struct HomeScreen: View {
                             onOpenSourcePicker: { showSourcePicker = true }
                         )
 
+                        // 官方分类横向胶囊导航栏（1:1 展示当前视频源全部官方频道，支持一键直选并联动下方无限分页）
+                        if repo.currentSource.categories.count > 1 {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: AuroraMetrics.spacingS) {
+                                    ForEach(repo.currentSource.categories, id: \.self) { cat in
+                                        let isSelected = (repo.currentCategory == cat)
+                                        Button {
+                                            guard repo.currentCategory != cat else { return }
+                                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                            withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
+                                                selectedCategory = cat
+                                                repo.switchCategory(to: cat)
+                                            }
+                                        } label: {
+                                            Text(cat)
+                                                .font(.subheadline.weight(isSelected ? .bold : .medium))
+                                                .foregroundStyle(isSelected ? Color.white : AuroraColor.textPrimary)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 8)
+                                                .background(
+                                                    isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                                    in: Capsule()
+                                                )
+                                                .overlay(
+                                                    Capsule()
+                                                        .stroke(isSelected ? Color.clear : AuroraColor.hairline, lineWidth: 1)
+                                                )
+                                        }
+                                        .buttonStyle(.plain)
+                                        .frame(minHeight: AuroraMetrics.minTouchTarget)
+                                        .accessibilityLabel("分类 \(cat)")
+                                        .accessibilityAddTraits(isSelected ? .isSelected : [])
+                                    }
+                                }
+                                .padding(.horizontal, AuroraMetrics.contentInset)
+                            }
+                        }
+
                         // 2. 今日热播 Top 10（Apple TV 风格精致半透明数字，重心回归海报）
                         if !repo.top10Videos.isEmpty {
                             VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
@@ -177,15 +215,25 @@ public struct HomeScreen: View {
                                     let gridVideos = remainingVideos.isEmpty ? repo.feedVideos : remainingVideos
 
                                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-                                        HStack {
-                                            Text("全部作品")
+                                        HStack(alignment: .firstTextBaseline) {
+                                            Text(repo.currentCategory == "全部" ? "全部作品" : "\(repo.currentCategory) · 全部作品")
                                                 .font(.title2)
                                                 .fontWeight(.bold)
                                                 .foregroundStyle(AuroraColor.textPrimary)
+                                                .lineLimit(1)
                                             Spacer()
-                                            Text("\(gridVideos.count) 部影片")
-                                                .font(.footnote)
-                                                .foregroundStyle(AuroraColor.textSecondary)
+                                            Button {
+                                                selectedCategoryForDetail = repo.currentCategory
+                                            } label: {
+                                                HStack(spacing: 4) {
+                                                    Text("\(repo.feedVideos.count)\(repo.canLoadMore ? "+" : "") 部影片")
+                                                    Image(systemName: "chevron.right")
+                                                        .font(.caption2.weight(.bold))
+                                                }
+                                                .font(.footnote.weight(.medium))
+                                                .foregroundStyle(AuroraColor.brand)
+                                            }
+                                            .buttonStyle(.plain)
                                         }
                                         .padding(.horizontal, AuroraMetrics.contentInset)
 
@@ -193,15 +241,41 @@ public struct HomeScreen: View {
                                             columns: gridColumns,
                                             spacing: AuroraMetrics.spacingL
                                         ) {
-                                            ForEach(gridVideos) { video in
+                                            ForEach(Array(gridVideos.enumerated()), id: \.element.id) { idx, video in
                                                 PosterCard(
                                                     video: video,
                                                     onSelect: { playVideo(video) },
                                                     onDetail: { selectedDetailVideo = video }
                                                 )
+                                                .onAppear {
+                                                    if idx >= max(0, gridVideos.count - 4) {
+                                                        Task {
+                                                            await repo.loadNextPage()
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                         .padding(.horizontal, AuroraMetrics.contentInset)
+
+                                        if repo.isLoadingNextPage {
+                                            HStack(spacing: AuroraMetrics.spacingM) {
+                                                ProgressView()
+                                                    .controlSize(.regular)
+                                                    .tint(AuroraColor.brand)
+                                                Text("home.loading_more".localized)
+                                                    .font(.footnote)
+                                                    .foregroundStyle(AuroraColor.textSecondary)
+                                            }
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, AuroraMetrics.spacingM)
+                                        } else if !repo.canLoadMore && !gridVideos.isEmpty {
+                                            Text("home.all_loaded".localized)
+                                                .font(.caption)
+                                                .foregroundStyle(AuroraColor.textTertiary)
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, AuroraMetrics.spacingM)
+                                        }
                                     }
                                     .padding(.top, AuroraMetrics.spacingM)
                                 }

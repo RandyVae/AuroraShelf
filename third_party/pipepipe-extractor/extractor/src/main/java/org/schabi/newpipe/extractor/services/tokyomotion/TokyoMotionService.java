@@ -80,7 +80,9 @@ public final class TokyoMotionService extends StreamingService {
     public KioskList getKioskList() throws ExtractionException {
         final KioskList list = new KioskList(this);
         try {
-            for (final String id : new String[] {"latest", "popular", "recommended"}) {
+            for (final String id : new String[] {
+                    "latest", "watching", "popular", "recommended", "favorited", "longest"
+            }) {
                 list.addKioskEntry((service, url, kioskId) -> new TokyoMotionKioskExtractor(
                                 service,
                                 TokyoMotionKioskLinkHandlerFactory.getInstance().fromId(kioskId),

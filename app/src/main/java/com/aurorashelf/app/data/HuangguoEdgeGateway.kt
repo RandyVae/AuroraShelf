@@ -300,18 +300,37 @@ object HuangguoEdgeGateway {
         origin: String = DEFAULT_ORIGIN,
         category: FeedCategory,
         page: Int,
-        size: Int = 20,
+        size: Int = 24,
+    ): List<VideoItem>? {
+        val catId = when (category) {
+            FeedCategory.CURRENT_HOT -> "recommend"
+            FeedCategory.MONTHLY_HOT -> "manju"
+            FeedCategory.FAVORITES -> "original"
+            FeedCategory.ALL -> "duanju"
+            FeedCategory.RECENT -> "newest"
+            else -> "newest"
+        }
+        return fetchFeedById(origin = origin, categoryId = catId, page = page, size = size)
+    }
+
+    fun fetchFeedById(
+        origin: String = DEFAULT_ORIGIN,
+        categoryId: String,
+        page: Int,
+        size: Int = 24,
     ): List<VideoItem>? {
         val normalizedOrigin = origin.trimEnd('/')
         val p = page.coerceAtLeast(1)
 
-        val path = when (category) {
-            FeedCategory.CURRENT_HOT -> "/api/ranks/hot"
-            FeedCategory.MONTHLY_HOT -> "/api/videos/category/ai-manju?page=$p&size=$size"
-            FeedCategory.FAVORITES -> "/api/videos/category/ai-huanlian?page=$p&size=$size"
-            FeedCategory.RECENT -> if (p == 1) "/api/home/latest" else "/api/videos?page=$p&size=$size"
-            FeedCategory.ALL -> if (p == 1) "/api/home/latest" else "/api/videos?page=$p&size=$size"
-            else -> if (p == 1) "/api/home/latest" else "/api/videos?page=$p&size=$size"
+        val path = when (categoryId) {
+            // /api/ranks/hot is a single-page leaderboard; page >= 2 falls back to HTML /recommend/{p}/
+            "recommend" -> if (p == 1) "/api/ranks/hot" else return null
+            // /original/ is served via HTML (/original/{p}/) with 44-49 items/page
+            "original" -> return null
+            "manju" -> "/api/videos/category/ai-manju?page=$p&size=$size"
+            "duanju" -> "/api/videos/category/ai-duanju?page=$p&size=$size"
+            "newest", "all" -> "/api/videos?page=$p&size=$size"
+            else -> "/api/videos?page=$p&size=$size"
         }
 
         val jsonStr = executeEdgeRequest(
@@ -320,7 +339,7 @@ object HuangguoEdgeGateway {
             path = path,
         ) ?: return null
 
-        return parseItemsJson(jsonStr, normalizedOrigin, category)
+        return parseItemsJson(jsonStr, normalizedOrigin, FeedCategory.RECENT)
     }
 
     private fun fetchDirectFeed(

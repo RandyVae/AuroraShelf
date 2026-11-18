@@ -24,6 +24,7 @@ public struct CategoryDetailScreen: View {
     @State private var canLoadMore: Bool = true
     @State private var currentPage: Int = 1
     @State private var errorMessage: String? = nil
+    @State private var loadMoreError: String? = nil
     @State private var selectedDetailVideo: VideoItem? = nil
 
     @Environment(\.dismiss) private var dismiss
@@ -31,8 +32,7 @@ public struct CategoryDetailScreen: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private var availableCategories: [String] {
-        let subs = source.categories.filter { $0 != "全部" }
-        return subs.isEmpty ? [initialCategory] : subs
+        source.categories.isEmpty ? [initialCategory] : source.categories
     }
 
     private var sortedVideos: [VideoItem] {
@@ -144,7 +144,7 @@ public struct CategoryDetailScreen: View {
                     } else {
                         VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                             LazyVGrid(columns: gridColumns, spacing: AuroraMetrics.spacingL) {
-                                ForEach(sortedVideos) { video in
+                                ForEach(Array(sortedVideos.enumerated()), id: \.element.id) { idx, video in
                                     PosterCard(
                                         video: video,
                                         onSelect: {
@@ -155,7 +155,7 @@ public struct CategoryDetailScreen: View {
                                         }
                                     )
                                     .onAppear {
-                                        if video.id == sortedVideos.last?.id {
+                                        if idx >= max(0, sortedVideos.count - 4) {
                                             loadNextPage()
                                         }
                                     }
@@ -172,6 +172,18 @@ public struct CategoryDetailScreen: View {
                                         .font(.footnote)
                                         .foregroundStyle(AuroraColor.textSecondary)
                                 }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, AuroraMetrics.spacingM)
+                            } else if let loadMoreError {
+                                Button {
+                                    self.loadMoreError = nil
+                                    loadNextPage()
+                                } label: {
+                                    Label("\(loadMoreError)（点击重试）", systemImage: "arrow.clockwise")
+                                        .font(.footnote.weight(.medium))
+                                        .foregroundStyle(AuroraColor.brand)
+                                }
+                                .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, AuroraMetrics.spacingM)
                             } else if !canLoadMore && !videos.isEmpty {
@@ -243,6 +255,7 @@ public struct CategoryDetailScreen: View {
     private func loadFirstPage() {
         isLoading = true
         errorMessage = nil
+        loadMoreError = nil
         currentPage = 1
         canLoadMore = true
 
@@ -269,7 +282,7 @@ public struct CategoryDetailScreen: View {
     }
 
     private func loadNextPage() {
-        guard canLoadMore, !isLoading, !isLoadingNextPage else { return }
+        guard canLoadMore, !isLoading, !isLoadingNextPage, loadMoreError == nil else { return }
         isLoadingNextPage = true
         let targetCategory = selectedCategory
         let targetSource = source
@@ -289,10 +302,13 @@ public struct CategoryDetailScreen: View {
                         self.currentPage = nextPage
                         self.canLoadMore = !fetched.isEmpty
                     }
+                    self.loadMoreError = nil
                     self.isLoadingNextPage = false
                 }
             } catch {
                 await MainActor.run {
+                    guard self.selectedCategory == targetCategory else { return }
+                    self.loadMoreError = error.localizedDescription
                     self.isLoadingNextPage = false
                 }
             }
