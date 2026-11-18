@@ -61,6 +61,13 @@ internal object ForumPostCache {
         currentBytes = 0
     }
 
+    fun remove(url: String) = synchronized(lock) {
+        val removed = cache.remove(url)
+        if (removed != null) {
+            currentBytes = (currentBytes - (url.length + removed.html.length) * 2).coerceAtLeast(0)
+        }
+    }
+
     fun sizeBytes(): Int = synchronized(lock) { currentBytes }
 
     /**

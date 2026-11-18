@@ -12,7 +12,7 @@
   3. 内屏双联展开态：460pt 剧院高度与 420pt 居中操作组、280pt 待播卡片与 3 列大图自适应流展，顶栏自动切为 `NetgreyMarkView`；
   4. 自动化测试：新增 `DeviceLayoutTests` 5 项测试，全量 101 项单元测试 100% 全部通过（0 failures, 5 skipped，耗时 4.277 秒）。
 
-# Netgrey · Android & iOS 2.17.3 · 跨 Agent 记忆
+# Netgrey · Android & iOS 2.17.4 · 跨 Agent 记忆
 
 > 本文件是所有 AI Agent（DSH / Codex / Claude / Hermes / Antigravity）进入本项目的统一入口。
 > 开工先读本文件，再按「权威来源」读细节；收工前更新「当前状态」。
@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `12c390b`（2026-11-18），未提交 0 个文件
+- Git：`main` @ `0dbe05f`（2026-11-18），未提交 19 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-18（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-18（今天）
@@ -36,19 +36,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-18 16:53 by `sync.py`
+- 最后同步：2026-11-18 17:48 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-18 · Build 270 / v2.17.3）：双端（Android + iPhone + iPad）根治 Stripchat 直播 Mouflon v2 鉴权阻断与 12 秒广告桩误判，并修复 Android 直播窗口顶栏贴边与上下比例失衡问题；全链路升级版本号至 `v2.17.3 (Build 270)`，三端 Release 模拟器（`emulator-5554` 正式签名 R8 APK、`iPhone 18 Pro` Release、`iPad Pro 13-inch (M5)` Release）全规模实测通过，网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,471,588` B / `Netgrey.ipa` `140,110,955` B，`/` 剩 `11G`）、TestFlight Build `270` 与 GitHub Release `v2.17.3` 全部同步上线。
-- 进行中：无阻塞任务；`v2.17.3 (Build 270)` 修复与双通道同步发布已闭环。
+- 当前阶段（2026-11-18 · Build 271 / v2.17.4）：根治 Android 论坛帖子内「划不动 / 无惯性滑行」三大耦合根因（`auroraSwipeBack` 全屏水平手势拦截抢占斜滑触控发送 `ACTION_CANCEL`、网页 `html, body` CSS 双层嵌套滚动致 `WebView scrollable=false` 丢失 `OverScroller` 惯性、单 `WebView` 全页多图同步重排卡顿），落地 24dp 物理左边缘即时放行手势与逐块虚拟化原生 120Hz `LazyColumn` 多楼层阅读器（对齐 iOS `ForumPostDetailView` 并保留修复后的原网页切换兜底）；全链路升级版本号至 `v2.17.4 (Build 271)`，三端 Release 模拟器（`emulator-5554` 正式签名 R8 APK、`iPhone 18 Pro` Release、`iPad Pro 13-inch (M5)` Release）全规模实测通过，网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,487,972` B / `Netgrey.ipa` `140,110,951` B，`/` 剩 `11G`）、TestFlight Build `271` 与 GitHub Release `v2.17.4` 全部同步上线。
+- 进行中：无阻塞任务；`v2.17.4 (Build 271)` 修复与三通道同步发布已闭环。
 - 下一步：常规版本演进与线上源站日常监控。
 - 阻塞：无。
 - 最近一次更新：2026-11-18 by Antigravity (Gemini 4 Argon)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-18（Antigravity）：根治 Android 论坛帖子内滑动阻滞（「划不动」），落地左边缘精准手势放行与逐块虚拟化原生 `LazyColumn` 阅读器并发布 `v2.17.4 (Build 271)`。(1) **真机级复现确诊三大叠加根因**：`emulator-5554` 实测纯垂直滑动 `dx=0` 可滚动 `~800px`，但自然单手拇指 `7°` 斜滑（`dx=-120, dy=-1000`）仅挪动 `<120px` 且 `0px` 惯性，根因是① [AppComponents.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AppComponents.kt) `Modifier.auroraSwipeBack` 使用全屏 `detectHorizontalDragGestures`，在检查 `offset.x <= 20.dp` 前先消费水平 touch slop 并向子视图下发 `MotionEvent.ACTION_CANCEL` 打断滚动；② [ForumScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ForumScreen.kt) 注入 `html, body { overflow-x: hidden; overflow-y: visible }` 触发 CSS 规范将 `<body>` 计算为内部 `overflow-y: auto` 子容器，导致 `WebView` 自身 `scrollable=false` 丧失原生 `OverScroller` 惯性；③ 多图长帖在单 `WebView` 全量并发解码重排阻塞主线程；(2) **方案一架构重构**：① 将 `auroraSwipeBack` 重写为 `awaitEachGesture` 在 `ACTION_DOWN` 首帧判断 `down.position.x > 24.dp` 即时 `return`，屏幕中区斜滑零拦截；② 新增 [ForumThreadParser.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/forum/ForumThreadParser.kt)（兼容 T66Y 与 Discuz! 多楼层图文交错、附件图集与底部分页）并在 `ForumScreen.kt` 默认启用逐块虚拟化 `LazyColumn` 阅读器（含图像宽高比缓存、单图/全帖批量存图及顶栏一键切换修复了 `html` 根滚动器与 `loading="lazy"` 的原网页模式），同时在 [AuroraApplication.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/AuroraApplication.kt) Coil 拦截器补齐第三方外链图床 `SSLException` 宽松 TLS 降级。
 
 - 2026-11-18（Antigravity）：双端根治 Stripchat 直播 Mouflon v2 阻断、重构 Android 直播窗口安全区与黄金比例并发布 `v2.17.3 (Build 270)`。(1) **Stripchat 直播打不开根因与自愈鉴权**：上游启用 `#EXT-X-MOUFLON:PSCH:v2` 保护，未携带 `pkey` 请求子清单时返回 `HTTP 200` 的 `#EXT-X-MOUFLON-ADVERT` 12 秒 VOD 广告桩，导致旧探针误判为有效直播流并在播完 12 秒后报「主播已离线」且不触发 WebRTC 降级；同时旧兜底 `{id}.m3u8` 已 TLS 超时。双端在 [LiveStreamResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/LiveStreamResolver.kt) 与 [LiveSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Live/LiveSourceCatalog.swift) 将主清单统一升级为自适应高清 `{id}_auto.m3u8?pkey=...`，支持从官方 MMP `main.js` 动态提取最新 `pkey`、核验首个子变体剔除 `#EXT-X-MOUFLON-ADVERT` / `#EXT-X-MOUFLON:FILE:`，并在密钥轮换失效或 `<25s` 异常结束时平滑降级至纯净 WebRTC 视口；(2) **Android 直播窗口位置与整体比例重构**：在 [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt) 为非全屏竖屏顶部补齐纯黑 `WindowInsets.statusBars` 安全隔离带（平板双栏左窗格同步补齐 `.statusBarsPadding()` 与右栏像素级对齐），移除播放器内顶栏重复状态栏内边距，新增 `calculateLiveStageHeight` 剧院级自适应舞台高度（竖屏横流约占视口 `30%`、竖流 `46%`），并将无弹幕时的「实时互动」收敛为紧凑状态卡、常驻展示下方「更多直播」推荐流，彻底消除「视频顶入状态栏 + 下方 70% 空白区」的比例失调。
 

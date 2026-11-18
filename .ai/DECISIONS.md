@@ -1,5 +1,15 @@
 # Existing Architectural Decisions
 
+## Native Virtualized Android Forum Reader & Edge-Isolated Swipe-Back (v2.17.4 Build 271)
+
+Date: 2026-11-18
+
+Status: Implemented, dual-platform Release verified, and published in `v2.17.4 (Build 271)`.
+
+Decisions:
+1. **Left-Edge Down-Gate in `Modifier.auroraSwipeBack` (`AppComponents.kt`)**: Replace full-screen `detectHorizontalDragGestures` (which consumed horizontal touch slop across the entire screen before checking `offset.x <= 20.dp`, dispatching `MotionEvent.ACTION_CANCEL` to child scrollers on natural diagonal thumb swipes) with `awaitEachGesture` + `awaitFirstDown(requireUnconsumed = false)` that immediately exits when `down.position.x > 24.dp`.
+2. **Per-Block Virtualized Native Compose Forum Reader (`ForumThreadParser.kt` + `ForumScreen.kt`)**: Align Android with iOS `ForumPostDetailView.swift` by parsing T66Y and Discuz! thread HTML into structured multi-floor `Paragraph` / `Image` / `ExternalLink` blocks and rendering them in a native `LazyColumn` (flattening multi-image floors into individual virtualized `LazyColumn` items with cached image aspect ratios so `[20P]–[100P]` threads only compose/decode 1–2 visible images at a time), while retaining a one-tap cleaned `WebView` fallback (`html { overflow-x: hidden; overflow-y: auto }` + `body { overflow-y: visible }` + `loading="lazy"`).
+
 ## Full-Stack 86-Item Optimization Audit Remediation (v2.17.0 Build 267)
 
 Date: 2026-11-18

@@ -113,7 +113,17 @@ class AuroraApplication : Application(), SingletonImageLoader.Factory {
         }
 
         val startedAt = System.currentTimeMillis()
-        var response: Response? = runCatching { chain.proceed(activeRequest) }.getOrNull()
+        var response: Response? = try {
+            chain.proceed(activeRequest)
+        } catch (sslErr: javax.net.ssl.SSLException) {
+            if (!rawHost.equals("bananarey.us", ignoreCase = true)) {
+                runCatching { com.aurorashelf.app.data.resilience.AuroraHttpClient.permissiveTlsClient.newCall(activeRequest).execute() }.getOrNull()
+            } else {
+                null
+            }
+        } catch (_: Throwable) {
+            null
+        }
         if (response != null && response.isSuccessful) {
             if (cdnPoolKey != null) {
                 SourceHealthRegistry.recordSuccess(cdnPoolKey, activeHost, System.currentTimeMillis() - startedAt)

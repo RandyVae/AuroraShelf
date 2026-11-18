@@ -1,6 +1,17 @@
 # Project State
 
-## 最新工作状态（2026年11月18日 · 双端 Stripchat 直播 Mouflon v2 动态鉴权修复＋Android 直播窗口顶栏避让与黄金比例重构＋三端 Release 模拟器验收与全通道上线 · v2.17.3 Build 270）
+## 最新工作状态（2026年11月18日 · Android 论坛帖子内滑动阻滞根治：左边缘精准放行手势＋逐块虚拟化原生 120Hz LazyColumn 阅读器＋三端 Release 模拟器验收与全通道上线 · v2.17.4 Build 271）
+
+- **版本号全链路同步至 `v2.17.4 (Build 271)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`（`publish_ota.sh --check-versions` 校验通过）。
+- **Android 论坛帖子内「划不动」三大根因确诊与方案一彻底根治**：
+  - **全局手势物理隔离（[AppComponents.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AppComponents.kt)）**：将 `Modifier.auroraSwipeBack` 从全屏 `detectHorizontalDragGestures` 重构为 `awaitEachGesture` + `awaitFirstDown(requireUnconsumed = false)`，当 `down.position.x > 24.dp` 时首帧立即 `return@awaitEachGesture`，彻底消除屏幕中部拇指弧形斜滑被水平 touch slop 抢占并下发 `MotionEvent.ACTION_CANCEL` 的缺陷（全应用详情页同步受益）。
+  - **原生多楼层图文解析与逐块虚拟化 `LazyColumn` 阅读器（[ForumThreadParser.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/forum/ForumThreadParser.kt) + [ForumScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ForumScreen.kt)）**：对齐 iOS `ForumPostDetailView`，默认采用原生 Compose `LazyColumn` 逐块虚拟化渲染 T66Y（草榴社区 / 达盖尔的旗帜）与 Discuz!（91自拍论坛）多楼层图文、外链按钮、单图「保存原图」、全帖「下载 N 图」与多页翻页条，内存持久缓存已解码图片宽高比杜绝回滚跳动；顶栏保留一键切换至修复了 `html` 根滚动器（消除 `body` 嵌套子滚动器）与 `loading="lazy"` 的净化原网页视图；在 [AuroraApplication.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/AuroraApplication.kt) Coil OkHttp 拦截器补齐第三方图床 `SSLException` 宽松 TLS 自动回退（排除 `bananarey.us`），并在 [ForumPostCache.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/forum/ForumPostCache.kt) 补齐 `remove(url)` 强刷清理。
+- **双端验证与全通道同步发布（`v2.17.4 Build 271`）**：
+  - Android：新增 [ForumThreadParserTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/data/forum/ForumThreadParserTest.kt)，`testDebugUnitTest`、`lintDebug`、`lintVitalRelease`、`assembleRelease`（0 warning）与 `apksigner verify`（`RSA-4096` V2+V3）全通；`emulator-5554` 覆盖升级 `dist/Netgrey.apk` 后实测 `scrollable=true`、`7°` 斜向拇指快滑顺畅惯性滑行、19 图原生解码与批量下载入口、左边缘侧滑返回、视频、漫画、Stripchat 高清直播及《Lust Goddess》`Version 2.17.4` 全绿。
+  - iOS / iPadOS：`ForumRepositoryTests` 与 `LiveSourceAdapterTests` 通过，`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器全模块（视频、漫画、直播、社区 278 篇主题、游戏 `Version 2.17.4`）走查通过。
+  - 双通道发布：OTA `https://bananarey.us`（`Netgrey.apk` `143,487,972` B / `137M`、`Netgrey.ipa` `140,110,951` B / `134M`、`manifest.plist` `2.17.4`、`source-manifest.json` `2.17.4` 均 `HTTP 200`，`/` 剩 `11G`）与 TestFlight Build `271`（`Upload succeeded`）同步上线。
+
+## 历史工作状态（2026年11月18日 · 双端 Stripchat 直播 Mouflon v2 动态鉴权修复＋Android 直播窗口顶栏避让与黄金比例重构＋三端 Release 模拟器验收与全通道上线 · v2.17.3 Build 270）
 
 - **版本号全链路同步至 `v2.17.3 (Build 270)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`（`publish_ota.sh --check-versions` 校验通过）。
 - **双端 Stripchat 直播恢复与动态密钥自愈（Android + iPhone + iPad）**：

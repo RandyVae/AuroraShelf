@@ -1,4 +1,15 @@
-## 最新交接：2026-11-18 — 双端 Stripchat 直播 Mouflon v2 动态鉴权修复、Android 直播窗口顶栏避让与整体比例重构及全通道同步上线 · v2.17.3 (Build 270)
+## 最新交接：2026-11-18 — Android 论坛帖子内滑动阻滞根治（24dp 左边缘精准放行手势 + 逐块虚拟化原生 120Hz LazyColumn 阅读器）及全通道同步上线 · v2.17.4 (Build 271)
+
+### 本次完成
+1. **Android 论坛打开帖子「划不动」三大根因确诊与根治**：
+   - **手势层（[AppComponents.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AppComponents.kt)）**：原 `Modifier.auroraSwipeBack` 使用全屏 `detectHorizontalDragGestures`，先消费水平 touch slop 再判断 `offset.x <= 20.dp`，导致单手拇指 `7°` 斜滑触发 `MotionEvent.ACTION_CANCEL` 打断列表/网页滚动；现重构为 `awaitEachGesture` 在 `ACTION_DOWN` 首帧对 `down.position.x > 24.dp` 直接 `return@awaitEachGesture`，屏幕中区斜滑零拦截。
+   - **原生阅读器层（[ForumThreadParser.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/forum/ForumThreadParser.kt) + [ForumScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/ForumScreen.kt)）**：新增 Jsoup 多楼层解析器（支持 T66Y `草榴社区`/`达盖尔的旗帜` 与 Discuz! `91自拍论坛` 图文交错、附件图集与分页），将 `ForumReader` 默认升级为逐块虚拟化原生 `LazyColumn`（长图楼层拆分为独立虚拟化 `floor-head` + `floor-img/txt/lnk` 切片并持久缓存图片解码宽高比，仅解码视口可见的 1–2 张图片，保留单图「保存原图」、全帖「下载 N 图」与长按存图弹窗）；同时修复 [AuroraApplication.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/AuroraApplication.kt) Coil 第三方图床 `SSLException` 宽松 TLS 降级与 [ForumPostCache.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/forum/ForumPostCache.kt) `remove(url)`。
+   - **原网页兜底层（`ForumScreen.kt`）**：顶栏提供一键切换「原网页视图」，修复 `html { overflow-x: hidden; overflow-y: auto }` vs `body { overflow-y: visible }` 消除嵌套子滚动器，关闭 `builtInZoomControls` 并注入 `loading="lazy"; decoding="async"`。
+2. **全量验证与三通道同步发布（`v2.17.4 Build 271`）**：
+   - 新增单测 [ForumThreadParserTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/data/forum/ForumThreadParserTest.kt)，Android 单测/Lint/正式签名 APK（0 warning）与 iOS `ForumRepositoryTests`/`LiveSourceAdapterTests` 全通。
+   - `emulator-5554` 正式签名 Release APK（实测 `scrollable=true`、`7°` 斜向快滑顺畅惯性滑行、19 图帖解析存图与游戏 `Version 2.17.4`）及 `iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 模拟器全规模实测通过；网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,487,972` B、`Netgrey.ipa` `140,110,951` B，`/` 剩 `11G`）、TestFlight `Build 271` 与 GitHub Release `v2.17.4` 同步上线。
+
+## 历史交接：2026-11-18 — 双端 Stripchat 直播 Mouflon v2 动态鉴权修复、Android 直播窗口顶栏避让与整体比例重构及全通道同步上线 · v2.17.3 (Build 270)
 
 ### 本次完成
 1. **双端 Stripchat 直播打不开根治（Android + iPhone + iPad）**：

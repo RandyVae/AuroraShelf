@@ -71,8 +71,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.ScrollableDefaults
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.animation.core.Spring
 import androidx.compose.runtime.mutableFloatStateOf
 import kotlin.math.roundToInt
@@ -1471,7 +1475,7 @@ internal fun Modifier.auroraSwipeBack(
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
     val triggerDistancePx = with(density) { 96.dp.toPx() }
-    val edgeThresholdPx = with(density) { 20.dp.toPx() }
+    val edgeThresholdPx = with(density) { 24.dp.toPx() }
 
     this
         .onSizeChanged { containerWidthPx = it.width.toFloat().coerceAtLeast(1f) }
@@ -1488,57 +1492,58 @@ internal fun Modifier.auroraSwipeBack(
             }
         }
         .pointerInput(enabled) {
-            detectHorizontalDragGestures(
-                onDragStart = { offset ->
-                    if (offset.x <= edgeThresholdPx) {
-                        isDragging = true
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                // Only inspect horizontal touch slop when the gesture starts inside the left edge zone.
+                // Exiting immediately for mid-screen touches prevents consuming slight diagonal thumb arcs
+                // and never dispatches MotionEvent.ACTION_CANCEL to child LazyColumn / WebView views.
+                if (down.position.x > edgeThresholdPx) {
+                    return@awaitEachGesture
+                }
+                var initialOverSlop = 0f
+                val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
+                    if (over > 0f) {
+                        change.consume()
+                        initialOverSlop = over
                     }
-                },
-                onDragEnd = {
-                    if (isDragging) {
+                }
+                if (drag != null) {
+                    isDragging = true
+                    if (initialOverSlop > 0f) {
+                        scope.launch { dragOffsetPx.snapTo(initialOverSlop) }
+                    }
+                    val completed = try {
+                        horizontalDrag(drag.id) { change ->
+                            val deltaX = change.positionChange().x
+                            change.consume()
+                            val next = (dragOffsetPx.value + deltaX).coerceAtLeast(0f)
+                            scope.launch { dragOffsetPx.snapTo(next) }
+                        }
+                    } finally {
                         isDragging = false
-                        if (dragOffsetPx.value > triggerDistancePx) {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            scope.launch {
-                                dragOffsetPx.animateTo(
-                                    targetValue = containerWidthPx,
-                                    animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
-                                )
-                                onDismiss()
-                            }
-                        } else {
-                            scope.launch {
-                                dragOffsetPx.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = 0.85f,
-                                        stiffness = Spring.StiffnessMediumLow,
-                                    ),
-                                )
-                            }
+                    }
+                    if (completed && dragOffsetPx.value > triggerDistancePx) {
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        scope.launch {
+                            dragOffsetPx.animateTo(
+                                targetValue = containerWidthPx,
+                                animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+                            )
+                            onDismiss()
+                        }
+                    } else {
+                        scope.launch {
+                            dragOffsetPx.animateTo(
+                                targetValue = 0f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.85f,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                            )
                         }
                     }
-                },
-                onDragCancel = {
-                    isDragging = false
-                    scope.launch {
-                        dragOffsetPx.animateTo(
-                            targetValue = 0f,
-                            animationSpec = spring(
-                                dampingRatio = 0.85f,
-                                stiffness = Spring.StiffnessMediumLow,
-                            ),
-                        )
-                    }
-                },
-                onHorizontalDrag = { change, dragAmount ->
-                    if (isDragging) {
-                        change.consume()
-                        val next = (dragOffsetPx.value + dragAmount).coerceAtLeast(0f)
-                        scope.launch { dragOffsetPx.snapTo(next) }
-                    }
-                },
-            )
+                }
+            }
         }
 }
 

@@ -2,6 +2,7 @@ package com.aurorashelf.app.ui
 
 import android.annotation.SuppressLint
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.os.Build
@@ -21,10 +22,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,6 +36,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -41,17 +46,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Image
@@ -74,6 +85,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,6 +99,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -106,12 +119,25 @@ import com.aurorashelf.app.ui.theme.AuroraMediaSurface
 import org.json.JSONArray
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
+import coil3.request.ImageRequest
+import com.aurorashelf.app.data.VideoRepository
+import com.aurorashelf.app.data.forum.ForumContentBlock
+import com.aurorashelf.app.data.forum.ForumFloor
+import com.aurorashelf.app.data.forum.ForumHttp
 import com.aurorashelf.app.data.forum.ForumImageRequest
 import com.aurorashelf.app.data.forum.ForumImageSaver
+import com.aurorashelf.app.data.forum.ForumPageLink
 import com.aurorashelf.app.data.forum.ForumPostCache
+import com.aurorashelf.app.data.forum.ForumThreadDetail
+import com.aurorashelf.app.data.forum.ForumThreadParser
 import com.aurorashelf.app.data.forum.deduplicateForumImageUrls
 import com.aurorashelf.app.data.forum.shouldForwardCookies
 import com.aurorashelf.app.model.ForumPost
@@ -488,31 +514,42 @@ private fun ForumError(message: String, onRetry: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     val context = LocalContext.current
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val imageSaver = remember(context) { ForumImageSaver(context) }
     val isDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
-    val latestIsDarkTheme by rememberUpdatedState(isDarkTheme)
-    val cachedHtml = remember(post.url) { ForumPostCache.get(post.url) }
-    val startedAt = remember(post.url) { System.currentTimeMillis() }
-    var isLoading by remember(post.url) { mutableStateOf(true) }
-    var earlyStyledGeneration by remember(post.url) { mutableIntStateOf(-1) }
-    var error by remember(post.url) { mutableStateOf<String?>(null) }
-    var canGoBack by remember(post.url) { mutableStateOf(false) }
-    var loadGeneration by remember(post.url) { mutableIntStateOf(0) }
+
+    var isWebMode by remember(post.url) { mutableStateOf(false) }
+    var activeThreadUrl by remember(post.url) { mutableStateOf(post.url) }
+    var threadUrlStack by remember(post.url) { mutableStateOf<List<String>>(emptyList()) }
+    var refreshNonce by remember(post.url) { mutableIntStateOf(0) }
+
+    var nativeDetail by remember(post.url) { mutableStateOf<ForumThreadDetail?>(null) }
+    var isNativeLoading by remember(post.url) { mutableStateOf(true) }
+    var nativeError by remember(post.url) { mutableStateOf<String?>(null) }
+    val nativeListState = rememberLazyListState()
+
+    var webDetectedImages by remember(post.url) { mutableStateOf<List<String>>(emptyList()) }
+    var webCanGoBack by remember(post.url) { mutableStateOf(false) }
+    var webGoBackTrigger by remember(post.url) { mutableIntStateOf(0) }
+    var readerUserAgent by remember(post.url) { mutableStateOf(VideoRepository.USER_AGENT) }
+
     var pendingImageRequest by remember(post.url) { mutableStateOf<ForumImageRequest?>(null) }
     var permissionImageRequest by remember(post.url) { mutableStateOf<ForumImageRequest?>(null) }
     var permissionBatchRequests by remember(post.url) { mutableStateOf<List<ForumImageRequest>?>(null) }
     var isSavingImage by remember(post.url) { mutableStateOf(false) }
     var batchSaveProgress by remember(post.url) { mutableStateOf<Pair<Int, Int>?>(null) }
-    var detectedImageUrls by remember(post.url) { mutableStateOf<List<String>>(emptyList()) }
-    val latestDetectedImages by rememberUpdatedState(detectedImageUrls)
-    var readerUserAgent by remember(post.url) { mutableStateOf("Mozilla/5.0") }
+
+    val effectiveDetectedImages = if (isWebMode) {
+        webDetectedImages
+    } else {
+        nativeDetail?.allImageUrls.orEmpty()
+    }
 
     val buildImageRequest: (String, String) -> ForumImageRequest = { imageUrl, currentPageUrl ->
         ForumImageRequest(
@@ -520,7 +557,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
             pageUrl = currentPageUrl,
             userAgent = readerUserAgent,
             cookies = if (shouldForwardCookies(currentPageUrl, imageUrl)) {
-                CookieManager.getInstance().getCookie(currentPageUrl)
+                runCatching { CookieManager.getInstance().getCookie(currentPageUrl) }.getOrNull()
             } else {
                 null
             },
@@ -606,17 +643,893 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
         }
     }
 
-    val webView = remember(post.url) {
+    // Native Jsoup thread loader (instant <5ms when ForumPostCache hits, shared HTTP/2 pool otherwise)
+    LaunchedEffect(activeThreadUrl, refreshNonce, isWebMode) {
+        if (isWebMode) return@LaunchedEffect
+        val targetUrl = activeThreadUrl
+        if (!targetUrl.startsWith("http://", ignoreCase = true) && !targetUrl.startsWith("https://", ignoreCase = true)) {
+            isNativeLoading = false
+            nativeError = "帖子链接无效"
+            return@LaunchedEffect
+        }
+        isNativeLoading = true
+        nativeError = null
+        val started = System.currentTimeMillis()
+        val outcome = withContext(Dispatchers.IO) {
+            runCatching {
+                val cached = ForumPostCache.get(targetUrl)
+                if (cached != null) {
+                    ForumThreadParser.parse(cached, targetUrl, post)
+                } else {
+                    val doc = ForumHttp.fetchDocument(targetUrl, mobileLayout = true)
+                    ForumPostCache.put(targetUrl, doc.outerHtml())
+                    ForumThreadParser.parse(doc, post)
+                }
+            }
+        }
+        outcome.fold(
+            onSuccess = { parsed ->
+                Log.i(TAG, "nativeParsed ms=${System.currentTimeMillis() - started} floors=${parsed.floors.size} imgs=${parsed.allImageUrls.size}")
+                if (parsed.floors.isEmpty()) {
+                    // Automatic graceful fallback to cleaned WebView if thread relies on dynamic JS DOM
+                    isWebMode = true
+                    isNativeLoading = false
+                } else {
+                    nativeDetail = parsed
+                    isNativeLoading = false
+                    nativeError = null
+                    nativeListState.scrollToItem(0)
+                }
+            },
+            onFailure = { err ->
+                if (err is kotlinx.coroutines.CancellationException) throw err
+                isNativeLoading = false
+                nativeError = err.message ?: "帖子加载失败，请检查网络后重试"
+            },
+        )
+    }
+
+    val navigateToThreadPage: (String) -> Unit = { nextUrl ->
+        if (nextUrl.isNotBlank() && nextUrl != activeThreadUrl) {
+            threadUrlStack = threadUrlStack + activeThreadUrl
+            activeThreadUrl = nextUrl
+        }
+    }
+
+    val hasInternalBack = if (isWebMode) webCanGoBack else threadUrlStack.isNotEmpty()
+    BackHandler(enabled = hasInternalBack) {
+        if (isWebMode) {
+            webGoBackTrigger += 1
+        } else if (threadUrlStack.isNotEmpty()) {
+            val prev = threadUrlStack.last()
+            threadUrlStack = threadUrlStack.dropLast(1)
+            activeThreadUrl = prev
+        }
+    }
+
+    PredictiveBackContainer(
+        enabled = !hasInternalBack,
+        onBack = onClose,
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .testTag("forum-reader"),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 60.dp)
+                    .padding(horizontal = 6.dp),
+            ) {
+                IconButton(onClick = onClose) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "返回论坛",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+                Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                    Text(
+                        post.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    Text(
+                        text = if (isWebMode) "${post.sourceName} · 原网页模式" else post.sourceName,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (effectiveDetectedImages.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = AuroraCoral.copy(alpha = 0.14f),
+                        border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.35f)),
+                        modifier = Modifier
+                            .padding(end = 2.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .clickable(enabled = !isSavingImage) {
+                                val requests = effectiveDetectedImages.map { buildImageRequest(it, activeThreadUrl) }
+                                triggerBatchSaveWithPermission(requests)
+                            }
+                            .testTag("forum-batch-download-images"),
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        ) {
+                            Icon(
+                                Icons.Default.Download,
+                                contentDescription = "下载本帖全部图片",
+                                tint = AuroraCoral,
+                                modifier = Modifier.size(15.dp),
+                            )
+                            Text(
+                                text = batchSaveProgress?.let { "${it.first}/${it.second}" } ?: "下载 ${effectiveDetectedImages.size} 图",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = AuroraCoral,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+                IconButton(
+                    onClick = { isWebMode = !isWebMode },
+                ) {
+                    Icon(
+                        imageVector = if (isWebMode) Icons.AutoMirrored.Filled.Article else Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = if (isWebMode) "切换为原生极速阅读" else "切换为原网页视图",
+                        tint = if (isWebMode) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        ForumPostCache.remove(activeThreadUrl)
+                        refreshNonce += 1
+                    },
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = "刷新帖子",
+                        tint = MaterialTheme.colorScheme.onBackground,
+                    )
+                }
+            }
+
+            batchSaveProgress?.let { (completed, total) ->
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(
+                            text = "正在保存本帖图片 $completed / $total…",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "${(completed * 100 / total.coerceAtLeast(1))}%",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = AuroraCoral,
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress = { completed.toFloat() / total.coerceAtLeast(1).toFloat() },
+                        modifier = Modifier.fillMaxWidth().height(4.dp),
+                        color = AuroraCoral,
+                    )
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+            Box(Modifier.fillMaxSize()) {
+                if (!isWebMode) {
+                    val detail = nativeDetail
+                    when {
+                        isNativeLoading && detail == null -> {
+                            LinearProgressIndicator(
+                                Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                                color = AuroraCoral,
+                            )
+                            Surface(
+                                color = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                shape = RoundedCornerShape(24.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                modifier = Modifier.align(Alignment.Center).testTag("forum-reader-loading"),
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
+                                ) {
+                                    CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp, color = AuroraCoral)
+                                    Text("正在加载帖子正文", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                                }
+                            }
+                        }
+
+                        nativeError != null && detail == null -> {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .background(MaterialTheme.colorScheme.background)
+                                    .padding(24.dp),
+                            ) {
+                                Text(nativeError.orEmpty(), color = MaterialTheme.colorScheme.onBackground)
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    TextButton(onClick = { refreshNonce += 1 }) {
+                                        Text("重新加载", color = AuroraCoral)
+                                    }
+                                    TextButton(onClick = { isWebMode = true }) {
+                                        Text("原网页打开")
+                                    }
+                                }
+                            }
+                        }
+
+                        detail != null -> {
+                            if (isNativeLoading) {
+                                LinearProgressIndicator(
+                                    Modifier.fillMaxWidth().align(Alignment.TopCenter),
+                                    color = AuroraCoral,
+                                )
+                            }
+                            NativeForumThreadContent(
+                                post = post,
+                                detail = detail,
+                                pageUrl = activeThreadUrl,
+                                listState = nativeListState,
+                                isSavingImage = isSavingImage,
+                                onSelectPage = navigateToThreadPage,
+                                onSaveSingleImage = { imgUrl ->
+                                    triggerSaveWithPermission(buildImageRequest(imgUrl, activeThreadUrl))
+                                },
+                                onConfirmSaveDialog = { imgUrl ->
+                                    pendingImageRequest = buildImageRequest(imgUrl, activeThreadUrl)
+                                },
+                                modifier = Modifier.fillMaxSize().testTag("forum-reader-content"),
+                            )
+                        }
+                    }
+                } else {
+                    ForumWebFallbackContent(
+                        url = activeThreadUrl,
+                        isDarkTheme = isDarkTheme,
+                        refreshNonce = refreshNonce,
+                        goBackTrigger = webGoBackTrigger,
+                        onCanGoBackChange = { webCanGoBack = it },
+                        onDetectedImagesChange = { webDetectedImages = it },
+                        onUserAgentCaptured = { readerUserAgent = it },
+                        onSaveImage = { imgUrl, pageUrl ->
+                            triggerSaveWithPermission(buildImageRequest(imgUrl, pageUrl))
+                        },
+                        onLongPressImage = { imgUrl, pageUrl ->
+                            pendingImageRequest = buildImageRequest(imgUrl, pageUrl)
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+
+                if (isSavingImage) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.inverseSurface,
+                        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                        shape = RoundedCornerShape(18.dp),
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp).testTag("forum-image-saving"),
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                        ) {
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            Text("正在保存图片…", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                )
+            }
+        }
+    }
+
+    pendingImageRequest?.let { request ->
+        AlertDialog(
+            onDismissRequest = { pendingImageRequest = null },
+            icon = { Icon(Icons.Default.Image, contentDescription = null) },
+            title = { Text("保存图片到相册？") },
+            text = { Text("图片将保存到系统相册的 Pictures/AuroraShelf 文件夹。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        pendingImageRequest = null
+                        triggerSaveWithPermission(request)
+                    },
+                    enabled = !isSavingImage,
+                    modifier = Modifier.testTag("forum-image-save-confirm"),
+                ) { Text("保存到相册") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingImageRequest = null }) { Text("取消") }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun NativeForumThreadContent(
+    post: ForumPost,
+    detail: ForumThreadDetail,
+    pageUrl: String,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    isSavingImage: Boolean,
+    onSelectPage: (String) -> Unit,
+    onSaveSingleImage: (String) -> Unit,
+    onConfirmSaveDialog: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val aspectRatioCache = remember(pageUrl) { mutableStateMapOf<String, Float>() }
+    val openExternalLink: (String) -> Unit = { targetUrl ->
+        runCatching {
+            val intent = Intent(Intent.ACTION_VIEW, targetUrl.toUri()).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        }
+    }
+    LazyColumn(
+        state = listState,
+        flingBehavior = ScrollableDefaults.flingBehavior(),
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 14.dp),
+        modifier = modifier,
+    ) {
+        item(key = "native-thread-header", contentType = "header") {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 2.dp, end = 2.dp, top = 4.dp, bottom = 14.dp),
+            ) {
+                Text(
+                    text = detail.title.ifBlank { post.title },
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = 20.sp,
+                        lineHeight = 27.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    val badgeColor = when (post.sourceId) {
+                        "t906" -> Color(0xFFE50914)
+                        "t66y" -> Color(0xFF2E7D32)
+                        "t66y_16" -> Color(0xFF00695C)
+                        else -> AuroraCoral
+                    }
+                    Surface(color = badgeColor, shape = RoundedCornerShape(4.dp)) {
+                        Text(
+                            text = post.sourceName,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                        )
+                    }
+                    Text(
+                        text = "${detail.floors.size} 楼 · ${detail.allImageUrls.size} 图",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (post.updatedLabel.isNotBlank()) {
+                        Text(
+                            text = "· ${post.updatedLabel}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (detail.pageLinks.isNotEmpty()) {
+                    ForumPaginationStrip(
+                        pageLinks = detail.pageLinks,
+                        onSelectPage = onSelectPage,
+                    )
+                }
+            }
+        }
+
+        detail.floors.forEach { floor ->
+            val hasImages = floor.blocks.any { it is ForumContentBlock.Image }
+            if (!hasImages && floor.blocks.size <= 3) {
+                item(
+                    key = "floor-${floor.floorNumber}-compact",
+                    contentType = "floor-compact",
+                ) {
+                    ForumFloorCard(
+                        floor = floor,
+                        pageUrl = pageUrl,
+                        aspectRatioCache = aspectRatioCache,
+                        isSavingImage = isSavingImage,
+                        onSaveSingleImage = onSaveSingleImage,
+                        onConfirmSaveDialog = onConfirmSaveDialog,
+                        onOpenExternalLink = openExternalLink,
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    )
+                }
+            } else {
+                item(
+                    key = "floor-${floor.floorNumber}-head",
+                    contentType = "floor-head",
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (floor.blocks.isEmpty()) Modifier.padding(bottom = 12.dp) else Modifier,
+                            ),
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp),
+                        ) {
+                            ForumFloorHeaderRow(floor = floor)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                        }
+                    }
+                }
+                itemsIndexed(
+                    items = floor.blocks,
+                    key = { idx, _ -> "floor-${floor.floorNumber}-b-$idx" },
+                    contentType = { _, block ->
+                        when (block) {
+                            is ForumContentBlock.Image -> "floor-img"
+                            is ForumContentBlock.Paragraph -> "floor-txt"
+                            is ForumContentBlock.ExternalLink -> "floor-lnk"
+                        }
+                    },
+                ) { idx, block ->
+                    val isLast = idx == floor.blocks.lastIndex
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shape = if (isLast) {
+                            RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+                        } else {
+                            RectangleShape
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (isLast) Modifier.padding(bottom = 12.dp) else Modifier),
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(
+                                start = 14.dp,
+                                end = 14.dp,
+                                top = 2.dp,
+                                bottom = if (isLast) 14.dp else 10.dp,
+                            ),
+                        ) {
+                            ForumFloorBlockItem(
+                                block = block,
+                                pageUrl = pageUrl,
+                                aspectRatioCache = aspectRatioCache,
+                                isSavingImage = isSavingImage,
+                                onSaveSingleImage = onSaveSingleImage,
+                                onConfirmSaveDialog = onConfirmSaveDialog,
+                                onOpenExternalLink = openExternalLink,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (detail.pageLinks.isNotEmpty()) {
+            item(key = "native-thread-footer-pages", contentType = "pagination") {
+                ForumPaginationStrip(
+                    pageLinks = detail.pageLinks,
+                    onSelectPage = onSelectPage,
+                    modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForumPaginationStrip(
+    pageLinks: List<ForumPageLink>,
+    onSelectPage: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+    ) {
+        pageLinks.forEach { link ->
+            Surface(
+                onClick = { if (!link.isCurrent) onSelectPage(link.url) },
+                enabled = !link.isCurrent,
+                shape = RoundedCornerShape(10.dp),
+                color = if (link.isCurrent) AuroraCoral else MaterialTheme.colorScheme.surface,
+                border = BorderStroke(
+                    1.dp,
+                    if (link.isCurrent) AuroraCoral else MaterialTheme.colorScheme.outlineVariant,
+                ),
+            ) {
+                Text(
+                    text = link.label,
+                    color = if (link.isCurrent) Color.White else MaterialTheme.colorScheme.onSurface,
+                    fontSize = 13.sp,
+                    fontWeight = if (link.isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForumFloorHeaderRow(floor: ForumFloor) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.size(32.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = floor.author.take(1).uppercase(),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = floor.author,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (floor.isOp) {
+                    Surface(
+                        color = AuroraCoral.copy(alpha = 0.16f),
+                        shape = RoundedCornerShape(4.dp),
+                    ) {
+                        Text(
+                            text = "楼主",
+                            color = AuroraCoral,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                        )
+                    }
+                }
+            }
+            if (floor.timestamp.isNotBlank()) {
+                Text(
+                    text = floor.timestamp,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Text(
+            text = "#${floor.floorNumber}",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ForumFloorBlockItem(
+    block: ForumContentBlock,
+    pageUrl: String,
+    aspectRatioCache: MutableMap<String, Float>,
+    isSavingImage: Boolean,
+    onSaveSingleImage: (String) -> Unit,
+    onConfirmSaveDialog: (String) -> Unit,
+    onOpenExternalLink: (String) -> Unit,
+) {
+    when (block) {
+        is ForumContentBlock.Paragraph -> {
+            Text(
+                text = block.text,
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontSize = 16.5.sp,
+                    lineHeight = 26.sp,
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+
+        is ForumContentBlock.Image -> {
+            ForumNativeImageCard(
+                imageUrl = block.url,
+                pageUrl = pageUrl,
+                aspectRatioCache = aspectRatioCache,
+                isSavingImage = isSavingImage,
+                onSaveClick = { onSaveSingleImage(block.url) },
+                onLongPress = { onConfirmSaveDialog(block.url) },
+            )
+        }
+
+        is ForumContentBlock.ExternalLink -> {
+            Surface(
+                onClick = { onOpenExternalLink(block.url) },
+                shape = RoundedCornerShape(10.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        text = block.label,
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForumFloorCard(
+    floor: ForumFloor,
+    pageUrl: String,
+    aspectRatioCache: MutableMap<String, Float>,
+    isSavingImage: Boolean,
+    onSaveSingleImage: (String) -> Unit,
+    onConfirmSaveDialog: (String) -> Unit,
+    onOpenExternalLink: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+        ) {
+            ForumFloorHeaderRow(floor = floor)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+            floor.blocks.forEach { block ->
+                ForumFloorBlockItem(
+                    block = block,
+                    pageUrl = pageUrl,
+                    aspectRatioCache = aspectRatioCache,
+                    isSavingImage = isSavingImage,
+                    onSaveSingleImage = onSaveSingleImage,
+                    onConfirmSaveDialog = onConfirmSaveDialog,
+                    onOpenExternalLink = onOpenExternalLink,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ForumNativeImageCard(
+    imageUrl: String,
+    pageUrl: String,
+    aspectRatioCache: MutableMap<String, Float>,
+    isSavingImage: Boolean,
+    onSaveClick: () -> Unit,
+    onLongPress: () -> Unit,
+) {
+    val context = LocalContext.current
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val cachedRatio = aspectRatioCache[imageUrl] ?: 0f
+    var decodedRatio by remember(imageUrl) { mutableFloatStateOf(cachedRatio) }
+    var isFailed by remember(imageUrl) { mutableStateOf(false) }
+    var retryKey by remember(imageUrl) { mutableIntStateOf(0) }
+    val activeRatio = if (decodedRatio > 0f) decodedRatio else cachedRatio
+
+    val model = remember(context, imageUrl, pageUrl, retryKey) {
+        ImageRequest.Builder(context)
+            .data(imageUrl)
+            .httpHeaders(
+                NetworkHeaders.Builder()
+                    .set("User-Agent", VideoRepository.USER_AGENT)
+                    .set("Referer", pageUrl)
+                    .build(),
+            )
+            .memoryCacheKey("$imageUrl#$retryKey")
+            .build()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (activeRatio > 0f) {
+                    Modifier.aspectRatio(activeRatio)
+                } else {
+                    Modifier.aspectRatio(0.78f)
+                },
+            )
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+            .combinedClickable(
+                onClick = {},
+                onLongClick = {
+                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    onLongPress()
+                },
+            ),
+    ) {
+        AsyncImage(
+            model = model,
+            contentDescription = "论坛图片",
+            contentScale = ContentScale.FillWidth,
+            onState = { state ->
+                when (state) {
+                    is AsyncImagePainter.State.Success -> {
+                        isFailed = false
+                        val size = state.painter.intrinsicSize
+                        if (size.width > 0f && size.height > 0f) {
+                            val ratio = (size.width / size.height).coerceIn(0.16f, 4.0f)
+                            decodedRatio = ratio
+                            aspectRatioCache[imageUrl] = ratio
+                        }
+                    }
+                    is AsyncImagePainter.State.Error -> {
+                        isFailed = true
+                    }
+                    else -> Unit
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        if (activeRatio <= 0f && !isFailed) {
+            CircularProgressIndicator(
+                color = AuroraCoral,
+                strokeWidth = 2.5.dp,
+                modifier = Modifier.size(26.dp).align(Alignment.Center),
+            )
+        }
+
+        if (isFailed) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.align(Alignment.Center).padding(16.dp),
+            ) {
+                Text(
+                    text = "外链图片加载失败",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(
+                    onClick = {
+                        isFailed = false
+                        retryKey += 1
+                    },
+                ) {
+                    Text("点击重试", color = AuroraCoral)
+                }
+            }
+        } else {
+            Surface(
+                onClick = onSaveClick,
+                enabled = !isSavingImage,
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xC8121216),
+                border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.24f)),
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp),
+            ) {
+                Text(
+                    text = "保存原图",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                )
+            }
+        }
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+private fun ForumWebFallbackContent(
+    url: String,
+    isDarkTheme: Boolean,
+    refreshNonce: Int,
+    goBackTrigger: Int,
+    onCanGoBackChange: (Boolean) -> Unit,
+    onDetectedImagesChange: (List<String>) -> Unit,
+    onUserAgentCaptured: (String) -> Unit,
+    onSaveImage: (imageUrl: String, pageUrl: String) -> Unit,
+    onLongPressImage: (imageUrl: String, pageUrl: String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val latestIsDarkTheme by rememberUpdatedState(isDarkTheme)
+    val cachedHtml = remember(url, refreshNonce) { ForumPostCache.get(url) }
+    var isLoading by remember(url, refreshNonce) { mutableStateOf(true) }
+    var earlyStyledGeneration by remember(url, refreshNonce) { mutableIntStateOf(-1) }
+    var error by remember(url, refreshNonce) { mutableStateOf<String?>(null) }
+    var loadGeneration by remember(url, refreshNonce) { mutableIntStateOf(0) }
+    var detectedImages by remember(url, refreshNonce) { mutableStateOf<List<String>>(emptyList()) }
+    val latestDetectedImages by rememberUpdatedState(detectedImages)
+
+    val webView = remember(url, refreshNonce) {
         WebView(context).apply {
-            readerUserAgent = settings.userAgentString
-            // ForumReader sits directly inside a Box + PredictiveBackContainer without a
-            // nested-scrolling parent; disabling nested scroll lets WebView own 100% of
-            // vertical touch pans and flings natively without competing with Compose.
+            onUserAgentCaptured(settings.userAgentString)
             isNestedScrollingEnabled = false
             isVerticalScrollBarEnabled = true
             overScrollMode = View.OVER_SCROLL_ALWAYS
             settings.apply {
-                javaScriptEnabled = false
+                javaScriptEnabled = true
                 domStorageEnabled = false
                 allowFileAccess = false
                 allowContentAccess = false
@@ -624,7 +1537,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 useWideViewPort = false
                 loadWithOverviewMode = false
                 layoutAlgorithm = WebSettings.LayoutAlgorithm.TEXT_AUTOSIZING
-                builtInZoomControls = true
+                builtInZoomControls = false
                 displayZoomControls = false
             }
             webChromeClient = object : WebChromeClient() {
@@ -642,7 +1555,12 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     view?.applyMobileForumLayout(
                         isDarkTheme = latestIsDarkTheme,
                         onHtml = null,
-                        onImages = { imgs -> if (imgs.isNotEmpty()) detectedImageUrls = imgs },
+                        onImages = { imgs ->
+                            if (imgs.isNotEmpty()) {
+                                detectedImages = imgs
+                                onDetectedImagesChange(imgs)
+                            }
+                        },
                     ) { wasApplied ->
                         if (currentGen == loadGeneration && wasApplied) {
                             isLoading = false
@@ -652,16 +1570,16 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 }
             }
             webViewClient = object : WebViewClient() {
-                override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                override fun onPageStarted(view: WebView?, pageUrl: String?, favicon: Bitmap?) {
                     loadGeneration += 1
                     earlyStyledGeneration = -1
                     isLoading = true
                     error = null
-                    detectedImageUrls = emptyList()
-                    Log.i(TAG, "pageStarted cacheHit=${cachedHtml != null}")
+                    detectedImages = emptyList()
+                    onDetectedImagesChange(emptyList())
                 }
 
-                override fun onPageCommitVisible(view: WebView?, url: String?) {
+                override fun onPageCommitVisible(view: WebView?, pageUrl: String?) {
                     if (cachedHtml == null) return
                     val visibleGen = loadGeneration
                     if (earlyStyledGeneration == visibleGen) return
@@ -669,7 +1587,12 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     view?.applyMobileForumLayout(
                         isDarkTheme = latestIsDarkTheme,
                         onHtml = null,
-                        onImages = { imgs -> if (imgs.isNotEmpty()) detectedImageUrls = imgs },
+                        onImages = { imgs ->
+                            if (imgs.isNotEmpty()) {
+                                detectedImages = imgs
+                                onDetectedImagesChange(imgs)
+                            }
+                        },
                     ) {
                         if (visibleGen == loadGeneration) {
                             isLoading = false
@@ -678,14 +1601,16 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     }
                 }
 
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    canGoBack = view?.canGoBack() == true
-                    Log.i(TAG, "pageFinished totalMs=${System.currentTimeMillis() - startedAt} cacheHit=${cachedHtml != null}")
+                override fun onPageFinished(view: WebView?, pageUrl: String?) {
+                    onCanGoBackChange(view?.canGoBack() == true)
                     val finishedGeneration = loadGeneration
                     view?.applyMobileForumLayout(
                         isDarkTheme = latestIsDarkTheme,
-                        onHtml = { html -> ForumPostCache.put(post.url, stripForumThemeClass(html)) },
-                        onImages = { imgs -> detectedImageUrls = imgs },
+                        onHtml = { html -> ForumPostCache.put(url, stripForumThemeClass(html)) },
+                        onImages = { imgs ->
+                            detectedImages = imgs
+                            onDetectedImagesChange(imgs)
+                        },
                     ) { wasApplied ->
                         if (finishedGeneration != loadGeneration) return@applyMobileForumLayout
                         isLoading = false
@@ -709,8 +1634,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     if (targetUri.scheme == "aurorashelf" && targetUri.host == "save-image") {
                         val imageUrl = targetUri.getQueryParameter("url").orEmpty()
                         if (isAllowedForumSaveImageUrl(imageUrl, latestDetectedImages)) {
-                            val currentPageUrl = view?.url ?: post.url
-                            triggerSaveWithPermission(buildImageRequest(imageUrl, currentPageUrl))
+                            onSaveImage(imageUrl, view?.url ?: url)
                         }
                         return true
                     }
@@ -724,31 +1648,37 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 val imageUrl = hit.extra.orEmpty()
                 if (!isImage || imageUrl.isBlank()) return@setOnLongClickListener false
                 performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                val currentPageUrl = url ?: post.url
-                pendingImageRequest = buildImageRequest(imageUrl, currentPageUrl)
+                onLongPressImage(imageUrl, this.url ?: url)
                 true
             }
             if (cachedHtml != null) {
-                val baseUrl = post.url
-                if (baseUrl.contains("t66y.com", ignoreCase = true)) {
-                    CookieManager.getInstance().setCookie(baseUrl, "ismob=1; Path=/; Secure")
+                if (url.contains("t66y.com", ignoreCase = true)) {
+                    CookieManager.getInstance().setCookie(url, "ismob=1; Path=/; Secure")
                     CookieManager.getInstance().flush()
                 }
-                // Load synchronously without a racing cookie callback so cached posts never
-                // have onPageStarted arrive after an external timer clears isLoading.
-                loadDataWithBaseURL(baseUrl, cachedHtml, "text/html", "UTF-8", null)
+                loadDataWithBaseURL(url, cachedHtml, "text/html", "UTF-8", null)
             } else {
-                loadForumPost(post.url)
+                loadForumPost(url)
             }
         }
     }
-    LaunchedEffect(webView, isDarkTheme) {
-        if (!isLoading) {
-            webView.evaluateForumScript(
-                "(() => { if (document.body) { document.body.classList.toggle('aurora-dark', $isDarkTheme); return true; } return false; })()",
-            ) {}
+
+    LaunchedEffect(goBackTrigger) {
+        if (goBackTrigger > 0 && webView.canGoBack()) {
+            webView.goBack()
+            onCanGoBackChange(webView.canGoBack())
         }
     }
+
+    LaunchedEffect(webView, isDarkTheme) {
+        if (!isLoading) {
+            webView.evaluateJavascript(
+                "(() => { if (document.body) { document.body.classList.toggle('aurora-dark', $isDarkTheme); return true; } return false; })()",
+                null,
+            )
+        }
+    }
+
     LaunchedEffect(loadGeneration) {
         val observedGeneration = loadGeneration
         delay(READER_LOAD_TIMEOUT_MS)
@@ -758,9 +1688,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
             error = "帖子加载超时，请检查网络后重试"
         }
     }
-    BackHandler(enabled = canGoBack && webView.canGoBack()) {
-        webView.goBack()
-    }
+
     DisposableEffect(webView, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -777,214 +1705,57 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
         }
     }
 
-    PredictiveBackContainer(
-        enabled = !(canGoBack && webView.canGoBack()),
-        onBack = onClose,
-    ) {
-        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding().testTag("forum-reader")) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp),
-        ) {
-            IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回论坛", tint = MaterialTheme.colorScheme.onBackground)
-            }
-            Column(Modifier.weight(1f).padding(end = 12.dp)) {
-                Text(post.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onBackground)
-                Text(post.sourceName, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            if (detectedImageUrls.isNotEmpty()) {
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = AuroraCoral.copy(alpha = 0.14f),
-                    border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.35f)),
-                    modifier = Modifier
-                        .padding(end = 4.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .clickable(enabled = !isSavingImage) {
-                            val currentPageUrl = webView.url ?: post.url
-                            val requests = detectedImageUrls.map { buildImageRequest(it, currentPageUrl) }
-                            triggerBatchSaveWithPermission(requests)
-                        }
-                        .testTag("forum-batch-download-images"),
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Download,
-                            contentDescription = "下载本帖全部图片",
-                            tint = AuroraCoral,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Text(
-                            text = batchSaveProgress?.let { "${it.first}/${it.second}" } ?: "下载 ${detectedImageUrls.size} 图",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = AuroraCoral,
-                            maxLines = 1,
-                        )
-                    }
-                }
-            }
-            IconButton(onClick = { webView.reload() }) {
-                Icon(Icons.Default.Refresh, contentDescription = "刷新帖子", tint = MaterialTheme.colorScheme.onBackground)
-            }
-        }
-        batchSaveProgress?.let { (completed, total) ->
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+    Box(modifier) {
+        val contentAlpha by animateFloatAsState(
+            targetValue = if (!isLoading && error == null) 1f else 0f,
+            animationSpec = tween(durationMillis = 180),
+            label = "forum reader content",
+        )
+        AndroidView(
+            factory = { webView },
+            modifier = Modifier.fillMaxSize().alpha(contentAlpha).testTag("forum-reader-content"),
+        )
+        if (isLoading) {
+            LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = AuroraCoral)
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(24.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                modifier = Modifier.align(Alignment.Center).testTag("forum-reader-loading"),
             ) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(
-                        text = "正在保存本帖图片 $completed / $total…",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "${(completed * 100 / total.coerceAtLeast(1))}%",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = AuroraCoral,
-                    )
-                }
-                LinearProgressIndicator(
-                    progress = { completed.toFloat() / total.coerceAtLeast(1).toFloat() },
-                    modifier = Modifier.fillMaxWidth().height(4.dp),
-                    color = AuroraCoral,
-                )
-            }
-        }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Box(Modifier.fillMaxSize()) {
-            val contentAlpha by animateFloatAsState(
-                targetValue = if (!isLoading && error == null) 1f else 0f,
-                animationSpec = tween(durationMillis = 180),
-                label = "forum reader content",
-            )
-            AndroidView(
-                factory = { webView },
-                modifier = Modifier.fillMaxSize().alpha(contentAlpha).testTag("forum-reader-content"),
-            )
-            if (isLoading) {
-                LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = AuroraCoral)
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    shape = RoundedCornerShape(24.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.align(Alignment.Center).testTag("forum-reader-loading"),
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
-                    ) {
-                        CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp, color = AuroraCoral)
-                        Text("正在整理帖子排版", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-                        Text(
-                            "内容准备好后会一次显示",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            error?.let { message ->
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.align(Alignment.Center).background(MaterialTheme.colorScheme.background).padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
                 ) {
-                    Text(message, color = MaterialTheme.colorScheme.onBackground)
-                    TextButton(onClick = { webView.reload() }) { Text("重新加载", color = AuroraCoral) }
+                    CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp, color = AuroraCoral)
+                    Text("正在整理帖子排版", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                 }
             }
-            if (isSavingImage) {
-                Surface(
-                    color = MaterialTheme.colorScheme.inverseSurface,
-                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                    shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp).testTag("forum-image-saving"),
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
-                    ) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Text("正在保存图片…", style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
+        }
+        error?.let { message ->
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.align(Alignment.Center).background(MaterialTheme.colorScheme.background).padding(24.dp),
+            ) {
+                Text(message, color = MaterialTheme.colorScheme.onBackground)
+                TextButton(onClick = { webView.reload() }) { Text("重新加载", color = AuroraCoral) }
             }
-            SnackbarHost(
-                hostState = snackbarHostState,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
-            )
         }
-        }
-    }
-
-    pendingImageRequest?.let { request ->
-        AlertDialog(
-            onDismissRequest = { pendingImageRequest = null },
-            icon = { Icon(Icons.Default.Image, contentDescription = null) },
-            title = { Text("保存图片到相册？") },
-            text = { Text("图片将保存到系统相册的 Pictures/AuroraShelf 文件夹。") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        pendingImageRequest = null
-                        val needsLegacyPermission = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P &&
-                            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) !=
-                            PackageManager.PERMISSION_GRANTED
-                        if (needsLegacyPermission) {
-                            permissionImageRequest = request
-                            storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                        } else {
-                            saveImage(request)
-                        }
-                    },
-                    enabled = !isSavingImage,
-                    modifier = Modifier.testTag("forum-image-save-confirm"),
-                ) { Text("保存到相册") }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingImageRequest = null }) { Text("取消") }
-            },
-        )
     }
 }
-
-private val activeForumJsCalls = java.util.WeakHashMap<WebView, java.util.concurrent.atomic.AtomicInteger>()
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebView.evaluateForumScript(
     script: String,
     onResult: (String?) -> Unit,
 ) {
-    val counter = synchronized(activeForumJsCalls) {
-        activeForumJsCalls.getOrPut(this) { java.util.concurrent.atomic.AtomicInteger(0) }.also {
-            it.incrementAndGet()
-        }
+    if (!settings.javaScriptEnabled) {
+        settings.javaScriptEnabled = true
     }
-    settings.javaScriptEnabled = true
-    evaluateJavascript(script) { raw ->
-        try {
-            onResult(raw)
-        } finally {
-            if (counter.decrementAndGet() <= 0) {
-                counter.set(0)
-                settings.javaScriptEnabled = false
-            }
-        }
-    }
+    evaluateJavascript(script, onResult)
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -1118,15 +1889,23 @@ internal val MOBILE_FORUM_SCRIPT =
       const style = document.getElementById('aurora-mobile-style') || document.createElement('style');
       style.id = 'aurora-mobile-style';
       style.textContent = `
-        html, body {
+        html {
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
-          min-height: 100% !important;
-          height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
           overflow-x: hidden !important;
+          overflow-y: auto !important;
+        }
+        body {
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
+          height: auto !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow-x: visible !important;
           overflow-y: visible !important;
           touch-action: pan-y pinch-zoom !important;
         }
@@ -1325,14 +2104,20 @@ internal val MOBILE_FORUM_SCRIPT =
 
       document.querySelectorAll('img[ess-data]').forEach((image) => {
         const source = image.getAttribute('ess-data');
+        image.loading = 'lazy';
+        image.decoding = 'async';
         if (source && source.startsWith('https://')) image.src = source;
       });
       document.querySelectorAll('img[file]').forEach((image) => {
         const source = image.getAttribute('file');
+        image.loading = 'lazy';
+        image.decoding = 'async';
         if (source && source.startsWith('https://')) image.src = source;
       });
       document.querySelectorAll('img[data-src]').forEach((image) => {
         const source = image.getAttribute('data-src');
+        image.loading = 'lazy';
+        image.decoding = 'async';
         if (source && source.startsWith('https://')) image.src = source;
       });
 

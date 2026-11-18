@@ -1,5 +1,6 @@
 # Active
 
+- [x] 根治 Android 论坛打开帖子内「划不动 / 无惯性」缺陷（重构 `auroraSwipeBack` 为 24dp 左边缘首帧放行消除斜滑 `ACTION_CANCEL`，新增 `ForumThreadParser` 与逐块虚拟化原生 120Hz `LazyColumn` 多楼层阅读器对齐 iOS `ForumPostDetailView` 并保留修复了 `html` 根滚动器的原网页切换兜底，补齐 Coil 第三方论坛图床 TLS 降级），全链路升级版本至 `v2.17.4 / Build 271`，通过三端 Release 模拟器全规模验收并同步发布至网页 OTA `bananarey.us`、TestFlight Build 271 与 GitHub Release `v2.17.4` — 2026-11-18。
 - [x] 修复双端 Stripchat 直播打不开与 Android 直播窗口过于靠上、整体布局比例失调问题，全链路升级版本至 `v2.17.3 / Build 270`，通过三端 Release 模拟器全规模验收并同步发布至网页 OTA `bananarey.us`、TestFlight Build 270 与 GitHub Release `v2.17.3` — 2026-11-18。
 - [x] Android 全面切换正式 Release 签名（签发 RSA-4096 PKCS12 正式证书、重构 `app/build.gradle.kts` 强制 Release 签名阻断 Debug 回退、在 `publish_ota.sh` 接入 `apksigner` V2/V3 与证书主体硬门禁、全链路升级版本至 `v2.17.2 / Build 269` 并同步发布至网页 OTA `bananarey.us`、TestFlight Build 269 与 GitHub Release `v2.17.2`）— 2026-11-18。
 - [x] 全量 18 视频源与漫画源官方分类 1:1 对齐、多页分页死锁根治、91动漫新版播放 API 适配、三端 Release 模拟器全规模验收与 `v2.17.1 (Build 268)` 全通道发布（双端补齐官方全量分类胶囊条与 `hydrateOverviewShelves` 独立分类货架，修复 `EPORNER`/`OHentai`/`TokyoMotion`/`XNXX`/`黄果`/`华视`/`134X`/`MissAV`/`xHamster` 分类与分页缺陷，适配 `91动漫` `POST /api/dm/anime/episodes/{id}/playback` 新流接口；Android 18/18 在线全源通过、iOS 全源与 P1/P2 分页探针通过、三端 Release 模拟器走查通过、OTA `bananarey.us` 与 TestFlight Build 268 及 GitHub Release `v2.17.1` 同步发布）— 2026-11-18。
