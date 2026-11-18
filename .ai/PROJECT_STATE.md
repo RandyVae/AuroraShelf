@@ -1,6 +1,20 @@
 # Project State
 
-## 最新工作状态（2026年11月18日 · Android 全面切换正式 Release 签名（RSA-4096 PKCS12 · V2/V3 强验签）＋三端 Release 模拟器验收与双通道同步上线 · v2.17.2 Build 269）
+## 最新工作状态（2026年11月18日 · 双端 Stripchat 直播 Mouflon v2 动态鉴权修复＋Android 直播窗口顶栏避让与黄金比例重构＋三端 Release 模拟器验收与全通道上线 · v2.17.3 Build 270）
+
+- **版本号全链路同步至 `v2.17.3 (Build 270)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`（`publish_ota.sh --check-versions` 校验通过）。
+- **双端 Stripchat 直播恢复与动态密钥自愈（Android + iPhone + iPad）**：
+  - 定位根因：Stripchat 上游启用 `#EXT-X-MOUFLON:PSCH:v2` 保护且旧版无后缀 `{id}.m3u8` 超时；未携带 `pkey` 请求子变体时返回 `#EXT-X-MOUFLON-ADVERT` 12 秒 VOD 广告桩，导致旧探针误判为有效直播流，播完后直接报「主播已离线」且不回退 WebRTC。
+  - 双端修复：在 [StripchatLiveRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/StripchatLiveRepository.kt)、[LiveStreamResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/LiveStreamResolver.kt)、[LiveSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Live/LiveSourceCatalog.swift) 与 [LivePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LivePlayerView.swift) 将主清单归一化至 `{id}_auto.m3u8?pkey=...`（自适应 1080p/720p H.264），内置 `mmpVersion` -> `mmp/main.js` 动态 `pkey` 提取刷新、子变体 `#EXT-X-MOUFLON-ADVERT` / `#EXT-X-MOUFLON:FILE:` 真流核验与 `<25s` 结束自动回退 WebRTC 视口，并收窄 [StripchatLiveWebView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/StripchatLiveWebView.swift) 过宽选择器。
+- **Android 直播窗口位置与整体布局比例重构（`LiveScreen.kt`）**：
+  - 在 [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt) 为非全屏竖屏顶部新增纯黑 `WindowInsets.statusBars` 避让带（双栏横屏左窗格同步增加 `.statusBarsPadding()` 对齐右栏），移除播放器内顶栏重复状态栏内边距，彻底解决视频画面与返回栏挤入顶部状态栏/挖孔区的问题。
+  - 新增 `calculateLiveStageHeight` 弹性舞台高度算法（竖屏横流约占视口 `30%`、竖流 `46%`），为 `StreamerInfoBar` 补齐真实头像渲染，并将无弹幕时的「实时互动」收敛为紧凑状态卡片、常驻展示下方「更多直播」推荐列表，消除下方 70% 空白失调。
+- **双端验证与全通道同步发布（`v2.17.3 Build 270`）**：
+  - Android：`testDebugUnitTest`、`lintDebug`、`assembleRelease` 与 `apksigner verify`（`RSA-4096` V2+V3）全通；`emulator-5554` 覆盖升级 `adb install -r dist/Netgrey.apk` 成功，实测 Stripchat、HornyStudents 直播出画及新布局比例、视频、漫画、论坛、《Lust Goddess》`Version 2.17.3` 全绿。
+  - iOS / iPadOS：在线测试套件 59/59 全通（含 Stripchat 动态鉴权实网断言與 18 视频源分页核验）；`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器实测 Stripchat 高清直播出画及全频道走查通过。
+  - 双通道发布：OTA `https://bananarey.us`（`Netgrey.apk` `143,471,588` B / `137M`、`Netgrey.ipa` `140,110,955` B / `134M`、`manifest.plist` `2.17.3`、`source-manifest.json` `2.17.3` 均 `HTTP 200`，`/` 剩 `11G`）与 TestFlight Build `270`（`Upload succeeded`）同步上线。
+
+## 历史工作状态（2026年11月18日 · Android 全面切换正式 Release 签名（RSA-4096 PKCS12 · V2/V3 强验签）＋三端 Release 模拟器验收与双通道同步上线 · v2.17.2 Build 269）
 
 - **版本号全链路同步至 `v2.17.2 (Build 269)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`。
 - **Android 正式 Release 签名切换与发布门禁（`app/build.gradle.kts` + `scripts/publish_ota.sh`）**：

@@ -98,6 +98,9 @@ public final class LiveRepository: ObservableObject {
 
     public func loadStreams() {
         hasTriggeredInitialLoad = true
+        Task.detached(priority: .utility) {
+            _ = await StripchatStreamAuthenticator.shared.refreshPkeyIfStale()
+        }
         _ = startLoading()
     }
 
@@ -534,8 +537,14 @@ enum LiveSourceAdapter {
             let title = model["country"] as? String ?? "Stripchat · 正在直播"
             let rawHls = model["hlsPlaylist"] as? String
             let numericId = (model["id"] as? Int).map { String($0) } ?? (model["id"] as? String)
-            let fallbackHls = numericId.map { "https://edge-hls.doppiocdn.media/hls/\($0)/master/\($0).m3u8" }
-            let hlsUrl = rawHls ?? fallbackHls
+            let streamName = (model["streamName"] as? String).flatMap {
+                !$0.isEmpty && $0.allSatisfy(\.isNumber) ? $0 : nil
+            }
+            let effectiveStreamId = streamName ?? numericId ?? ""
+            let hlsUrl = StripchatStreamAuthenticator.normalizeMasterURL(
+                rawUrl: rawHls,
+                fallbackNumericId: effectiveStreamId
+            )
 
             return LiveStreamItem(
                 id: "sc-\(numericId ?? username)",
@@ -590,6 +599,242 @@ public enum LiveSourceCatalog {
 
     public static func name(for id: String) -> String {
         allSources.first(where: { $0.id == id })?.name ?? id
+    }
+}
+
+public enum StripchatResolveOutcome: Sendable, Equatable {
+    case authenticated(URL)
+    case offlineOrPrivate
+    case webFallback
+}
+
+public actor StripchatStreamAuthenticator {
+    public static let shared = StripchatStreamAuthenticator()
+    public static let defaultPkey = "B0p93vi8Uj6AYyZb"
+    private static let defaultMmpOrigin = "https://mmp.doppiocdn.com/player/mmp"
+    private static let refreshTTL: TimeInterval = 30 * 60
+    private static let retryCooldown: TimeInterval = 15
+
+    private var cachedPkey: String = StripchatStreamAuthenticator.defaultPkey
+    private var lastRefreshDate: Date?
+    private let probeSession: URLSession
+
+    public init() {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 4.0
+        config.timeoutIntervalForResource = 7.0
+        self.probeSession = URLSession.permissive(configuration: config)
+    }
+
+    public func currentPkey() -> String {
+        cachedPkey
+    }
+
+    public nonisolated static func isMouflonLockedManifest(_ manifest: String) -> Bool {
+        let lower = manifest.lowercased()
+        return lower.contains("#ext-x-mouflon-advert") || lower.contains("#ext-x-mouflon:file:")
+    }
+
+    public nonisolated static func normalizeMasterURL(rawUrl: String?, fallbackNumericId: String = "") -> String? {
+        if let raw = rawUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty {
+            let pattern = #"^(https://[^/]*doppiocdn\.[^/]+/hls/([0-9]+)/master/)[0-9]+(?:_[0-9]+p)?\.m3u8(\?.*)?$"#
+            if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+               let match = regex.firstMatch(in: raw, range: NSRange(location: 0, length: (raw as NSString).length)) {
+                let ns = raw as NSString
+                let prefix = ns.substring(with: match.range(at: 1))
+                let streamId = ns.substring(with: match.range(at: 2))
+                let query = match.range(at: 3).location != NSNotFound ? ns.substring(with: match.range(at: 3)) : ""
+                return "\(prefix)\(streamId)_auto.m3u8\(query)"
+            }
+            return raw
+        }
+        let cleanId = fallbackNumericId.filter(\.isNumber)
+        guard !cleanId.isEmpty else { return nil }
+        return "https://edge-hls.doppiocdn.media/hls/\(cleanId)/master/\(cleanId)_auto.m3u8"
+    }
+
+    public nonisolated static func attachPkey(masterUrl: String, pkey: String) -> String {
+        guard !pkey.isEmpty, masterUrl.range(of: "doppiocdn.", options: .caseInsensitive) != nil else {
+            return masterUrl
+        }
+        let parts = masterUrl.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let base = String(parts[0])
+        let existingQuery = parts.count > 1 ? String(parts[1]) : ""
+        var params = existingQuery
+            .split(separator: "&")
+            .map(String.init)
+            .filter { !$0.isEmpty && !$0.lowercased().hasPrefix("pkey=") }
+        params.append("pkey=\(pkey)")
+        return "\(base)?\(params.joined(separator: "&"))"
+    }
+
+    public nonisolated static func extractMmpBundleURL(fromHtml rawHtml: String) -> URL? {
+        let normalized = rawHtml
+            .replacingOccurrences(of: "\\u002F", with: "/")
+            .replacingOccurrences(of: "\\/", with: "/")
+            .replacingOccurrences(of: "\\u0022", with: "\"")
+        let ns = normalized as NSString
+        let fullRange = NSRange(location: 0, length: ns.length)
+        guard let verRegex = try? NSRegularExpression(pattern: #""mmpVersion"\s*:\s*"(v[0-9]+\.[0-9]+\.[0-9][^"]*)""#),
+              let verMatch = verRegex.firstMatch(in: normalized, range: fullRange) else {
+            return nil
+        }
+        let version = ns.substring(with: verMatch.range(at: 1))
+        var origin = defaultMmpOrigin
+        if let origRegex = try? NSRegularExpression(pattern: #""MMPExternalUnitedSourceOrigin"\s*:\s*"(https://[^"]+)""#),
+           let origMatch = origRegex.firstMatch(in: normalized, range: fullRange) {
+            origin = ns.substring(with: origMatch.range(at: 1)).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        }
+        return URL(string: "\(origin)/\(version)/main.js")
+    }
+
+    public nonisolated static func extractPkey(fromMmpJS jsSource: String) -> String? {
+        let pattern = #"searchParams\.set\(\s*["']pkey["']\s*,\s*["']([A-Za-z0-9_-]{8,64})["']\s*\)"#
+        let ns = jsSource as NSString
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: jsSource, range: NSRange(location: 0, length: ns.length)) else {
+            return nil
+        }
+        let key = ns.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return key.isEmpty ? nil : key
+    }
+
+    public func refreshPkeyIfStale() async -> String {
+        if let last = lastRefreshDate, Date().timeIntervalSince(last) < Self.refreshTTL {
+            return cachedPkey
+        }
+        return await refreshPkey(force: false) ?? cachedPkey
+    }
+
+    public func refreshPkey(force: Bool) async -> String? {
+        let now = Date()
+        if !force, let last = lastRefreshDate, now.timeIntervalSince(last) < Self.refreshTTL {
+            return cachedPkey
+        }
+        if force, let last = lastRefreshDate, now.timeIntervalSince(last) < Self.retryCooldown {
+            return cachedPkey
+        }
+        lastRefreshDate = now
+
+        let candidateBases = ["https://zh.stripchat.com", "https://stripchat.com"]
+        let ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+        for siteBase in candidateBases {
+            guard let pageUrl = URL(string: "\(siteBase)/") else { continue }
+            var pageReq = URLRequest(url: pageUrl, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 6.0)
+            pageReq.setValue(ua, forHTTPHeaderField: "User-Agent")
+            pageReq.setValue("text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", forHTTPHeaderField: "Accept")
+            pageReq.setValue("zh-CN,zh;q=0.9,en;q=0.8", forHTTPHeaderField: "Accept-Language")
+
+            guard let (htmlData, htmlResp) = try? await probeSession.data(for: pageReq),
+                  let httpResp = htmlResp as? HTTPURLResponse,
+                  (200...299).contains(httpResp.statusCode),
+                  let rawHtml = String(data: htmlData, encoding: .utf8),
+                  let bundleUrl = Self.extractMmpBundleURL(fromHtml: rawHtml) else {
+                continue
+            }
+
+            var jsReq = URLRequest(url: bundleUrl, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 7.0)
+            jsReq.setValue(ua, forHTTPHeaderField: "User-Agent")
+            jsReq.setValue(siteBase, forHTTPHeaderField: "Origin")
+            jsReq.setValue("\(siteBase)/", forHTTPHeaderField: "Referer")
+            jsReq.setValue("*/*", forHTTPHeaderField: "Accept")
+
+            if let (jsData, jsResp) = try? await probeSession.data(for: jsReq),
+               let jsHttp = jsResp as? HTTPURLResponse,
+               (200...299).contains(jsHttp.statusCode),
+               let jsText = String(data: jsData, encoding: .utf8),
+               let extracted = Self.extractPkey(fromMmpJS: jsText) {
+                cachedPkey = extracted
+                return extracted
+            }
+        }
+        return nil
+    }
+
+    public func resolvePlayableURL(rawHls: String?, fallbackNumericId: String) async -> StripchatResolveOutcome {
+        guard let normalizedMaster = Self.normalizeMasterURL(rawUrl: rawHls, fallbackNumericId: fallbackNumericId) else {
+            return .webFallback
+        }
+        var activeKey = cachedPkey
+        var candidateString = Self.attachPkey(masterUrl: normalizedMaster, pkey: activeKey)
+        guard var candidateURL = URL(string: candidateString) else {
+            return .webFallback
+        }
+
+        var probeStatus = await probeMasterAndVariant(candidateURL)
+        if probeStatus == .mouflonLocked {
+            if let refreshed = await refreshPkey(force: true), refreshed != activeKey {
+                activeKey = refreshed
+                candidateString = Self.attachPkey(masterUrl: normalizedMaster, pkey: activeKey)
+                if let updatedURL = URL(string: candidateString) {
+                    candidateURL = updatedURL
+                    probeStatus = await probeMasterAndVariant(candidateURL)
+                }
+            }
+        }
+
+        switch probeStatus {
+        case .live:
+            return .authenticated(candidateURL)
+        case .offlineOrPrivate:
+            return .offlineOrPrivate
+        case .mouflonLocked, .invalid:
+            return .webFallback
+        case .transientError:
+            return .authenticated(candidateURL)
+        }
+    }
+
+    private enum ProbeState {
+        case live
+        case mouflonLocked
+        case offlineOrPrivate
+        case invalid
+        case transientError
+    }
+
+    private func probeMasterAndVariant(_ masterURL: URL) async -> ProbeState {
+        let ua = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+        var req = URLRequest(url: masterURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 4.0)
+        req.setValue(ua, forHTTPHeaderField: "User-Agent")
+        req.setValue("https://zh.stripchat.com/", forHTTPHeaderField: "Referer")
+        req.setValue("https://zh.stripchat.com", forHTTPHeaderField: "Origin")
+        req.setValue("application/vnd.apple.mpegurl,application/x-mpegURL,*/*", forHTTPHeaderField: "Accept")
+
+        do {
+            let (data, resp) = try await probeSession.data(for: req)
+            guard let http = resp as? HTTPURLResponse else { return .transientError }
+            if [403, 404, 410].contains(http.statusCode) { return .offlineOrPrivate }
+            guard (200...299).contains(http.statusCode) else { return .transientError }
+            let manifest = String(data: data, encoding: .utf8) ?? ""
+            guard manifest.localizedCaseInsensitiveContains("#EXTM3U") else { return .invalid }
+            if Self.isMouflonLockedManifest(manifest) { return .mouflonLocked }
+
+            let firstVariant = manifest
+                .components(separatedBy: .newlines)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .first { $0.lowercased().hasPrefix("https://") && $0.lowercased().contains(".m3u8") }
+
+            if let variantStr = firstVariant,
+               variantStr.localizedCaseInsensitiveContains("doppiocdn"),
+               let variantURL = URL(string: variantStr) {
+                var vReq = URLRequest(url: variantURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 4.0)
+                vReq.setValue(ua, forHTTPHeaderField: "User-Agent")
+                vReq.setValue("https://zh.stripchat.com/", forHTTPHeaderField: "Referer")
+                vReq.setValue("https://zh.stripchat.com", forHTTPHeaderField: "Origin")
+                vReq.setValue("application/vnd.apple.mpegurl,application/x-mpegURL,*/*", forHTTPHeaderField: "Accept")
+                let (vData, vResp) = try await probeSession.data(for: vReq)
+                guard let vHttp = vResp as? HTTPURLResponse else { return .transientError }
+                if [403, 404, 410].contains(vHttp.statusCode) { return .offlineOrPrivate }
+                guard (200...299).contains(vHttp.statusCode) else { return .transientError }
+                let vText = String(data: vData.prefix(2048), encoding: .utf8) ?? ""
+                guard vText.localizedCaseInsensitiveContains("#EXTM3U") else { return .invalid }
+                if Self.isMouflonLockedManifest(vText) { return .mouflonLocked }
+            }
+            return .live
+        } catch {
+            return .transientError
+        }
     }
 }
 

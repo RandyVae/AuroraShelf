@@ -1,5 +1,6 @@
 package com.aurorashelf.app.ui
 
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -124,5 +125,38 @@ class LiveScreenTest {
         // Test non-positive dimensions are safely ignored
         bridge.onVideoSize(0, 0)
         bridge.onVideoSize(-1, 200)
+    }
+
+    @Test
+    fun calculateLiveStageHeightBalancesPhonePortraitFoldableAndTabletProportions() {
+        // Standard phone portrait (393 x 852 dp) with 16:9 stream: lifts cramped 221dp to balanced ~255.6dp theater stage
+        val phoneLandscapeStage = calculateLiveStageHeight(
+            aspectRatio = 16f / 9f,
+            containerWidth = 393.dp,
+            containerHeight = 852.dp,
+            isTwoPaneLandscape = false,
+        )
+        assertTrue("Expected >= 250dp, got $phoneLandscapeStage", phoneLandscapeStage >= 250.dp)
+        assertTrue("Expected <= 280dp, got $phoneLandscapeStage", phoneLandscapeStage <= 280.dp)
+
+        // Standard phone portrait (393 x 852 dp) with 9:16 vertical stream: bounded cleanly so lower chat & related stay visible
+        val phonePortraitStage = calculateLiveStageHeight(
+            aspectRatio = 9f / 16f,
+            containerWidth = 393.dp,
+            containerHeight = 852.dp,
+            isTwoPaneLandscape = false,
+        )
+        assertTrue("Expected >= 360dp, got $phonePortraitStage", phonePortraitStage >= 360.dp)
+        assertTrue("Expected <= 410dp, got $phonePortraitStage", phonePortraitStage <= 410.dp)
+
+        // Tablet / foldable two-pane landscape (left pane 793dp, height 800dp)
+        val tabletTwoPaneStage = calculateLiveStageHeight(
+            aspectRatio = 16f / 9f,
+            containerWidth = 793.dp,
+            containerHeight = 800.dp,
+            isTwoPaneLandscape = true,
+        )
+        assertTrue("Expected >= 430dp, got $tabletTwoPaneStage", tabletTwoPaneStage >= 430.dp)
+        assertTrue("Expected <= 512dp, got $tabletTwoPaneStage", tabletTwoPaneStage <= 512.dp)
     }
 }

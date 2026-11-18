@@ -21,6 +21,8 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -42,6 +44,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -1129,29 +1132,39 @@ private fun StreamerInfoBar(
     onFullscreenToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
             .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
     ) {
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.size(38.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.size(40.dp),
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Text(
                     text = item.username.take(1).uppercase(),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 15.sp,
                 )
+                if (item.thumbnailUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = livePosterRequest(context, item.thumbnailUrl, liveReferer(item)),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    )
+                }
             }
         }
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -1271,30 +1284,49 @@ private fun LivePlayerScreen(
             isFullscreen = isFullscreen,
         )
         val leftPaneWidthFraction = if (isTwoPaneLandscape) 0.62f else 1f
-        val safeAspectRatio = videoAspectRatio.coerceAtLeast(0.5f)
-        val playerModifier = when {
-            isFullscreen -> Modifier.fillMaxSize()
-            isTwoPaneLandscape -> {
-                val leftPaneWidth = maxWidth * 0.62f
-                val targetHeight = (leftPaneWidth / safeAspectRatio).coerceIn(220.dp, maxHeight * 0.64f)
-                Modifier.fillMaxWidth().height(targetHeight)
-            }
-            videoAspectRatio < 1.0f -> Modifier
+        val leftPaneWidth = maxWidth * leftPaneWidthFraction
+        val targetStageHeight = remember(videoAspectRatio, leftPaneWidth, maxHeight, isTwoPaneLandscape) {
+            calculateLiveStageHeight(
+                aspectRatio = videoAspectRatio,
+                containerWidth = leftPaneWidth,
+                containerHeight = maxHeight,
+                isTwoPaneLandscape = isTwoPaneLandscape,
+            )
+        }
+        val animatedStageHeight by animateDpAsState(
+            targetValue = targetStageHeight,
+            animationSpec = spring(dampingRatio = 0.84f, stiffness = 320f),
+            label = "live-stage-height",
+        )
+        val playerModifier = if (isFullscreen) {
+            Modifier.fillMaxSize()
+        } else {
+            Modifier
                 .fillMaxWidth()
-                .heightIn(max = 420.dp)
-                .aspectRatio(videoAspectRatio, matchHeightConstraintsFirst = true)
-            else -> Modifier
-                .fillMaxWidth()
-                .heightIn(max = 420.dp)
-                .aspectRatio(videoAspectRatio)
+                .height(animatedStageHeight)
         }
 
         Column(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .fillMaxWidth(leftPaneWidthFraction)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                .then(
+                    if (!isFullscreen && isTwoPaneLandscape) {
+                        Modifier.statusBarsPadding()
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
+            if (!isFullscreen && !isTwoPaneLandscape) {
+                Spacer(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(AuroraImmersiveBackground)
+                        .windowInsetsTopHeight(WindowInsets.statusBars),
+                )
+            }
             if (forceEmbedded) {
                 EmbeddedLivePlayer(
                     url = item.playerUrl,
@@ -1379,7 +1411,7 @@ private fun LivePlayerScreen(
                                 ),
                                 modifier = Modifier
                                     .align(Alignment.TopStart)
-                                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
+                                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
                                     .padding(12.dp)
                                     .size(44.dp),
                             ) {
@@ -1403,18 +1435,29 @@ private fun LivePlayerScreen(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
                 } else {
+                    val hasRelated = relatedItems.isNotEmpty()
+                    val isCommentsLoading = !hasCheckedComments && resolveResult == null
                     LiveComments(
                         comments = comments,
-                        isLoading = !hasCheckedComments && resolveResult == null,
+                        isLoading = isCommentsLoading,
                         isExpanded = isCommentsExpanded,
+                        applyBottomInset = !hasRelated,
+                        compactWhenEmpty = hasRelated,
                         onToggleExpand = { isCommentsExpanded = !isCommentsExpanded },
-                        modifier = if (isCommentsExpanded || relatedItems.isEmpty()) {
-                            Modifier.fillMaxWidth().weight(1f)
-                        } else {
-                            Modifier.fillMaxWidth()
+                        modifier = when {
+                            !hasRelated -> Modifier.fillMaxWidth().weight(1f)
+                            !isCommentsExpanded -> Modifier.fillMaxWidth()
+                            comments.isEmpty() && !isCommentsLoading -> Modifier.fillMaxWidth()
+                            else -> Modifier.fillMaxWidth().heightIn(max = 196.dp)
                         },
                     )
-                    if (!isCommentsExpanded && relatedItems.isNotEmpty()) {
+                    if (hasRelated) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(0.5.dp)
+                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+                        )
                         LiveRelatedStreamsList(
                             relatedItems = relatedItems,
                             onSelectRelated = onSelectRelated,
@@ -1481,6 +1524,7 @@ private fun NativeLivePlayer(
     var controlsVisible by remember { mutableStateOf(true) }
     var feedbackMessage by remember { mutableStateOf<String?>(null) }
     var reloadAttempt by remember(hlsUrl) { mutableIntStateOf(0) }
+    var readySinceEpochMs by remember(hlsUrl, reloadAttempt) { mutableStateOf<Long?>(null) }
 
     val player = remember(hlsUrl, reloadAttempt) {
         val loadControl = DefaultLoadControl.Builder()
@@ -1518,6 +1562,9 @@ private fun NativeLivePlayer(
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
                     Player.STATE_READY -> {
+                        if (readySinceEpochMs == null) {
+                            readySinceEpochMs = System.currentTimeMillis()
+                        }
                         isLoading = false
                         isPlaying = true
                         errorMessage = null
@@ -1528,7 +1575,12 @@ private fun NativeLivePlayer(
                     Player.STATE_ENDED -> {
                         isLoading = false
                         isPlaying = false
-                        errorMessage = "主播当前已离线或暂未开播"
+                        val playedMs = readySinceEpochMs?.let { System.currentTimeMillis() - it } ?: 0L
+                        if (playedMs < 25_000L && onFallbackToWeb != null) {
+                            onFallbackToWeb.invoke()
+                        } else {
+                            errorMessage = "主播当前已离线或暂未开播"
+                        }
                     }
                     Player.STATE_IDLE -> Unit
                 }
@@ -1562,6 +1614,7 @@ private fun NativeLivePlayer(
             .setDefaultRequestProperties(
                 mutableMapOf(
                     "Referer" to referer,
+                    "Origin" to referer.trimEnd('/'),
                     "Accept" to "*/*",
                 ),
             )
@@ -1670,7 +1723,7 @@ private fun NativeLivePlayer(
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .statusBarsPadding()
+                .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
                 .padding(top = 56.dp),
         ) {
             Surface(
@@ -1716,7 +1769,7 @@ private fun NativeLivePlayer(
                             listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent),
                         ),
                     )
-                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
+                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 FilledTonalIconButton(
@@ -1874,6 +1927,8 @@ private fun LiveComments(
     comments: List<LiveComment>,
     isLoading: Boolean,
     isExpanded: Boolean = true,
+    applyBottomInset: Boolean = true,
+    compactWhenEmpty: Boolean = false,
     onToggleExpand: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -1887,7 +1942,7 @@ private fun LiveComments(
     Column(
         modifier
             .background(MaterialTheme.colorScheme.background)
-            .navigationBarsPadding()
+            .then(if (applyBottomInset) Modifier.navigationBarsPadding() else Modifier)
             .padding(horizontal = 16.dp)
             .testTag("live-comments"),
     ) {
@@ -1942,18 +1997,46 @@ private fun LiveComments(
             exit = shrinkVertically() + fadeOut(),
         ) {
             if (comments.isEmpty()) {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    Text(
-                        if (isLoading) "正在连接直播间实时评论…" else "当前暂无公开评论",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                if (compactWhenEmpty && !isLoading) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp),
+                    ) {
+                        Text(
+                            text = "原生低延迟直连播放中 · 当前暂无新弹幕",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 12.dp),
+                        )
+                    }
+                } else {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = if (compactWhenEmpty) {
+                            Modifier.fillMaxWidth().height(72.dp)
+                        } else {
+                            Modifier.fillMaxSize()
+                        },
+                    ) {
+                        Text(
+                            if (isLoading) "正在连接直播间实时评论…" else "当前暂无公开评论",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             } else {
                 LazyColumn(
                     state = listState,
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(top = 4.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(top = 4.dp, bottom = if (applyBottomInset) 24.dp else 10.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(comments, key = LiveComment::id) { comment ->
@@ -2082,15 +2165,19 @@ private fun LiveRightRail(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.background(MaterialTheme.colorScheme.background)) {
+        val hasRelated = relatedItems.isNotEmpty()
         LiveComments(
             comments = comments,
             isLoading = isLoadingComments,
             isExpanded = isCommentsExpanded,
+            applyBottomInset = !hasRelated,
+            compactWhenEmpty = hasRelated,
             onToggleExpand = onToggleComments,
             modifier = when {
-                isCommentsExpanded && relatedItems.isNotEmpty() -> Modifier.fillMaxWidth().weight(0.45f)
-                isCommentsExpanded -> Modifier.fillMaxWidth().weight(1f)
-                else -> Modifier.fillMaxWidth()
+                !hasRelated -> Modifier.fillMaxWidth().weight(1f)
+                !isCommentsExpanded -> Modifier.fillMaxWidth()
+                comments.isEmpty() && !isLoadingComments -> Modifier.fillMaxWidth()
+                else -> Modifier.fillMaxWidth().weight(0.42f)
             },
         )
         if (relatedItems.isNotEmpty()) {
@@ -2343,8 +2430,9 @@ private fun EmbeddedLivePlayer(
                 ): WebResourceResponse? {
                     val requestUrl = request?.url?.toString() ?: return null
                     if (shouldBlockLiveResource(requestUrl)) {
+                        val isScript = requestUrl.substringBefore('?').endsWith(".js", ignoreCase = true)
                         return WebResourceResponse(
-                            "text/plain",
+                            if (isScript) "application/javascript" else "text/plain",
                             "UTF-8",
                             ByteArrayInputStream(EMPTY_INTERCEPT_BYTES),
                         )
@@ -2602,7 +2690,7 @@ private fun EmbeddedLivePlayer(
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .statusBarsPadding()
+                .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
                 .padding(top = 56.dp),
         ) {
             Surface(
@@ -2648,7 +2736,7 @@ private fun EmbeddedLivePlayer(
                             listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent),
                         ),
                     )
-                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier.windowInsetsPadding(WindowInsets.statusBars))
+                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 FilledTonalIconButton(
@@ -3013,6 +3101,31 @@ internal fun formatViewerCount(value: Int): String = when {
     value >= 10_000 -> String.format(java.util.Locale.US, "%.1f万", value / 10_000f)
     value >= 1_000 -> String.format(java.util.Locale.US, "%.1f千", value / 1_000f)
     else -> value.coerceAtLeast(0).toString()
+}
+
+internal fun calculateLiveStageHeight(
+    aspectRatio: Float,
+    containerWidth: Dp,
+    containerHeight: Dp,
+    isTwoPaneLandscape: Boolean,
+): Dp {
+    val safeWidth = containerWidth.coerceAtLeast(160.dp)
+    val safeHeight = containerHeight.coerceAtLeast(320.dp)
+    val safeRatio = aspectRatio.takeIf { it.isFinite() && it > 0f }?.coerceIn(0.45f, 2.4f) ?: (16f / 9f)
+
+    if (isTwoPaneLandscape) {
+        return (safeWidth / safeRatio).coerceIn(220.dp, safeHeight * 0.64f)
+    }
+
+    return if (safeRatio < 1.0f) {
+        val maxPortraitStage = (safeHeight * 0.46f).coerceIn(280.dp, 440.dp)
+        (safeWidth / safeRatio).coerceIn(260.dp, maxPortraitStage)
+    } else {
+        val naturalHeight = safeWidth / safeRatio
+        val balancedMinStage = (safeHeight * 0.30f).coerceIn(232.dp, 276.dp)
+        val maxLandscapeStage = (safeHeight * 0.38f).coerceAtLeast(balancedMinStage)
+        maxOf(naturalHeight, balancedMinStage).coerceAtMost(maxLandscapeStage)
+    }
 }
 
 internal fun parseLiveComments(value: String): List<LiveComment> = runCatching {

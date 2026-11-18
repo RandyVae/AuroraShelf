@@ -12,7 +12,7 @@
   3. 内屏双联展开态：460pt 剧院高度与 420pt 居中操作组、280pt 待播卡片与 3 列大图自适应流展，顶栏自动切为 `NetgreyMarkView`；
   4. 自动化测试：新增 `DeviceLayoutTests` 5 项测试，全量 101 项单元测试 100% 全部通过（0 failures, 5 skipped，耗时 4.277 秒）。
 
-# Netgrey · Android & iOS 2.17.2 · 跨 Agent 记忆
+# Netgrey · Android & iOS 2.17.3 · 跨 Agent 记忆
 
 > 本文件是所有 AI Agent（DSH / Codex / Claude / Hermes / Antigravity）进入本项目的统一入口。
 > 开工先读本文件，再按「权威来源」读细节；收工前更新「当前状态」。
@@ -23,7 +23,7 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `ed361af`（2026-11-18），未提交 0 个文件
+- Git：`main` @ `12c390b`（2026-11-18），未提交 0 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-18（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-18（今天）
@@ -36,19 +36,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-18 15:59 by `sync.py`
+- 最后同步：2026-11-18 16:53 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-18 · Build 269 / v2.17.2）：完成 Android 全面切换正式生产级 Release 签名（`RSA-4096` `PKCS12`、`SHA256withRSA`、APK Signature Scheme v2 + v3、`CN=Netgrey Release, O=Netgrey, C=HK`，证书 SHA-256 `B9:44:D3:55:47:34:B4:14:BC:8E:6F:A7:ED:1B:03:EF:50:EA:32:34:CC:6E:B6:A9:49:55:1F:8E:3A:83:13:47`），在 [build.gradle.kts](file:///Users/itou/Documents/ChatGPT/91pron/app/build.gradle.kts) 移除 Release 构建向 `debug.keystore` 的静默回退，并在 [publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 增加 `apksigner` V2/V3 与非 Debug 证书硬门禁；同步保留 `v2.17.1` 全量 18 视频源与漫画官方分类对齐及多页分页修复成果，三端 Release 模拟器核验通过，网页 OTA（`https://bananarey.us`）、TestFlight Build `269` 与 GitHub Release `v2.17.2` 全部同步上线。
-- 进行中：无阻塞任务；`v2.17.2 (Build 269)` 正式签名切换与双通道发布已闭环。
+- 当前阶段（2026-11-18 · Build 270 / v2.17.3）：双端（Android + iPhone + iPad）根治 Stripchat 直播 Mouflon v2 鉴权阻断与 12 秒广告桩误判，并修复 Android 直播窗口顶栏贴边与上下比例失衡问题；全链路升级版本号至 `v2.17.3 (Build 270)`，三端 Release 模拟器（`emulator-5554` 正式签名 R8 APK、`iPhone 18 Pro` Release、`iPad Pro 13-inch (M5)` Release）全规模实测通过，网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,471,588` B / `Netgrey.ipa` `140,110,955` B，`/` 剩 `11G`）、TestFlight Build `270` 与 GitHub Release `v2.17.3` 全部同步上线。
+- 进行中：无阻塞任务；`v2.17.3 (Build 270)` 修复与双通道同步发布已闭环。
 - 下一步：常规版本演进与线上源站日常监控。
 - 阻塞：无。
 - 最近一次更新：2026-11-18 by Antigravity (Gemini 4 Argon)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-18（Antigravity）：双端根治 Stripchat 直播 Mouflon v2 阻断、重构 Android 直播窗口安全区与黄金比例并发布 `v2.17.3 (Build 270)`。(1) **Stripchat 直播打不开根因与自愈鉴权**：上游启用 `#EXT-X-MOUFLON:PSCH:v2` 保护，未携带 `pkey` 请求子清单时返回 `HTTP 200` 的 `#EXT-X-MOUFLON-ADVERT` 12 秒 VOD 广告桩，导致旧探针误判为有效直播流并在播完 12 秒后报「主播已离线」且不触发 WebRTC 降级；同时旧兜底 `{id}.m3u8` 已 TLS 超时。双端在 [LiveStreamResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/LiveStreamResolver.kt) 与 [LiveSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Live/LiveSourceCatalog.swift) 将主清单统一升级为自适应高清 `{id}_auto.m3u8?pkey=...`，支持从官方 MMP `main.js` 动态提取最新 `pkey`、核验首个子变体剔除 `#EXT-X-MOUFLON-ADVERT` / `#EXT-X-MOUFLON:FILE:`，并在密钥轮换失效或 `<25s` 异常结束时平滑降级至纯净 WebRTC 视口；(2) **Android 直播窗口位置与整体比例重构**：在 [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt) 为非全屏竖屏顶部补齐纯黑 `WindowInsets.statusBars` 安全隔离带（平板双栏左窗格同步补齐 `.statusBarsPadding()` 与右栏像素级对齐），移除播放器内顶栏重复状态栏内边距，新增 `calculateLiveStageHeight` 剧院级自适应舞台高度（竖屏横流约占视口 `30%`、竖流 `46%`），并将无弹幕时的「实时互动」收敛为紧凑状态卡、常驻展示下方「更多直播」推荐流，彻底消除「视频顶入状态栏 + 下方 70% 空白区」的比例失调。
 
 - 2026-11-18（Antigravity）：Android 全面切换正式 Release 签名并发布 `v2.17.2 (Build 269)`。签发独立 `RSA-4096` `PKCS12` 正式生产证书（凭据仅存本地未跟踪私有配置 `source-secrets.properties` 并设 `0600`，同时在本机用户目录做 `0600` 备份），重构 [build.gradle.kts](file:///Users/itou/Documents/ChatGPT/91pron/app/build.gradle.kts) 强制要求正式证书签名 Release 产物，并在 [publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 增加 `apksigner verify` V2/V3 强门禁阻断任何 `CN=Android Debug` 包上线。
 
@@ -421,6 +423,7 @@
 - 2026-11-15（2）：iOS 27.2 SwiftUI `View.body` 内同步访问 `UIWindow.safeAreaInsets` 引发 `AttributeGraph: Cycle detected through attribute` 冻结陷阱：在播控/详情界面频繁重绘期间，若布局属性在 `body` 内同步读取底层 `UIWindow.safeAreaInsets` 或将顶层安全区与全屏忽略容器互相引用，会导致 iOS 27.2 AttributeGraph 触发循环依赖死锁——表现为播放器音频继续正常解码发声，但视频图层与界面 UI 完全停滞卡死（「有声音无画面」）。做法是用带锁缓存 + 节流异步主线程采集（`SafeAreaCache`）配合外层非忽略安全区 `onGeometryChange(for: EdgeInsets.self)` 测量边距，并确保多元素横向骨架也使用 `ScrollView(.horizontal)` 避免 `508.0pt` 类宽度撑破视口。
 - 2026-11-15（3）：运行 `LiveVideoSourceAuditTests` 须前置环境变量 `TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1 xcodebuild test ...`（无检查进仓库的共享 `.xcscheme` 时，不能用 `RUN_IOS_LIVE_SOURCE_AUDIT=1` 或将其作为 build setting），否则在线源审计测试会被 `XCTSkip` 跳过。
 - 2026-11-18：SWR 异步刷新链路不能裁剪固定子分类货架数，且代理环境下系统 DNS 若返回 `198.18.0.0/15` TUN Fake-IP 严禁用 DoH 真实 IP 覆盖。此外 Apple App Store Connect REST `/v1/apps` 出现间歇 HTTP 500 导致 `xcodebuild -exportArchive (destination=upload)` 超时时，可先以 `destination=export` 本地导出再调用 `xcrun altool --use-old-altool --upload-package` 绑定 App ID（见私有凭据配置）完成 TestFlight 上传。
+- 2026-11-18（2）：HLS 主清单 HTTP 200 `#EXTM3U` 假阳性与直播广告桩陷阱：Stripchat 启用 Mouflon v2 后，未携带有效 `pkey` 的 master M3U8 仍返回 HTTP 200 `#EXTM3U`，但其子变体 M3U8 会下发 `#EXT-X-MOUFLON-ADVERT` 12 秒静态 VOD 片段；若探针仅检查 master 首部是否含 `#EXTM3U`，原生播放器会播完 12 秒广告桩后触发 `STATE_ENDED` 误报「主播已离线」且不触发 Web 降级。做法是同时检查首个子变体是否含 `#EXT-X-MOUFLON-ADVERT` / `#EXT-X-MOUFLON:FILE:`，支持从官方 MMP `main.js` 动态提取刷新 `pkey`，并对 `<25s` 结束事件挂接 WebRTC 兜底。
 
 ## 权威来源（细节以这些文件为准）
 

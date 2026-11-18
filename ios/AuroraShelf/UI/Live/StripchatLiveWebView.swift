@@ -114,13 +114,13 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         #close_entrance_terms, #entrance_terms, #entrance_terms_overlay,
         .language-mismatch-notice, .language_mismatch_notice, [class*="language-mismatch"], [class*="language_mismatch"],
         [class*="language_mismatch_update"], [class*="language_mismatch_go_back"], [class*="language_mismatch_dismiss"],
-        [id*="language"], [class*="language"], #language-suggestion,
+        #language-suggestion,
         .notification-bar, .site-notice, .lang-bar, #banner-container,
         [class*="chat-settings"], [class*="chat-toolbar"], [class*="font-list"], .c-chat-settings, .chat-settings-holder,
         .user-warning-banner, .site_alert,
         div[style*="background: rgb(255, 255, 204)"], div[style*="background-color: #fff9d7"],
         .vjs-control-bar, .vjs-big-play-button, .vjs-loading-spinner,
-        [data-testid*="banner"], [data-testid*="chat"], [data-testid*="tip"],
+        [data-testid*="banner"], [data-testid*="tip-menu"],
         .related-models, .models-list, .gallery-section, .profile-section,
         .view-cam-controls, .view-cam-info, [class*="view-cam-info"], .videoPlayerControls {
             display: none !important;
@@ -196,7 +196,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
 
             function checkAndHook() {
                 // 1. 自动处理 Cookie 政策 / 进入确认弹层 / 年龄确认 / 语言提示条 / 语言不匹配警告
-                const langBars = document.querySelectorAll('#language-suggestion, [id*="language"], [class*="language-choice"], [class*="language-suggest"], .notification-bar, .site-notice, .language-mismatch-notice, .language_mismatch_notice, [class*="language-mismatch"], [class*="language_mismatch"]');
+                const langBars = document.querySelectorAll('#language-suggestion, [class*="language-choice"], [class*="language-suggest"], .notification-bar, .site-notice, .language-mismatch-notice, .language_mismatch_notice, [class*="language-mismatch"], [class*="language_mismatch"]');
                 langBars.forEach(function(b) { try { b.remove(); } catch(e) { b.style.display = 'none'; } });
 
                 const closeEntrance = document.getElementById('close_entrance_terms') || document.querySelector('.close_entrance_terms, #close_entrance_terms, [id*="close_entrance"]');

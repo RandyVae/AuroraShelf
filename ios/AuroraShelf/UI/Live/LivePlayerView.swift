@@ -22,6 +22,8 @@ public struct LivePlayerView: View {
     @State private var hideControlsTask: DispatchWorkItem?
     @State private var itemStatusObserver: NSKeyValueObservation?
     @State private var presentationSizeObserver: NSKeyValueObservation?
+    @State private var playbackEndObserver: NSObjectProtocol?
+    @State private var playbackStartedAt: Date?
     @State private var isPortraitStream: Bool = false
     @State private var streamRequestTask: Task<Void, Never>?
     @State private var activeStreamRequestID = UUID()
@@ -439,25 +441,44 @@ public struct LivePlayerView: View {
         cleanupLivePlayer(cancelRequest: false)
 
         if stream.sourceID == LiveSourceCatalog.stripchatID {
-            var directHlsUrl: URL? = nil
-            if let hlsStr = stream.hlsStreamUrl, let url = URL(string: hlsStr) {
-                directHlsUrl = url
-            } else {
-                let numericId = stream.id.replacingOccurrences(of: "sc-", with: "")
-                if !numericId.isEmpty && Int(numericId) != nil {
-                    directHlsUrl = URL(string: "https://edge-hls.doppiocdn.media/hls/\(numericId)/master/\(numericId).m3u8")
+            startStripchatPlayback(requestID: requestID)
+        } else {
+            startChaturbatePlayback(requestID: requestID)
+        }
+    }
+
+    private func startStripchatPlayback(requestID: UUID) {
+        let numericId = stream.id.replacingOccurrences(of: "sc-", with: "").filter(\.isNumber)
+        let rawHls = stream.hlsStreamUrl
+        streamRequestTask = Task { @MainActor in
+            defer {
+                if activeStreamRequestID == requestID {
+                    streamRequestTask = nil
                 }
             }
-            if let targetUrl = directHlsUrl {
-                startNativePlayback(hlsUrl: targetUrl, referer: "https://zh.stripchat.com/", requestID: requestID)
-            } else {
+            let outcome = await StripchatStreamAuthenticator.shared.resolvePlayableURL(
+                rawHls: rawHls,
+                fallbackNumericId: numericId
+            )
+            guard !Task.isCancelled, activeStreamRequestID == requestID else { return }
+            switch outcome {
+            case .authenticated(let authenticatedURL):
+                startNativePlayback(
+                    hlsUrl: authenticatedURL,
+                    referer: "https://zh.stripchat.com/",
+                    requestID: requestID
+                )
+            case .offlineOrPrivate:
+                self.player = nil
+                self.isLoadingLive = false
+                self.isWebFallbackActive = false
+                self.liveError = "主播当前已离线、下播或正在进行私密秀"
+            case .webFallback:
                 self.player = nil
                 self.isLoadingLive = false
                 self.isWebFallbackActive = true
                 self.liveError = nil
             }
-        } else {
-            startChaturbatePlayback(requestID: requestID)
         }
     }
 
@@ -651,19 +672,25 @@ public struct LivePlayerView: View {
         guard activeStreamRequestID == requestID else { return }
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
         try? AVAudioSession.sharedInstance().setActive(true)
+        let origin = referer.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let headers: [String: String] = [
             "Referer": referer,
+            "Origin": origin,
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
         ]
         let asset = AVURLAsset(url: hlsUrl, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let playerItem = AVPlayerItem(asset: asset)
         let avPlayer = AVPlayer(playerItem: playerItem)
+        self.playbackStartedAt = nil
         self.player = avPlayer
 
         itemStatusObserver = playerItem.observe(\.status, options: [.new, .initial]) { item, _ in
             DispatchQueue.main.async {
                 guard self.player?.currentItem === item else { return }
                 if item.status == .readyToPlay {
+                    if self.playbackStartedAt == nil {
+                        self.playbackStartedAt = Date()
+                    }
                     self.isLoadingLive = false
                     self.isPlaying = true
                     let size = item.presentationSize
@@ -687,6 +714,22 @@ public struct LivePlayerView: View {
                         self.isWebFallbackActive = true
                     }
                 }
+            }
+        }
+
+        playbackEndObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: playerItem,
+            queue: .main
+        ) { _ in
+            guard self.player?.currentItem === playerItem else { return }
+            let elapsed = self.playbackStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+            self.cleanupLivePlayer(cancelRequest: false)
+            self.isLoadingLive = false
+            if elapsed < 25.0 {
+                self.isWebFallbackActive = true
+            } else {
+                self.liveError = "主播当前已离线或暂未开播"
             }
         }
 
@@ -714,6 +757,11 @@ public struct LivePlayerView: View {
         itemStatusObserver = nil
         presentationSizeObserver?.invalidate()
         presentationSizeObserver = nil
+        if let endObs = playbackEndObserver {
+            NotificationCenter.default.removeObserver(endObs)
+            playbackEndObserver = nil
+        }
+        playbackStartedAt = nil
         player?.pause()
         player?.replaceCurrentItem(with: nil)
         player = nil

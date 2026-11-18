@@ -1,4 +1,17 @@
-## 最新交接：2026-11-18 — Android 全面切换正式 Release 签名（RSA-4096 PKCS12 · V2/V3 强验签）与双通道同步上线 · v2.17.2 (Build 269)
+## 最新交接：2026-11-18 — 双端 Stripchat 直播 Mouflon v2 动态鉴权修复、Android 直播窗口顶栏避让与整体比例重构及全通道同步上线 · v2.17.3 (Build 270)
+
+### 本次完成
+1. **双端 Stripchat 直播打不开根治（Android + iPhone + iPad）**：
+   - 根因：Stripchat 启用 `#EXT-X-MOUFLON:PSCH:v2` 后，未附带 `pkey` 的变体 M3U8 返回 `#EXT-X-MOUFLON-ADVERT` 12 秒 VOD 广告桩，且旧兜底 `{id}.m3u8` 超时；旧探针仅判断 master 含 `#EXTM3U` 导致误入原生播放器并在 12 秒结束后报「主播已离线」。
+   - 修复：在 [StripchatLiveRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/StripchatLiveRepository.kt)、[LiveStreamResolver.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/LiveStreamResolver.kt)、[LiveSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Live/LiveSourceCatalog.swift) 与 [LivePlayerView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/LivePlayerView.swift) 统一升级为自适应高清 `{id}_auto.m3u8?pkey=...`，支持从官方 MMP `main.js` 动态提取刷新 `pkey`、核验子变体剔除 `#EXT-X-MOUFLON-ADVERT` / `#EXT-X-MOUFLON:FILE:`，并在锁流或 `<25s` 异常结束时自动降级至纯净 WebRTC 视口；同步收窄 [StripchatLiveWebView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Live/StripchatLiveWebView.swift) 过宽 CSS 选择器并为 [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt) 拦截的 `.js` 返回合法 MIME。
+2. **Android 直播窗口过于靠上与整体布局比例重构（`LiveScreen.kt`）**：
+   - 竖屏非全屏顶部新增纯黑 `WindowInsets.statusBars` 安全隔离带，双栏横屏左窗格补齐 `.statusBarsPadding()` 与右栏顶部对齐，同时移除播放器内顶栏在非全屏态的重复 `statusBars` 内边距。
+   - 新增 `calculateLiveStageHeight` 自适应舞台高度算法与弹簧过渡（横流约占视口 `30%`、竖流 `46%`），`StreamerInfoBar` 接入真实主播头像，无弹幕时将「实时互动」收敛为单行紧凑卡片并始终展示下方「更多直播」列表。
+3. **全量验证与双通道同步发布（`v2.17.3 Build 270`）**：
+   - 新增单测覆盖 [LiveStreamResolverTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/data/LiveStreamResolverTest.kt)、[LiveScreenTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/ui/LiveScreenTest.kt) 与 [LiveSourceAdapterTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/LiveSourceAdapterTests.swift)。
+   - Android 单测/Lint/正式签名 APK 校验通过，`emulator-5554` 原位覆盖升级及 `iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 模拟器全规模实测通过；网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,471,588` B、`Netgrey.ipa` `140,110,955` B，`/` 剩 `11G`）、TestFlight `Build 270` 与 GitHub Release `v2.17.3` 同步上线。
+
+## 历史交接：2026-11-18 — Android 全面切换正式 Release 签名（RSA-4096 PKCS12 · V2/V3 强验签）与双通道同步上线 · v2.17.2 (Build 269)
 
 ### 本次完成
 1. **Android 正式生产级 Release 签名体系落地**：

@@ -35,13 +35,15 @@ class StripchatLiveRepository {
                 val model = models.optJSONObject(index) ?: continue
                 if (!model.optBoolean("isLive") || model.optString("status") != PUBLIC_STATUS) continue
                 val id = model.optString("id").trim()
+                val streamId = model.optString("streamName").trim().takeIf { it.all(Char::isDigit) && it.isNotEmpty() } ?: id
                 val username = model.optString("username").trim()
                 if (id.isBlank() || !USERNAME_PATTERN.matches(username)) continue
                 val thumbnail = model.optString("previewUrlThumbSmall").takeIf(::isHttpsUrl)
                     ?: model.optString("avatarUrl").takeIf(::isHttpsUrl)
                     ?: continue
-                val hlsUrl = model.optString("hlsPlaylist").takeIf(::isHttpsUrl)
-                    ?: "https://edge-hls.doppiocdn.media/hls/$id/master/$id.m3u8"
+                val rawHlsUrl = model.optString("hlsPlaylist").takeIf(::isHttpsUrl)
+                val hlsUrl = LiveStreamResolver.normalizeStripchatMasterUrl(rawHlsUrl, streamId)
+                    ?: "https://edge-hls.doppiocdn.media/hls/$streamId/master/${streamId}_auto.m3u8"
                 add(
                     LiveItem(
                         id = id,
@@ -112,7 +114,7 @@ class StripchatLiveRepository {
                 .build()
         }
 
-        /** Asynchronously warms DNS and TLS connection for live stream hosts to eliminate handshake delay. */
+        /** Asynchronously warms DNS, TLS connection, and Stripchat MMP pkey to eliminate startup delay. */
         fun prefetchDns() {
             val pool = java.util.concurrent.Executors.newSingleThreadExecutor()
             pool.execute {
@@ -120,6 +122,9 @@ class StripchatLiveRepository {
                     runCatching {
                         val req = Request.Builder().url("$SITE_BASE/api/front/models?limit=1").head().build()
                         okHttpClient.newCall(req).execute().close()
+                    }
+                    runCatching {
+                        LiveStreamResolver.refreshStripchatPkeyIfStale()
                     }
                 } finally {
                     pool.shutdown()
