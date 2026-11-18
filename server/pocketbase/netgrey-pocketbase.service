@@ -8,7 +8,7 @@ Type=simple
 User=netgrey-auth
 Group=netgrey-auth
 WorkingDirectory=/var/lib/netgrey-pocketbase
-ExecStart=/usr/local/bin/pocketbase serve --http=127.0.0.1:8090 --dir=/var/lib/netgrey-pocketbase/pb_data --migrationsDir=/var/lib/netgrey-pocketbase/pb_migrations
+ExecStart=/usr/local/bin/pocketbase serve --http=127.0.0.1:8090 --dir=/var/lib/netgrey-pocketbase/pb_data --migrationsDir=/var/lib/netgrey-pocketbase/pb_migrations --hooksDir=/var/lib/netgrey-pocketbase/pb_hooks
 Restart=on-failure
 RestartSec=3
 NoNewPrivileges=true

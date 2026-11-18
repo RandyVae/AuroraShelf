@@ -93,7 +93,8 @@ if magic != b"\x7fELF":
 PY
 
 run_ssh 'set -e
-mkdir -p /var/backups/netgrey-auth /var/lib/netgrey-pocketbase/pb_data /var/lib/netgrey-pocketbase/pb_migrations
+mkdir -p /var/backups/netgrey-auth /var/lib/netgrey-pocketbase/pb_data /var/lib/netgrey-pocketbase/pb_migrations /var/lib/netgrey-pocketbase/pb_hooks /etc/netgrey-ota
+chmod 700 /etc/netgrey-ota
 STAMP="$(date +%Y%m%d%H%M%S)"
 if [ -f /etc/nginx/sites-available/netgrey ]; then
   cp -a /etc/nginx/sites-available/netgrey "/var/backups/netgrey-auth/netgrey.${STAMP}.conf"
@@ -137,9 +138,51 @@ if [ -d "${PROJECT_ROOT}/server/pocketbase/pb_migrations" ]; then
   done
 fi
 
+if [ -d "${PROJECT_ROOT}/server/pocketbase/pb_hooks" ]; then
+  for hook in "${PROJECT_ROOT}/server/pocketbase/pb_hooks/"*.js; do
+    if [ -f "${hook}" ]; then
+      run_scp "${hook}" "/var/lib/netgrey-pocketbase/pb_hooks/$(basename "${hook}")"
+    fi
+  done
+fi
+
 run_ssh 'set -e
 install -o root -g root -m 755 /tmp/pocketbase.netgrey.new /usr/local/bin/pocketbase
 rm -f /tmp/pocketbase.netgrey.new
+systemctl stop netgrey-pocketbase 2>/dev/null || true
+python3 - <<'\''PY'\''
+import json
+import os
+import secrets
+import subprocess
+from pathlib import Path
+
+admin_cfg_path = Path("/etc/netgrey-ota/pocketbase_admin.json")
+if admin_cfg_path.exists():
+    cfg = json.loads(admin_cfg_path.read_text(encoding="utf-8"))
+else:
+    cfg = {
+        "email": "admin@bananarey.us",
+        "password": secrets.token_urlsafe(24),
+    }
+    admin_cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+os.chmod(admin_cfg_path, 0o600)
+
+subprocess.run(
+    [
+        "/usr/local/bin/pocketbase",
+        "superuser",
+        "upsert",
+        cfg["email"],
+        cfg["password"],
+        "--dir=/var/lib/netgrey-pocketbase/pb_data",
+        "--migrationsDir=/var/lib/netgrey-pocketbase/pb_migrations",
+    ],
+    check=True,
+    stdout=subprocess.DEVNULL,
+)
+print("pocketbase_superuser=ready")
+PY
 chown -R netgrey-auth:netgrey-auth /var/lib/netgrey-pocketbase
 systemctl daemon-reload
 systemctl enable netgrey-pocketbase
@@ -155,4 +198,4 @@ done
 echo pocketbase=healthcheck_failed >&2
 exit 1'
 
-echo "PocketBase binary, migrations, and service deployed and restarted."
+echo "PocketBase binary, migrations, hooks, superuser, and service deployed and restarted."

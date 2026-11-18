@@ -302,19 +302,17 @@ for target_file in Netgrey.ipa Netgrey.apk provisioned_udids.json icon57.png ico
   fi
 done
 
-# 同步更新远端 ota_service.py 并重启服务（自动定位 systemd ExecStart 路径，默认 /usr/local/lib/netgrey-ota/ota_service.py）
+# 同步更新远端 ota_service.py 至独立目录 /usr/local/lib/netgrey-ota/ota_service.py 并移除 Web 根目录旧脚本
 if [ '${STAGE_OTA_SERVICE}' = '1' ] && [ -f '/tmp/ota_service.py.tmp.${RUN_ID}' ]; then
   OTA_SCRIPT_DEST='/usr/local/lib/netgrey-ota/ota_service.py'
-  if command -v systemctl >/dev/null 2>&1; then
-    DETECTED_PATH=\$(systemctl cat netgrey-ota.service 2>/dev/null | grep -Eo '/[^[:space:]\"]*ota_service\.py' | tail -n 1 || true)
-    if [ -n \"\${DETECTED_PATH}\" ]; then
-      OTA_SCRIPT_DEST=\"\${DETECTED_PATH}\"
-    fi
-  fi
   mkdir -p \"\$(dirname \"\${OTA_SCRIPT_DEST}\")\" /var/lib/netgrey-ota
   chmod 700 /var/lib/netgrey-ota
   install -o root -g root -m 755 '/tmp/ota_service.py.tmp.${RUN_ID}' \"\${OTA_SCRIPT_DEST}\"
-  rm -f '/tmp/ota_service.py.tmp.${RUN_ID}'
+  rm -f '/tmp/ota_service.py.tmp.${RUN_ID}' '${REMOTE_DIR}/ota_service.py'
+  if [ -f /etc/systemd/system/netgrey-ota.service ] && grep -q '/var/www/netgrey/ota_service.py' /etc/systemd/system/netgrey-ota.service; then
+    sed -i 's|/var/www/netgrey/ota_service.py|/usr/local/lib/netgrey-ota/ota_service.py|g' /etc/systemd/system/netgrey-ota.service
+    systemctl daemon-reload
+  fi
   if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files netgrey-ota.service 2>/dev/null | grep -q 'netgrey-ota.service'; then
     systemctl restart netgrey-ota.service
   fi

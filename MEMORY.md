@@ -23,28 +23,28 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `26d0eea`（2026-11-18），未提交 0 个文件
+- Git：`main` @ `d74b418`（2026-11-18），未提交 0 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-18（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-18（今天）
   - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-18（今天）
   - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-18（今天）
-  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（23 天前）
+  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（24 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-18（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-18 11:18 by `sync.py`
+- 最后同步：2026-11-18 13:39 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-18 · Build 267 / v2.17.0）：完成全栈 86 项优化审计问题全面整改、双端 Release 模拟器全规模验收与全渠道同步发布：(1) **后端、OTA 与 PocketBase 安全加固（`SEC-01`、`SEC-02`、`SEC-11`、`OPS-01..07`）**：[ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 将 `devices.json` / `testflight_invites.json` 迁出公开 Web 目录至 `/var/lib/netgrey-ota/`（`0700`/`0600` 原子落盘并自动迁移删除旧公开文件），接入口令门禁 + 10 分钟单次 HMAC-SHA256 `enrollment_token`（`/api/udid/enroll` -> `/api/udid/enroll.mobileconfig` -> `/api/receive-udid`）防止无口令刷满 Apple Developer 100 台设备配额，升级 `BoundedThreadingTCPServer(max_workers=16)`、LRU 限流桶与跨 IP 口令防爆；[publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 新增四端版本一致性预检、从 IPA 提取 `provisioned_udids.json`、远端 `>=5GB` 磁盘门禁与全文件单次事务原子切换，[index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 仅在设备 UDID 已签入当前 IPA 时解锁绿色直装按钮；[netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf) 与 `1731900000_lock_users_rules.js` 锁定 PocketBase 用户集合规则、屏蔽 `/auth-api/_/` 与静态 `.json/.py/.sh` 泄露，已实部署至远端并经 `verify_auth_api.sh` 验证通过；(2) **Android、iOS/iPadOS 与 Web 游戏全栈修复**：完成证书信任边界收窄、DLNA `LocalMediaProxy` 环回与 Header 白名单、Android 原生 PiP 与多窗口 `ON_STOP` 生命周期、iOS `HLSLoopbackRelayServer` 并发连接上限与 `PictureInPictureManager` 单例守卫、双端四模块（视频/漫画/直播/社区）真实分域搜索、账号验证邮件重发与 KeyStore 加密、浅色/深色/跟随系统三态外观与 12 语种本地化补齐、香港繁体词库校准、以及内置游戏《Lust Goddess》`v2.17.0` 跨端存档桥（`AuroraSaveBridge` / `GameSaveStore`）、`handleAppBack()` 防软锁、11 看板娘 Spine 完整映射与死音频清理；(3) **全量验证与双通道上线（v2.17.0 Build 267）**：Web 逻辑与资产校验全通，Node 探针 32 源 0 失败，Android 离线 43 套件 276 项（268 通/8 跳/0 失败）+ 在线全源探针 + `lintDebug`（0 error）+ `assembleRelease` 全通，iOS 离线与在线全源探针（18 视频 + 9 免登漫画 + 7 论坛 + 2 直播）全通，`emulator-5554` R8 APK、`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器全规模走查通过，OTA（`https://bananarey.us`）与 TestFlight Build `267` 同步上线。
-- 进行中：无阻塞任务；持续监控线上源站健康度与 TestFlight 构建分发状态。
-- 下一步：按需配置 PocketBase SMTP 邮件服务以启用生产环境自动发信。
+- 当前阶段（2026-11-18 · Build 267 / v2.17.0）：完成全栈 86 项优化审计问题全面整改、双端 Release 模拟器全规模验收、全渠道同步发布与生产环境 PocketBase / OTA 运维收口：(1) **后端、OTA 与 PocketBase 安全加固与运维收口（`SEC-01`、`SEC-02`、`SEC-11`、`OPS-01..07`）**：[ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 已从 `/var/www/netgrey/` 彻底迁至 `/usr/local/lib/netgrey-ota/ota_service.py`，将 `devices.json` / `testflight_invites.json` 迁至 `/var/lib/netgrey-ota/`（`0700`/`0600` 原子落盘并自动清理旧文件），接入口令门禁 + 10 分钟单次 HMAC-SHA256 `enrollment_token`（`/api/udid/enroll` -> `/api/udid/enroll.mobileconfig` -> `/api/receive-udid`），升级 `BoundedThreadingTCPServer(max_workers=16)`、LRU 限流桶与跨 IP 口令防爆；[publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 新增四端版本一致性预检、从 IPA 提取 `provisioned_udids.json`、远端 `>=5GB` 磁盘门禁与全文件单次事务原子切换，[index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 仅在设备 UDID 已签入当前 IPA 时解锁绿色直装按钮；[deploy_auth_backend.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/deploy_auth_backend.sh) 自动在 `/etc/netgrey-ota/pocketbase_admin.json`（`0600`）签发 CSPRNG 超级管理员并执行 `pocketbase superuser upsert` 彻底消除 `pbinstall` 临时安装令牌，配合 [1731900001_configure_app_meta_and_verification.js](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/pb_migrations/1731900001_configure_app_meta_and_verification.js) 与 [main.pb.js](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/pb_hooks/main.pb.js) 配置 `Netgrey` 品牌元数据、`X-Real-IP` 可信代理与限流、将存量 3 个未验证账号全部迁移为 `verified = 1`，并在 VPS 25 端口受阻未启用外部 SMTP 时自动完成新注册与 `request-verification`（`HTTP 204`）验证闭环；(2) **Android、iOS/iPadOS 与 Web 游戏全栈修复**：完成证书信任边界收窄、DLNA `LocalMediaProxy` 环回与 Header 白名单、Android 原生 PiP 与多窗口 `ON_STOP` 生命周期、iOS `HLSLoopbackRelayServer` 并发连接上限与 `PictureInPictureManager` 单例守卫、双端四模块（视频/漫画/直播/社区）真实分域搜索、账号验证邮件重发与 KeyStore 加密、浅色/深色/跟随系统三态外观与 12 语种本地化补齐、香港繁体词库校准、以及内置游戏《Lust Goddess》`v2.17.0` 跨端存档桥（`AuroraSaveBridge` / `GameSaveStore`）、`handleAppBack()` 防软锁、11 看板娘 Spine 完整映射与死音频清理；(3) **全量验证与双通道上线（v2.17.0 Build 267）**：Web 逻辑与资产校验全通，Node 探针 32 源 0 失败，Android 离线 43 套件 276 项（268 通/8 跳/0 失败）+ 在线全源探针 + `lintDebug`（0 error）+ `assembleRelease` 全通，iOS 离线与在线全源探针（18 视频 + 9 免登漫画 + 7 论坛 + 2 直播）全通，`emulator-5554` R8 APK、`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器全规模走查通过，OTA（`https://bananarey.us`）与 TestFlight Build `267`（Apple 已处理完成 `processingState: VALID` 并挂载至 `Internal` 测试组）同步上线。
+- 进行中：无阻塞任务；全部 86 项审计整改与服务端运维收口项已 100% 闭环。
+- 下一步：常规版本演进与线上源站日常监控。
 - 阻塞：无。
 - 最近一次更新：2026-11-18 by Antigravity (Gemini 4 Argon)
 
