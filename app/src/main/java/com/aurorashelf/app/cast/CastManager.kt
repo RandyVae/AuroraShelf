@@ -1,7 +1,6 @@
 package com.aurorashelf.app.cast
 
 import android.content.Context
-import android.net.Uri
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.core.net.toUri
@@ -11,7 +10,10 @@ import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultHttpDataSource
 import com.aurorashelf.app.data.OfflineCacheManager
 import com.aurorashelf.app.data.VideoRepository
+import java.io.File
+import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -35,23 +37,27 @@ import okhttp3.RequestBody.Companion.toRequestBody
 class CastManager private constructor(context: Context) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-    private val okHttpClient = OkHttpClient.Builder()
+    private val soapHttpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
+        .followRedirects(false)
+        .followSslRedirects(false)
         .build()
 
-    private val ssdpDiscovery = SsdpDiscovery(appContext, okHttpClient)
+    private val upstreamMediaClient = OkHttpClient.Builder()
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .build()
+
+    private val ssdpDiscovery = SsdpDiscovery(appContext, soapHttpClient)
 
     internal val localMediaProxy = LocalMediaProxy(
-        okHttpClient = okHttpClient,
-        allowedDirs = listOfNotNull(
-            java.io.File(appContext.filesDir, "offline_media"),
-            java.io.File(appContext.filesDir, "OfflineComics"),
-            appContext.cacheDir,
-            appContext.externalCacheDir,
+        okHttpClient = upstreamMediaClient,
+        allowedDirs = listOf(
+            File(appContext.filesDir, "offline_media"),
         ),
-        cacheStreamOpener = { cacheKey, sourceUrl, referer, start, endInclusive ->
-            openOfflineCachedStream(cacheKey, sourceUrl, referer, start, endInclusive)
+        cacheStreamOpener = { cacheKey, sourceUrl, referer, extraHeaders, start, endInclusive ->
+            openOfflineCachedStream(cacheKey, sourceUrl, referer, extraHeaders, start, endInclusive)
         },
     )
 
@@ -94,6 +100,8 @@ class CastManager private constructor(context: Context) {
                     onDeviceFound = { partial -> _devices.value = partial },
                 )
                 _devices.value = found
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w(TAG, "Discovery error: ${e.message}")
             } finally {
@@ -113,36 +121,40 @@ class CastManager private constructor(context: Context) {
         videoUrl: String,
         title: String,
         referer: String? = null,
+        extraHeaders: Map<String, String> = emptyMap(),
         localFilePath: String? = null,
         cacheKey: String? = null,
         initialPositionMs: Long = 0L,
     ) {
         syncJob?.cancel()
         castJob?.cancel()
+        localMediaProxy.rotateSession()
         _selectedDevice.value = device
         _castState.value = CastState.Connecting(device)
 
         castJob = scope.launch(Dispatchers.IO) {
             try {
-                // Determine the stream URL for the TV:
                 val streamUrl = when {
                     !cacheKey.isNullOrBlank() -> {
                         localMediaProxy.buildProxyUrl(
                             videoUrl = videoUrl,
                             referer = referer,
                             cacheKey = cacheKey,
+                            extraHeaders = extraHeaders,
                         ) ?: videoUrl
                     }
                     !localFilePath.isNullOrBlank() -> {
                         localMediaProxy.buildLocalFileProxyUrl(
                             filePath = localFilePath,
                             referer = referer,
+                            extraHeaders = extraHeaders,
                         ) ?: videoUrl
                     }
-                    !referer.isNullOrBlank() || DlnaSoap.isHlsUrl(videoUrl) -> {
+                    !referer.isNullOrBlank() || extraHeaders.isNotEmpty() || DlnaSoap.isHlsUrl(videoUrl) -> {
                         localMediaProxy.buildProxyUrl(
                             videoUrl = videoUrl,
                             referer = referer,
+                            extraHeaders = extraHeaders,
                         ) ?: videoUrl
                     }
                     else -> videoUrl
@@ -177,10 +189,12 @@ class CastManager private constructor(context: Context) {
                 }
 
                 startPositionSync(device)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to cast to ${device.name}", e)
                 withContext(Dispatchers.Main) {
-                    _castState.value = CastState.Error(e.message ?: "投屏連接失敗")
+                    _castState.value = CastState.Error(e.message ?: "投屏连接失败")
                 }
             }
         }
@@ -190,6 +204,7 @@ class CastManager private constructor(context: Context) {
         cacheKey: String,
         sourceUrl: String,
         referer: String?,
+        extraHeaders: Map<String, String>,
         start: Long,
         endInclusive: Long?,
     ): CachedStreamSlice? {
@@ -198,16 +213,19 @@ class CastManager private constructor(context: Context) {
             val totalCachedLength = androidx.media3.datasource.cache.ContentMetadata.getContentLength(
                 cacheManager.cache.getContentMetadata(cacheKey),
             )
+            val requestHeaders = LinkedHashMap<String, String>().apply {
+                put("Accept", "*/*")
+                putAll(extraHeaders)
+                if (!referer.isNullOrBlank() && keys.none { it.equals("Referer", ignoreCase = true) }) {
+                    put("Referer", referer)
+                }
+            }
             val httpFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
+                .setAllowCrossProtocolRedirects(true)
                 .setUserAgent(VideoRepository.USER_AGENT)
                 .setConnectTimeoutMs(15_000)
                 .setReadTimeoutMs(20_000)
-                .apply {
-                    if (!referer.isNullOrBlank()) {
-                        setDefaultRequestProperties(mapOf("Referer" to referer, "Accept" to "*/*"))
-                    }
-                }
+                .setDefaultRequestProperties(requestHeaders)
             val dataSource = cacheManager.playbackDataSourceFactory(httpFactory).createDataSource()
             val requestedLength = when {
                 endInclusive != null && endInclusive >= start -> endInclusive - start + 1
@@ -254,6 +272,8 @@ class CastManager private constructor(context: Context) {
                         _castState.value = current.copy(isPlaying = true)
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w(TAG, "Play error: ${e.message}")
             }
@@ -271,6 +291,8 @@ class CastManager private constructor(context: Context) {
                         _castState.value = current.copy(isPlaying = false)
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w(TAG, "Pause error: ${e.message}")
             }
@@ -288,6 +310,8 @@ class CastManager private constructor(context: Context) {
                         _castState.value = current.copy(positionMs = positionMs)
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.w(TAG, "Seek error: ${e.message}")
             }
@@ -307,6 +331,8 @@ class CastManager private constructor(context: Context) {
             scope.launch(Dispatchers.IO) {
                 try {
                     executeSoapAction(connected.device.avTransportUrl, "Stop", DlnaSoap.buildStopXml())
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     Log.d(TAG, "Stop response: ${e.message}")
                 }
@@ -341,6 +367,8 @@ class CastManager private constructor(context: Context) {
                             )
                         }
                     }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (_: Exception) {}
             }
         }
@@ -356,10 +384,10 @@ class CastManager private constructor(context: Context) {
             .post(requestBody)
             .build()
 
-        okHttpClient.newCall(request).execute().use { response ->
-            val body = response.body?.string().orEmpty()
+        soapHttpClient.newCall(request).execute().use { response ->
+            val body = LocalMediaProxy.readTextCapped(response.body?.byteStream(), 256 * 1024)
             if (!response.isSuccessful && !body.contains("errorCode")) {
-                throw java.io.IOException("SOAP $action failed with HTTP ${response.code}")
+                throw IOException("SOAP $action failed with HTTP ${response.code}")
             }
             return body
         }

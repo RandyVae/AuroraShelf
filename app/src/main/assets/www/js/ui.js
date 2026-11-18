@@ -11,6 +11,7 @@
       else if (k === 'html') n.innerHTML = attrs[k];
       else if (k === 'text') n.textContent = attrs[k];
       else if (k.startsWith('on')) n.addEventListener(k.slice(2), attrs[k]);
+      else if (k === 'disabled' || k === 'hidden') { if (attrs[k]) n[k] = true; }
       else if (attrs[k] !== null && attrs[k] !== undefined) n.setAttribute(k, attrs[k]);
     }
     (children || []).forEach((c) => c && n.appendChild(c));
@@ -61,8 +62,18 @@
     }
   }
 
+  function formatEquipStats(item) {
+    if (!item) return '空槽位';
+    const parts = [];
+    if (item.atk) parts.push(`ATK +${item.atk}`);
+    if (item.hp) parts.push(`HP +${item.hp}`);
+    if (item.crit) parts.push(`暴击 +${Math.round(item.crit * 100)}%`);
+    if (item.mitigation) parts.push(`减伤 +${Math.round(item.mitigation * 100)}%`);
+    return parts.length ? parts.join(' · ') : '战术装备';
+  }
+
   const UI = {
-    toast, el, $, $$, starsText, fiveStarsText, heroThumb, heroArt,
+    toast, el, $, $$, starsText, fiveStarsText, heroThumb, heroArt, formatEquipStats,
 
     setProgress(pct) {
       const bar = $('#boot-bar');
@@ -98,11 +109,11 @@
       const lead = (data.heroes && data.heroes.find((h) => h.key === leadKey)) || data.heroes[0];
       $('#hub-bg').style.backgroundImage = 'url(assets/bg/hub.webp)';
 
-      // Determine hero outfit: prioritize 18+ awaken (nude) or tactical armor (lega), NEVER casual clothes (base)
-      const adultOn = state.settings && state.settings.adult !== false;
-      const outfitPref = state.hubOutfit || (adultOn ? 'nude' : 'lega');
+      // Determine hero outfit: strictly gate 18+ awaken (nude) behind state.settings.adult
+      const adultOn = !!(state.settings && state.settings.adult === true);
+      const outfitPref = adultOn ? (state.hubOutfit || 'nude') : 'lega';
       const img = $('#hub-art');
-      img.src = heroArt(lead, outfitPref);
+      img.src = heroArt(lead, outfitPref) || heroArt(lead, 'lega') || heroArt(lead, 'base') || heroThumb(lead);
       img.hidden = !img.src;
       img.alt = lead.name + ' 立绘';
       img.classList.add('hero-breathing');
@@ -177,14 +188,18 @@
       img.style.setProperty('--hero-offset-y', (adapt.y || 0) + 'px');
       img.style.setProperty('--hero-offset-x', (adapt.x || 0) + 'px');
 
-      // Update outfit toggle button
+      // Update outfit toggle button (gated by state.settings.adult)
       const outfitBtn = $('#btn-hub-outfit');
       const outfitLabel = $('#hub-outfit-label');
       if (outfitBtn && outfitLabel) {
-        const isNude = outfitPref === 'nude';
+        const isNude = adultOn && outfitPref === 'nude';
         outfitLabel.textContent = isNude ? '18+觉醒' : '战术装';
         outfitBtn.className = 'hub-outfit-btn ' + (isNude ? 'outfit-nude' : 'outfit-tactical');
         outfitBtn.onclick = () => {
+          if (!state.settings || !state.settings.adult) {
+            toast('请先前往「设置」开启「18+ 内容」开关');
+            return;
+          }
           state.hubOutfit = isNude ? 'lega' : 'nude';
           if (window.LGSave) LGSave.persist(state);
           this.renderHub(state, data);
@@ -243,13 +258,52 @@
       if (heroNameEl) heroNameEl.textContent = lead.name || leadKey;
       if (heroCountEl) heroCountEl.textContent = (currentIdx + 1) + '/' + ownedList.length;
 
-      $('#hub-name').textContent = 'Ethan';
+      $('#hub-name').textContent = (state.profile && state.profile.name) || 'Ethan';
 
+      const vipBadge = $('.vip-badge');
+      if (vipBadge) {
+        const vipLvl = (state.isVip || (state.slotsSession && state.slotsSession.isVip) || state.slotsVaultClaimed ? 1 : 0) + (state.firstBattleRecharge ? 1 : 0);
+        vipBadge.textContent = 'VIP ' + vipLvl;
+        vipBadge.setAttribute('aria-label', 'VIP ' + vipLvl);
+      }
+
+      const totalHeroes = (data.heroes && data.heroes.length) || 55;
+      const chapters = data.chapters || [];
+      const totalChapters = chapters.length || 10;
+      const totalStages = chapters.reduce((s, c) => s + ((c.stages && c.stages.length) || 0), 0);
       const cleared = Object.keys(state.cleared || {}).length;
       $('#hub-meta').textContent = '指挥官 · 通关 ' + cleared + ' 关';
-      $('#nav-campaign-sub').textContent = data.chapters.length + ' 章 · ' + data.chapters.reduce((s, c) => s + c.stages.length, 0) + ' 关卡';
+      $('#nav-campaign-sub').textContent = totalChapters + ' 章 · ' + totalStages + ' 关卡';
       $('#nav-squad-sub').textContent = (state.squad || []).length + ' / 3';
-      $('#nav-roster-sub').textContent = '已收集 ' + (state.owned || []).length + ' / ' + data.heroes.length;
+      $('#nav-roster-sub').textContent = '已收集 ' + (state.owned || []).length + ' / ' + totalHeroes;
+      const gachaSub = $('#nav-gacha .sub');
+      if (gachaSub) gachaSub.textContent = totalHeroes + ' 名作战单位';
+
+      // Dynamic Hub chapter focus & Captain's Path progress bar
+      if (chapters.length) {
+        const activeCh = chapters.find((ch) => {
+          const last = ch.stages && ch.stages[ch.stages.length - 1];
+          return last && !(state.cleared && state.cleared[last.id]);
+        }) || chapters[chapters.length - 1];
+        if (activeCh) {
+          const parts = String(activeCh.title || '').split(/\s*·\s*/);
+          const kickerEl = $('.hub-focus-kicker');
+          const titleEl = $('.hub-focus-title');
+          const pathSubEl = $('.hub-path-title b');
+          const pathProgEl = $('.path-progress');
+          const pathFillEl = $('.hub-path-card i em');
+          if (kickerEl) kickerEl.textContent = '战线部署 · ' + (parts[0] || ('第 ' + activeCh.id + ' 章'));
+          if (titleEl) titleEl.textContent = parts[1] || activeCh.title;
+          if (pathSubEl) pathSubEl.textContent = activeCh.subtitle || '前哨突破';
+          if (pathProgEl) {
+            pathProgEl.textContent = String(activeCh.id).padStart(2, '0') + ' / ' + String(totalChapters).padStart(2, '0');
+          }
+          if (pathFillEl) {
+            const pct = totalStages > 0 ? Math.max(4, Math.min(100, Math.round((cleared / totalStages) * 100))) : 10;
+            pathFillEl.style.width = pct + '%';
+          }
+        }
+      }
 
       const lines = [
         ['欢迎回家，指挥官。', '今天该推进哪条战线？'],
@@ -274,7 +328,7 @@
       }
       this._currentLeadHero = lead;
 
-      // 激活大厅特勤超高清 18+ 原画立绘与物理有机呼吸律动（停用战斗 Spine 小人，呈现高画质 18+ 艺术）
+      // 激活大厅特勤超高清原画立绘与物理有机呼吸律动（严格遵循 state.settings.adult 门禁）
       if (APP.stages && APP.stages.hub) {
         try { APP.stages.hub.stop(); } catch (e) {}
       }
@@ -283,10 +337,10 @@
       const artImg = $('#hub-art');
       if (artImg) {
         artImg.hidden = false;
-        const outfitPref = state.hubOutfit || (state.settings && state.settings.adult ? 'nude' : 'lega');
-        const artSrc = heroArt(lead, outfitPref) || heroArt(lead, 'nude') || heroArt(lead, 'base') || heroThumb(lead);
+        const safeVariant = adultOn ? (state.hubOutfit || 'nude') : 'lega';
+        const artSrc = heroArt(lead, safeVariant) || heroArt(lead, 'lega') || heroArt(lead, 'base') || heroThumb(lead);
         artImg.src = artSrc;
-        artImg.alt = (lead.name || '') + ' 18+ 原画立绘';
+        artImg.alt = (lead.name || '') + ' 原画立绘';
         artImg.className = 'hub-art hero-breathing';
       }
       this.showHubSpeech('「指挥官，' + (lead.name || '') + ' 专属随侍在侧，请下达作战指令～」');
@@ -470,8 +524,10 @@
         sweepGroup.style.display = 'none';
       }
 
-      $('#btn-stage-action-close').onclick = () => $('#stage-action-sheet').classList.remove('open');
-      $('#stage-action-sheet').classList.add('open');
+      const stageSheet = $('#stage-action-sheet');
+      $('#btn-stage-action-close').onclick = () => stageSheet.classList.remove('open');
+      stageSheet.hidden = false;
+      stageSheet.classList.add('open');
     },
 
     renderSquad(state, data) {
@@ -647,7 +703,7 @@
         }, [
           el('span', { class: 'eq-tag', text: s.label }),
           el('span', { class: 'eq-name', text: item ? item.name : '+ 穿戴装备' }),
-          el('span', { class: 'eq-stat', text: item ? (item.atk ? `ATK +${item.atk}` : item.hp ? `HP +${item.hp}` : `暴击 +${Math.round((item.crit||0)*100)}%`) : '空槽位' }),
+          el('span', { class: 'eq-stat', text: formatEquipStats(item) }),
         ]);
         equipBox.appendChild(slotEl);
       });
@@ -788,7 +844,9 @@
         }
       };
 
-      $('#detail-sheet').classList.add('open');
+      const detailSheet = $('#detail-sheet');
+      detailSheet.hidden = false;
+      detailSheet.classList.add('open');
     },
 
     openEquipPicker(hero, slot) {
@@ -796,6 +854,8 @@
       const catalog = APP.data.equipment || [];
       const inst = Progression.getHeroInstance(state, hero.key);
       const curEquip = inst.equips && inst.equips[slot];
+      const ownedList = (state.inventory && Array.isArray(state.inventory[slot + 's'])) ? state.inventory[slot + 's'] : [];
+      const ownedSet = new Set(ownedList);
 
       $('#equip-picker-title').textContent = `为 ${hero.name} 选择${slot === 'weapon' ? '武器' : slot === 'armor' ? '防具' : '核心'}`;
       const list = $('#equip-picker-list');
@@ -823,25 +883,41 @@
         list.appendChild(unequipBtn);
       }
 
-      // Available items in inventory
+      // Filter by state.inventory[slot + 's']: only owned items can be equipped; unowned shown locked/disabled
       const slotItems = catalog.filter((item) => item.slot === slot);
-      slotItems.forEach((item) => {
+      const ownedItems = slotItems.filter((item) => ownedSet.has(item.id));
+      const lockedItems = slotItems.filter((item) => !ownedSet.has(item.id));
+
+      if (!ownedItems.length) {
+        list.appendChild(el('div', {
+          class: 'equip-empty-note',
+          style: 'padding:10px 12px;margin-bottom:8px;border-radius:var(--radius-s);background:var(--surface);color:var(--text-tertiary);font-size:var(--type-caption);'
+        }, [
+          el('span', { text: '当前槽位暂无已获得的装备，请前往军需商店开启装备箱。' })
+        ]));
+      }
+
+      ownedItems.forEach((item) => {
         const isCurrent = curEquip === item.id;
         const wearer = Object.keys(state.roster || {}).find((k) => state.roster[k].equips && state.roster[k].equips[slot] === item.id);
         const wearerHero = wearer ? APP.data.heroes.find((x) => x.key === wearer) : null;
 
-        const row = el('div', { class: 'equip-item-row' }, [
+        const row = el('div', { class: 'equip-item-row owned' }, [
           el('div', { class: 'ei-main' }, [
             el('b', { text: `${item.name} (${item.rarity})`, style: 'color:var(--text-primary)' }),
             el('p', { text: item.desc }),
-            el('p', { text: item.atk ? `攻击力 +${item.atk}` : item.hp ? `生命值 +${item.hp}` : `暴击率 +${Math.round((item.crit||0)*100)}%`, style: 'color:var(--accent)' }),
+            el('p', { text: formatEquipStats(item), style: 'color:var(--accent)' }),
           ]),
           el('button', {
             class: 'btn sm' + (isCurrent ? ' ghost' : ' primary'),
             text: isCurrent ? '当前穿戴' : wearerHero ? `由 ${wearerHero.name} 替换` : '穿戴',
             disabled: isCurrent,
             onclick: () => {
-              Progression.equipItem(state, hero.key, slot, item.id);
+              const res = Progression.equipItem(state, hero.key, slot, item.id);
+              if (!res || !res.ok) {
+                toast((res && res.msg) || '未获得（军需商店开启装备箱）');
+                return;
+              }
               LGSave.persist(state);
               $('#equip-picker-sheet').classList.remove('open');
               this.openDetail(hero);
@@ -852,8 +928,29 @@
         list.appendChild(row);
       });
 
-      $('#btn-equip-picker-close').onclick = () => $('#equip-picker-sheet').classList.remove('open');
-      $('#equip-picker-sheet').classList.add('open');
+      lockedItems.forEach((item) => {
+        const row = el('div', { class: 'equip-item-row locked', style: 'opacity:0.55' }, [
+          el('div', { class: 'ei-main' }, [
+            el('b', { text: `${item.name} (${item.rarity})`, style: 'color:var(--text-secondary)' }),
+            el('p', { text: formatEquipStats(item), style: 'color:var(--text-tertiary)' }),
+            el('p', { text: '未获得（军需商店开启装备箱）', style: 'color:var(--text-tertiary)' }),
+          ]),
+          el('button', {
+            class: 'btn sm ghost',
+            text: '未获得',
+            disabled: true,
+          }),
+        ]);
+        list.appendChild(row);
+      });
+
+      const pickerSheet = $('#equip-picker-sheet');
+      const closeBtn = $('#btn-equip-picker-close');
+      if (closeBtn && pickerSheet) closeBtn.onclick = () => pickerSheet.classList.remove('open');
+      if (pickerSheet) {
+        pickerSheet.hidden = false;
+        pickerSheet.classList.add('open');
+      }
     },
 
     renderMissions(state, data, activeTab) {
@@ -905,8 +1002,10 @@
         list.appendChild(row);
       });
 
-      $('#btn-mission-close').onclick = () => $('#mission-sheet').classList.remove('open');
-      $('#mission-sheet').classList.add('open');
+      const missionSheet = $('#mission-sheet');
+      $('#btn-mission-close').onclick = () => missionSheet.classList.remove('open');
+      missionSheet.hidden = false;
+      missionSheet.classList.add('open');
     },
 
     closeDetail() {
@@ -971,7 +1070,7 @@
       (videos || []).forEach((src, i) => {
         const title = src.includes('event049') ? '諸神降臨 · 盛典特寫' :
                       src.includes('general') ? '神殿巡禮 · 史詩序幕' :
-                      src.includes('comics_maze') ? ('番外迷宮 · 記憶切片 ' + (i - 3)) :
+                      src.includes('comics_maze') ? '番外迷宮 · 記憶切片' :
                       ('戰役 CG · 第 ' + (i + 1) + ' 章');
         const wrap = el('div', { style: 'margin-top:10px;margin-bottom:14px' }, [
           el('div', { style: 'font-size:var(--type-caption);color:var(--text-secondary);font-weight:600;margin-bottom:4px', text: title }),
@@ -980,7 +1079,9 @@
         box.appendChild(wrap);
       });
 
-      $('#cg-sheet').classList.add('open');
+      const cgSheet = $('#cg-sheet');
+      cgSheet.hidden = false;
+      cgSheet.classList.add('open');
     },
 
     showLightbox(cg) {
@@ -1014,6 +1115,10 @@
       const banner = data.heroes.find((h) => h.rarity === 'legendary');
       $('#gacha-banner-img').src = heroArt(banner, 'lega');
       $('#gacha-pity').textContent = state.pity + ' / ' + data.gacha.pity;
+      const note = $('#gacha-note');
+      if (note && data.heroes) {
+        note.textContent = '重复获得的单位会转化为突破碎片。招募池包含全部 ' + data.heroes.length + ' 名可用单位。';
+      }
       this.renderHud(state);
     },
 
@@ -1030,7 +1135,9 @@
         ]);
         grid.appendChild(card);
       });
-      $('#gacha-reveal').classList.add('open');
+      const reveal = $('#gacha-reveal');
+      reveal.hidden = false;
+      reveal.classList.add('open');
       const stage = APP.stages && APP.stages.gacha;
       const first = results[0] && results[0].hero;
       if (stage && first && first.unit) stage.show(first.unit);

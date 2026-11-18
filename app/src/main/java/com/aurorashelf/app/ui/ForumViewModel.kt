@@ -34,6 +34,8 @@ data class ForumUiState(
     val loadMoreError: String? = null,
     val selectedPost: ForumPost? = null,
     val selectedSourceId: String? = null,
+    val isSearchOpen: Boolean = false,
+    val searchQuery: String = "",
 )
 
 class ForumViewModel(application: Application) : AndroidViewModel(application) {
@@ -164,6 +166,10 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
     fun open(post: ForumPost) = mutableUiState.update { it.copy(selectedPost = post) }
     fun closePost() = mutableUiState.update { it.copy(selectedPost = null) }
     fun selectSource(sourceId: String?) = mutableUiState.update { it.copy(selectedSourceId = sourceId) }
+    fun setSearchOpen(open: Boolean) = mutableUiState.update {
+        it.copy(isSearchOpen = open, searchQuery = if (open) it.searchQuery else "")
+    }
+    fun updateSearchQuery(query: String) = mutableUiState.update { it.copy(searchQuery = query) }
 
     /**
      * Prefetch exactly one next page in the background (2 min in-memory TTL). The slot is

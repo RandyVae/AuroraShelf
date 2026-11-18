@@ -1,151 +1,108 @@
+import Combine
 import Foundation
 import SwiftUI
-import Combine
 
-/// 全平台启动全量预热中枢（涵盖视频全货架、论坛热帖图集、漫画推荐与热门首话）
+/// 全平台启动静默预热中枢（遵循按需懒加载准则，等待首页稳定后再预热首屏封面与流，绝不在未打开标签页制造冷启动网络风暴）
 @MainActor
 public final class GlobalStartupPrefetchEngine: ObservableObject {
     public static let shared = GlobalStartupPrefetchEngine()
-    
+
     @Published public private(set) var isWarmingUp: Bool = false
     @Published public private(set) var warmedVideoCount: Int = 0
     @Published public private(set) var warmedForumCount: Int = 0
     @Published public private(set) var warmedComicCount: Int = 0
-    
+
     private var warmupTask: Task<Void, Never>?
     private var hasStarted = false
-    
+
     private init() {}
-    
-    /// 从用户启动软件的一刻起触发全量后台静默预热（低调度优先级，严禁争抢首屏渲染线程）
+
+    /// 启动期轻量级非阻塞预热：同步远端自愈配置、刷新登录态、等待首页首个视频源就绪后预热首屏封面与排头流
     public func startGlobalWarmup() {
         guard !hasStarted else { return }
         hasStarted = true
         isWarmingUp = true
 
-        // 启动零单点故障远端自愈配置异步同步（3秒短超时，不阻塞首屏），并预热核心源 TCP/TLS 连接池
+        // 1. 远端自愈配置清单异步同步（3 秒短超时）与核心首页源 TCP/TLS 预连接
         RemoteSourceManifest.shared.syncInBackground()
         let warmURLs = [
             "https://huavod.com/",
-            "https://huangguoai.com/",
-            "https://91dongman.net/",
-            "https://h1014.sol148.com/",
-            "https://api.mangacopy.com/",
-            "https://cn.webmota.com/"
+            "https://huangguoai.com/"
         ].compactMap(URL.init(string:))
         AuroraNetworkEngine.shared.prewarmOrigins(warmURLs)
 
-        warmupTask = Task.detached(priority: .utility) { [weak self] in
-            // 1. 视频模块全货架预热
-            await self?.warmupVideoModule()
-            
-            // 2. 论坛热帖与图集预热
-            await self?.warmupForumModule()
-            
-            // 3. 漫画推荐与热门前话预热
-            await self?.warmupComicModule()
-            
-            await MainActor.run {
-                self?.isWarmingUp = false
+        // 2. 若本地已持有登录令牌，启动时静默刷新会话
+        if AccountService.shared.hasToken {
+            Task(priority: .utility) {
+                await AccountService.shared.refresh()
+            }
+        }
+
+        // 3. 等待首页 VideoRepository 首屏数据稳定后再预热首屏封面与前 2 部播放流（不主动请求未打开的论坛/漫画 Tab）
+        warmupTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            await self.warmupVideoModuleAfterInitialFeed()
+            self.warmupCachedSnapshotsOnly()
+            self.isWarmingUp = false
+        }
+    }
+
+    private func warmupVideoModuleAfterInitialFeed() async {
+        let repo = VideoRepository.shared
+        var attempts = 0
+        while repo.isLoading && repo.feedVideos.isEmpty && attempts < 40 && !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(250))
+            attempts += 1
+        }
+        guard !Task.isCancelled else { return }
+
+        let feed = repo.feedVideos
+        for video in feed.prefix(8) where !video.coverUrl.isEmpty {
+            CoverImageLoader.shared.preload(
+                url: video.coverUrl,
+                baseURL: video.coverBaseURL
+            )
+        }
+
+        let maxStreamPrewarm = repo.currentSource.id == VideoSourceCatalog.huavod.id ? 1 : 2
+        for video in feed.prefix(maxStreamPrewarm) {
+            VideoPreloadManager.shared.prewarm(video: video)
+        }
+
+        self.warmedVideoCount = feed.count
+    }
+
+    /// 仅针对本地已落盘的 SWR 缓存快照预热少量封面（零额外列表网络请求）
+    private func warmupCachedSnapshotsOnly() {
+        let forumPosts = ForumRepository.shared.posts
+        for post in forumPosts.prefix(4) {
+            if let cover = post.previewImageUrl, !cover.isEmpty {
+                CoverImageLoader.shared.preload(url: cover, baseURL: nil)
+            }
+        }
+        self.warmedForumCount = forumPosts.count
+
+        let comics = ComicRepository.shared.comics
+        for comic in comics.prefix(4) where !comic.coverUrl.isEmpty {
+            CoverImageLoader.shared.preload(url: comic.coverUrl, baseURL: nil)
+        }
+        self.warmedComicCount = comics.count
+    }
+
+    /// 按需预热指定漫画章节的前几页（使用 ComicPageImageLoader，严禁误用 CoverImageLoader 导致混淆/鉴权失效）
+    public func prewarmComicPages(_ pages: [ComicPage], limit: Int = 3) {
+        let targets = Array(pages.prefix(max(0, limit)))
+        guard !targets.isEmpty else { return }
+        Task.detached(priority: .utility) {
+            for page in targets {
+                guard !Task.isCancelled else { break }
+                _ = try? await ComicPageImageLoader.shared.load(page)
             }
         }
     }
-    
-    // MARK: - 1. 视频模块预热
-    
-    private func warmupVideoModule() async {
-        do {
-            let repo = await VideoRepository.shared
-            // VideoRepository already owns the initial feed request. Reuse its result instead of
-            // issuing a second network request during cold start.
-            let feed = await repo.feedVideos
-            
-            // 预热前 8 部视频的海报高清图入磁盘与内存缓存
-            for video in feed.prefix(8) {
-                if !video.coverUrl.isEmpty {
-                    CoverImageLoader.shared.preload(
-                        url: video.coverUrl,
-                        baseURL: video.coverBaseURL
-                    )
-                }
-            }
-            
-            // 对排头前 3 部推荐视频进行播放流静默预解析，实现真正即点即开
-            for video in feed.prefix(3) {
-                await VideoPreloadManager.shared.prewarm(video: video)
-            }
-            
-            await MainActor.run {
-                self.warmedVideoCount = feed.count
-            }
-        } catch {
-            // 静默处理预热异常
-        }
-    }
-    
-    // MARK: - 2. 论坛热帖预热
-    
-    private func warmupForumModule() async {
-        do {
-            let forumRepo = await ForumRepository.shared
-            let posts = await forumRepo.posts
-            
-            // 预热前 10 篇热帖的封面图片
-            for post in posts.prefix(10) {
-                if let cover = post.previewImageUrl, !cover.isEmpty {
-                    CoverImageLoader.shared.preload(url: cover, baseURL: nil)
-                }
-            }
-            
-            await MainActor.run {
-                self.warmedForumCount = posts.count
-            }
-        } catch {
-            // 静默处理预热异常
-        }
-    }
-    
-    // MARK: - 3. 漫画模块预热
-    
-    private func warmupComicModule() async {
-        do {
-            let comicRepo = await ComicRepository.shared
-            let source = await comicRepo.currentSource
-            let comics = try await comicRepo.fetchComics(for: source, category: "全部", page: 1)
-            
-            // 预热前 6 部热门漫画的封面
-            for comic in comics.prefix(6) {
-                if !comic.coverUrl.isEmpty {
-                    CoverImageLoader.shared.preload(url: comic.coverUrl, baseURL: nil)
-                }
-            }
-            
-            // 对第一部热门漫画拉取章节列表并静默预热第一话的前 3 页图片
-            if let firstComic = comics.first {
-                let detail = try await comicRepo.fetchComicDetails(firstComic)
-                if let firstChapter = detail.chapters.first {
-                    let pages = try await comicRepo.fetchChapterPages(
-                        comicId: firstComic.id,
-                        sourceId: firstComic.sourceId,
-                        chapterId: firstChapter.id
-                    )
-                    for page in pages.prefix(3) {
-                        CoverImageLoader.shared.preload(url: page.imageUrl, baseURL: nil)
-                    }
-                }
-            }
-            
-            await MainActor.run {
-                self.warmedComicCount = comics.count
-            }
-        } catch {
-            // 静默处理预热异常
-        }
-    }
-    
-    // MARK: - 4. 剧集滑动窗口持续向后缓存中枢
-    
-    /// 当播放第 N 集时，预热向后 N+1、N+2 集的播放流与缓存
+
+    // MARK: - 剧集滑动窗口持续向后缓存中枢
+
     public func handleEpisodePlaying(
         video: VideoItem,
         currentEpisode: PlaybackEpisode,
@@ -158,8 +115,7 @@ public final class GlobalStartupPrefetchEngine: ObservableObject {
             windowSize: 2
         )
     }
-    
-    /// 当第 N 集完成离线缓存后，自动向后持续缓存第 N+1 集
+
     public func handleEpisodeDownloadCompleted(
         video: VideoItem,
         completedEpisode: PlaybackEpisode,

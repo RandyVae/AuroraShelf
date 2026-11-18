@@ -2,98 +2,55 @@ package com.aurorashelf.app.ui
 
 import android.view.ViewGroup
 import android.webkit.WebView
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-
-internal class CachedLiveSession(
-    val webView: WebView,
-    val ready: Boolean,
-)
 
 /**
- * Keeps the WebView of the last opened live room alive (paused and muted) when the user returns
- * to the grid, so re-entering the same room is instant instead of reloading the whole site.
+ * Stateless lifecycle cleaner for embedded live WebViews.
  *
- * This deliberately only reuses rooms the user has already opened; the app never pre-loads a room
- * or touches the site's age/consent flow on the user's behalf.
+ * Deliberately avoids holding any static [WebView] or [android.content.Context] references across
+ * compositions so Activity memory and background WebView audio can never leak (`StaticFieldLeak` / `PLY-06`).
  */
 internal object LiveSessionCache {
-    /** Observable so the grid can host the retained view in a 1 dp window. */
-    var retained by mutableStateOf<WebView?>(null)
-        private set
+    private const val PAUSE_AND_MUTE =
+        "try{window.__auroraPlaybackPaused=true;document.querySelectorAll('video,audio').forEach(function(m){m.muted=true;m.pause();});}catch(e){}"
 
-    private var retainedUrl: String? = null
-    private var retainedReady = false
-    private var preparedUrl: String? = null
-    private var preparedSession: CachedLiveSession? = null
+    private const val DESTROY_MEDIA =
+        "try{window.__auroraPlaybackPaused=true;document.querySelectorAll('video,audio').forEach(function(m){m.muted=true;m.pause();m.removeAttribute('src');m.load();});}catch(e){}"
 
-    fun retain(webView: WebView, url: String, ready: Boolean) {
-        release()
-        (webView.parent as? ViewGroup)?.removeView(webView)
+    fun pauseAndMute(webView: WebView?) {
+        val view = webView ?: return
         runCatching {
-            webView.evaluateJavascript(PAUSE_AND_MUTE, null)
-            webView.onPause()
+            view.evaluateJavascript(PAUSE_AND_MUTE, null)
+            view.onPause()
         }
-        retained = webView
-        retainedUrl = url
-        retainedReady = ready
     }
 
-    /** Moves any matching retained WebView out of snapshot state before entering player composition. */
-    fun prepareFor(expectedUrl: String) {
-        val view = retained
-        if (view != null && retainedUrl == expectedUrl) {
-            retained = null
-            retainedUrl = null
-            val ready = retainedReady
-            retainedReady = false
+    fun resumeView(webView: WebView?, shouldPlay: Boolean, shouldMute: Boolean) {
+        val view = webView ?: return
+        runCatching {
+            view.onResume()
+            val script = if (shouldPlay) {
+                "try{window.__auroraPlaybackPaused=false;document.querySelectorAll('video,audio').forEach(function(m){m.muted=$shouldMute;m.play().catch(function(){});});}catch(e){}"
+            } else {
+                "try{document.querySelectorAll('video,audio').forEach(function(m){m.muted=$shouldMute;});}catch(e){}"
+            }
+            view.evaluateJavascript(script, null)
+        }
+    }
+
+    fun destroyView(webView: WebView?) {
+        val view = webView ?: return
+        runCatching {
+            view.evaluateJavascript(DESTROY_MEDIA, null)
+            view.onPause()
+            view.stopLoading()
+            view.loadUrl("about:blank")
             (view.parent as? ViewGroup)?.removeView(view)
-            runCatching { view.onResume() }
-            preparedUrl = expectedUrl
-            preparedSession = CachedLiveSession(view, ready)
-        } else {
-            release()
-        }
-    }
-
-    /** Pure non-snapshot read during composition; falls back only if already prepared. */
-    fun consumePrepared(expectedUrl: String): CachedLiveSession? {
-        val session = preparedSession ?: return null
-        if (preparedUrl != expectedUrl) return null
-        preparedSession = null
-        preparedUrl = null
-        return session
-    }
-
-    fun releaseIfNot(url: String) {
-        if (retainedUrl != url) {
-            retained?.let { view ->
-                runCatching { view.evaluateJavascript(PAUSE_AND_MUTE, null) }
-                (view.parent as? ViewGroup)?.removeView(view)
-                view.stopLoading()
-                view.destroy()
-            }
-            retained = null
-            retainedUrl = null
-            retainedReady = false
-        }
-        if (preparedUrl != url) {
-            preparedSession?.webView?.let { view ->
-                runCatching { view.evaluateJavascript(PAUSE_AND_MUTE, null) }
-                (view.parent as? ViewGroup)?.removeView(view)
-                view.stopLoading()
-                view.destroy()
-            }
-            preparedSession = null
-            preparedUrl = null
+            view.removeAllViews()
+            view.destroy()
         }
     }
 
     fun release() {
-        releaseIfNot("")
+        // No-op: static WebView retention has been eliminated to prevent Context and audio leaks.
     }
-
-    private const val PAUSE_AND_MUTE =
-        "document.querySelectorAll('video').forEach(v => { v.muted = true; v.pause(); });"
 }

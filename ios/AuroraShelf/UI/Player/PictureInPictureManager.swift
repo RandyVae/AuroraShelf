@@ -10,11 +10,17 @@ public final class PictureInPictureManager: NSObject {
     @ObservationIgnored private var possibleObserver: NSKeyValueObservation?
     @ObservationIgnored private var activeObserver: NSKeyValueObservation?
     @ObservationIgnored private var retainedPlayer: AVPlayer?
+    @ObservationIgnored private var retainedDuration: Double = 0
 
     public private(set) var isPossible: Bool = false
     public private(set) var isActive: Bool = false
-    public private(set) var activePiPVideo: VideoItem? = nil
+    public private(set) var isStartingPiP: Bool = false
+    public private(set) var activePiPVideo: VideoItem?
     @ObservationIgnored public var onRestoreUserInterface: ((@escaping (Bool) -> Void) -> Void)?
+
+    public var isPiPActiveOrStarting: Bool {
+        isActive || isStartingPiP
+    }
 
     public func attach(playerLayer: AVPlayerLayer) {
         guard AVPictureInPictureController.isPictureInPictureSupported() else { return }
@@ -30,6 +36,7 @@ public final class PictureInPictureManager: NSObject {
                 controller = next
                 isPossible = next.isPictureInPicturePossible
                 isActive = next.isPictureInPictureActive
+                isStartingPiP = false
                 possibleObserver = next.observe(\.isPictureInPicturePossible, options: [.new, .initial]) { [weak self] pip, _ in
                     let possible = pip.isPictureInPicturePossible
                     Task { @MainActor [weak self] in
@@ -40,6 +47,9 @@ public final class PictureInPictureManager: NSObject {
                     let active = pip.isPictureInPictureActive
                     Task { @MainActor [weak self] in
                         self?.isActive = active
+                        if active {
+                            self?.isStartingPiP = false
+                        }
                     }
                 }
             }
@@ -49,15 +59,18 @@ public final class PictureInPictureManager: NSObject {
     public func toggle() {
         guard let controller else { return }
         if controller.isPictureInPictureActive {
+            isStartingPiP = false
             controller.stopPictureInPicture()
         } else if controller.isPictureInPicturePossible {
+            isStartingPiP = true
             controller.startPictureInPicture()
         }
     }
 
-    public func retainPlayerForPiP(player: AVPlayer, video: VideoItem) {
+    public func retainPlayerForPiP(player: AVPlayer, video: VideoItem, duration: Double = 0) {
         retainedPlayer = player
         activePiPVideo = video
+        retainedDuration = duration
     }
 
     public func consumeRetainedPlayer(for video: VideoItem) -> AVPlayer? {
@@ -65,18 +78,22 @@ public final class PictureInPictureManager: NSObject {
         if activePiPVideo?.playbackUrl == video.playbackUrl {
             self.retainedPlayer = nil
             self.activePiPVideo = nil
+            self.retainedDuration = 0
             return retainedPlayer
         }
-        // Opening a different video replaces any lingering PiP playback.
+        flushRetainedPlayerProgressIfNeeded()
         controller?.stopPictureInPicture()
         retainedPlayer.pause()
         retainedPlayer.replaceCurrentItem(with: nil)
         self.retainedPlayer = nil
         self.activePiPVideo = nil
+        self.retainedDuration = 0
+        self.isStartingPiP = false
         return nil
     }
 
     public func stopAndReleasePiPIfNeeded() {
+        flushRetainedPlayerProgressIfNeeded()
         if controller?.isPictureInPictureActive == true {
             controller?.stopPictureInPicture()
         }
@@ -84,11 +101,13 @@ public final class PictureInPictureManager: NSObject {
         retainedPlayer?.replaceCurrentItem(with: nil)
         retainedPlayer = nil
         activePiPVideo = nil
+        retainedDuration = 0
         isActive = false
+        isStartingPiP = false
     }
 
     public func detach() {
-        guard controller?.isPictureInPictureActive != true else { return }
+        guard controller?.isPictureInPictureActive != true && !isStartingPiP else { return }
         possibleObserver?.invalidate()
         possibleObserver = nil
         activeObserver?.invalidate()
@@ -96,23 +115,50 @@ public final class PictureInPictureManager: NSObject {
         controller = nil
         isPossible = false
         isActive = false
+        isStartingPiP = false
+    }
+
+    private func flushRetainedPlayerProgressIfNeeded() {
+        guard let player = retainedPlayer, let video = activePiPVideo else { return }
+        let posSec = CMTimeGetSeconds(player.currentTime())
+        let itemDur = player.currentItem.map { CMTimeGetSeconds($0.duration) } ?? 0
+        let durSec = (itemDur.isFinite && itemDur > 0) ? itemDur : retainedDuration
+        if posSec.isFinite && posSec > 2.0 && durSec.isFinite && durSec > 5.0 {
+            if posSec >= durSec - 1.0 {
+                PlaybackProgressStore.shared.markCompleted(for: video)
+            } else {
+                PlaybackProgressStore.shared.updateProgress(
+                    video: video,
+                    positionMs: Int64(posSec * 1000),
+                    durationMs: Int64(durSec * 1000)
+                )
+                PlaybackProgressStore.shared.flushPendingPersist()
+            }
+        }
     }
 }
 
 // MARK: - AVPictureInPictureControllerDelegate
 extension PictureInPictureManager: @preconcurrency AVPictureInPictureControllerDelegate {
+    public func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        isStartingPiP = true
+    }
+
     public func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        isStartingPiP = false
         isActive = true
     }
 
     public func pictureInPictureControllerDidStopPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        isStartingPiP = false
         isActive = false
-        // Release retained background player if PiP was closed rather than restored into UI.
         if let player = retainedPlayer {
+            flushRetainedPlayerProgressIfNeeded()
             player.pause()
             player.replaceCurrentItem(with: nil)
             retainedPlayer = nil
             activePiPVideo = nil
+            retainedDuration = 0
             Task.detached(priority: .utility) {
                 try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
             }
@@ -120,9 +166,11 @@ extension PictureInPictureManager: @preconcurrency AVPictureInPictureControllerD
     }
 
     public func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: any Error) {
+        isStartingPiP = false
         isActive = false
         retainedPlayer = nil
         activePiPVideo = nil
+        retainedDuration = 0
     }
 
     public func pictureInPictureController(

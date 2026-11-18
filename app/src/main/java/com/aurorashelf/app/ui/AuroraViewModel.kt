@@ -52,9 +52,11 @@ data class AuroraUiState(
 )
 
 class AuroraViewModel(application: Application) : AndroidViewModel(application) {
-    private val preferences = AppPreferences(application)
+    private val preferences = AppPreferences.get(application)
     private val repository = VideoRepository()
     private var feedJob: Job? = null
+    private var searchJob: Job? = null
+    private var searchGeneration: Long = 0L
     private var nextPage = 1
     private val initialSourceUrl = preferences.sourceUrl
     private val initialCategory = ContentSourceCatalog.sourceCategories(initialSourceUrl).let { available ->
@@ -66,7 +68,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         SourceSnapshotStore.getVideoFeed(initialSourceUrl, initialCategory.cacheKey)?.items
             ?: preferences.cachedFeed()?.takeIf {
                 it.sourceUrl == initialSourceUrl &&
-                    it.categoryPath == initialCategory.path &&
+                    (it.categoryPath == initialCategory.cacheKey || it.categoryPath == initialCategory.path) &&
                     isFreshFeed(it.savedAtMillis)
             }?.videos.orEmpty()
     private val _uiState = MutableStateFlow(
@@ -79,8 +81,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
             historyIds = preferences.historyIds(),
             // Kept synchronous: favorites/history screens must be complete on the first frame,
             // otherwise a freshly started app can briefly show an empty library.
-            allKnownVideos = (initialSnapshotVideos + preferences.savedVideos())
-                .distinctBy(VideoItem::id),
+            allKnownVideos = capKnownVideos(initialSnapshotVideos, preferences.savedVideos()),
         ),
     )
     val uiState: StateFlow<AuroraUiState> = _uiState.asStateFlow()
@@ -195,7 +196,11 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
             snapshot.items
         } else {
             val legacy = preferences.cachedFeed()
-            if (legacy != null && legacy.sourceUrl == sourceUrl && legacy.categoryPath == category.cacheKey && isFreshFeed(legacy.savedAtMillis)) {
+            if (legacy != null &&
+                legacy.sourceUrl == sourceUrl &&
+                (legacy.categoryPath == category.cacheKey || legacy.categoryPath == category.path) &&
+                isFreshFeed(legacy.savedAtMillis)
+            ) {
                 legacy.videos
             } else {
                 emptyList()
@@ -207,7 +212,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update {
             it.copy(
                 videos = distinct,
-                allKnownVideos = (distinct + it.allKnownVideos).distinctBy(VideoItem::id),
+                allKnownVideos = capKnownVideos(distinct, it.allKnownVideos, preferences.savedVideos()),
                 canLoadMore = true,
                 message = null,
             )
@@ -227,34 +232,66 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun updateQuery(query: String) {
-        _uiState.update { it.copy(query = query, searchMessage = null) }
+        if (query.isBlank()) {
+            searchJob?.cancel()
+            searchJob = null
+            searchGeneration++
+            _uiState.update {
+                it.copy(
+                    query = query,
+                    searchResults = emptyList(),
+                    isRemoteSearch = false,
+                    isSearching = false,
+                    searchMessage = null,
+                )
+            }
+        } else {
+            _uiState.update { it.copy(query = query, searchMessage = null) }
+        }
     }
 
     fun setSearchOpen(isOpen: Boolean) {
+        if (!isOpen) {
+            searchJob?.cancel()
+            searchJob = null
+            searchGeneration++
+        }
         _uiState.update {
             it.copy(
                 isSearchOpen = isOpen,
                 query = if (isOpen) it.query else "",
                 searchResults = if (isOpen) it.searchResults else emptyList(),
+                isRemoteSearch = if (isOpen) it.isRemoteSearch else false,
+                isSearching = if (isOpen) it.isSearching else false,
                 searchMessage = null,
             )
         }
     }
 
     fun search() {
-        val snapshot = _uiState.value
-        if (snapshot.query.isBlank() || snapshot.isSearching) return
-        viewModelScope.launch {
-            _uiState.update { it.copy(isSearching = true, searchMessage = null) }
-            runCatching { repository.searchAll(snapshot.query) }
+        val targetQuery = _uiState.value.query.trim()
+        if (targetQuery.isBlank()) return
+        searchJob?.cancel()
+        val gen = ++searchGeneration
+        searchJob = viewModelScope.launch {
+            _uiState.update {
+                it.copy(
+                    isSearching = true,
+                    searchResults = emptyList(),
+                    isRemoteSearch = false,
+                    searchMessage = null,
+                )
+            }
+            runCatching { repository.searchAll(targetQuery) }
                 .onSuccess { results ->
+                    if (searchGeneration != gen || _uiState.value.query.trim() != targetQuery) return@onSuccess
                     // Site search can return the same item twice; LazyColumn keys must stay unique.
                     val distinctResults = results.distinctBy(VideoItem::id)
                     _uiState.update {
                         it.copy(
                             searchResults = distinctResults,
                             isRemoteSearch = true,
-                            allKnownVideos = (distinctResults + it.allKnownVideos).distinctBy(VideoItem::id),
+                            allKnownVideos = capKnownVideos(distinctResults, it.allKnownVideos, preferences.savedVideos()),
                             isSearching = false,
                             searchMessage = if (distinctResults.isEmpty()) "全网视频源未找到相关视频" else null,
                         )
@@ -262,8 +299,11 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
+                    if (searchGeneration != gen) return@onFailure
                     _uiState.update {
                         it.copy(
+                            searchResults = emptyList(),
+                            isRemoteSearch = false,
                             isSearching = false,
                             searchMessage = "搜索失败：${VideoRepository.friendlyLoadErrorMessage(error, "网络异常")}",
                         )
@@ -312,7 +352,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                 category = nextCategory,
                 destination = AppDestination.HOME,
                 videos = preloadedVideos,
-                allKnownVideos = (preloadedVideos + it.allKnownVideos).distinctBy(VideoItem::id),
+                allKnownVideos = capKnownVideos(preloadedVideos, it.allKnownVideos, preferences.savedVideos()),
                 searchResults = emptyList(),
                 isRemoteSearch = false,
                 canLoadMore = true,
@@ -354,7 +394,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                     _uiState.update {
                         it.copy(
                             videos = videos,
-                            allKnownVideos = (videos + it.allKnownVideos).distinctBy(VideoItem::id),
+                            allKnownVideos = capKnownVideos(videos, it.allKnownVideos, preferences.savedVideos()),
                             isLoading = false,
                             canLoadMore = videos.isNotEmpty(),
                             message = null,
@@ -397,7 +437,7 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                     if (newVideos.isNotEmpty()) nextPage = requestedPage + 1
                     current.copy(
                         videos = current.videos + newVideos,
-                        allKnownVideos = (newVideos + current.allKnownVideos).distinctBy(VideoItem::id),
+                        allKnownVideos = capKnownVideos(newVideos, current.allKnownVideos, preferences.savedVideos()),
                         isLoadingMore = false,
                         canLoadMore = newVideos.isNotEmpty(),
                         loadMoreError = null,
@@ -431,9 +471,26 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
 
         /** One detail prefetch per page per cache window keeps repeated refreshes cheap. */
         private const val DETAIL_PREFETCH_DEDUPE_MS = 60_000L
+        private const val MAX_KNOWN_VIDEOS = 500
 
         /** Process-wide de-duplication for detail-page prefetches triggered by feed refreshes. */
-        private val recentDetailPrefetches = ConcurrentHashMap<String, Long>()
+        private val recentDetailPrefetches = java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<String, Long>(64, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean =
+                    size > 256
+            },
+        )
+
+        internal fun capKnownVideos(
+            primary: List<VideoItem>,
+            existing: List<VideoItem>,
+            pinnedSaved: List<VideoItem> = emptyList(),
+        ): List<VideoItem> {
+            val savedFirst = pinnedSaved.distinctBy(VideoItem::id)
+            val rest = (primary + existing).distinctBy(VideoItem::id)
+                .filterNot { candidate -> savedFirst.any { it.id == candidate.id } }
+            return (savedFirst + rest).take(MAX_KNOWN_VIDEOS.coerceAtLeast(savedFirst.size))
+        }
 
         /** Local search only: network results are already matched by the site search endpoint. */
         internal fun localSearchMatches(query: String, videos: List<VideoItem>): List<VideoItem> =

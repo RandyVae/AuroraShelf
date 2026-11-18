@@ -22,6 +22,13 @@ public enum ForumImageSaveError: LocalizedError {
 public struct ForumImageSaveOutcome: Sendable {
     public let localURL: URL
     public let savedToPhotoLibrary: Bool
+    public let photoPermissionDenied: Bool
+
+    public init(localURL: URL, savedToPhotoLibrary: Bool, photoPermissionDenied: Bool = false) {
+        self.localURL = localURL
+        self.savedToPhotoLibrary = savedToPhotoLibrary
+        self.photoPermissionDenied = photoPermissionDenied
+    }
 }
 
 @MainActor
@@ -31,15 +38,24 @@ public final class ForumImageSaver: ObservableObject {
     @Published public private(set) var savedLocalURLs: [String: URL] = [:]
     @Published public private(set) var activeSavingURLs: Set<String> = []
     @Published public private(set) var batchProgress: (completed: Int, total: Int)?
+    @Published public private(set) var batchProgressByPost: [String: (completed: Int, total: Int)] = [:]
 
     private let fileManager = FileManager.default
     private let saveDirectory: URL
+
+    public var saveDirectoryURL: URL {
+        saveDirectory
+    }
 
     private init() {
         let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
         self.saveDirectory = docs.appendingPathComponent("ForumSavedImages", isDirectory: true)
         try? fileManager.createDirectory(at: saveDirectory, withIntermediateDirectories: true)
         restoreExistingFiles()
+    }
+
+    public func batchProgress(for postKey: String) -> (completed: Int, total: Int)? {
+        batchProgressByPost[postKey]
     }
 
     private func restoreExistingFiles() {
@@ -64,7 +80,7 @@ public final class ForumImageSaver: ObservableObject {
     private func persistIndex() {
         let map = savedLocalURLs.mapValues { $0.lastPathComponent }
         if let data = try? JSONEncoder().encode(map) {
-            try? data.write(to: indexFileURL)
+            try? data.write(to: indexFileURL, options: .atomic)
         }
     }
 
@@ -95,14 +111,19 @@ public final class ForumImageSaver: ObservableObject {
         savedLocalURLs[urlString] = localURL
         persistIndex()
 
-        let photoSaved = await Self.saveToPhotoLibraryIfAuthorized(data: data)
-        return ForumImageSaveOutcome(localURL: localURL, savedToPhotoLibrary: photoSaved)
+        let photoResult = await Self.saveToPhotoLibraryIfAuthorized(data: data)
+        return ForumImageSaveOutcome(
+            localURL: localURL,
+            savedToPhotoLibrary: photoResult.saved,
+            photoPermissionDenied: photoResult.permissionDenied
+        )
     }
 
     public func saveAllImages(
         _ urls: [String],
-        referer: String
-    ) async -> (succeeded: Int, total: Int, savedToPhotoLibraryCount: Int) {
+        referer: String,
+        postKey: String? = nil
+    ) async -> (succeeded: Int, total: Int, savedToPhotoLibraryCount: Int, photoPermissionDenied: Bool) {
         var uniqueUrls: [String] = []
         var seen = Set<String>()
         for url in urls {
@@ -111,23 +132,40 @@ public final class ForumImageSaver: ObservableObject {
                 uniqueUrls.append(trimmed)
             }
         }
-        guard !uniqueUrls.isEmpty else { return (0, 0, 0) }
+        guard !uniqueUrls.isEmpty else { return (0, 0, 0, false) }
 
-        batchProgress = (completed: 0, total: uniqueUrls.count)
-        defer { batchProgress = nil }
+        let initialProgress = (completed: 0, total: uniqueUrls.count)
+        batchProgress = initialProgress
+        if let postKey {
+            batchProgressByPost[postKey] = initialProgress
+        }
+        defer {
+            batchProgress = nil
+            if let postKey {
+                batchProgressByPost[postKey] = nil
+            }
+        }
 
         var succeeded = 0
         var photoSavedCount = 0
+        var sawPermissionDenied = false
         for (idx, url) in uniqueUrls.enumerated() {
             if let outcome = try? await saveImage(urlString: url, referer: referer) {
                 succeeded += 1
                 if outcome.savedToPhotoLibrary {
                     photoSavedCount += 1
                 }
+                if outcome.photoPermissionDenied {
+                    sawPermissionDenied = true
+                }
             }
-            batchProgress = (completed: idx + 1, total: uniqueUrls.count)
+            let nextProgress = (completed: idx + 1, total: uniqueUrls.count)
+            batchProgress = nextProgress
+            if let postKey {
+                batchProgressByPost[postKey] = nextProgress
+            }
         }
-        return (succeeded, uniqueUrls.count, photoSavedCount)
+        return (succeeded, uniqueUrls.count, photoSavedCount, sawPermissionDenied)
     }
 
     nonisolated static func fileExtension(for data: Data, fallbackURL: URL) -> String {
@@ -158,7 +196,9 @@ public final class ForumImageSaver: ObservableObject {
         return directory.appendingPathComponent("forum_\(hash).\(fileExtension)")
     }
 
-    private static func saveToPhotoLibraryIfAuthorized(data: Data) async -> Bool {
+    private static func saveToPhotoLibraryIfAuthorized(
+        data: Data
+    ) async -> (saved: Bool, permissionDenied: Bool) {
         let currentStatus = PHPhotoLibrary.authorizationStatus(for: .addOnly)
         let status: PHAuthorizationStatus
         if currentStatus == .notDetermined {
@@ -166,10 +206,13 @@ public final class ForumImageSaver: ObservableObject {
         } else {
             status = currentStatus
         }
-        guard status == .authorized || status == .limited else {
-            return false
+        if status == .denied || status == .restricted {
+            return (false, true)
         }
-        return await withCheckedContinuation { continuation in
+        guard status == .authorized || status == .limited else {
+            return (false, false)
+        }
+        let saved = await withCheckedContinuation { continuation in
             PHPhotoLibrary.shared().performChanges {
                 let request = PHAssetCreationRequest.forAsset()
                 request.addResource(with: .photo, data: data, options: nil)
@@ -177,5 +220,6 @@ public final class ForumImageSaver: ObservableObject {
                 continuation.resume(returning: success)
             }
         }
+        return (saved, false)
     }
 }

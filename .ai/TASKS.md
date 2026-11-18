@@ -1,7 +1,8 @@
 # Active
 
+- [x] 全栈 86 项优化审计问题全面整改、服务端安全部署、三端 Release 模拟器全规模验收与 `v2.17.0 (Build 267)` 全通道发布（完成 OTA/PocketBase/Nginx 安全加固与远端部署验证、Android/iOS/Web 游戏 86 项根因修复、双端离线与在线全源测试全绿、三端 Release 模拟器走查、网页 OTA `bananarey.us` 原子覆盖、TestFlight Build 267 上传与 GitHub Release `v2.17.0` 发布）— 2026-11-18。
+- [x] 部署 [netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf)（`./scripts/configure_auth_proxy.sh`）并同步更新远端 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) — 2026-11-18。
 - [x] 修复华视部分视频播放失败（错误 `2004`）及 `.ts`/TLS 分片加载失败并发布 `v2.16.37 (Build 263)`（诊断 BunnyCDN `428 CDN-Limit`、短效 `/link/penny-` 缓存污染、消费 `mt` 残留与跨站 `Origin`/TLS 断连；Android 新增 `ResilientHttpDataSourceFactory`/`ResilientLoadErrorHandlingPolicy`、消费清 `mt`、`90s` 短缓存及 2 阶段自动重解/换线恢复；iOS/iPadOS 新增 `HLSLoopbackRelayServer`、`AVPlayerItemFailedToPlayToEndTime` 监听、`90s` 缓存及换线中继恢复；Android 269/269 在线全通与 R8 APK 实测出画、iOS 190 项离线通过与 `iPhone 18 Pro`/`iPad Pro 13-inch M5` Release 实测通过；TestFlight Build 263、OTA `bananarey.us` 与 GitHub Release `v2.16.37` 同步完成）— 2026-11-16。
-- [ ] 待运维窗口部署 [netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf)（`./scripts/configure_auth_proxy.sh`）并同步更新远端 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py)。
 
 - [x] 全盘 Bug 与优化审计落地修复及 `v2.16.36 (Build 262)` TestFlight 与 GitHub Release 发布（清理 123 个未引用资产减重 60.53 MB；iOS/Android 安全、并发、PiP、直播/漫画/论坛分页与生命周期全栈加固；Web Game JS 与 OTA/Nginx/TestFlight 脚本加固；Android 单测/Lint/在线探针全绿与 `emulator-5554` R8 实测，iOS 188 项单测与 `iPhone 18 Pro` / `iPad Pro 13-inch M5` Release 走查通过，`./scripts/publish_testflight.sh` 成功上传 `Build 262`）— 2026-11-16。
 

@@ -7,7 +7,7 @@ final class ForumRepositoryTests: XCTestCase {
             throw XCTSkip("Set RUN_IOS_LIVE_SOURCE_AUDIT=1 to probe live forum boards.")
         }
         let session = URLSession(configuration: .ephemeral)
-        let sharedPinnedIDs: Set<String> = ["411942", "412035", "83424", "407901"]
+        let sharedPinnedIDs: Set<String> = ["411942", "412035", "83424", "407901", "417968"]
         for board in ForumSourceCatalog.allBoards {
             let listURL = try XCTUnwrap(ForumSourceAdapter.pageURL(fid: board.fid, page: 1))
             var request = URLRequest(url: listURL)

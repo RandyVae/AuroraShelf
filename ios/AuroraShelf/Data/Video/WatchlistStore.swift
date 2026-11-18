@@ -5,6 +5,30 @@ public final class WatchlistStore: ObservableObject {
     public static let shared = WatchlistStore()
     private static let storageKey = "aurora.watchlist.v1"
 
+    private struct EmptyDecodable: Decodable {}
+    private struct LossyVideoItemArray: Decodable {
+        let items: [VideoItem]
+        let droppedCount: Int
+
+        init(from decoder: Decoder) throws {
+            var container = try decoder.unkeyedContainer()
+            var decoded: [VideoItem] = []
+            var dropped = 0
+            while !container.isAtEnd {
+                if let item = try? container.decode(VideoItem.self) {
+                    decoded.append(item)
+                } else {
+                    dropped += 1
+                    if (try? container.decode(EmptyDecodable.self)) == nil {
+                        break
+                    }
+                }
+            }
+            self.items = decoded
+            self.droppedCount = dropped
+        }
+    }
+
     @Published public private(set) var items: [VideoItem] = []
     @Published public private(set) var loadError: String?
 
@@ -15,7 +39,14 @@ public final class WatchlistStore: ObservableObject {
         guard let data = defaults.data(forKey: Self.storageKey) else { return }
 
         do {
-            items = try JSONDecoder().decode([VideoItem].self, from: data)
+            let decoded = try JSONDecoder().decode(LossyVideoItemArray.self, from: data)
+            items = decoded.items
+            if decoded.droppedCount > 0 {
+                // Re-save clean items so corrupted entries do not linger
+                if let cleanData = try? JSONEncoder().encode(decoded.items) {
+                    defaults.set(cleanData, forKey: Self.storageKey)
+                }
+            }
         } catch {
             loadError = "片单数据无法读取：\(error.localizedDescription)"
         }

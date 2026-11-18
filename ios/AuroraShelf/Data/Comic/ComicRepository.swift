@@ -48,11 +48,18 @@ public final class ComicRepository: ObservableObject {
     @Published public var canLoadMore: Bool = true
     @Published public var isLoadingNextPage: Bool = false
 
+    private struct InFlightChapterEntry {
+        let id: UUID
+        var waiterIds: Set<UUID>
+        let task: Task<[ComicPage], Error>
+    }
+
     private let session: URLSession
     private var loadTask: Task<Void, Never>?
     private var activeRequestID = UUID()
+    private var hasTriggeredInitialLoad = false
     private var chapterCache: [String: [ComicPage]] = [:]
-    private var inFlightChapterTasks: [String: (id: UUID, task: Task<[ComicPage], Error>)] = [:]
+    private var inFlightChapterTasks: [String: InFlightChapterEntry] = [:]
     private var preferredJMDomain: String?
 
     public func cachedChapter(sourceId: String, comicId: String, chapterId: String) -> [ComicPage]? {
@@ -67,7 +74,6 @@ public final class ComicRepository: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             let pages = (try? await self.fetchChapterPages(comicId: comicId, sourceId: sourceId, chapterId: chapterId)) ?? []
-            // 管道预热前 3 张图片
             for page in pages.prefix(3) {
                 _ = try? await ComicPageImageLoader.shared.load(page)
             }
@@ -81,7 +87,13 @@ public final class ComicRepository: ObservableObject {
             self.comics = snapshot.items
             print("[AuroraPerf] comic_swr_init source=\(currentSource.id) count=\(snapshot.items.count) fresh=\(snapshot.isFresh)")
         }
-        self.loadComics(for: ComicSourceCatalog.jm)
+    }
+
+    /// 按需在用户首次进入漫画标签页时触发网络刷新（避免冷启动未打开标签页抢占带宽）
+    public func loadComicsIfNeeded() {
+        guard !hasTriggeredInitialLoad else { return }
+        hasTriggeredInitialLoad = true
+        loadComics(for: currentSource)
     }
 
     public func switchSource(to source: ComicSourceDefinition) {
@@ -121,6 +133,7 @@ public final class ComicRepository: ObservableObject {
     }
 
     public func loadComics(for source: ComicSourceDefinition) {
+        hasTriggeredInitialLoad = true
         loadTask?.cancel()
         let requestID = UUID()
         activeRequestID = requestID
@@ -229,9 +242,10 @@ public final class ComicRepository: ObservableObject {
         try await fetchRealComics(source: source, category: category, page: page)
     }
 
-    public func searchComics(query: String, source: ComicSourceDefinition? = nil) async throws -> [ComicItem] {
+    public func searchComics(query: String, source: ComicSourceDefinition? = nil, page: Int = 1) async throws -> [ComicItem] {
         let activeSource = source ?? currentSource
-        guard let url = ComicSourceAdapter.searchURL(source: activeSource, query: query, page: 1) else {
+        let safePage = max(page, 1)
+        guard let url = ComicSourceAdapter.searchURL(source: activeSource, query: query, page: safePage) else {
             throw ComicFetchError.notSupported("\(activeSource.name) 暂不支持搜索。")
         }
         switch activeSource.id {
@@ -248,7 +262,7 @@ public final class ComicRepository: ObservableObject {
             let queryGQL = "query searchComics($keyword: String!, $pagination: Pagination!) { searchComics(keyword: $keyword, pagination: $pagination) { id title status year imageUrl authors { id name } categories { id name } dateUpdated } }"
             let variables: [String: Any] = [
                 "keyword": query,
-                "pagination": ["limit": 24, "offset": 0, "orderBy": "DATE_UPDATED", "status": "", "asc": true]
+                "pagination": ["limit": 24, "offset": (safePage - 1) * 24, "orderBy": "DATE_UPDATED", "status": "", "asc": true]
             ]
             let result = try await komiicRequest(operation: "searchComics", variables: variables, query: queryGQL)
             let data = try JSONSerialization.data(withJSONObject: result)
@@ -257,8 +271,8 @@ public final class ComicRepository: ObservableObject {
             guard ComicProtocolSecrets.hasJMConfiguration else {
                 throw ComicFetchError.authenticationRequired("此构建未配置禁漫协议参数。")
             }
-            let encodedQ = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-            let json = try await jmRequest(path: "search?search_query=\(encodedQ)&o=mr&page=1", secretKey: "JM_TOKEN_SECRET")
+            let encodedQ = ComicSourceAdapter.queryValue(query)
+            let json = try await jmRequest(path: "search?search_query=\(encodedQ)&o=mr&page=\(safePage)", secretKey: "JM_TOKEN_SECRET")
             let items = json["content"] as? [[String: Any]] ?? []
             return items.compactMap { raw in
                 let idString: String
@@ -290,8 +304,9 @@ public final class ComicRepository: ObservableObject {
             let token = PicacgAuthStore.shared.token
             guard !token.isEmpty else { throw ComicFetchError.authenticationRequired("哔咔需要先登录。") }
             let postBody = try JSONSerialization.data(withJSONObject: ["keyword": query, "sort": "dd"])
-            guard let searchURL = URL(string: "https://picaapi.picacomic.com/comics/advanced-search?page=1") else { throw ComicFetchError.invalidURL }
-            let response = try await request(searchURL, method: "POST", body: postBody, headers: picacgHeaders(method: "POST", path: "comics/advanced-search?page=1", token: token))
+            let picaPath = "comics/advanced-search?page=\(safePage)"
+            guard let searchURL = URL(string: "https://picaapi.picacomic.com/\(picaPath)") else { throw ComicFetchError.invalidURL }
+            let response = try await request(searchURL, method: "POST", body: postBody, headers: picacgHeaders(method: "POST", path: picaPath, token: token))
             return try ComicSourceAdapter.decodePicacgComicFeed(response.data)
         default:
             let response = try await request(url, headers: ComicSourceAdapter.requestHeaders(sourceID: activeSource.id, referer: activeSource.baseUrl))
@@ -430,15 +445,37 @@ public final class ComicRepository: ObservableObject {
             throw ComicFetchError.malformedResponse
         }
         let chapterRoot = try JSONSerialization.jsonObject(with: chapterResult.data) as? [String: Any]
-        let chapterList = ((chapterRoot?["results"] as? [String: Any])?["list"] as? [[String: Any]]) ?? []
+        let chapterResultsDict = chapterRoot?["results"] as? [String: Any]
+        var allChapterRows = (chapterResultsDict?["list"] as? [[String: Any]]) ?? []
+        let totalChapters = (chapterResultsDict?["total"] as? Int) ?? allChapterRows.count
+        var lastBatchCount = allChapterRows.count
+        var nextOffset = 500
+        while lastBatchCount >= 500 && nextOffset < min(totalChapters, 5000) {
+            try Task.checkCancellation()
+            let nextURLs = origins.compactMap { URL(string: "\($0)/api/v3/comic/\(comic.id)/group/default/chapters?limit=500&offset=\(nextOffset)&platform=3") }
+            guard let nextResp = try? await AuroraNetworkEngine.shared.fetchHedged(
+                sourceKey: "copy",
+                candidateURLs: nextURLs,
+                headersBuilder: { _ in copyHeaders },
+                validator: { $0.data.count > 10 }
+            ),
+            let nextRoot = try? JSONSerialization.jsonObject(with: nextResp.data) as? [String: Any],
+            let nextRows = (nextRoot["results"] as? [String: Any])?["list"] as? [[String: Any]],
+            !nextRows.isEmpty else {
+                break
+            }
+            allChapterRows.append(contentsOf: nextRows)
+            lastBatchCount = nextRows.count
+            nextOffset += 500
+        }
         let version = item["reclass"] == nil || item["reclass"] is NSNull ? 2 : 1
-        let chapters = chapterList.enumerated().compactMap { index, row -> ComicChapter? in
+        let chapters = allChapterRows.enumerated().compactMap { index, row -> ComicChapter? in
             guard let uuid = row["uuid"] as? String else { return nil }
             return ComicChapter(id: "\(version):\(uuid)", title: row["name"] as? String ?? "第 \(index + 1) 话")
         }
         let author = ((item["author"] as? [[String: Any]])?.first?["name"] as? String) ?? comic.author
         let tags = (item["theme"] as? [[String: Any]] ?? []).compactMap { $0["name"] as? String }
-        let updated = ComicItem(id: comic.id, sourceId: comic.sourceId, title: item["name"] as? String ?? comic.title, author: author, coverUrl: item["cover"] as? String ?? comic.coverUrl, category: comic.category, tags: tags, chapters: chapters, latestChapterTitle: chapters.first?.title ?? "")
+        let updated = ComicItem(id: comic.id, sourceId: comic.sourceId, title: item["name"] as? String ?? comic.title, author: author, coverUrl: item["cover"] as? String ?? comic.coverUrl, category: comic.category, tags: tags, chapters: chapters, latestChapterTitle: chapters.last?.title ?? "")
         return updated
     }
 
@@ -489,7 +526,7 @@ public final class ComicRepository: ObservableObject {
             author = comic.author
         }
         let cdnOrigin = SourceHealthRegistry.shared.resolveOrigins(sourceKey: "jm-cdn").first ?? "https://cdn-msp.jmapiproxy2.cc"
-        let updated = ComicItem(id: comic.id, sourceId: comic.sourceId, title: item["name"] as? String ?? comic.title, author: author.isEmpty ? comic.author : author, coverUrl: "\(cdnOrigin)/media/albums/\(comic.id)_3x4.jpg", category: comic.category, tags: item["tags"] as? [String] ?? comic.tags, chapters: chapters.isEmpty ? [ComicChapter(id: comic.id, title: "完整内容")] : chapters, latestChapterTitle: chapters.first?.title ?? "完整内容")
+        let updated = ComicItem(id: comic.id, sourceId: comic.sourceId, title: item["name"] as? String ?? comic.title, author: author.isEmpty ? comic.author : author, coverUrl: "\(cdnOrigin)/media/albums/\(comic.id)_3x4.jpg", category: comic.category, tags: item["tags"] as? [String] ?? comic.tags, chapters: chapters.isEmpty ? [ComicChapter(id: comic.id, title: "完整内容")] : chapters, latestChapterTitle: chapters.last?.title ?? "完整内容")
         return updated
     }
 
@@ -518,7 +555,7 @@ public final class ComicRepository: ObservableObject {
             })
             page += 1
         }
-        return ComicItem(id: comic.id, sourceId: comic.sourceId, title: item["title"] as? String ?? comic.title, author: item["author"] as? String ?? comic.author, coverUrl: comic.coverUrl, category: comic.category, tags: comic.tags, chapters: chapters, latestChapterTitle: chapters.first?.title ?? "")
+        return ComicItem(id: comic.id, sourceId: comic.sourceId, title: item["title"] as? String ?? comic.title, author: item["author"] as? String ?? comic.author, coverUrl: comic.coverUrl, category: comic.category, tags: comic.tags, chapters: chapters, latestChapterTitle: chapters.last?.title ?? "")
     }
 
     private func fetchCopyPages(comicId: String, chapterId: String) async throws -> [ComicPage] {
@@ -576,8 +613,9 @@ public final class ComicRepository: ObservableObject {
         let hosts = SourceHealthRegistry.shared.rankCandidates(sourceKey: "jm-cdn", candidates: defaultHosts)
         return files.enumerated().map { index, filename in
             let imageName = filename.split(separator: "?").first.map(String.init) ?? filename
+            let isGif = imageName.lowercased().hasSuffix(".gif")
             let basename = (imageName as NSString).deletingPathExtension
-            let segments = ComicSourceAdapter.jmSegmentCount(scrambleID: scrambleID, photoID: photoID, imageName: basename)
+            let segments = isGif ? 0 : ComicSourceAdapter.jmSegmentCount(scrambleID: scrambleID, photoID: photoID, imageName: basename)
             let referer = "https://www.cdnhjk.net/"
             return ComicPage(imageUrl: "https://\(hosts[index % hosts.count])/media/photos/\(photoID)/\(filename)", referer: referer, headers: ComicSourceAdapter.requestHeaders(sourceID: "jm", referer: referer), verticalSegments: segments)
         }
@@ -682,8 +720,9 @@ public final class ComicRepository: ObservableObject {
             throw ComicFetchError.invalidURL
         }
         let response = try await request(url, headers: ComicSourceAdapter.requestHeaders(sourceID: "ikmmh", referer: "https://ymcdnyfqdapp.ikmmh.com/"))
-        let path = url.lastPathComponent
-        guard let chaptersURL = URL(string: "https://ymcdnyfqdapp.ikmmh.com/api/comic/zyz/chapters?ph=1&tempid=3&zpid=\(path)&page=0&line=200&orderby=desc") else {
+        let rawLast = url.lastPathComponent
+        let zpid = rawLast.lowercased().hasSuffix(".html") ? String(rawLast.dropLast(5)) : rawLast
+        guard let chaptersURL = URL(string: "https://ymcdnyfqdapp.ikmmh.com/api/comic/zyz/chapters?ph=1&tempid=3&zpid=\(zpid)&page=0&line=200&orderby=asc") else {
             throw ComicFetchError.invalidURL
         }
         let chapterResponse = try await request(chaptersURL, headers: ComicSourceAdapter.requestHeaders(sourceID: "ikmmh", referer: url.absoluteString))
@@ -709,7 +748,7 @@ public final class ComicRepository: ObservableObject {
     }
 
     private func comicWithChapters(_ comic: ComicItem, chapters: [ComicChapter]) -> ComicItem {
-        ComicItem(id: comic.id, sourceId: comic.sourceId, title: comic.title, author: comic.author, coverUrl: comic.coverUrl, category: comic.category, tags: comic.tags, chapters: chapters, latestChapterTitle: chapters.first?.title ?? "")
+        ComicItem(id: comic.id, sourceId: comic.sourceId, title: comic.title, author: comic.author, coverUrl: comic.coverUrl, category: comic.category, tags: comic.tags, chapters: chapters, latestChapterTitle: chapters.last?.title ?? "")
     }
 
     private func extractImageURL(_ html: String) -> String? {
@@ -938,25 +977,36 @@ public final class ComicRepository: ObservableObject {
         }
     }
 
+    private func releaseChapterWaiter(key: String, taskToken: UUID, waiterId: UUID, cancelIfLast: Bool) {
+        guard var entry = inFlightChapterTasks[key], entry.id == taskToken else { return }
+        entry.waiterIds.remove(waiterId)
+        if entry.waiterIds.isEmpty {
+            if cancelIfLast {
+                entry.task.cancel()
+            }
+            inFlightChapterTasks[key] = nil
+        } else {
+            inFlightChapterTasks[key] = entry
+        }
+    }
+
     public func fetchChapterPages(comicId: String, sourceId: String, chapterId: String) async throws -> [ComicPage] {
         let key = "\(sourceId):\(comicId):\(chapterId)"
         if let cached = chapterCache[key], !cached.isEmpty {
             return cached
         }
+        let waiterId = UUID()
         let taskToken: UUID
         let task: Task<[ComicPage], Error>
-        if let ongoing = inFlightChapterTasks[key], !ongoing.task.isCancelled {
+        if var ongoing = inFlightChapterTasks[key], !ongoing.task.isCancelled {
+            ongoing.waiterIds.insert(waiterId)
+            inFlightChapterTasks[key] = ongoing
             taskToken = ongoing.id
             task = ongoing.task
         } else {
             let newToken = UUID()
             let created = Task<[ComicPage], Error> { [weak self] in
                 guard let self else { throw CancellationError() }
-                defer {
-                    if self.inFlightChapterTasks[key]?.id == newToken {
-                        self.inFlightChapterTasks[key] = nil
-                    }
-                }
                 return try await self.performWithTimeout(
                     seconds: 18,
                     timeoutMessage: "加载章节图片超时，请检查网络或切换漫画源后重试。"
@@ -964,28 +1014,31 @@ public final class ComicRepository: ObservableObject {
                     try await self.loadChapterPagesUncached(comicId: comicId, sourceId: sourceId, chapterId: chapterId)
                 }
             }
-            inFlightChapterTasks[key] = (id: newToken, task: created)
+            inFlightChapterTasks[key] = InFlightChapterEntry(id: newToken, waiterIds: [waiterId], task: created)
             taskToken = newToken
             task = created
         }
 
-        do {
-            let pages = try await awaitTask(
+        defer {
+            releaseChapterWaiter(key: key, taskToken: taskToken, waiterId: waiterId, cancelIfLast: false)
+        }
+
+        let pages = try await withTaskCancellationHandler {
+            try await awaitTask(
                 task,
                 seconds: 19,
                 timeoutMessage: "加载章节图片超时，请检查网络或切换漫画源后重试。",
-                cancelWorkOnCancel: true
+                cancelWorkOnCancel: false
             )
-            if !pages.isEmpty {
-                chapterCache[key] = pages
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.releaseChapterWaiter(key: key, taskToken: taskToken, waiterId: waiterId, cancelIfLast: true)
             }
-            return pages
-        } catch {
-            if inFlightChapterTasks[key]?.id == taskToken {
-                inFlightChapterTasks[key] = nil
-            }
-            throw error
         }
+        if !pages.isEmpty {
+            chapterCache[key] = pages
+        }
+        return pages
     }
 
     private func loadChapterPagesUncached(comicId: String, sourceId: String, chapterId: String) async throws -> [ComicPage] {

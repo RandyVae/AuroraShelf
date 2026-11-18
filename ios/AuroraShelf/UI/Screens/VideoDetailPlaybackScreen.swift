@@ -1,6 +1,7 @@
 import SwiftUI
 import AVKit
 import Combine
+import MediaPlayer
 
 /// 影视二级详情与内嵌播放一体化界面（Apple HIG 规范：单一播放源驱动、原位无缝全屏展开、控制栏与选集联动）
 public struct VideoDetailPlaybackScreen: View {
@@ -46,6 +47,9 @@ public struct VideoDetailPlaybackScreen: View {
     }
     @State private var activeGestureMode: PlayerVerticalGestureMode? = nil
     @State private var gestureInitialValue: CGFloat = 0
+    @State private var originalScreenBrightness: CGFloat? = nil
+    @State private var didTriggerEndForCurrentItem: Bool = false
+    @State private var remoteCommandCleanups: [() -> Void] = []
     
     // 核心播放器状态（全程唯一实例）
     @State private var player: AVPlayer?
@@ -177,8 +181,15 @@ public struct VideoDetailPlaybackScreen: View {
                         if isSplitMode {
                             // iPad 横屏采用 YouTube 式双栏：左侧保持播放器与当前视频上下文，右侧独立滚动推荐。
                             HStack(alignment: .top, spacing: 0) {
-                                ScrollView(.vertical, showsIndicators: false) {
-                                    detailScrollContent(includeRecommendations: false, columnWidth: playerWidth)
+                                ScrollViewReader { scrollProxy in
+                                    ScrollView(.vertical, showsIndicators: false) {
+                                        detailScrollContent(includeRecommendations: false, columnWidth: playerWidth)
+                                    }
+                                    .onChange(of: currentVideo.id) { _, _ in
+                                        withAnimation(.easeOut(duration: 0.2)) {
+                                            scrollProxy.scrollTo("video-detail-top-anchor", anchor: .top)
+                                        }
+                                    }
                                 }
                                 .padding(.top, targetHeight)
                                 .frame(width: playerWidth, height: screenSize.height)
@@ -195,8 +206,15 @@ public struct VideoDetailPlaybackScreen: View {
                             }
                             .accessibilityIdentifier("video-detail-split-layout")
                         } else {
-                            ScrollView(.vertical, showsIndicators: false) {
-                                detailScrollContent(includeRecommendations: true, columnWidth: screenSize.width)
+                            ScrollViewReader { scrollProxy in
+                                ScrollView(.vertical, showsIndicators: false) {
+                                    detailScrollContent(includeRecommendations: true, columnWidth: screenSize.width)
+                                }
+                                .onChange(of: currentVideo.id) { _, _ in
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        scrollProxy.scrollTo("video-detail-top-anchor", anchor: .top)
+                                    }
+                                }
                             }
                             .padding(.top, targetHeight)
                             .frame(width: screenSize.width, height: screenSize.height)
@@ -224,7 +242,7 @@ public struct VideoDetailPlaybackScreen: View {
                                     .foregroundStyle(AuroraColor.brand)
                                 Text(downloadToastText)
                                     .font(.subheadline.bold())
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(AuroraColor.textPrimary)
                             }
                             .padding(.horizontal, 16)
                             .padding(.vertical, 10)
@@ -285,7 +303,8 @@ public struct VideoDetailPlaybackScreen: View {
         }
         .onDisappear {
             isViewDismissed = true
-            cleanupPlayer(forceStopPlayer: !PictureInPictureManager.shared.isActive)
+            restoreBrightnessAndOrientationIfNeeded()
+            cleanupPlayer(forceStopPlayer: !PictureInPictureManager.shared.isPiPActiveOrStarting)
         }
         .sheet(isPresented: $isShowingEpisodePicker) {
             EpisodePickerSheet(
@@ -356,6 +375,7 @@ public struct VideoDetailPlaybackScreen: View {
         }
         .onKeyPress(.escape) {
             if isFullScreen {
+                requestDeviceOrientation(landscape: false)
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                     isFullScreen = false
                     isLandscape = false
@@ -366,7 +386,7 @@ public struct VideoDetailPlaybackScreen: View {
             }
             return .handled
         }
-        .enableSwipeBack(isEnabled: !isFullScreen) {
+        .enableSwipeBack(isEnabled: !isFullScreen, allowsContentSwipe: false) {
             dismissView()
         }
     }
@@ -375,6 +395,7 @@ public struct VideoDetailPlaybackScreen: View {
     private func detailScrollContent(includeRecommendations: Bool, columnWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
             headerInfoSection
+                .id("video-detail-top-anchor")
                 .padding(.top, AuroraMetrics.spacingM)
 
             actionToolbarSection
@@ -664,8 +685,12 @@ public struct VideoDetailPlaybackScreen: View {
                             if activeGestureMode == nil {
                                 if startX < playerWidth * 0.40 {
                                     activeGestureMode = .brightness
-                                    let activeScreen = (UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)?.screen
-                                    gestureInitialValue = activeScreen?.brightness ?? 0.5
+                                    let activeScreen = Self.activeWindowScene()?.screen
+                                    let currentBrightness = activeScreen?.brightness ?? 0.5
+                                    if originalScreenBrightness == nil {
+                                        originalScreenBrightness = currentBrightness
+                                    }
+                                    gestureInitialValue = currentBrightness
                                 } else if startX > playerWidth * 0.60 {
                                     activeGestureMode = .volume
                                     gestureInitialValue = CGFloat(player?.volume ?? 1.0)
@@ -674,8 +699,7 @@ public struct VideoDetailPlaybackScreen: View {
                             let deltaY = -value.translation.height / (isPad ? 280.0 : 200.0)
                             if activeGestureMode == .brightness {
                                 let newBrightness = min(max(gestureInitialValue + deltaY, 0.0), 1.0)
-                                let activeScreen = (UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first(where: { $0.activationState == .foregroundActive }) ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first)?.screen
-                                activeScreen?.brightness = newBrightness
+                                Self.activeWindowScene()?.screen.brightness = newBrightness
                                 showHud(icon: "sun.max.fill", text: "亮度", progress: Double(newBrightness))
                             } else if activeGestureMode == .volume {
                                 let newVolume = min(max(gestureInitialValue + deltaY, 0.0), 1.0)
@@ -695,6 +719,7 @@ public struct VideoDetailPlaybackScreen: View {
                                 if isSwipeDown || isSwipeRight {
                                     let impact = UIImpactFeedbackGenerator(style: .medium)
                                     impact.impactOccurred()
+                                    requestDeviceOrientation(landscape: false)
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                                         isFullScreen = false
                                         isLandscape = false
@@ -765,6 +790,7 @@ public struct VideoDetailPlaybackScreen: View {
                     Button {
                         let impact = UIImpactFeedbackGenerator(style: .medium)
                         impact.impactOccurred()
+                        requestDeviceOrientation(landscape: false)
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                             isFullScreen = false
                             isLandscape = false
@@ -863,8 +889,8 @@ public struct VideoDetailPlaybackScreen: View {
                     .accessibilityLabel("播放倍速: \(playbackRate)x")
                 }
                 
-                // AirPlay 原生路由选择器
-                AirPlayRoutePicker()
+                // AirPlay 原生路由选择器（深色播放器顶栏使用纯白图标）
+                AirPlayRoutePicker(tint: .white)
                     .frame(width: isPad ? 42 : 38, height: isPad ? 42 : 38)
                     .glassEffect(.regular.interactive(), in: .circle)
                     .frame(minWidth: 44, minHeight: 44)
@@ -931,7 +957,7 @@ public struct VideoDetailPlaybackScreen: View {
                         Button {
                             toggleOrientation()
                         } label: {
-                            Image(systemName: isLandscape ? "iphone.portrait" : "iphone.landscape")
+                            Image(systemName: isLandscape ? "iphone" : "iphone.landscape")
                                 .font(.system(size: 13, weight: .bold))
                                 .frame(width: 26, height: 26)
                         }
@@ -1028,8 +1054,11 @@ public struct VideoDetailPlaybackScreen: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 18))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.white.opacity(0.75))
+                        .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+                        .contentShape(Rectangle())
                 }
+                .accessibilityLabel("关闭选集")
             }
             .padding(.horizontal, 16)
             
@@ -1829,7 +1858,7 @@ public struct VideoDetailPlaybackScreen: View {
         resolveError = nil
         resolveStatus = alternateLineIndex > 0 ? "正在切换备用线路…" : (useRelay ? "正在切换防限流通道…" : "正在极速秒开…")
 
-        // 若正从当前视频的画中画恢复，直接复用仍在播放且状态健康的 AVPlayer，零中断
+        // 若正从当前视频的画中画恢复，直接复用仍在播放且状态健康的 AVPlayer，零中断并尊重用户在 PiP 中的暂停/倍速状态
         if !forceFresh, let retainedPlayer = PictureInPictureManager.shared.consumeRetainedPlayer(for: video) {
             if retainedPlayer.error == nil,
                let item = retainedPlayer.currentItem,
@@ -1839,12 +1868,14 @@ public struct VideoDetailPlaybackScreen: View {
                activeResolveID == resolveID {
                 try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
                 try? AVAudioSession.sharedInstance().setActive(true)
-                attachObservers(to: retainedPlayer)
-                self.player = retainedPlayer
-                if retainedPlayer.timeControlStatus == .paused || retainedPlayer.rate == 0 {
-                    retainedPlayer.play()
+                let wasPlayingInPiP = retainedPlayer.timeControlStatus == .playing || retainedPlayer.rate > 0
+                if wasPlayingInPiP, retainedPlayer.rate > 0 {
+                    self.playbackRate = retainedPlayer.rate
                 }
-                self.isPlaying = true
+                attachObservers(to: retainedPlayer, preservePlaybackState: true, wasPlaying: wasPlayingInPiP)
+                self.player = retainedPlayer
+                self.isPlaying = wasPlayingInPiP
+                UIApplication.shared.isIdleTimerDisabled = wasPlayingInPiP
                 self.isResolving = false
                 return
             } else {
@@ -1925,16 +1956,24 @@ public struct VideoDetailPlaybackScreen: View {
         attachObservers(to: p, applyResumeSeek: true)
     }
 
-    private func attachObservers(to p: AVPlayer, applyResumeSeek: Bool = false) {
+    private func attachObservers(
+        to p: AVPlayer,
+        applyResumeSeek: Bool = false,
+        preservePlaybackState: Bool = false,
+        wasPlaying: Bool = true
+    ) {
         guard let playerItem = p.currentItem else { return }
         self.player = p
         self.lastSavedSecond = -1
+        self.didTriggerEndForCurrentItem = false
         let itemDur = CMTimeGetSeconds(playerItem.duration)
         if itemDur.isFinite && itemDur > 0 {
             self.duration = itemDur
         }
         self.currentTime = max(0, CMTimeGetSeconds(p.currentTime()))
         self.loadMediaSelectionGroups(for: playerItem)
+        self.configureRemoteTransportControls()
+        self.updateNowPlayingMetadata()
 
         // 观察时长
         itemDurationObserver = playerItem.observe(\.duration, options: [.new, .initial]) { [self] item, _ in
@@ -1942,6 +1981,7 @@ public struct VideoDetailPlaybackScreen: View {
             if seconds.isFinite && seconds > 0 {
                 Task { @MainActor in
                     self.duration = seconds
+                    self.updateNowPlayingMetadata()
                 }
             }
         }
@@ -1957,6 +1997,24 @@ public struct VideoDetailPlaybackScreen: View {
                 }
                 if status == .readyToPlay {
                     self.isBuffering = false
+                    if preservePlaybackState {
+                        self.isPlaying = wasPlaying
+                        if wasPlaying {
+                            if p.rate == 0 {
+                                p.play()
+                                if self.playbackRate != 1.0 {
+                                    p.rate = self.playbackRate
+                                }
+                            }
+                            UIApplication.shared.isIdleTimerDisabled = true
+                        } else {
+                            p.pause()
+                            UIApplication.shared.isIdleTimerDisabled = false
+                        }
+                        self.loadMediaSelectionGroups(for: item)
+                        self.updateNowPlayingMetadata()
+                        return
+                    }
                     self.isPlaying = true
                     self.loadMediaSelectionGroups(for: item)
                     // Apple TV Up Next 断点续播：若存在未完成的播放记录，自动跳转至上次观看进度
@@ -1998,7 +2056,7 @@ public struct VideoDetailPlaybackScreen: View {
             }
         }
         
-        // 进度观察与末尾连播保底（拖拽或 Seek 期间暂停覆写 currentTime，防止进度条跳针）
+        // 进度观察与断点持久化（拖拽或 Seek 期间暂停覆写 currentTime，移除提前 0.4s 误触发，交由去重 AVPlayerItemDidPlayToEndTime 精确驱动）
         let interval = CMTime(seconds: 0.5, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
         timeObserverToken = p.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [self] time in
             let cur = CMTimeGetSeconds(time)
@@ -2007,6 +2065,9 @@ public struct VideoDetailPlaybackScreen: View {
                 guard cur.isFinite && cur >= 0 else { return }
                 self.currentTime = cur
                 let sec = Int(cur)
+                if sec != self.lastSavedSecond {
+                    self.updateNowPlayingElapsedTime(cur)
+                }
                 if sec > 2 && sec % 3 == 0 && sec != self.lastSavedSecond && self.duration > 5.0 {
                     self.lastSavedSecond = sec
                     self.progressStore.updateProgress(
@@ -2015,13 +2076,10 @@ public struct VideoDetailPlaybackScreen: View {
                         durationMs: Int64(self.duration * 1000)
                     )
                 }
-                if self.duration > 3.0 && cur >= self.duration - 0.4 {
-                    self.handleEpisodePlaybackEnded()
-                }
             }
         }
         
-        // 观察播放自然结束通知
+        // 观察播放自然结束通知（单条目去重，杜绝重复连播跳集）
         if let oldToken = didPlayToEndObserverToken {
             NotificationCenter.default.removeObserver(oldToken)
             didPlayToEndObserverToken = nil
@@ -2032,6 +2090,8 @@ public struct VideoDetailPlaybackScreen: View {
             queue: .main
         ) { [self] _ in
             Task { @MainActor in
+                guard !self.didTriggerEndForCurrentItem else { return }
+                self.didTriggerEndForCurrentItem = true
                 self.handleEpisodePlaybackEnded()
             }
         }
@@ -2088,6 +2148,7 @@ public struct VideoDetailPlaybackScreen: View {
             UIApplication.shared.isIdleTimerDisabled = true
             scheduleHideControls()
         }
+        updateNowPlayingMetadata()
     }
     
     private func toggleMute() {
@@ -2140,14 +2201,150 @@ public struct VideoDetailPlaybackScreen: View {
         scheduleHideControls()
     }
     
+    private static func activeWindowScene() -> UIWindowScene? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+    }
+
+    private func requestDeviceOrientation(landscape: Bool) {
+        guard UIDevice.current.userInterfaceIdiom != .pad,
+              let windowScene = Self.activeWindowScene() else { return }
+        let mask: UIInterfaceOrientationMask = landscape ? .landscapeRight : .portrait
+        windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { _ in }
+    }
+
+    private func restoreBrightnessAndOrientationIfNeeded() {
+        if let savedBrightness = originalScreenBrightness {
+            Self.activeWindowScene()?.screen.brightness = savedBrightness
+            originalScreenBrightness = nil
+        }
+        if isLandscape {
+            requestDeviceOrientation(landscape: false)
+        }
+    }
+
+    private func configureRemoteTransportControls() {
+        tearDownRemoteTransportControls(clearMetadata: false)
+        let commandCenter = MPRemoteCommandCenter.shared()
+
+        commandCenter.playCommand.isEnabled = true
+        let playTarget = commandCenter.playCommand.addTarget { _ in
+            Task { @MainActor in
+                if !self.isPlaying {
+                    self.togglePlayPause()
+                }
+            }
+            return .success
+        }
+
+        commandCenter.pauseCommand.isEnabled = true
+        let pauseTarget = commandCenter.pauseCommand.addTarget { _ in
+            Task { @MainActor in
+                if self.isPlaying {
+                    self.togglePlayPause()
+                }
+            }
+            return .success
+        }
+
+        commandCenter.togglePlayPauseCommand.isEnabled = true
+        let toggleTarget = commandCenter.togglePlayPauseCommand.addTarget { _ in
+            Task { @MainActor in
+                self.togglePlayPause()
+            }
+            return .success
+        }
+
+        commandCenter.skipForwardCommand.isEnabled = true
+        commandCenter.skipForwardCommand.preferredIntervals = [15]
+        let forwardTarget = commandCenter.skipForwardCommand.addTarget { event in
+            let delta = (event as? MPSkipIntervalCommandEvent)?.interval ?? 15
+            Task { @MainActor in
+                self.seekRelative(delta)
+            }
+            return .success
+        }
+
+        commandCenter.skipBackwardCommand.isEnabled = true
+        commandCenter.skipBackwardCommand.preferredIntervals = [15]
+        let backwardTarget = commandCenter.skipBackwardCommand.addTarget { event in
+            let delta = (event as? MPSkipIntervalCommandEvent)?.interval ?? 15
+            Task { @MainActor in
+                self.seekRelative(-delta)
+            }
+            return .success
+        }
+
+        commandCenter.changePlaybackPositionCommand.isEnabled = true
+        let scrubTarget = commandCenter.changePlaybackPositionCommand.addTarget { event in
+            guard let posEvent = event as? MPChangePlaybackPositionCommandEvent else {
+                return .commandFailed
+            }
+            let targetSec = posEvent.positionTime
+            Task { @MainActor in
+                self.seekTo(time: targetSec)
+                self.updateNowPlayingElapsedTime(targetSec)
+            }
+            return .success
+        }
+
+        remoteCommandCleanups = [
+            { commandCenter.playCommand.removeTarget(playTarget) },
+            { commandCenter.pauseCommand.removeTarget(pauseTarget) },
+            { commandCenter.togglePlayPauseCommand.removeTarget(toggleTarget) },
+            { commandCenter.skipForwardCommand.removeTarget(forwardTarget) },
+            { commandCenter.skipBackwardCommand.removeTarget(backwardTarget) },
+            { commandCenter.changePlaybackPositionCommand.removeTarget(scrubTarget) }
+        ]
+    }
+
+    private func updateNowPlayingMetadata() {
+        var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
+        info[MPMediaItemPropertyTitle] = currentVideo.title
+        info[MPMediaItemPropertyArtist] = currentVideo.sourceName
+        if duration.isFinite && duration > 0 {
+            info[MPMediaItemPropertyPlaybackDuration] = duration
+        }
+        if currentTime.isFinite && currentTime >= 0 {
+            info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
+        }
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? playbackRate : Float(0.0)
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    private func updateNowPlayingElapsedTime(_ elapsed: Double) {
+        guard var info = MPNowPlayingInfoCenter.default().nowPlayingInfo else {
+            updateNowPlayingMetadata()
+            return
+        }
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = elapsed
+        if duration.isFinite && duration > 0 {
+            info[MPMediaItemPropertyPlaybackDuration] = duration
+        }
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? playbackRate : Float(0.0)
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    private func tearDownRemoteTransportControls(clearMetadata: Bool) {
+        for cleanup in remoteCommandCleanups {
+            cleanup()
+        }
+        remoteCommandCleanups.removeAll()
+        if clearMetadata {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        }
+    }
+
     private func toggleOrientation() {
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
+        let nextLandscape = !isLandscape
+        requestDeviceOrientation(landscape: nextLandscape)
         withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-            isLandscape.toggle()
+            isLandscape = nextLandscape
         }
         showHud(
-            icon: isLandscape ? "iphone.landscape" : "iphone.portrait",
+            icon: isLandscape ? "iphone.landscape" : "iphone",
             text: isLandscape ? "横屏沉浸" : "竖屏模式"
         )
         scheduleHideControls()
@@ -2172,7 +2369,8 @@ public struct VideoDetailPlaybackScreen: View {
     
     private func dismissView() {
         isViewDismissed = true
-        cleanupPlayer(forceStopPlayer: true)
+        restoreBrightnessAndOrientationIfNeeded()
+        cleanupPlayer(forceStopPlayer: !PictureInPictureManager.shared.isPiPActiveOrStarting)
         onDismiss()
     }
 
@@ -2211,9 +2409,15 @@ public struct VideoDetailPlaybackScreen: View {
             p.removeTimeObserver(token)
             timeObserverToken = nil
         }
-        if !forceStopPlayer, PictureInPictureManager.shared.isActive, let activePlayer = player {
-            PictureInPictureManager.shared.retainPlayerForPiP(player: activePlayer, video: currentVideo)
+        if !forceStopPlayer, PictureInPictureManager.shared.isPiPActiveOrStarting, let activePlayer = player {
+            tearDownRemoteTransportControls(clearMetadata: false)
+            PictureInPictureManager.shared.retainPlayerForPiP(
+                player: activePlayer,
+                video: currentVideo,
+                duration: duration
+            )
         } else {
+            tearDownRemoteTransportControls(clearMetadata: isViewDismissed || forceStopPlayer)
             if forceStopPlayer || isViewDismissed {
                 PictureInPictureManager.shared.stopAndReleasePiPIfNeeded()
                 PictureInPictureManager.shared.detach()
@@ -2232,6 +2436,7 @@ public struct VideoDetailPlaybackScreen: View {
         currentTime = 0
         duration = 0
         lastSavedSecond = -1
+        didTriggerEndForCurrentItem = false
         isPlaying = false
     }
     
@@ -2340,7 +2545,10 @@ public struct VideoDetailPlaybackScreen: View {
         guard !Task.isCancelled, !isViewDismissed else { return }
         episodes = eps
         if currentEpisode == nil {
-            currentEpisode = eps.first(where: { $0.pageUrl == video.playbackUrl }) ?? eps.first
+            let parsedEpNum = OfflineDownloadManager.extractEpisodeNumber(fromVideoID: video.id)
+            currentEpisode = eps.first(where: { $0.pageUrl == video.playbackUrl })
+                ?? parsedEpNum.flatMap { num in eps.first(where: { $0.number == num }) }
+                ?? eps.first
         }
         isLoadingEpisodes = false
         

@@ -100,15 +100,29 @@
     this.ended = false;
     this.stopped = false;
     this.isSettling = false;
+    this.skipping = false;
     this.speed = 1;
     this.hitStop = 0;
+    this.nextDelivery = 0;
+    this._reviveUsed = false;
+    this._reviving = false;
+    this.comboCount = 0;
+    this.lastHitTime = 0;
+    this.justinaWard = 0;
 
-    // 动态绑定章节超高清原厂战役背景 (ch1.webp ~ ch8.webp，保底 battle.webp)
-    const chapId = (this.chapter && this.chapter.id) || (stage && stage.id && parseInt(stage.id.split('-')[0], 10)) || 1;
-    const bgFile = (chapId >= 1 && chapId <= 8) ? `ch${chapId}.webp` : 'battle.webp';
+    // 动态绑定章节超高清原厂战役背景 (优先 chapter.bgWeb，支持第 1~10 章，保底 battle.webp)
+    const chapId = (this.chapter && this.chapter.id) || (stage && stage.id && parseInt(String(stage.id).split('-')[0], 10)) || 1;
+    let bgUrl = (this.chapter && this.chapter.bgWeb) || '';
+    if (!bgUrl) {
+      if (chapId === 9) bgUrl = 'assets/bg/rea_temple_b001.webp';
+      else if (chapId === 10) bgUrl = 'assets/bg/rea_throne_b002.webp';
+      else if (chapId >= 1 && chapId <= 8) bgUrl = `assets/bg/ch${chapId}.webp`;
+      else bgUrl = 'assets/bg/battle.webp';
+    }
     if (this.el) {
-      this.el.style.backgroundImage = `url(assets/bg/${bgFile})`;
-      this.el.querySelectorAll('.unit-tag, .dmg-float, .unit-shadow, .unit-fx, .slash-trail, .crit-vignette, .battle-combo').forEach((n) => n.remove());
+      this.el.onclick = null;
+      this.el.style.backgroundImage = `url(${bgUrl})`;
+      this.el.querySelectorAll('.unit-tag, .dmg-float, .unit-shadow, .unit-fx, .slash-trail, .crit-vignette, .battle-combo, .tactical-hud-el').forEach((n) => n.remove());
     }
     if (this.tags) this.tags.clear();
     if (this.shadows) this.shadows.clear();
@@ -200,6 +214,9 @@
         skills: h.skills || [], rarity: h.rarity,
         race: h.race, class: h.class, leader: laneIdx === 0,
         crit: heroCrit, mitigation: st.mitigation,
+        skillMult: st.skillMult || 1,
+        nanoRegen: st.nanoRegen || 0,
+        critDmgBonus: st.critDmgBonus || 0,
       });
 
       // 应用阵营共鸣增益
@@ -208,19 +225,26 @@
           if (syn.hpBonus) { allyUnit.maxHp = Math.round(allyUnit.maxHp * (1 + syn.hpBonus)); allyUnit.hp = allyUnit.maxHp; }
           if (syn.atkBonus) allyUnit.atk = Math.round(allyUnit.atk * (1 + syn.atkBonus));
           if (syn.mitBonus) allyUnit.mitigation = Math.min(0.75, (allyUnit.mitigation || 0) + syn.mitBonus);
-          if (syn.critBonus) allyUnit.crit = Math.min(0.40, (allyUnit.crit || 0) + syn.critBonus);
+          if (syn.critBonus) allyUnit.crit = Math.min(0.60, (allyUnit.crit || 0) + syn.critBonus);
           if (syn.speedBonus) allyUnit.speed = Math.round(allyUnit.speed * (1 + syn.speedBonus));
           if (syn.startShieldPct) allyUnit.shield = (allyUnit.shield || 0) + Math.round(allyUnit.maxHp * syn.startShieldPct);
-          if (syn.critDmgBonus) allyUnit.critDmgBonus = syn.critDmgBonus;
-          if (syn.healBoost) allyUnit.healBoost = syn.healBoost;
-          if (syn.lifesteal) allyUnit.lifesteal = syn.lifesteal;
+          if (syn.critDmgBonus) allyUnit.critDmgBonus = (allyUnit.critDmgBonus || 0) + syn.critDmgBonus;
+          if (syn.healBoost) allyUnit.healBoost = (allyUnit.healBoost || 0) + syn.healBoost;
+          if (syn.lifesteal) allyUnit.lifesteal = (allyUnit.lifesteal || 0) + syn.lifesteal;
         });
       }
 
-      // Justina Signature: Aegis Holy Ward
+      // Justina Signature: Team-wide Aegis Holy Ward
       if (h.key === 'justina') {
-        allyUnit.shield = (allyUnit.shield || 0) + Math.round(allyUnit.atk * 1.0);
+        const ward = Math.round(allyUnit.atk * 1.0);
+        this.justinaWard = ward;
+        allyUnit.shield = (allyUnit.shield || 0) + ward;
+        this.units.filter((u) => u.side === 'ally' && u.alive).forEach((u) => {
+          u.shield = (u.shield || 0) + ward;
+        });
         this.log('【神圣圣盾】Justina 为全队展开神圣护盾！');
+      } else if (this.justinaWard > 0) {
+        allyUnit.shield = (allyUnit.shield || 0) + this.justinaWard;
       }
 
       this.units.push(allyUnit);
@@ -265,24 +289,53 @@
 
   Battle.prototype.triggerReviveProtocol = function () {
     this.ended = false;
+    this.isSettling = false;
     this.running = true;
     this.units.filter((u) => u.side === 'ally').forEach((u) => {
       u.alive = true;
       u.dead = false;
       u.hp = u.maxHp;
       u.shield = Math.round(u.maxHp * 0.6);
-      u.atk = Math.round(u.atk * 2.2); // 狂暴翻倍斩杀！
-      u.speed = Math.round(u.speed * 1.6);
+      u.stun = 0;
+      u.poison = 0;
+      u.debuffAtk = 0;
+      u.haste = 5.0; // 5s +100% attack-speed haste matching modal description
+      u.cd = 0;
+      u.atk = Math.round(u.atk * 1.6);
+      u.speed = Math.round(u.speed * 1.4);
       if (this.spine && u.view) {
+        u.view.alpha = 1;
+        u.view.hitFlash = 0;
+        if (!this.spine.units.includes(u.view)) {
+          this.spine.units.push(u.view);
+        }
+        this.spine.position(u.view, u.x, u.footY);
         this.spine.resumeIdle(u.view);
       }
+      const tag = this.tags && this.tags.get(u.id);
+      if (tag) {
+        tag.classList.remove('dead');
+        tag.style.opacity = '1';
+        const bar = tag.querySelector('i');
+        if (bar) bar.style.width = '100%';
+      }
+      const shadow = this.shadows && this.shadows.get(u.id);
+      if (shadow) shadow.style.opacity = '0.72';
     });
+    if (this.strip) {
+      this.strip.forEach((s2) => {
+        s2.chip.classList.remove('dead');
+        if (s2.rail) s2.rail.style.width = '100%';
+      });
+    }
+    const allyBar = document.getElementById('ally-hp');
+    if (allyBar) allyBar.style.width = '100%';
     this.commanderEnergy = 100;
     this.updateCommanderUI();
-    this.log('💉【战术急救血清注入】全员满血复活，攻击力+120%，开始绝地反杀！');
-    if (window.NativeBridge) NativeBridge.haptic('bigWin');
-    if (window.LGVFX && this.el) {
-      window.LGVFX.victoryBurst(this.el);
+    this.log('💉【战术急救血清注入】全员满血复活，5秒狂暴攻速+100%，开始绝地反杀！');
+    if (window.NativeBridge && !this.skipping) NativeBridge.haptic('bigWin');
+    if (window.LGVFX && this.el && !this.skipping) {
+      window.LGVFX.victoryBurst();
     }
   };
 
@@ -301,9 +354,12 @@
       race: o.race || '', class: o.class || 'melee', leader: !!o.leader,
       cd: 0.6 + this.rng() * 0.5, energy: 0, alive: true,
       stun: 0, poison: 0, poisonTick: 0, buffAtk: 0, debuffAtk: 0,
-      counter: 0, evade: 0, lunge: 0, hurt: 0,
+      counter: 0, evade: 0, lunge: 0, hurt: 0, haste: 0,
       knockback: 0, knockbackDir: 0, stagger: 0, recoil: 0,
       crit: o.crit, mitigation: o.mitigation,
+      skillMult: o.skillMult || 1,
+      nanoRegen: o.nanoRegen || 0, nanoTick: 2.0,
+      critDmgBonus: o.critDmgBonus || 0,
     };
     u.view = this.spine.build(o.unit, { x: u.x, y: u.footY, heightPx: u.heightPx, flip: u.flip });
     return u;
@@ -352,7 +408,7 @@
           rangeFrac: opts.rangeFrac || 0,
           critChance: src ? src.crit : 0.10,
         },
-        { class: dst.class, race: dst.race },
+        { class: dst.class, race: dst.race, mitigation: dst.mitigation },
         { mult, rng: this.rng },
       );
       if (res.dodged) {
@@ -413,11 +469,13 @@
       dst.knockbackDir = dst.side === 'ally' ? -1 : 1;
 
       // 3. 暴击顿帧 (Hit-Stop 45ms) 与 Apple/Android 原生触感反馈
-      if (crit) {
-        this.hitStop = 0.045;
-        if (window.LGVFX) window.LGVFX.haptic('heavy');
-      } else {
-        if (window.LGVFX) window.LGVFX.haptic('light');
+      if (!this.skipping) {
+        if (crit) {
+          this.hitStop = 0.045;
+          if (window.LGVFX) window.LGVFX.haptic('heavy');
+        } else {
+          if (window.LGVFX) window.LGVFX.haptic('light');
+        }
       }
 
       // 4. 己方连击累加与浮现
@@ -428,12 +486,12 @@
           this.comboCount = 1;
         }
         this.lastHitTime = this.time;
-        if (this.comboCount >= 3) {
+        if (this.comboCount >= 3 && !this.skipping) {
           this.showCombo(this.comboCount);
         }
       }
 
-      if (window.LGVFX) {
+      if (window.LGVFX && !this.skipping) {
         const dp = this.spine.project(dst.x, dst.footY);
         const normPos = { x: (dp.x / this.W) * 100, y: (1 - dp.y / this.H) * 100 };
         window.LGVFX.hitSpark(normPos, crit);
@@ -447,7 +505,7 @@
 
       // Arachne Signature: Lifesteal 20%
       if (src && src.key === 'arachne' && src.alive && !opts.reflect && !opts.isCounter) {
-        const stolen = Math.round(dmg * 0.20);
+        const stolen = Math.round(dmg * 0.20 * (1 + (src.healBoost || 0)));
         if (stolen > 0) {
           src.hp = Math.min(src.maxHp, src.hp + stolen);
           this.float(src, '+' + stolen, 'heal');
@@ -456,7 +514,7 @@
 
       // Nature Synergy Lifesteal
       if (src && src.lifesteal && src.alive && !opts.reflect && !opts.isCounter) {
-        const stolen = Math.round(dmg * src.lifesteal);
+        const stolen = Math.round(dmg * src.lifesteal * (1 + (src.healBoost || 0)));
         if (stolen > 0) {
           src.hp = Math.min(src.maxHp, src.hp + stolen);
           this.float(src, '+' + stolen, 'heal');
@@ -500,6 +558,27 @@
     u.alive = false;
     u.hp = 0;
     this.trySkills(u, 'on_death', src);
+    if (u.reborn) {
+      u.reborn = false;
+      u.alive = true;
+      u.hp = Math.max(1, Math.round(u.maxHp * 0.4));
+      u.stun = 0;
+      u.poison = 0;
+      if (u.view) {
+        u.view.alpha = 1;
+        if (this.spine) this.spine.resumeIdle(u.view);
+      }
+      const rTag = this.tags.get(u.id);
+      if (rTag) {
+        rTag.classList.remove('dead');
+        rTag.style.opacity = '1';
+      }
+      const rShadow = this.shadows.get(u.id);
+      if (rShadow) rShadow.style.opacity = '0.72';
+      this.float(u, '浴火重生!', 'heal');
+      this.log('【战术重生】' + u.name + ' 触发重生协议，恢复 40% 生命重返战线！');
+      return;
+    }
     if (src && src.alive) this.trySkills(src, 'on_kill', u);
 
     // Kitty Signature: Falcon Kill Chain (Reset attack CD + grant Commander Energy)
@@ -521,33 +600,43 @@
       this.log('【混沌剧毒】Zoe 剧毒爆裂，对敌方全员造成毒爆冲击！');
     }
 
-    u.view.alpha = 0.35;
+    if (u.view) u.view.alpha = 0.35;
     const tag = this.tags.get(u.id);
     if (tag) tag.classList.add('dead');
     const shadow = this.shadows.get(u.id);
     if (shadow) shadow.style.opacity = '0';
-    if (window.LGVFX && this.spine) {
-      const dp = this.spine.project(u.x, u.footY);
-      const normPos = { x: (dp.x / this.W) * 100, y: (1 - dp.y / this.H) * 100 };
-      window.LGVFX.deathDissolve(normPos, u.side);
-    }
-    if (u.side === 'ally' && window.LGVFX) {
-      window.LGVFX.haptic('defeat');
+    if (!this.skipping) {
+      if (window.LGVFX && this.spine) {
+        const dp = this.spine.project(u.x, u.footY);
+        const normPos = { x: (dp.x / this.W) * 100, y: (1 - dp.y / this.H) * 100 };
+        window.LGVFX.deathDissolve(normPos, u.side);
+      }
+      if (u.side === 'ally' && window.LGVFX) {
+        window.LGVFX.haptic('defeat');
+      }
     }
     this.log(u.name + ' 被击倒');
     if (u.side === 'enemy') {
       this.commanderEnergy = Math.min(this.maxCommanderEnergy, this.commanderEnergy + 15);
       this.updateCommanderUI();
     }
-    this.spine.setAnim(u.view, 'damage', false);
-    setTimeout(() => {
-      if (!this.spine.units.includes(u.view)) return;
-      u.view.alpha = 0;
-      this.spine.remove(u.view);
-    }, 900);
+    if (u.view && this.spine) {
+      this.spine.setAnim(u.view, 'damage', false);
+      if (this.skipping) {
+        u.view.alpha = 0;
+        this.spine.remove(u.view);
+      } else {
+        this.schedule(() => {
+          if (u.alive || !this.spine || !this.spine.units.includes(u.view)) return;
+          u.view.alpha = 0;
+          this.spine.remove(u.view);
+        }, 900);
+      }
+    }
   };
 
   Battle.prototype.float = function (u, text, cls) {
+    if (this.skipping || !this.el || !this.spine) return;
     const el = document.createElement('div');
     el.className = 'dmg-float ' + (cls || '');
     el.textContent = text;
@@ -555,11 +644,11 @@
     el.style.left = (p.x / this.W * 100) + '%';
     el.style.top = ((1 - p.y / this.H) * 100 - 15) + '%';
     this.el.appendChild(el);
-    setTimeout(() => el.remove(), 850);
+    this.schedule(() => { if (el.parentNode) el.remove(); }, 850);
   };
 
   Battle.prototype.showCombo = function (count) {
-    if (!this.el || count < 3) return;
+    if (this.skipping || !this.el || count < 3) return;
     let comboEl = this.el.querySelector('.battle-combo');
     if (!comboEl) {
       comboEl = document.createElement('div');
@@ -606,7 +695,7 @@
   };
 
   Battle.prototype.trySkills = function (u, trigger, target) {
-    if (!u.alive || !u.skills || !u.skills.length) return;
+    if ((!u.alive && trigger !== 'on_death') || !u.skills || !u.skills.length) return;
     u.skillReady = u.skillReady || {};
     const now = this.time;
     u.skills.forEach((spec, i) => {
@@ -623,7 +712,8 @@
     const targets = this.scopeTargets(u, scope, target);
     if (!targets.length) return;
     const raw = Math.max(0, Number(spec.value) || 0);
-    const pct = raw > 0 ? Math.min(3, raw / 100) : 1;
+    const sMult = u.skillMult || 1;
+    const pct = (raw > 0 ? Math.min(3, raw / 100) : 1) * sMult;
     const HARM = new Set(['damage', 'instant_kill', 'poison', 'freeze', 'silence', 'debuff_atk', 'steal', 'lifesteal']);
     const BENEFIT = new Set(['heal', 'shield', 'buff_atk', 'buff_hp', 'cleanse', 'reborn', 'counter', 'transform', 'summon']);
     let chosen = targets;
@@ -634,9 +724,11 @@
       chosen = this.units.filter((a) => a.alive && a.side === u.side);
     }
     this.log(u.name + ' 触发「' + (spec.name || '技能') + '」');
-    const skillAnim = u.class === 'ranged' ? 'rangehit' : (u.view.data.animations.some((a) => a.name === 'hit') ? 'hit' : 'damage');
-    this.spine.setAnim(u.view, skillAnim, false, 0.45);
-    if (window.LGVFX) {
+    if (u.view && u.view.data) {
+      const skillAnim = u.class === 'ranged' ? 'rangehit' : (u.view.data.animations.some((a) => a.name === 'hit') ? 'hit' : 'damage');
+      this.spine.setAnim(u.view, skillAnim, false, 0.45);
+    }
+    if (window.LGVFX && !this.skipping) {
       window.LGVFX.skillCutIn(u, spec);
     }
 
@@ -649,15 +741,17 @@
       this.log('【以太超频】Dominica 激活战术链路，全队攻击过载强化！');
     }
     switch (spec.action) {
-      case 'damage':
-        chosen.forEach((t) => this.damage(u, t, u.atk * Math.max(0.4, pct)));
+      case 'damage': {
+        const dmgMult = Math.max(0.4, pct);
+        chosen.forEach((t) => this.damage(u, t, u.atk * dmgMult, { mult: dmgMult }));
         break;
+      }
       case 'heal':
         chosen.forEach((t) => {
-          const n = Math.round(t.maxHp * Math.max(0.05, pct));
+          const n = Math.round(t.maxHp * Math.max(0.05, pct) * (1 + (t.healBoost || 0)));
           t.hp = Math.min(t.maxHp, t.hp + n);
           this.float(t, '+' + n, 'heal');
-          if (window.LGVFX) {
+          if (window.LGVFX && !this.skipping) {
             const tp = this.spine.project(t.x, t.footY);
             window.LGVFX.healAura({ x: (tp.x / this.W) * 100, y: (1 - tp.y / this.H) * 100 });
           }
@@ -667,7 +761,7 @@
         chosen.forEach((t) => {
           t.shield += Math.round(u.atk * Math.max(0.3, pct));
           this.float(t, '护盾', 'heal');
-          if (window.LGVFX) {
+          if (window.LGVFX && !this.skipping) {
             const tp = this.spine.project(t.x, t.footY);
             window.LGVFX.shieldBarrier({ x: (tp.x / this.W) * 100, y: (1 - tp.y / this.H) * 100 });
           }
@@ -698,8 +792,9 @@
         break;
       case 'lifesteal':
         chosen.forEach((t) => {
-          const d = this.damage(u, t, u.atk);
-          u.hp = Math.min(u.maxHp, u.hp + Math.round(d * 0.6));
+          const d = this.damage(u, t, u.atk * sMult, { mult: sMult });
+          const healed = Math.round(d * 0.6 * (1 + (u.healBoost || 0)));
+          u.hp = Math.min(u.maxHp, u.hp + healed);
         });
         break;
       case 'counter':
@@ -722,15 +817,18 @@
         break;
       case 'transform':
         u.buffAtk = Math.max(u.buffAtk, 6);
-        u.shield += Math.round(u.atk * 0.5);
+        u.shield += Math.round(u.atk * 0.5 * sMult);
         this.float(u, '转换', 'heal');
         break;
-      case 'steal':
+      case 'steal': {
+        const stealMult = Math.max(0.5, pct);
         chosen.forEach((t) => {
-          const d = this.damage(u, t, u.atk * Math.max(0.5, pct));
-          u.hp = Math.min(u.maxHp, u.hp + Math.round(d * 0.5));
+          const d = this.damage(u, t, u.atk * stealMult, { mult: stealMult });
+          const healed = Math.round(d * 0.5 * (1 + (u.healBoost || 0)));
+          u.hp = Math.min(u.maxHp, u.hp + healed);
         });
         break;
+      }
       case 'summon':
       case 'stat_change':
       case 'skill_control':
@@ -738,7 +836,7 @@
         this.float(u, '强化', 'heal');
         break;
       default:
-        chosen.forEach((t) => this.damage(u, t, u.atk));
+        chosen.forEach((t) => this.damage(u, t, u.atk * sMult, { mult: sMult }));
         break;
     }
   };
@@ -791,7 +889,9 @@
 
     for (const u of this.units) {
       if (!u.alive) continue;
-      u.cd = Math.max(0, u.cd - dt);
+      const hasteRate = (u.haste || 0) > 0 ? 2 : 1;
+      u.haste = Math.max(0, (u.haste || 0) - dt);
+      u.cd = Math.max(0, u.cd - dt * hasteRate);
       u.hurt = Math.max(0, u.hurt - dt);
       u.lunge = Math.max(0, u.lunge - dt);
       u.recoil = Math.max(0, (u.recoil || 0) - dt);
@@ -803,6 +903,15 @@
       u.counter = Math.max(0, u.counter - dt);
       u.evade = Math.max(0, u.evade - dt);
       u.armorBreak = Math.max(0, (u.armorBreak || 0) - dt);
+      if (u.nanoRegen > 0 && u.hp < u.maxHp) {
+        u.nanoTick = (u.nanoTick === undefined ? 2.0 : u.nanoTick) - dt;
+        if (u.nanoTick <= 0) {
+          u.nanoTick = 2.0;
+          const regen = Math.max(1, Math.round(u.maxHp * u.nanoRegen * (1 + (u.healBoost || 0))));
+          u.hp = Math.min(u.maxHp, u.hp + regen);
+          this.float(u, '+' + regen, 'heal');
+        }
+      }
       if (u.poison > 0) {
         u.poison -= dt;
         u.poisonTick -= dt;
@@ -1018,6 +1127,10 @@
     if (this.ended) return;
     this.skipping = true;
     this.running = true;
+    if (typeof window !== 'undefined' && window.APP && window.APP._entranceTimer) {
+      clearTimeout(window.APP._entranceTimer);
+      window.APP._entranceTimer = null;
+    }
     if (this.deployWave) {
       for (let i = 0; i < 3; i++) this.deployWave(i);
     }
@@ -1076,7 +1189,7 @@
       }
       const allies = this.units.filter((u) => u.side === 'ally' && u.alive);
       allies.forEach((u) => {
-        const amt = Math.round(u.maxHp * 0.25);
+        const amt = Math.round(u.maxHp * 0.25 * (1 + (u.healBoost || 0)));
         u.hp = Math.min(u.maxHp, u.hp + amt);
         u.shield += Math.round(u.atk * 0.6);
         this.float(u, '+' + amt, 'heal');
@@ -1148,6 +1261,10 @@
     this.running = false;
     this.ended = true;
     this.isSettling = false;
+    if (typeof window !== 'undefined' && window.APP && window.APP._entranceTimer) {
+      clearTimeout(window.APP._entranceTimer);
+      window.APP._entranceTimer = null;
+    }
     if (this._timers) {
       this._timers.forEach(clearTimeout);
       this._timers = [];
@@ -1157,10 +1274,11 @@
       this._comboTimeout = null;
     }
     if (this.el) {
+      this.el.onclick = null;
       this.el.classList.remove('danger-pulse');
       const combo = this.el.querySelector('.battle-combo');
       if (combo) combo.remove();
-      this.el.querySelectorAll('.unit-tag, .dmg-float, .unit-shadow, .unit-fx, .slash-trail, .crit-vignette, .battle-combo').forEach((n) => n.remove());
+      this.el.querySelectorAll('.unit-tag, .dmg-float, .unit-shadow, .unit-fx, .slash-trail, .crit-vignette, .battle-combo, .tactical-hud-el').forEach((n) => n.remove());
     }
     if (this.spine) {
       if (this.spine.clear) {

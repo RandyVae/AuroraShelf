@@ -240,7 +240,8 @@ internal fun SearchScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier
                 .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.statusBars),
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .navigationBarsPadding(),
         ) {
             stickyHeader(key = "search-header") {
                 Box(
@@ -337,8 +338,8 @@ internal fun SearchScreen(
                                 val isSelected = selectedSourceFilter == src
                                 Surface(
                                     shape = RoundedCornerShape(16.dp),
-                                    color = if (isSelected) AuroraCoral else MaterialTheme.colorScheme.surfaceVariant,
-                                    border = BorderStroke(1.dp, if (isSelected) AuroraCoral else MaterialTheme.colorScheme.outlineVariant),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                    border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
                                     modifier = Modifier.applePressEffect {
                                         selectedSourceFilter = src
                                     },
@@ -354,7 +355,7 @@ internal fun SearchScreen(
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         ),
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier
@@ -388,7 +389,7 @@ internal fun SearchScreen(
                                 Text(
                                     text = "精选 ${topMatches.size} 部",
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = AuroraCoral,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                             }
                             Row(

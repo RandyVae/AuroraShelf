@@ -253,6 +253,7 @@ internal fun PlayerScreen(
     val selectedEpisodeLabel = episodes.firstOrNull { it.pageUrl == playbackUrl }?.label
     val cachedVideo = cachedVideos.firstOrNull { it.id == OfflineCacheManager.idFor(playbackUrl) }
 
+    val isInPipMode = com.aurorashelf.app.LocalIsInPipMode.current
     val launchCastForUrl: (CastDevice, String, String?, Long) -> Unit = { device, targetPageUrl, epLabel, resumePos ->
         scope.launch(Dispatchers.IO) {
             val targetCached = cachedVideos.firstOrNull {
@@ -260,7 +261,11 @@ internal fun PlayerScreen(
             }
             val resolved = runCatching { PlaybackResolver().resolve(targetPageUrl) }.getOrNull()
             val source = if (targetCached != null && targetCached.mediaUrl != null) {
-                PlaybackSource(targetCached.mediaUrl, resolved?.referer ?: targetPageUrl)
+                PlaybackSource(
+                    url = targetCached.mediaUrl,
+                    referer = targetCached.referer?.ifBlank { resolved?.referer ?: targetPageUrl } ?: (resolved?.referer ?: targetPageUrl),
+                    extraHeaders = targetCached.extraHeaders.ifEmpty { resolved?.extraHeaders.orEmpty() },
+                )
             } else {
                 resolved
             }
@@ -272,6 +277,7 @@ internal fun PlayerScreen(
                     videoUrl = source.url,
                     title = if (epLabel.isNullOrBlank()) video.title else "${video.title} · $epLabel",
                     referer = source.referer,
+                    extraHeaders = source.extraHeaders,
                     localFilePath = if (isLocalFile) source.url else null,
                     cacheKey = targetCached?.id,
                     initialPositionMs = resumePos,
@@ -326,8 +332,8 @@ internal fun PlayerScreen(
     }
 
     Surface(
-        color = if (isFullscreen) Color.Black else MaterialTheme.colorScheme.background,
-        contentColor = if (isFullscreen) Color.White else MaterialTheme.colorScheme.onBackground,
+        color = if (isFullscreen || isInPipMode) Color.Black else MaterialTheme.colorScheme.background,
+        contentColor = if (isFullscreen || isInPipMode) Color.White else MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.fillMaxSize(),
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -335,11 +341,18 @@ internal fun PlayerScreen(
             val screenHeight = maxHeight
             val density = LocalDensity.current
             val listState = rememberLazyListState()
+            val isTwoPaneLandscape = shouldUseTwoPaneLandscapeLayout(
+                width = screenWidth,
+                height = screenHeight,
+                isFullscreen = isFullscreen || isInPipMode,
+            )
+            val leftPaneWidthFraction = if (isTwoPaneLandscape) 0.62f else 1f
+            val effectivePaneWidth = screenWidth * leftPaneWidthFraction
 
-            val targetPlayerHeight = remember(videoAspectRatio, screenWidth, screenHeight) {
+            val targetPlayerHeight = remember(videoAspectRatio, effectivePaneWidth, screenHeight) {
                 calculateAdaptivePlayerHeight(
                     aspectRatio = videoAspectRatio,
-                    containerWidth = screenWidth,
+                    containerWidth = effectivePaneWidth,
                     containerHeight = screenHeight,
                 )
             }
@@ -352,8 +365,8 @@ internal fun PlayerScreen(
                 label = "player-height-expansion",
             )
 
-            val collapsedHeight = remember(screenWidth, animatedPlayerHeight) {
-                minOf(animatedPlayerHeight, screenWidth * (9f / 16f))
+            val collapsedHeight = remember(effectivePaneWidth, animatedPlayerHeight) {
+                minOf(animatedPlayerHeight, effectivePaneWidth * (9f / 16f))
             }
             val expandedHeight = animatedPlayerHeight
             val maxCollapsePx = with(density) {
@@ -465,15 +478,7 @@ internal fun PlayerScreen(
                 collapseOffsetDp = currentCollapseDp,
             )
 
-            val isTwoPaneLandscape = shouldUseTwoPaneLandscapeLayout(
-                width = screenWidth,
-                height = screenHeight,
-                isFullscreen = isFullscreen,
-            )
-            val twoPanePlayerHeight = (screenWidth * 0.62f * (9f / 16f))
-                .coerceIn(220.dp, screenHeight * 0.62f)
-            val leftPaneWidthFraction = if (isTwoPaneLandscape) 0.62f else 1f
-            val currentPlayerHeight = if (isTwoPaneLandscape) twoPanePlayerHeight else effectivePlayerHeight
+            val currentPlayerHeight = effectivePlayerHeight
             val handleEpisodeSelect: (PlaybackEpisode) -> Unit = { episode ->
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 playbackUrl = episode.pageUrl
@@ -571,7 +576,7 @@ internal fun PlayerScreen(
                 }
             }
 
-            if (!isFullscreen) {
+            if (!isFullscreen && !isInPipMode) {
                 LazyColumn(
                     state = listState,
                     contentPadding = PaddingValues(bottom = 32.dp),
@@ -582,7 +587,8 @@ internal fun PlayerScreen(
                         .fillMaxHeight()
                         .background(MaterialTheme.colorScheme.background)
                         .statusBarsPadding()
-                        .then(if (isTwoPaneLandscape) Modifier else Modifier.nestedScroll(nestedScrollConnection))
+                        .navigationBarsPadding()
+                        .nestedScroll(nestedScrollConnection)
                         .testTag("player-details"),
                 ) {
                     item(key = "player-space") {
@@ -653,6 +659,7 @@ internal fun PlayerScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .fillMaxHeight()
+                                .navigationBarsPadding()
                                 .testTag("player-right-rail"),
                         ) {
                             if (relatedVideos.isNotEmpty()) {
@@ -689,8 +696,8 @@ internal fun PlayerScreen(
                 )
             }
 
-            // Single persistent player container across portrait, tablet landscape split, and fullscreen
-            // so rotation never tears down or recreates ExoPlayer.
+            // Single persistent player container across portrait, tablet landscape split, PiP, and fullscreen
+            // so rotation/PiP never tears down or recreates ExoPlayer.
             NativeSitePlayer(
                 pageUrl = playbackUrl,
                 isFullscreen = isFullscreen,
@@ -701,14 +708,14 @@ internal fun PlayerScreen(
                 onDurationChange = { currentDurationMs = it },
                 onControllerVisibilityChange = { isPlayerControllerVisible = it },
                 onPlaybackEnded = handlePlaybackEnded,
-                keepTopBarVisible = !isFullscreen && isCasting,
+                keepTopBarVisible = !isFullscreen && !isInPipMode && isCasting,
                 suppressPlayback = suppressPlayback,
                 topBarStart = topBarBackButton,
                 topBarEnd = topBarRightControls,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .then(
-                        if (isFullscreen) {
+                        if (isFullscreen || isInPipMode) {
                             Modifier.fillMaxSize()
                         } else {
                             Modifier
@@ -720,27 +727,29 @@ internal fun PlayerScreen(
                     .testTag("native-player-container"),
             )
 
-            Box(
-                contentAlignment = Alignment.TopCenter,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .fillMaxWidth(leftPaneWidthFraction)
-                    .statusBarsPadding()
-                    .padding(
-                        top = 60.dp,
-                        start = if (isTwoPaneLandscape) 16.dp else 20.dp,
-                        end = if (isTwoPaneLandscape) 16.dp else 20.dp,
-                    ),
-            ) {
-                FloatingCastStatusBanner(
-                    visible = isCasting,
-                    connected = castState as? CastState.Connected,
-                    castManager = castManager,
-                    onOpenSheet = { isCastSheetVisible = true },
-                )
+            if (!isInPipMode) {
+                Box(
+                    contentAlignment = Alignment.TopCenter,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .fillMaxWidth(leftPaneWidthFraction)
+                        .statusBarsPadding()
+                        .padding(
+                            top = 60.dp,
+                            start = if (isTwoPaneLandscape) 16.dp else 20.dp,
+                            end = if (isTwoPaneLandscape) 16.dp else 20.dp,
+                        ),
+                ) {
+                    FloatingCastStatusBanner(
+                        visible = isCasting,
+                        connected = castState as? CastState.Connected,
+                        castManager = castManager,
+                        onOpenSheet = { isCastSheetVisible = true },
+                    )
+                }
             }
 
-            if (isCastSheetVisible) {
+            if (isCastSheetVisible && !isInPipMode) {
                 CastDeviceSheet(
                     castManager = castManager,
                     onDismissRequest = { isCastSheetVisible = false },
@@ -1335,7 +1344,9 @@ private fun PlayerRecommendationRow(
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onFavorite()
             },
-            modifier = Modifier.offset(x = 8.dp, y = (-8).dp),
+            modifier = Modifier
+                .minimumInteractiveComponentSize()
+                .offset(x = 8.dp, y = (-8).dp),
         ) {
             Icon(
                 imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,

@@ -2,6 +2,7 @@ import SwiftUI
 
 public struct HomeScreen: View {
     @ObservedObject public var repo = VideoRepository.shared
+    @ObservedObject private var account = AccountService.shared
     public let onPlayVideo: (VideoItem) -> Void
     public let onOpenSearch: () -> Void
     public let onOpenAccount: () -> Void
@@ -71,9 +72,11 @@ public struct HomeScreen: View {
                             onDetail: { selectedDetailVideo = $0 }
                         )
 
-                        AccountOnboardingCard(onOpenAccount: onOpenAccount)
+                        if account.profile == nil {
+                            AccountOnboardingCard(onOpenAccount: onOpenAccount)
+                        }
 
-                        // Apple TV 核心层级：流媒体频道与 19 视频源（Channels）
+                        // Apple TV 核心层级：流媒体频道与 18 视频源（Channels）
                         ChannelsShelf(
                             onOpenSourcePicker: { showSourcePicker = true }
                         )
@@ -156,8 +159,23 @@ public struct HomeScreen: View {
                                     )
                                 }
 
-                                // 4. 全量双列海报探索网格（确保所有视频作品完整呈现）
+                                // 4. 全量双列/多列海报探索网格（确保所有视频作品完整呈现）
                                 if !repo.feedVideos.isEmpty {
+                                    let form = DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
+                                    let baseMin = DeviceLayout.gridMinimumWidth(for: form)
+                                    let minColWidth: CGFloat = dynamicTypeSize.isAccessibilitySize ? max(baseMin, 260) : baseMin
+                                    let gridColumns = form.isWide
+                                        ? [GridItem(.adaptive(minimum: minColWidth, maximum: 260), spacing: AuroraMetrics.spacingM)]
+                                        : [
+                                            GridItem(.flexible(), spacing: AuroraMetrics.spacingM),
+                                            GridItem(.flexible(), spacing: AuroraMetrics.spacingM)
+                                        ]
+                                    let excludedIds: Set<String> = repo.top10Videos.isEmpty
+                                        ? Set(spotlightVideos.prefix(1).map(\.id))
+                                        : Set(repo.top10Videos.map(\.id)).union(spotlightVideos.prefix(1).map(\.id))
+                                    let remainingVideos = repo.feedVideos.filter { !excludedIds.contains($0.id) }
+                                    let gridVideos = remainingVideos.isEmpty ? repo.feedVideos : remainingVideos
+
                                     VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
                                         HStack {
                                             Text("全部作品")
@@ -165,21 +183,11 @@ public struct HomeScreen: View {
                                                 .fontWeight(.bold)
                                                 .foregroundStyle(AuroraColor.textPrimary)
                                             Spacer()
-                                            Text("\(repo.feedVideos.count) 部影片")
+                                            Text("\(gridVideos.count) 部影片")
                                                 .font(.footnote)
                                                 .foregroundStyle(AuroraColor.textSecondary)
                                         }
                                         .padding(.horizontal, AuroraMetrics.contentInset)
-
-                                        let gridColumns = horizontalSizeClass == .regular
-                                            ? [GridItem(.adaptive(minimum: 240, maximum: 340), spacing: AuroraMetrics.spacingM)]
-                                            : [
-                                                GridItem(.flexible(), spacing: AuroraMetrics.spacingM),
-                                                GridItem(.flexible(), spacing: AuroraMetrics.spacingM)
-                                            ]
-                                        let dropOffset = repo.top10Videos.isEmpty ? 1 : 11
-                                        let remainingVideos = Array(repo.feedVideos.dropFirst(dropOffset))
-                                        let gridVideos = remainingVideos.isEmpty ? repo.feedVideos : remainingVideos
 
                                         LazyVGrid(
                                             columns: gridColumns,
@@ -306,11 +314,6 @@ public struct HomeScreen: View {
             if let v = video {
                 VideoPreloadManager.shared.prewarm(video: v)
             }
-            if CommandLine.arguments.contains("--auto-play"), let v = video {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    playVideo(v)
-                }
-            }
             if CommandLine.arguments.contains("--open-detail"), let v = video {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     selectedDetailVideo = v
@@ -376,7 +379,7 @@ private struct AccountOnboardingCard: View {
                 Text("注册免费账号")
                     .font(.headline)
                     .foregroundStyle(AuroraColor.textPrimary)
-                Text("同步片单与历史，后续会员权益也会保留在账号中")
+                Text("保存账号与后续会员权益（片单与历史保存在本机）")
                     .font(.caption)
                     .foregroundStyle(AuroraColor.textSecondary)
                     .lineLimit(2)
@@ -500,7 +503,7 @@ public struct HeroLoadingPlaceholder: View {
             Rectangle()
                 .fill(
                     LinearGradient(
-                        colors: [Color.white.opacity(0.04), Color.white.opacity(0.08), Color.white.opacity(0.02)],
+                        colors: [AuroraColor.surfaceCard, AuroraColor.surfaceHigh, AuroraColor.canvas],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -510,19 +513,19 @@ public struct HeroLoadingPlaceholder: View {
             
             VStack(spacing: AuroraMetrics.spacingM) {
                 RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.white.opacity(0.1))
+                    .fill(AuroraColor.surfaceHigh)
                     .frame(width: 220, height: 28)
                 
                 RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.white.opacity(0.08))
+                    .fill(AuroraColor.surfaceCard)
                     .frame(width: 140, height: 16)
                 
                 HStack(spacing: AuroraMetrics.spacingL) {
                     RoundedRectangle(cornerRadius: 22)
-                        .fill(Color.white.opacity(0.12))
+                        .fill(AuroraColor.surfaceHigh)
                         .frame(height: 44)
                     RoundedRectangle(cornerRadius: 22)
-                        .fill(Color.white.opacity(0.08))
+                        .fill(AuroraColor.surfaceCard)
                         .frame(width: 120, height: 44)
                 }
                 .padding(.horizontal, AuroraMetrics.contentInset)

@@ -11,8 +11,23 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven("https://jitpack.io")
-        maven("https://clojars.org/repo")
+        exclusiveContent {
+            forRepository {
+                maven("https://jitpack.io")
+            }
+            filter {
+                includeGroup("com.github.TeamNewPipe")
+                includeGroup("com.github.InfinityLoop1308.PipePipeExtractor")
+            }
+        }
+        exclusiveContent {
+            forRepository {
+                maven("https://clojars.org/repo")
+            }
+            filter {
+                includeGroupByRegex("org\\.clojars(\\..+)?")
+            }
+        }
     }
 }
 

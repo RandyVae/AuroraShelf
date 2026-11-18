@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "ค้นหาวิดีโอ อนิเมะ การ์ตูน หรือรหัส";
-"search.concurrent_hint" = "ค้นหาจาก 20 แหล่งวิดีโอพร้อมกัน";
+"search.concurrent_hint" = "ค้นหาจาก %d แหล่งวิดีโอพร้อมกัน";
 "search.no_results" = "ไม่พบผลการค้นหา";
 "search.searching" = "กำลังค้นหา…";
 "search.history" = "ประวัติการค้นหา";
@@ -110,3 +110,6 @@
 "common.cancel" = "ยกเลิก";
 "common.close" = "ปิด";
 "common.ok" = "ตกลง";
+
+"settings.appearance" = "โหมดการแสดงผล";
+"settings.open_source" = "สัญญาอนุญาตโอเพนซอร์ส";

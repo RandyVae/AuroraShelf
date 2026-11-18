@@ -1,5 +1,6 @@
 import Foundation
 import CommonCrypto
+import CryptoKit
 
 enum ComicProtocolSecrets {
     private static let values: [String: String] = {
@@ -72,12 +73,7 @@ enum ComicProtocolSecrets {
     }
 
     static func md5Hex(_ value: String) -> String {
-        let data = Data(value.utf8)
-        var digest = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
-        data.withUnsafeBytes { bytes in
-            _ = CC_MD5(bytes.baseAddress, CC_LONG(data.count), &digest)
-        }
-        return digest.map { String(format: "%02x", $0) }.joined()
+        Insecure.MD5.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     static func hmacSHA256(_ value: String, secret: String) -> String {

@@ -103,21 +103,48 @@
         version: 1,
         lastSeed: null,
         freeSpins: 0,
+        freeSpinBet: null,
       },
+      slotsVaultClaimed: false,
+      isVip: false,
 
       transactions: [],
     };
   }
 
+  const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+  function safeReviver(key, value) {
+    if (FORBIDDEN_KEYS.has(key)) return undefined;
+    return value;
+  }
+
+  function sanitizeKeyArray(arr) {
+    if (!Array.isArray(arr)) return [];
+    const seen = new Set();
+    const out = [];
+    for (let i = 0; i < arr.length; i++) {
+      const k = arr[i];
+      if (typeof k === 'string' && k.length > 0 && !FORBIDDEN_KEYS.has(k) && !seen.has(k)) {
+        seen.add(k);
+        out.push(k);
+      }
+    }
+    return out;
+  }
+
   function nativeBridge() {
-    return (typeof window !== 'undefined' && window.AndroidSave) ? window.AndroidSave : null;
+    if (typeof window === 'undefined') return null;
+    return window.AuroraSaveBridge || window.AndroidSave || null;
   }
 
   function readStorage(k) {
     const bridge = nativeBridge();
     if (bridge) {
       try {
-        const v = bridge.getKey ? bridge.getKey(k) : (bridge.get && k === KEY ? bridge.get() : '');
+        const v = typeof bridge.getKey === 'function'
+          ? bridge.getKey(k)
+          : (typeof bridge.get === 'function' && k === KEY ? bridge.get() : '');
         if (v) return v;
       } catch (e) { /* fall through */ }
     }
@@ -132,8 +159,8 @@
     const bridge = nativeBridge();
     if (bridge) {
       try {
-        if (bridge.setKey) bridge.setKey(k, text);
-        else if (bridge.set && k === KEY) bridge.set(text);
+        if (typeof bridge.setKey === 'function') bridge.setKey(k, text);
+        else if (typeof bridge.set === 'function' && k === KEY) bridge.set(text);
       } catch (e) { /* fall through */ }
     }
     try {
@@ -141,6 +168,19 @@
     } catch (e) {
       console.warn('Local storage write error:', e);
     }
+  }
+
+  function clearStorage(k) {
+    const bridge = nativeBridge();
+    if (bridge) {
+      try {
+        if (typeof bridge.clearKey === 'function') bridge.clearKey(k);
+        else if (typeof bridge.clear === 'function' && k === KEY) bridge.clear();
+      } catch (e) { /* fall through */ }
+    }
+    try {
+      localStorage.removeItem(k);
+    } catch (e) { /* ignore */ }
   }
 
   function syncMirrors(state) {
@@ -197,7 +237,8 @@
     state.pulls = state.gacha.pulls = Math.max(0, Math.round(state.gacha.pulls || state.pulls || 0));
 
     if (!state.roster || typeof state.roster !== 'object') state.roster = {};
-    if (!Array.isArray(state.owned) || !state.owned.length) state.owned = STARTERS.slice();
+    state.owned = sanitizeKeyArray(state.owned);
+    if (!state.owned.length) state.owned = STARTERS.slice();
 
     // Ensure every owned hero has a roster instance
     state.owned.forEach((key) => {
@@ -216,11 +257,29 @@
       }
     });
 
-    if (!Array.isArray(state.squad) || !state.squad.length) state.squad = state.owned.slice(0, 3);
-    if (!state.inventory) state.inventory = { weapons: ['wp_plasma_blade'], armors: ['ar_kevlar_suit'], cores: ['cr_overclock_chip'] };
-    if (!Array.isArray(state.inventory.weapons)) state.inventory.weapons = [];
-    if (!Array.isArray(state.inventory.armors)) state.inventory.armors = [];
-    if (!Array.isArray(state.inventory.cores)) state.inventory.cores = [];
+    state.squad = sanitizeKeyArray(state.squad).slice(0, 3);
+    if (!state.squad.length) state.squad = state.owned.slice(0, 3);
+    if (!state.inventory || typeof state.inventory !== 'object') {
+      state.inventory = { weapons: ['wp_plasma_blade'], armors: ['ar_kevlar_suit'], cores: ['cr_overclock_chip'] };
+    }
+    state.inventory.weapons = Array.isArray(state.inventory.weapons) ? sanitizeKeyArray(state.inventory.weapons) : ['wp_plasma_blade'];
+    state.inventory.armors = Array.isArray(state.inventory.armors) ? sanitizeKeyArray(state.inventory.armors) : ['ar_kevlar_suit'];
+    state.inventory.cores = Array.isArray(state.inventory.cores) ? sanitizeKeyArray(state.inventory.cores) : ['cr_overclock_chip'];
+
+    // Migrate any currently equipped items on roster heroes into state.inventory so existing saves keep what they wear
+    const equipSlotMap = { weapon: 'weapons', armor: 'armors', core: 'cores' };
+    Object.keys(state.roster || {}).forEach((hKey) => {
+      const eq = state.roster[hKey] && state.roster[hKey].equips;
+      if (!eq || typeof eq !== 'object') return;
+      Object.entries(equipSlotMap).forEach(([slot, invKey]) => {
+        const itemId = eq[slot];
+        if (typeof itemId === 'string' && itemId.length > 0 && !FORBIDDEN_KEYS.has(itemId)) {
+          if (!state.inventory[invKey].includes(itemId)) {
+            state.inventory[invKey].push(itemId);
+          }
+        }
+      });
+    });
 
     if (!state.missions) state.missions = { daily: {}, achievements: {}, lastDailyReset: 0 };
     if (!state.missions.daily) state.missions.daily = {};
@@ -231,9 +290,11 @@
     if (!state.stats) state.stats = {};
     state.stats.slotsSpins = Math.max(0, Math.round(state.stats.slotsSpins || 0));
     state.stats.slotsWins = Math.max(0, Math.round(state.stats.slotsWins || 0));
-    if (!state.slots || typeof state.slots !== 'object') state.slots = { version: 1, lastSeed: null, freeSpins: 0 };
+    if (!state.slots || typeof state.slots !== 'object') state.slots = { version: 1, lastSeed: null, freeSpins: 0, freeSpinBet: null };
     state.slots.version = 1;
     state.slots.freeSpins = Math.max(0, Math.min(999, Math.round(state.slots.freeSpins || 0)));
+    state.slotsVaultClaimed = !!state.slotsVaultClaimed;
+    state.isVip = !!(state.isVip || (state.slotsSession && state.slotsSession.isVip));
 
     return state;
   }
@@ -316,10 +377,16 @@
     state.profile.updatedAt = Date.now();
 
     const json = JSON.stringify(state);
-    // Write backup first
+    // Preserve previous known-good snapshot from KEY into BACKUP_KEY BEFORE overwriting KEY
     try {
-      writeStorage(BACKUP_KEY, json);
-    } catch (e) { /* ignore */ }
+      const prevRaw = readStorage(KEY);
+      if (prevRaw && typeof prevRaw === 'string') {
+        const parsedPrev = JSON.parse(prevRaw, safeReviver);
+        if (parsedPrev && typeof parsedPrev === 'object' && !Array.isArray(parsedPrev)) {
+          writeStorage(BACKUP_KEY, prevRaw);
+        }
+      }
+    } catch (e) { /* existing KEY unreadable or corrupt; keep BACKUP_KEY intact */ }
 
     // Write main
     writeStorage(KEY, json);
@@ -350,13 +417,24 @@
     if (!text || typeof text !== 'string') throw new Error('存档文本无效');
     if (text.length > 500000) throw new Error('存档大小超出安全限制');
 
-    const parsed = JSON.parse(text);
-    if (!parsed || typeof parsed !== 'object') throw new Error('存档格式解析失败');
+    const parsed = JSON.parse(text, safeReviver);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('存档格式解析失败');
+    if (parsed.owned !== undefined && !Array.isArray(parsed.owned)) throw new Error('存档特勤列表格式无效');
+    if (parsed.squad !== undefined && !Array.isArray(parsed.squad)) throw new Error('存档编队格式无效');
+    if (Array.isArray(parsed.owned)) parsed.owned = sanitizeKeyArray(parsed.owned);
+    if (Array.isArray(parsed.squad)) parsed.squad = sanitizeKeyArray(parsed.squad);
+
     if (parsed.v === 1 || !parsed.v) {
       return migrateV1toV2(parsed);
     }
     const base = defaults();
     const merged = Object.assign(base, parsed);
+    merged.wallet = Object.assign(base.wallet, parsed.wallet || {});
+    merged.settings = Object.assign(base.settings, parsed.settings || {});
+    merged.stats = Object.assign(base.stats, parsed.stats || {});
+    merged.inventory = Object.assign(base.inventory, parsed.inventory || {});
+    merged.missions = Object.assign(base.missions, parsed.missions || {});
+    merged.slots = Object.assign(base.slots, parsed.slots || {});
     syncMirrors(merged);
     return merged;
   }
@@ -421,15 +499,19 @@
     KEY,
     BACKUP_KEY,
     defaults,
+    defaultState: defaults,
     load,
     persist,
     exportText,
     importText,
     reset,
+    clearStorage,
+    nativeBridge,
     STARTERS,
     createHeroInstance,
     recordTransaction,
     syncMirrors,
+    normalize: syncMirrors,
     applyQAFullTestResources,
   };
 })();

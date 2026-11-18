@@ -1,65 +1,84 @@
 # Third-party notices
 
-## PipePipeExtractor
+This document lists the open-source libraries, runtime components, and public protocol references integrated or consulted in Netgrey (`AuroraShelf`).
 
-This project includes PipePipeExtractor source code under
-`third_party/pipepipe-extractor`. PipePipeExtractor is licensed under the GNU
-General Public License version 3. Its license text is preserved at
-`third_party/pipepipe-extractor/LICENSE`.
+---
 
-The integrated code is used only for public video catalog, search, metadata,
-and playback-source extraction. Login, membership, and payment features are
-not enabled in AuroraShelf. AuroraShelf's separate offline cache is built on
-AndroidX Media3 and does not reuse a source application's download feature.
+## 1. PipePipeExtractor (GNU General Public License v3.0)
 
-## Haze
+The Android client integrates `PipePipeExtractor` source code under `third_party/pipepipe-extractor`. `PipePipeExtractor` is licensed under the **GNU General Public License version 3 (GPL-3.0)**. The complete license text is preserved at `third_party/pipepipe-extractor/LICENSE`.
 
-AuroraShelf uses Haze 1.7.3 for hardware-accelerated background blur in its
-Compose interface. Haze is Copyright 2024 Chris Banes and contributors and is
-licensed under the Apache License 2.0.
+In compliance with GPLv3, complete corresponding source code for the Android application and its `PipePipeExtractor` integration is published in the official repository (<https://github.com/RandyVae/AuroraShelf>). The extractor is used solely for public video catalog browsing, search, metadata parsing, and playback-stream resolution.
+
+Upstream project: <https://github.com/InfinityLoop1308/PipePipeExtractor>
+
+---
+
+## 2. Spine WebGL Runtime (Spine Runtimes License Agreement)
+
+The built-in offline game integrates the Spine WebGL Runtime (`spine-webgl.min.js`) for 2D skeletal animation rendering. Copyright (c) 2013-2025, Esoteric Software LLC. Distributed under the **Spine Runtimes License Agreement** (last updated April 5, 2025).
+
+Full license text is bundled in both client asset trees at:
+- `app/src/main/assets/www/vendor/spine-LICENSE.txt`
+- `ios/AuroraShelf/Resources/www/vendor/spine-LICENSE.txt`
+
+Upstream license reference: <http://esotericsoftware.com/spine-editor-license>
+
+---
+
+## 3. AndroidX Media3 / ExoPlayer (Apache License 2.0)
+
+The Android client uses AndroidX Media3 (`media3-exoplayer`, `media3-exoplayer-hls`, `media3-ui`, `media3-database`, `media3-datasource`, v1.11.0) for hardware-accelerated MP4/HLS playback and local offline media caching. Copyright The Android Open Source Project; licensed under the **Apache License 2.0**.
+
+Project: <https://github.com/androidx/media>
+
+---
+
+## 4. OkHttp (Apache License 2.0)
+
+The Android client uses Square OkHttp (transitively and directly in `AuroraHttpClient`, `AccountRepository`, and Coil network transport) for HTTP/2 connection pooling, DoH/custom DNS resolution, and TLS transport. Copyright Square, Inc.; licensed under the **Apache License 2.0**.
+
+Project: <https://github.com/square/okhttp>
+
+---
+
+## 5. Coil 3 (Apache License 2.0)
+
+The Android client uses Coil 3 (`io.coil-kt.coil3:coil-compose` and `coil-network-okhttp`, v3.3.0) for asynchronous image loading, memory/disk caching, and custom header/de-scrambling pipelines. Copyright Coil Contributors; licensed under the **Apache License 2.0**.
+
+Project: <https://github.com/coil-kt/coil>
+
+---
+
+## 6. Jsoup (MIT License)
+
+The Android client uses Jsoup (`org.jsoup:jsoup`, v1.21.2) for HTML parsing, DOM traversal, and sanitization across video, comic, and forum adapters. Copyright 2009-2025 Jonathan Hedley; licensed under the **MIT License**.
+
+Project: <https://jsoup.org/> / <https://github.com/jhy/jsoup>
+
+---
+
+## 7. Haze (Apache License 2.0)
+
+The Android client uses Haze (`dev.chrisbanes.haze:haze` and `haze-materials`, v1.7.3) for hardware-accelerated background blur in Jetpack Compose surfaces. Copyright 2024 Chris Banes and contributors; licensed under the **Apache License 2.0**.
 
 Project: <https://github.com/chrisbanes/haze>
 
-## pica_configs
+---
 
-The native comic-source adapters use public endpoint and document-structure
-information from wgh136/pica_configs. The project is licensed under the MIT
-License. AuroraShelf does not download or execute its JavaScript at runtime.
+## 8. AndroidLiquidGlass / Backdrop & Shapes (Apache License 2.0)
 
-Project: <https://github.com/wgh136/pica_configs>
-
-## PicaComic protocol reference
-
-The Picacg adapter was independently implemented from the public protocol
-behavior documented by PicaComic. No GPL-licensed Haka Comic source code is
-copied into AuroraShelf. PicaComic is licensed under the MIT License.
-
-Project: <https://github.com/wgh136/PicaComic>
-
-## E-Hentai public-site reference
-
-The E-Hentai adapter parses the anonymously accessible public HTML site. The
-implementation was informed by the public behavior documented by JHenTai,
-licensed under the Apache License 2.0. AuroraShelf does not include private
-ExHentai cookies or bypass access controls.
-
-Project: <https://github.com/jiangtian616/JHenTai>
-
-> Verification note (2026-10-24): the repository owner/path and license above were recorded offline and have **not been verified against the upstream repository**. Confirm the canonical URL and license online before release; do not treat this entry as final until checked.
-
-## JMComic protocol reference
-
-The JMComic adapter was independently implemented from the public protocol and
-image-scrambling behavior documented by JMComic-Crawler-Python. That project is
-licensed under the MIT License.
-
-Project: <https://github.com/hect0x7/JMComic-Crawler-Python>
-
-## AndroidLiquidGlass / Backdrop
-
-AuroraShelf uses Backdrop 2.0.1 and Shapes 1.2.1 from
-AndroidLiquidGlass. Copyright Kyant and contributors; licensed under the
-Apache License 2.0. Portions of the liquid bottom-navigation interaction are
-adapted from the project's Apache-licensed sample and are marked in source.
+The Android client uses `io.github.kyant0:backdrop` (v2.0.1) and `io.github.kyant0:shapes` (v1.2.1) from AndroidLiquidGlass for real-time optical refraction and liquid bottom-navigation lens effects. Copyright Kyant and contributors; licensed under the **Apache License 2.0**. Portions of the liquid navigation gesture interaction are adapted from the Apache-2.0 sample and attributed in source.
 
 Project: <https://github.com/Kyant0/AndroidLiquidGlass>
+
+---
+
+## 9. Protocol & Public-Site Structure References
+
+The native Kotlin (Android) and Swift (iOS) comic adapters were independently written in Kotlin and Swift without bundling runtime scripts from the following open-source projects, which served as public protocol and document-structure references:
+
+- **wgh136/pica_configs** — MIT License (<https://github.com/wgh136/pica_configs>): endpoint and HTML/JSON structure reference for comic adapters.
+- **wgh136/PicaComic** — MIT License (<https://github.com/wgh136/PicaComic>): public Picacg client protocol behavior reference.
+- **jiangtian616/JHenTai** — Apache License 2.0 (<https://github.com/jiangtian616/JHenTai>): anonymous public E-Hentai gallery HTML structure reference.
+- **hect0x7/JMComic-Crawler-Python** — MIT License (<https://github.com/hect0x7/JMComic-Crawler-Python>): public JMComic API encryption and segmented image de-scrambling algorithm reference.

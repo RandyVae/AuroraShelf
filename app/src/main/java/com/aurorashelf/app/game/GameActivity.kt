@@ -53,6 +53,7 @@ import kotlin.math.max
 class GameActivity : ComponentActivity() {
     private var webView: WebView? = null
     private var assetServer: GameAssetServer? = null
+    private var saveBridge: GameSaveBridge? = null
     private var exitCapsule: View? = null
     private val handler = Handler(Looper.getMainLooper())
     private val autoFadeRunnable = Runnable {
@@ -90,7 +91,7 @@ class GameActivity : ComponentActivity() {
             val server = GameAssetServer(applicationContext).also { assetServer = it }
             val port = server.start()
             activeAssetPort = port
-            url = "http://127.0.0.1:$port/index.html"
+            url = server.buildEntryUrl()
         } catch (e: Exception) {
             assetServer = null
         }
@@ -116,21 +117,51 @@ class GameActivity : ComponentActivity() {
         wv.defaultFocusHighlightEnabled = false
         wv.overScrollMode = View.OVER_SCROLL_NEVER
 
-        wv.addJavascriptInterface(GameSaveBridge(applicationContext), "AndroidSave")
+        val bridge = GameSaveBridge(applicationContext).also { saveBridge = it }
+        wv.addJavascriptInterface(bridge, "AndroidSave")
         wv.addJavascriptInterface(GameNativeBridge(this), "AndroidNative")
         wv.webViewClient = object : android.webkit.WebViewClient() {
+            private fun isAllowedGameTarget(target: android.net.Uri): Boolean {
+                val scheme = target.scheme?.lowercase() ?: return false
+                if (scheme == "data" || scheme == "blob") return true
+                return if (usingLocalHttp) {
+                    scheme == "http" && target.host == "127.0.0.1" && target.port == activeAssetPort
+                } else {
+                    if (scheme != "file") return false
+                    val rawPath = target.path ?: return false
+                    val canonical = runCatching { java.io.File(rawPath).canonicalPath }.getOrNull() ?: return false
+                    canonical.startsWith("/android_asset/www/") && !rawPath.contains("..")
+                }
+            }
+
             override fun shouldOverrideUrlLoading(
                 view: WebView?,
                 request: android.webkit.WebResourceRequest?,
             ): Boolean {
                 val target = request?.url ?: return true
-                val allowed = if (usingLocalHttp) {
-                    target.scheme == "http" && target.host == "127.0.0.1" && target.port == activeAssetPort
-                } else {
-                    target.scheme == "file" && (target.path?.startsWith("/android_asset/www/") == true)
-                }
-                return !allowed
+                return !isAllowedGameTarget(target)
             }
+
+            override fun shouldInterceptRequest(
+                view: WebView?,
+                request: android.webkit.WebResourceRequest?,
+            ): android.webkit.WebResourceResponse? {
+                val target = request?.url ?: return blockedResponse()
+                if (!isAllowedGameTarget(target)) {
+                    return blockedResponse()
+                }
+                return super.shouldInterceptRequest(view, request)
+            }
+
+            private fun blockedResponse(): android.webkit.WebResourceResponse =
+                android.webkit.WebResourceResponse(
+                    "text/plain",
+                    "utf-8",
+                    403,
+                    "Forbidden",
+                    emptyMap(),
+                    java.io.ByteArrayInputStream(ByteArray(0)),
+                )
         }
         wv.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(m: ConsoleMessage): Boolean {
@@ -227,11 +258,12 @@ class GameActivity : ComponentActivity() {
         // 左半部：··· 功能菜单
         val menuBtn = TextView(this).apply {
             text = "···"
+            contentDescription = "游戏功能菜单"
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(dpToPx(42), dpToPx(32))
+            layoutParams = LinearLayout.LayoutParams(dpToPx(48), dpToPx(48))
             isClickable = true
             isFocusable = true
             setOnClickListener { v ->
@@ -243,7 +275,7 @@ class GameActivity : ComponentActivity() {
 
         // 中间半透明垂直分割线
         val divider = View(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dpToPx(1), dpToPx(14))
+            layoutParams = LinearLayout.LayoutParams(dpToPx(1), dpToPx(18))
             setBackgroundColor(Color.argb(60, 255, 255, 255))
         }
         capsule.addView(divider)
@@ -251,11 +283,12 @@ class GameActivity : ComponentActivity() {
         // 右半部：✕ 关闭退出按键
         val closeBtn = TextView(this).apply {
             text = "✕"
+            contentDescription = "退出游戏"
             setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(dpToPx(42), dpToPx(32))
+            layoutParams = LinearLayout.LayoutParams(dpToPx(48), dpToPx(48))
             isClickable = true
             isFocusable = true
             setOnClickListener { v ->
@@ -322,6 +355,7 @@ class GameActivity : ComponentActivity() {
         super.onPause()
         webView?.evaluateJavascript("window.APP && APP.pauseGame && APP.pauseGame()", null)
         webView?.onPause()
+        saveBridge?.flushSync()
     }
 
     override fun onResume() {
@@ -340,6 +374,8 @@ class GameActivity : ComponentActivity() {
             wv.destroy()
         }
         webView = null
+        saveBridge?.flushSync()
+        saveBridge = null
         assetServer?.stop()
         assetServer = null
         exitCapsule = null

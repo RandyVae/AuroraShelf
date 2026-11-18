@@ -19,6 +19,7 @@ public struct LiveDetailView: View {
     @State private var hudMessage: String?
     @State private var hudTask: DispatchWorkItem?
     @State private var stripchatComments: [LiveComment] = []
+    @State private var isCommentBridgeActive: Bool = false
 
     public init(
         stream: LiveStreamItem,
@@ -108,6 +109,7 @@ public struct LiveDetailView: View {
                                     stream: stream,
                                     externalComments: stripchatComments,
                                     isLivePlaying: true,
+                                    isCommentBridgeActive: isCommentBridgeActive,
                                     isExpanded: $isCommentsExpanded,
                                     maxBodyHeight: 240
                                 )
@@ -140,12 +142,12 @@ public struct LiveDetailView: View {
                 if let hud = hudMessage {
                     Text(hud)
                         .font(.callout.bold())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AuroraColor.textPrimary)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
                         .background(.ultraThinMaterial, in: Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
-                        .shadow(color: .black.opacity(0.5), radius: 8, y: 3)
+                        .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
+                        .shadow(color: .black.opacity(0.28), radius: 8, y: 3)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                         .transition(.scale(scale: 0.9).combined(with: .opacity))
                         .zIndex(30)
@@ -195,6 +197,7 @@ public struct LiveDetailView: View {
             isLandscape: $isLandscape,
             isFillMode: $isFillMode,
             topSafeArea: DeviceLayout.safeAreaTop(in: screenGeo.size),
+            isChatPresented: $showChat,
             onDismiss: {
                 onDismiss()
             },
@@ -203,6 +206,9 @@ public struct LiveDetailView: View {
             },
             onComment: { comment in
                 stripchatComments = Array((stripchatComments + [comment]).suffix(50))
+            },
+            onCommentBridgeStateChange: { active in
+                isCommentBridgeActive = active
             }
         )
         .id(stream.id)
@@ -235,6 +241,7 @@ public struct LiveDetailView: View {
                 stream: stream,
                 externalComments: stripchatComments,
                 isLivePlaying: true,
+                isCommentBridgeActive: isCommentBridgeActive,
                 isExpanded: $isCommentsExpanded,
                 maxBodyHeight: min(240, max(120, screenHeight * 0.28))
             )
@@ -318,9 +325,11 @@ public struct LiveDetailView: View {
                             .multilineTextAlignment(.leading)
                     }
 
-                    Label("\(related.viewCount)", systemImage: "person.2.fill")
-                        .font(.caption2)
-                        .foregroundStyle(AuroraColor.textTertiary)
+                    if let viewers = related.viewCount.value {
+                        Label("\(viewers)", systemImage: "person.2.fill")
+                            .font(.caption2)
+                            .foregroundStyle(AuroraColor.textTertiary)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -354,16 +363,18 @@ public struct LiveDetailView: View {
 
                 Spacer()
 
-                HStack(spacing: 4) {
-                    Image(systemName: "person.2.fill")
-                        .font(.caption2)
-                    Text("\(stream.viewCount)")
-                        .font(.caption.bold())
+                if let viewers = stream.viewCount.value {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption2)
+                        Text("\(viewers)")
+                            .font(.caption.bold())
+                    }
+                    .foregroundStyle(AuroraColor.brandLabel)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(AuroraColor.brand.opacity(0.15), in: Capsule())
                 }
-                .foregroundStyle(AuroraColor.brandLabel)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(AuroraColor.brand.opacity(0.15), in: Capsule())
             }
 
             Text(stream.title.isEmpty ? "正在直播中" : stream.title)

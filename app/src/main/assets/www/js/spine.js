@@ -83,7 +83,35 @@
   };
 
   SpineField.prototype.loadAll = function () {
-    return this.am ? this.am.loadAll() : Promise.resolve();
+    if (!this.am) return Promise.resolve();
+    return this.am.loadAll().catch((errs) => {
+      const errObj = (errs && typeof errs === 'object') ? errs : (this.am.errors || {});
+      const failedPaths = Object.keys(errObj);
+      if (this.am.cache && this.am.cache.assetsLoaded) {
+        failedPaths.forEach((p) => {
+          delete this.am.cache.assetsLoaded[p];
+        });
+      }
+      if (this._queued) {
+        for (const [uName, meta] of Object.entries(this._queued)) {
+          const hit = !meta || failedPaths.some((p) =>
+            p === meta.atlas ||
+            p === meta.json ||
+            p.indexOf('/' + meta.resolvedUnit + '/') !== -1 ||
+            p.indexOf('/' + uName + '/') !== -1
+          );
+          if (hit) {
+            if (this.am.cache && this.am.cache.assetsLoaded && meta) {
+              if (meta.atlas) delete this.am.cache.assetsLoaded[meta.atlas];
+              if (meta.json) delete this.am.cache.assetsLoaded[meta.json];
+            }
+            delete this._queued[uName];
+          }
+        }
+      }
+      this.am.errors = {};
+      throw errs;
+    });
   };
 
   SpineField.prototype.build = function (unitName, opts) {
@@ -252,6 +280,23 @@
       this.renderer.drawSkeleton(v.skeleton, true);
     }
     this.renderer.end();
+  };
+
+  SpineField.prototype.dispose = function () {
+    this.clear();
+    try {
+      if (this.am && typeof this.am.dispose === 'function') this.am.dispose();
+      if (this.renderer && typeof this.renderer.dispose === 'function') this.renderer.dispose();
+      const gl = this.ctx && this.ctx.gl;
+      if (gl && typeof gl.getExtension === 'function') {
+        const loseExt = gl.getExtension('WEBGL_lose_context');
+        if (loseExt) loseExt.loseContext();
+      }
+    } catch (_) {}
+    this.am = null;
+    this.renderer = null;
+    this.ctx = null;
+    this._queued = {};
   };
 
   window.SpineField = SpineField;

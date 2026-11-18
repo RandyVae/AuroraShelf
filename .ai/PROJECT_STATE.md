@@ -1,6 +1,23 @@
 # Project State
 
-## 最新工作状态（2026年11月18日 · 五层端侧自治容灾与极速加载引擎研发论证＋三端 Release 模拟器全绿验收＋香港繁体正式报告与全通道上线 · v2.16.40 Build 266）
+## 最新工作状态（2026年11月18日 · 全栈 86 项优化审计问题全面整改＋服务端安全部署＋三端 Release 模拟器全绿验收与双通道同步上线 · v2.17.0 Build 267）
+
+- **版本号全链路同步至 `v2.17.0 (Build 267)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`（`publish_ota.sh --check-versions` 校验通过）。
+- **后端、OTA 与发布管线安全闭环（`SEC-01`、`SEC-02`、`SEC-11`、`OPS-01..10`）**：
+  - [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 将 `devices.json` 与 `testflight_invites.json` 迁至 `/var/lib/netgrey-ota/`（`0700` 目录 / `0600` 文件）并自动迁移清理 `/var/www/netgrey/` 旧文件；新增 `/api/udid/enroll`（口令校验签发 10 分钟单次 HMAC `enrollment_token`）、`/api/udid/enroll.mobileconfig`、`/api/receive-udid`（CMS 剥离 + 单次 nonce 防重放 + `provisioned=1|0` 判定）与 `/api/udid/status`；升级 `BoundedThreadingTCPServer(max_workers=16)`、`OrderedDict` LRU 限流与全局口令防爆。
+  - [netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf)、[netgrey-pocketbase.service](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-pocketbase.service) 与 `1731900000_lock_users_rules.js` 锁定 PocketBase 用户表查询/提权边界并拦截 `/auth-api/_/`、`/devices.json`、`/invites.json`（均实测返回 `HTTP 404`）。
+  - 完善 [THIRD_PARTY_NOTICES.md](file:///Users/itou/Documents/ChatGPT/91pron/THIRD_PARTY_NOTICES.md)、[README.md](file:///Users/itou/Documents/ChatGPT/91pron/README.md) 与 [.github/workflows/ci.yml](file:///Users/itou/Documents/ChatGPT/91pron/.github/workflows/ci.yml)。
+- **Android、iOS/iPadOS 与 Web 游戏全栈整改（`SEC-03..14`、`PLY-01..19`、`DAT-01..16`、`UIX-01..13`、`GAM-01..14`）**：
+  - **Android**：移除 `network_security_config.xml` 全局 `src="user"` 证书信任与 `backup_rules.xml` 冲突，收窄宽松 TLS 域名边界，加固 `LocalMediaProxy` 环回绑定与请求头白名单，落地原生 PiP 与多窗口 `ON_STOP` 生命周期，消除 `LiveSessionCache` 静态 `WebView` 泄漏，补齐验证邮件重发、直播/论坛页内真实搜索、Webtoon 超长条漫分块防 OOM、浅色/深色对比度及繁体/英文 `strings.xml`。
+  - **iOS / iPadOS**：删除无引用 `intro_film.mp4` 与死文件 `NativePlayerView.swift`，新增 [GameSaveStore.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Game/GameSaveStore.swift)、[ComicReadingProgressStore.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Comic/ComicReadingProgressStore.swift) 与 [PlayerMediaTrackMenu.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/PlayerMediaTrackMenu.swift)，支持四域聚合搜索（视频/漫画/直播/社区）、外观三态切换（跟随系统/浅色/深色）、动态账号资料卡、开源许可弹窗、真实磁盘容量统计及 12 语种 `InfoPlist.strings` / `Localizable.strings`（香港繁体正字校准）。
+  - **Web Game (`Lust Goddess v2.17.0`)**：打通 `window.AuroraSaveBridge || window.AndroidSave` 与写前 `BACKUP_KEY` 快照、页内导入/导出弹窗、修复 `handleAppBack()` 软锁与战斗复活死锁、补全 11 看板娘 Spine 映射、修复 Spine `AssetManager` 错误恢复与音频池键清理，移除 `Disable/` 死音频。
+- **双端验证与同步发布（`v2.17.0 Build 267`）**：
+  - Web Game：`verify-game-logic.js`、`verify-fixes.js`、`verify_curated_assets.py` 全通（0 异常）。
+  - Android：`testDebugUnitTest`（43 套件 276 项：268 通 / 8 跳 / 0 失败）、在线 `com.aurorashelf.app.data.*` 全通、`lintDebug` 0 error、`assembleRelease` 生成 `dist/Netgrey.apk`（`143,321,062` B）；`emulator-5554` R8 APK 全模块走查通过。
+  - iOS / iPadOS：离线 XCTest 全通，在线 `LiveVideoSourceAuditTests`（18/18 视频）、`ComicRepositoryTests`（9/9 免登漫画含 `91动漫漫画` 动态 CDN 解密）、`ForumRepositoryTests`（7/7 版块列表+详情+翻页）与 `LiveSourceAdapterTests` 全通；`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器全模块走查通过。
+  - 双通道发布：OTA `https://bananarey.us`（`Netgrey.apk` `137M`、`Netgrey.ipa` `134M`、`manifest.plist` `2.17.0`、`source-manifest.json` `2.17.0` 均 `HTTP 200`，`/` 剩 `11G`）与 TestFlight Build `267` 同步上线。
+
+## 历史工作状态（2026年11月18日 · 五层端侧自治容灾与极速加载引擎研发论证＋三端 Release 模拟器全绿验收＋香港繁体正式报告与全通道上线 · v2.16.40 Build 266）
 
 - **版本号全链路同步至 `v2.16.40 (Build 266)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与新增远程清单 [source-manifest.json](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/source-manifest.json)。
 - **Android 5 层容灾引擎全面落地**：

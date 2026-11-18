@@ -3,6 +3,30 @@ import UIKit
 
 // MARK: - Aurora Design Tokens (Single Source of Truth)
 
+public enum AuroraThemeMode: String, CaseIterable, Identifiable, Sendable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .system: return "settings.follow_system".localized
+        case .light: return "浅色 / Light"
+        case .dark: return "深色 / Dark"
+        }
+    }
+
+    public var preferredColorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 public enum AuroraColor {
     // 品牌
     public static let brand        = Color(rgb: 0xFF4F7B)   // AuroraCoral，1:1 对齐 Android

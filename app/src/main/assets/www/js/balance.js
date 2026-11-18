@@ -141,7 +141,10 @@
     }
     const v = C.varianceMin + rnd() * (C.varianceMax - C.varianceMin);
     dmg *= v;
-    dmg *= 1 - mitigation(defender.class);
+    const defMit = (defender && defender.mitigation != null)
+      ? Math.max(0, Math.min(0.75, Number(defender.mitigation) || 0))
+      : mitigation(defender.class);
+    dmg *= 1 - defMit;
     return { damage: Math.max(1, Math.round(dmg)), crit, dodged: false, mult: skillMult };
   }
 

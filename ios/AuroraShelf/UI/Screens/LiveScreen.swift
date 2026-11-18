@@ -21,8 +21,8 @@ public struct LiveVisualSpec: Sendable {
                 gradientColors: [Color(rgb: 0x0D1B2A), Color(rgb: 0xC2185B)],
                 accentColor: Color(rgb: 0xFF4081)
             )
-        case "chaturbate":
-            // Chaturbate：黑曜石炭黑至耀金渐变
+        case LiveSourceCatalog.hornyStudentsID, "chaturbate":
+            // HornyStudents / Chaturbate：黑曜石炭黑至耀金渐变
             return LiveVisualSpec(
                 iconName: "flame.fill",
                 gradientColors: [Color(rgb: 0x1A1A1A), Color(rgb: 0xEF6C00)],
@@ -209,11 +209,11 @@ public struct LiveFeaturedCard: View {
                             .frame(width: 6, height: 6)
                         Text("LIVE")
                             .font(.system(size: 10, weight: .black))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(.primary)
                         if let viewCount = stream.viewCount.value {
                             Text("\(viewCount)")
                                 .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.85))
+                                .foregroundStyle(.secondary)
                         }
                     }
                     .padding(.horizontal, 6)
@@ -280,10 +280,10 @@ public struct LiveFeaturedCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(stream.username)
                         .font(.headline)
-                        .foregroundStyle(Color.white)
+                        .foregroundStyle(AuroraColor.textPrimary)
                     Text("\(stream.viewCount.value ?? 0) 人在线观看 · 即时直播")
                         .font(.caption)
-                        .foregroundStyle(Color.secondary)
+                        .foregroundStyle(AuroraColor.textSecondary)
                 }
                 .padding(.horizontal, 10)
                 .padding(.bottom, 10)
@@ -303,6 +303,7 @@ public struct LiveHeroBanner: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
 
     public init(
         stream: LiveStreamItem,
@@ -376,11 +377,11 @@ public struct LiveHeroBanner: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .shadow(color: .black.opacity(0.95), radius: 8, x: 0, y: 3)
+                    .shadow(color: colorScheme == .dark ? .black.opacity(0.85) : .clear, radius: 8, x: 0, y: 3)
                     .padding(.horizontal, AuroraMetrics.contentInset)
 
                 metadataView
-                    .shadow(color: .black.opacity(0.9), radius: 6, x: 0, y: 2)
+                    .shadow(color: colorScheme == .dark ? .black.opacity(0.75) : .clear, radius: 6, x: 0, y: 2)
 
                 HStack(spacing: AuroraMetrics.spacingM) {
                     watchButton
@@ -412,9 +413,9 @@ public struct LiveHeroBanner: View {
             if let viewCount = stream.viewCount.value {
                 Text("\(viewCount) 人在线")
                     .font(.caption.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AuroraColor.textPrimary)
                 Text("•")
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(AuroraColor.textTertiary)
             }
 
             Text(sourceName)
@@ -423,10 +424,10 @@ public struct LiveHeroBanner: View {
 
             if !stream.title.isEmpty {
                 Text("•")
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(AuroraColor.textTertiary)
                 Text(stream.title)
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(AuroraColor.textSecondary)
                     .lineLimit(1)
             }
         }
@@ -443,8 +444,8 @@ public struct LiveHeroBanner: View {
                     .font(.headline.weight(.bold))
             }
             .frame(maxWidth: .infinity, minHeight: 46)
-            .background(Color.white, in: Capsule())
-            .foregroundStyle(Color.black)
+            .background(AuroraColor.textPrimary, in: Capsule())
+            .foregroundStyle(AuroraColor.canvas)
         }
         .buttonStyle(AppleSpringCardButtonStyle())
     }
@@ -460,12 +461,11 @@ public struct LiveHeroBanner: View {
             .frame(minHeight: 46)
             .padding(.horizontal, 16)
             .background(.ultraThinMaterial, in: Capsule())
-            .background(Color.black.opacity(0.35), in: Capsule())
             .overlay(
                 Capsule()
-                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                    .stroke(AuroraColor.hairline, lineWidth: 1)
             )
-            .foregroundStyle(.white)
+            .foregroundStyle(AuroraColor.textPrimary)
         }
         .buttonStyle(AppleSpringCardButtonStyle())
         .accessibilityHint("切换另一位推荐主播")
@@ -585,16 +585,13 @@ public struct LiveScreen: View {
                         }
                         .padding(.horizontal, AuroraMetrics.contentInset)
 
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: AuroraMetrics.spacingS) {
-                                ForEach(repo.categories, id: \.self) { cat in
-                                    let isSelected = cat == repo.selectedGender
-                                    categoryButton(cat, isSelected: isSelected)
-                                }
-                            }
-                            .padding(.horizontal, AuroraMetrics.contentInset)
-                            .padding(.vertical, AuroraMetrics.spacingXS)
-                        }
+                        SourceFilterBar(
+                            categories: repo.categories,
+                            selectedCategory: Binding(
+                                get: { repo.selectedGender },
+                                set: { repo.selectGender($0) }
+                            )
+                        )
 
                         feedState
 
@@ -671,13 +668,29 @@ public struct LiveScreen: View {
                                 }
                                 .buttonStyle(AppleSpringCardButtonStyle())
                                 .accessibilityElement(children: .combine)
-                                .accessibilityLabel("主播 \(item.username), \(item.title.isEmpty ? "" : item.title + ", ")在线人数 \(item.viewCount)")
+                                .accessibilityLabel(liveCardAccessibilityLabel(for: item))
                                 .accessibilityHint("打开直播间播放并查看实时聊天")
+                                .onAppear {
+                                    if item.id == filteredStreams.last?.id, repo.canLoadMore, !repo.isLoadingNextPage {
+                                        Task { await repo.loadNextPage() }
+                                    }
+                                }
                             }
                         }
                         .padding(.horizontal, AuroraMetrics.contentInset)
                         .frame(maxWidth: 1080)
                         .frame(maxWidth: .infinity)
+
+                        if repo.isLoadingNextPage {
+                            HStack(spacing: AuroraMetrics.spacingS) {
+                                ProgressView().tint(AuroraColor.brand)
+                                Text("home.loading_more".localized)
+                                    .font(.caption)
+                                    .foregroundStyle(AuroraColor.textSecondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, AuroraMetrics.spacingM)
+                        }
                     }
 
                     // Keep clear of floating tab bar
@@ -717,6 +730,7 @@ public struct LiveScreen: View {
             }
         }
         .onAppear {
+            repo.loadStreamsIfNeeded()
             if CommandLine.arguments.contains("--select-stripchat") {
                 repo.selectSource(LiveSourceCatalog.stripchatID)
             }
@@ -790,7 +804,7 @@ public struct LiveScreen: View {
                     } actions: {
                         Button("显示全部", systemImage: "arrow.uturn.backward") {
                             withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
-                                repo.selectedGender = "全部"
+                                repo.selectGender("全部")
                             }
                         }
                         .buttonStyle(.bordered)
@@ -801,53 +815,20 @@ public struct LiveScreen: View {
         }
     }
 
-    private var filteredStreams: [LiveStreamItem] {
-        guard let selectedCode = Self.genderCodes[repo.selectedGender] else {
-            return repo.liveStreams
-        }
-        return repo.liveStreams.filter { $0.gender.lowercased() == selectedCode }
+    private func liveCardAccessibilityLabel(for item: LiveStreamItem) -> String {
+        let titleSegment = item.title.isEmpty ? "" : "，\(item.title)"
+        let viewerSegment = item.viewCount.value.map { "，在线人数 \($0)" } ?? ""
+        return "主播 \(item.username)\(titleSegment)\(viewerSegment)"
     }
 
-    @ViewBuilder
-    private func categoryButton(_ category: String, isSelected: Bool) -> some View {
-        if isSelected {
-            Button {
-                withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
-                    repo.selectedGender = category
-                }
-            } label: {
-                Text(category).font(.subheadline.weight(.semibold)).lineLimit(1)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(AuroraColor.brand)
-            .clipShape(Capsule())
-            .frame(minHeight: AuroraMetrics.minTouchTarget)
-        } else {
-            Button {
-                withAnimation(AuroraMotion.selection(reduceMotion: reduceMotion)) {
-                    repo.selectedGender = category
-                }
-            } label: {
-                Text(category).font(.subheadline).lineLimit(1)
-            }
-            .buttonStyle(.bordered)
-            .tint(.secondary)
-            .clipShape(Capsule())
-            .frame(minHeight: AuroraMetrics.minTouchTarget)
-        }
+    private var filteredStreams: [LiveStreamItem] {
+        repo.liveStreams.filter { LiveRepository.matchesSelectedGender(itemGender: $0.gender, selectedGender: repo.selectedGender) }
     }
 
     private var liveGridColumns: [GridItem] {
         let minimumWidth: CGFloat = dynamicTypeSize.isAccessibilitySize ? 300 : 160
         return [GridItem(.adaptive(minimum: minimumWidth, maximum: 420), spacing: AuroraMetrics.spacingM)]
     }
-
-    private static let genderCodes: [String: String] = [
-        "女性主播": "f",
-        "情侣互动": "c",
-        "男性主播": "m",
-        "跨性别": "s"
-    ]
 
     private var retryButton: some View {
         Button("重试", systemImage: "arrow.clockwise") {

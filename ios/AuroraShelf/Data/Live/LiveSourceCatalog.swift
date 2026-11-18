@@ -25,7 +25,7 @@ public struct LiveStreamItem: Identifiable, Hashable, Codable, Sendable {
     public let gender: String
     public let isPrivateShow: Bool
     public let hlsStreamUrl: String?
-    
+
     public init(
         id: String,
         sourceID: String = LiveSourceCatalog.hornyStudentsID,
@@ -58,18 +58,22 @@ public struct LiveStreamItem: Identifiable, Hashable, Codable, Sendable {
 @MainActor
 public final class LiveRepository: ObservableObject {
     public static let shared = LiveRepository()
-    
+
     @Published public var liveStreams: [LiveStreamItem] = []
     @Published public var selectedGender: String = "全部"
     @Published public private(set) var selectedSourceID: String = LiveSourceCatalog.allSourcesID
     @Published public var isLoading: Bool = false
-    @Published public var loadErrorMessage: String? = nil
-    
+    @Published public var loadErrorMessage: String?
+    @Published public var currentPage: Int = 1
+    @Published public var canLoadMore: Bool = true
+    @Published public var isLoadingNextPage: Bool = false
+
     public let categories = ["全部", "女性主播", "情侣互动", "男性主播", "跨性别"]
     private let session: URLSession
     private var currentLoadTask: Task<Void, Never>?
     private var activeRequestID = UUID()
-    
+    private var hasTriggeredInitialLoad = false
+
     private init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 25
@@ -79,16 +83,30 @@ public final class LiveRepository: ObservableObject {
             "Accept": "application/xml, text/xml, */*"
         ]
         self.session = URLSession.permissive(configuration: config)
-        self.loadStreams()
+        if let snapshot = SourceSnapshotStore.shared.getLiveFeed(sourceId: selectedSourceID, gender: selectedGender),
+           !snapshot.items.isEmpty {
+            self.liveStreams = snapshot.items
+            print("[AuroraPerf] live_swr_init count=\(snapshot.items.count) fresh=\(snapshot.isFresh)")
+        }
     }
-    
+
+    public func loadStreamsIfNeeded() {
+        guard !hasTriggeredInitialLoad else { return }
+        hasTriggeredInitialLoad = true
+        loadStreams()
+    }
+
     public func loadStreams() {
+        hasTriggeredInitialLoad = true
         _ = startLoading()
     }
 
     public func selectSource(_ sourceID: String) {
         guard LiveSourceCatalog.validSourceIDs.contains(sourceID), selectedSourceID != sourceID else { return }
         selectedSourceID = sourceID
+        currentPage = 1
+        canLoadMore = sourceID != LiveSourceCatalog.hornyStudentsID
+        isLoadingNextPage = false
         if let snapshot = SourceSnapshotStore.shared.getLiveFeed(sourceId: sourceID, gender: selectedGender),
            !snapshot.items.isEmpty {
             liveStreams = snapshot.items
@@ -99,8 +117,62 @@ public final class LiveRepository: ObservableObject {
         _ = startLoading()
     }
 
+    public func selectGender(_ gender: String) {
+        guard categories.contains(gender), selectedGender != gender else { return }
+        selectedGender = gender
+        currentPage = 1
+        canLoadMore = selectedSourceID != LiveSourceCatalog.hornyStudentsID
+        isLoadingNextPage = false
+        if let snapshot = SourceSnapshotStore.shared.getLiveFeed(sourceId: selectedSourceID, gender: gender),
+           !snapshot.items.isEmpty {
+            liveStreams = snapshot.items
+            loadErrorMessage = nil
+        } else {
+            liveStreams = []
+        }
+        _ = startLoading()
+    }
+
     public func refreshStreams() async {
+        hasTriggeredInitialLoad = true
         await startLoading().value
+    }
+
+    public func loadNextPage() async {
+        guard canLoadMore, !isLoading, !isLoadingNextPage else { return }
+        guard selectedSourceID == LiveSourceCatalog.allSourcesID || selectedSourceID == LiveSourceCatalog.stripchatID else {
+            canLoadMore = false
+            return
+        }
+        let capturedRequestID = activeRequestID
+        let capturedSourceID = selectedSourceID
+        let capturedGender = selectedGender
+        let nextPage = currentPage + 1
+        isLoadingNextPage = true
+        defer {
+            if activeRequestID == capturedRequestID {
+                isLoadingNextPage = false
+            }
+        }
+
+        do {
+            let nextItems = try await fetchRealStripchatFeed(gender: capturedGender, page: nextPage)
+            guard !Task.isCancelled,
+                  activeRequestID == capturedRequestID,
+                  selectedSourceID == capturedSourceID,
+                  selectedGender == capturedGender else { return }
+            let existingIDs = Set(liveStreams.map(\.id))
+            let uniqueNew = nextItems.filter { !existingIDs.contains($0.id) }
+            if uniqueNew.isEmpty {
+                canLoadMore = false
+            } else {
+                liveStreams.append(contentsOf: uniqueNew)
+                currentPage = nextPage
+                canLoadMore = !nextItems.isEmpty
+            }
+        } catch {
+            // Keep canLoadMore = true on transient error so user can scroll to retry
+        }
     }
 
     private func startLoading() -> Task<Void, Never> {
@@ -109,6 +181,10 @@ public final class LiveRepository: ObservableObject {
         activeRequestID = requestID
         let selectedSourceID = self.selectedSourceID
         let selectedGender = self.selectedGender
+        self.currentPage = 1
+        self.canLoadMore = selectedSourceID != LiveSourceCatalog.hornyStudentsID
+        self.isLoadingNextPage = false
+
         if self.liveStreams.isEmpty,
            let snapshot = SourceSnapshotStore.shared.getLiveFeed(sourceId: selectedSourceID, gender: selectedGender),
            !snapshot.items.isEmpty {
@@ -129,9 +205,9 @@ public final class LiveRepository: ObservableObject {
                     SourceSnapshotStore.shared.putLiveFeed(sourceId: selectedSourceID, gender: selectedGender, items: streams)
                 }
                 self.liveStreams = streams
+                self.canLoadMore = !streams.isEmpty && selectedSourceID != LiveSourceCatalog.hornyStudentsID
                 self.loadErrorMessage = warnings.isEmpty ? nil : warnings.joined(separator: "\n")
             case .failed(let message):
-                // Stale-If-Error：若已有缓存快照在屏幕展示，不覆盖成整屏报错
                 if self.liveStreams.isEmpty {
                     self.loadErrorMessage = message
                 } else {
@@ -145,10 +221,29 @@ public final class LiveRepository: ObservableObject {
         return task
     }
 
+    nonisolated static func matchesSelectedGender(itemGender: String, selectedGender: String) -> Bool {
+        if selectedGender == "全部" || selectedGender.isEmpty {
+            return true
+        }
+        let g = itemGender.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        switch selectedGender {
+        case "女性主播":
+            return g == "f" || g == "female" || g == "girls" || g == "girl"
+        case "情侣互动":
+            return g == "c" || g == "couple" || g == "couples"
+        case "男性主播":
+            return g == "m" || g == "male" || g == "men" || g == "man"
+        case "跨性别":
+            return g == "s" || g == "t" || g == "trans" || g == "shemale"
+        default:
+            return true
+        }
+    }
+
     private nonisolated func fetchSelectedSources(selectedSourceID: String, selectedGender: String) async -> LiveFeedOutcome {
         if selectedSourceID == LiveSourceCatalog.allSourcesID {
-            async let hsFeed = runCatchingStreams { try await self.fetchRealHornyStudentsFeed() }
-            async let scFeed = runCatchingStreams { try await self.fetchRealStripchatFeed(gender: selectedGender) }
+            async let hsFeed = runCatchingStreams { try await self.fetchRealHornyStudentsFeed(gender: selectedGender) }
+            async let scFeed = runCatchingStreams { try await self.fetchRealStripchatFeed(gender: selectedGender, page: 1) }
             let (hsResult, scResult) = await (hsFeed, scFeed)
 
             var streams: [LiveStreamItem] = []
@@ -174,8 +269,8 @@ public final class LiveRepository: ObservableObject {
 
         do {
             let loaded = selectedSourceID == LiveSourceCatalog.stripchatID
-                ? try await fetchRealStripchatFeed(gender: selectedGender)
-                : try await fetchRealHornyStudentsFeed()
+                ? try await fetchRealStripchatFeed(gender: selectedGender, page: 1)
+                : try await fetchRealHornyStudentsFeed(gender: selectedGender)
             return .loaded(loaded, [])
         } catch {
             guard !Task.isCancelled else { return .failed("直播列表加载已取消。") }
@@ -194,7 +289,7 @@ public final class LiveRepository: ObservableObject {
 
     // MARK: - 真实请求 HornyStudents RSS 2.0 在线主播流
 
-    private nonisolated func fetchRealHornyStudentsFeed() async throws -> [LiveStreamItem] {
+    private nonisolated func fetchRealHornyStudentsFeed(gender: String = "全部") async throws -> [LiveStreamItem] {
         guard let url = URL(string: "https://www.hornystudents.com/feed/latest/") else {
             throw LiveFeedError.invalidURL
         }
@@ -206,14 +301,11 @@ public final class LiveRepository: ObservableObject {
         guard (200...299).contains(httpResponse.statusCode) else {
             throw LiveFeedError.httpStatus(httpResponse.statusCode)
         }
-        guard let xmlString = String(data: data, encoding: .utf8) else {
-            throw LiveFeedError.invalidEncoding
-        }
-
-        return try parseRssXml(xmlString)
+        let allItems = try Self.parseHornyStudentsRSS(data: data)
+        return allItems.filter { Self.matchesSelectedGender(itemGender: $0.gender, selectedGender: gender) }
     }
 
-    private nonisolated func fetchRealStripchatFeed(gender: String) async throws -> [LiveStreamItem] {
+    private nonisolated func fetchRealStripchatFeed(gender: String, page: Int = 1) async throws -> [LiveStreamItem] {
         let primaryTags: [String]
         switch gender {
         case "女性主播": primaryTags = ["girls"]
@@ -227,7 +319,7 @@ public final class LiveRepository: ObservableObject {
             for tag in primaryTags {
                 group.addTask {
                     do {
-                        return .success(try await self.fetchStripchatFeed(primaryTag: tag))
+                        return .success(try await self.fetchStripchatFeed(primaryTag: tag, page: page))
                     } catch {
                         return .failure(error)
                     }
@@ -254,12 +346,12 @@ public final class LiveRepository: ObservableObject {
         return []
     }
 
-    private nonisolated func fetchStripchatFeed(primaryTag: String) async throws -> [LiveStreamItem] {
+    private nonisolated func fetchStripchatFeed(primaryTag: String, page: Int = 1) async throws -> [LiveStreamItem] {
         let hosts = ["https://zh.stripchat.com", "https://stripchat.com"]
         var lastError: Error = LiveFeedError.invalidURL
         for host in hosts {
             do {
-                let url = LiveSourceAdapter.stripchatFeedURL(page: 1, primaryTag: primaryTag, base: host)
+                let url = LiveSourceAdapter.stripchatFeedURL(page: page, primaryTag: primaryTag, base: host)
                 var request = URLRequest(url: url)
                 request.setValue("application/json", forHTTPHeaderField: "Accept")
                 request.setValue("zh-CN,zh;q=0.9,en;q=0.8", forHTTPHeaderField: "Accept-Language")
@@ -275,86 +367,126 @@ public final class LiveRepository: ObservableObject {
         }
         throw lastError
     }
-    
-    private nonisolated func parseRssXml(_ xml: String) throws -> [LiveStreamItem] {
-        guard xml.range(of: #"<rss(?:\s|>)"#, options: [.regularExpression, .caseInsensitive]) != nil else {
-            throw LiveFeedError.malformedXML
-        }
-        guard let xmlData = xml.data(using: .utf8) else {
+
+    // MARK: - Single-Pass XMLParserDelegate for HornyStudents RSS (CDATA + XXE Hardening)
+
+    nonisolated static func parseHornyStudentsRSS(_ xml: String) throws -> [LiveStreamItem] {
+        guard let data = xml.data(using: .utf8) else {
             throw LiveFeedError.invalidEncoding
         }
-        let xmlParser = XMLParser(data: xmlData)
-        xmlParser.shouldResolveExternalEntities = false
-        guard xmlParser.parse() else {
-            throw LiveFeedError.malformedXML
-        }
-
-        var items: [LiveStreamItem] = []
-        
-        // 正则逐个匹配 <item> 节点
-        let itemPattern = #"<item>([\s\S]*?)</item>"#
-        guard let itemRegex = try? NSRegularExpression(pattern: itemPattern) else {
-            throw LiveFeedError.malformedXML
-        }
-        let nsXml = xml as NSString
-        let matches = itemRegex.matches(in: xml, options: [], range: NSRange(location: 0, length: nsXml.length))
-        let hasIdentifiableItem = matches.contains { match in
-            let block = nsXml.substring(with: match.range)
-            return extractTag(from: block, tag: "cb:username") != nil
-                || extractTag(from: block, tag: "title") != nil
-        }
-        guard matches.isEmpty || hasIdentifiableItem else {
-            throw LiveFeedError.malformedXML
-        }
-        
-        for m in matches {
-            let block = nsXml.substring(with: m.range)
-            
-            let username = extractTag(from: block, tag: "cb:username")
-                ?? extractTag(from: block, tag: "title")
-                ?? ""
-            guard !username.isEmpty else { continue }
-            
-            let viewers = extractTag(from: block, tag: "cb:number_of_users_watching")
-                .flatMap { Int($0) }
-                .flatMap { $0 >= 0 ? $0 : nil }
-            
-            let gender = extractTag(from: block, tag: "cb:gender") ?? ""
-            let location = extractTag(from: block, tag: "cb:location") ?? "Online"
-            
-            let currentShow = extractTag(from: block, tag: "cb:current_show") ?? "public"
-            guard currentShow == "public" else { continue }
-            let isPrivate = false
-            
-            let imgUrl = extractTag(from: block, tag: "cb:image_url")
-                ?? "https://thumb.live.mmcdn.com/ri/\(username).jpg"
-            
-            items.append(LiveStreamItem(
-                id: "hs-\(username)",
-                sourceID: LiveSourceCatalog.hornyStudentsID,
-                username: username,
-                title: "\(location) · 正在直播",
-                roomUrl: "https://chaturbate.com/\(username)/",
-                avatarUrl: imgUrl,
-                snapshotUrl: imgUrl,
-                viewCount: viewers,
-                tags: ["LIVE", location],
-                gender: gender,
-                isPrivateShow: isPrivate
-            ))
-        }
-        
-        return items
+        return try parseHornyStudentsRSS(data: data)
     }
-    
-    private nonisolated func extractTag(from text: String, tag: String) -> String? {
-        let pattern = "<\(tag)>([^<]*?)</\(tag)>"
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
-        let ns = text as NSString
-        if let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: ns.length)) {
-            return ns.substring(with: match.range(at: 1)).trimmingCharacters(in: .whitespacesAndNewlines)
+
+    nonisolated static func parseHornyStudentsRSS(data: Data) throws -> [LiveStreamItem] {
+        let delegate = HornyStudentsRSSParserDelegate()
+        let parser = XMLParser(data: data)
+        parser.shouldResolveExternalEntities = false
+        parser.shouldProcessNamespaces = false
+        parser.delegate = delegate
+
+        guard parser.parse(), delegate.sawRSSRoot else {
+            throw LiveFeedError.malformedXML
         }
-        return nil
+        guard delegate.rawItemCount == 0 || delegate.sawIdentifiableItem else {
+            throw LiveFeedError.malformedXML
+        }
+        return delegate.items.uniqued(by: \.id)
+    }
+}
+
+private final class HornyStudentsRSSParserDelegate: NSObject, XMLParserDelegate {
+    private(set) var sawRSSRoot = false
+    private(set) var rawItemCount = 0
+    private(set) var sawIdentifiableItem = false
+    private(set) var items: [LiveStreamItem] = []
+
+    private var insideItem = false
+    private var currentElementName = ""
+    private var currentTextBuffer = ""
+    private var currentFields: [String: String] = [:]
+
+    func parser(
+        _ parser: XMLParser,
+        didStartElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?,
+        attributes attributeDict: [String: String] = [:]
+    ) {
+        let lower = elementName.lowercased()
+        if lower == "rss" {
+            sawRSSRoot = true
+        } else if lower == "item" {
+            insideItem = true
+            rawItemCount += 1
+            currentFields.removeAll(keepingCapacity: true)
+        } else if insideItem {
+            currentElementName = lower
+            currentTextBuffer = ""
+        }
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        guard insideItem, !currentElementName.isEmpty else { return }
+        currentTextBuffer.append(string)
+    }
+
+    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+        guard insideItem, !currentElementName.isEmpty,
+              let text = String(data: CDATABlock, encoding: .utf8) else { return }
+        currentTextBuffer.append(text)
+    }
+
+    func parser(
+        _ parser: XMLParser,
+        didEndElement elementName: String,
+        namespaceURI: String?,
+        qualifiedName qName: String?
+    ) {
+        let lower = elementName.lowercased()
+        if lower == "item" {
+            insideItem = false
+            finalizeCurrentItem()
+            currentElementName = ""
+            currentTextBuffer = ""
+        } else if insideItem && lower == currentElementName {
+            let trimmed = currentTextBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                currentFields[lower] = trimmed
+            }
+            currentElementName = ""
+            currentTextBuffer = ""
+        }
+    }
+
+    private func finalizeCurrentItem() {
+        let rawUsername = currentFields["cb:username"] ?? currentFields["title"] ?? ""
+        let username = rawUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !username.isEmpty else { return }
+        sawIdentifiableItem = true
+
+        let currentShow = (currentFields["cb:current_show"] ?? "public").lowercased()
+        guard currentShow == "public" else { return }
+
+        let viewers = currentFields["cb:number_of_users_watching"]
+            .flatMap(Int.init)
+            .flatMap { $0 >= 0 ? $0 : nil }
+        let gender = currentFields["cb:gender"] ?? ""
+        let location = currentFields["cb:location"] ?? "Online"
+        let imgUrl = currentFields["cb:image_url"] ?? "https://thumb.live.mmcdn.com/ri/\(username).jpg"
+
+        items.append(LiveStreamItem(
+            id: "hs-\(username)",
+            sourceID: LiveSourceCatalog.hornyStudentsID,
+            username: username,
+            title: "\(location) · 正在直播",
+            roomUrl: "https://chaturbate.com/\(username)/",
+            avatarUrl: imgUrl,
+            snapshotUrl: imgUrl,
+            viewCount: viewers,
+            tags: ["LIVE", location],
+            gender: gender,
+            isPrivateShow: false
+        ))
     }
 }
 

@@ -67,6 +67,15 @@
       this.start();
       return true;
     } catch (err) {
+      if (field && field.am) {
+        const meta = field._queued && field._queued[unitName];
+        if (field.am.cache && field.am.cache.assetsLoaded && meta) {
+          if (meta.atlas) delete field.am.cache.assetsLoaded[meta.atlas];
+          if (meta.json) delete field.am.cache.assetsLoaded[meta.json];
+        }
+        field.am.errors = {};
+      }
+      if (field && field._queued) delete field._queued[unitName];
       console.warn('SpineStage failed for', unitName, err);
       this.canvas.hidden = true;
       return false;
@@ -90,6 +99,11 @@
 
   SpineStage.prototype.loop = function (now) {
     if (!this.active || !this.field) return;
+    if (typeof window !== 'undefined' && window.APP && window.APP.gamePaused) {
+      this.last = now;
+      this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
     const dt = Math.min(0.05, Math.max(0, (now - (this.last || now)) / 1000));
     this.last = now;
     this.field.update(dt);
@@ -117,8 +131,15 @@
     if (this.field) {
       try {
         if (this.field.clear) this.field.clear();
-        if (this.field.gl) {
-          const loseExt = this.field.gl.getExtension('WEBGL_lose_context');
+        if (this.field.am && typeof this.field.am.dispose === 'function') {
+          this.field.am.dispose();
+        }
+        if (this.field.renderer && typeof this.field.renderer.dispose === 'function') {
+          this.field.renderer.dispose();
+        }
+        const gl = (this.field.ctx && this.field.ctx.gl) || this.field.gl;
+        if (gl && typeof gl.getExtension === 'function') {
+          const loseExt = gl.getExtension('WEBGL_lose_context');
           if (loseExt) loseExt.loseContext();
         }
       } catch (_) {}

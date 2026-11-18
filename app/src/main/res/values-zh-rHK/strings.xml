@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Netgrey</string>
+    <string name="action_search">搜尋</string>
+    <string name="cast_sheet_title">投屏至電視</string>
+    <string name="cast_rescan">重新搜尋</string>
+    <string name="cast_disconnect">中斷連接</string>
+    <string name="cast_system_mirror_title">系統無線投屏 / 畫面鏡像</string>
+    <string name="cast_system_mirror_subtitle">開啟系統投屏面板（支援 Chromecast / Miracast）</string>
+    <string name="cast_searching_lan">正在搜尋區域網絡內的電視裝置…</string>
+    <string name="cast_empty_title">未發現支援 DLNA 的電視</string>
+    <string name="cast_empty_subtitle">請確認手機與電視連接在同一 Wi-Fi 網絡，或使用上方「系統無線投屏 / 畫面鏡像」</string>
+    <string name="theme_mode_title">外觀模式</string>
+    <string name="theme_mode_system">跟隨系統</string>
+    <string name="theme_mode_light">淺色模式</string>
+    <string name="theme_mode_dark">深色模式</string>
+    <string name="about_open_source_title">關於與開源許可</string>
+</resources>

@@ -109,6 +109,10 @@ internal object ComicHttp {
                 noRedirectClient.newCall(BuiltRequest).execute()
             } catch (err: IOException) {
                 val isSsl = generateSequence(err as Throwable?) { it.cause }.any { it is javax.net.ssl.SSLException }
+                val reqHost = BuiltRequest.url.host.lowercase()
+                val isStrictAuthHost = reqHost == "bananarey.us" || reqHost.endsWith(".bananarey.us") ||
+                    reqHost == "picacomic.com" || reqHost.endsWith(".picacomic.com")
+                if (isSsl && isStrictAuthHost) throw err
                 val fallback = if (isSsl) AuroraHttpClient.permissiveTlsClient else AuroraHttpClient.http1Client
                 fallback.newBuilder()
                     .followRedirects(false)
@@ -126,16 +130,7 @@ internal object ComicHttp {
                     val location = resp.header("Location")
                     if (!location.isNullOrBlank()) {
                         val nextUrl = resolve(currentUrl, location) ?: location
-                        val oldHost = runCatching { URI(currentUrl).host?.lowercase() }.getOrNull()
-                        val nextHost = runCatching { URI(nextUrl).host?.lowercase() }.getOrNull()
-                        if (oldHost != null && nextHost != null && oldHost != nextHost) {
-                            currentHeaders = currentHeaders.filterKeys { key ->
-                                !key.equals("authorization", ignoreCase = true) &&
-                                    !key.equals("cookie", ignoreCase = true) &&
-                                    !key.equals("token", ignoreCase = true) &&
-                                    !key.equals("signature", ignoreCase = true)
-                            }
-                        }
+                        currentHeaders = sanitizeHeadersForRedirect(currentHeaders, currentUrl, nextUrl)
                         if (status in listOf(301, 302, 303) && currentMethod != "GET" && currentMethod != "HEAD") {
                             currentMethod = "GET"
                             currentBody = null
@@ -155,6 +150,30 @@ internal object ComicHttp {
                     finalUrl = resp.request.url.toString(),
                 )
             }
+        }
+    }
+
+    internal fun sanitizeHeadersForRedirect(
+        headers: Map<String, String>,
+        currentUrl: String,
+        nextUrl: String,
+    ): Map<String, String> {
+        val oldUri = runCatching { URI(currentUrl) }.getOrNull()
+        val nextUri = runCatching { URI(nextUrl) }.getOrNull()
+        val oldHost = oldUri?.host?.lowercase()
+        val nextHost = nextUri?.host?.lowercase()
+        val oldScheme = oldUri?.scheme?.lowercase()
+        val nextScheme = nextUri?.scheme?.lowercase()
+        val hostChanged = oldHost == null || nextHost == null || oldHost != nextHost
+        val protocolDowngraded = oldScheme == "https" && nextScheme != "https"
+        if (!hostChanged && !protocolDowngraded) return headers
+        return headers.filterKeys { key ->
+            !key.equals("authorization", ignoreCase = true) &&
+                !key.equals("proxy-authorization", ignoreCase = true) &&
+                !key.equals("cookie", ignoreCase = true) &&
+                !key.equals("token", ignoreCase = true) &&
+                !key.equals("tokenparam", ignoreCase = true) &&
+                !key.equals("signature", ignoreCase = true)
         }
     }
 

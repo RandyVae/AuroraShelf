@@ -160,7 +160,7 @@ class DlnaSoapTest {
         val fakeData = "0123456789ABCDEF".toByteArray()
         val proxy = LocalMediaProxy(
             sessionToken = "validToken",
-            cacheStreamOpener = { cacheKey, _, _, start, endInclusive ->
+            cacheStreamOpener = { cacheKey, _, _, _, start, endInclusive ->
                 if (cacheKey == "offline-demo") {
                     val end = (endInclusive ?: (fakeData.size - 1L)).toInt().coerceAtMost(fakeData.size - 1)
                     val sliceBytes = fakeData.copyOfRange(start.toInt(), end + 1)

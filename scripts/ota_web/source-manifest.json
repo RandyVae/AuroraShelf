@@ -1,6 +1,6 @@
 {
-  "version": "2.16.40",
-  "updatedAt": "2026-11-18T01:45:00+08:00",
+  "version": "2.17.0",
+  "updatedAt": "2026-11-18T09:00:00+08:00",
   "mirrors": {
     "copy": [
       "https://api.mangacopy.com",
@@ -22,10 +22,10 @@
       "https://missav.ai"
     ],
     "jm": [
-      "https://www.cdnhjk.net",
+      "https://www.cdngwc.cc",
       "https://www.cdngwc.net",
       "https://www.cdngwc.club",
-      "https://www.cdngwc.cc"
+      "https://www.cdnhjk.net"
     ],
     "t906": [
       "https://t924.sol140.com",

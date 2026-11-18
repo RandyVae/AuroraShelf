@@ -67,6 +67,9 @@ class ForumRepository internal constructor(
     private suspend fun loadSource(source: ForumSource, page: Int): Result<List<ForumPost>> {
         val startedAt = System.currentTimeMillis()
         val result = runCatching { source.load(page) }
+        result.exceptionOrNull()?.let { err ->
+            if (err is kotlinx.coroutines.CancellationException) throw err
+        }
         val elapsedMs = System.currentTimeMillis() - startedAt
         logSafely {
             val err = result.exceptionOrNull()

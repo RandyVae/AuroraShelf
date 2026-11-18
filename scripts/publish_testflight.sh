@@ -120,7 +120,10 @@ else
 fi
 
 SHORT_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${INFO_PLIST}" 2>/dev/null || echo "unknown")
-BUILD_NUMBER=$(grep -m1 "CURRENT_PROJECT_VERSION:" "${IOS_DIR}/project.yml" | awk '{print $2}' || echo "unknown")
+if [ "${SHORT_VERSION}" = "\$(MARKETING_VERSION)" ] || [ "${SHORT_VERSION}" = "unknown" ]; then
+  SHORT_VERSION=$(grep -m1 "MARKETING_VERSION:" "${IOS_DIR}/project.yml" | awk '{print $2}' | tr -d '"' || echo "unknown")
+fi
+BUILD_NUMBER=$(grep -m1 "CURRENT_PROJECT_VERSION:" "${IOS_DIR}/project.yml" | awk '{print $2}' | tr -d '"' || echo "unknown")
 DEPLOY_TARGET=$(grep -m1 'iOS: "' "${IOS_DIR}/project.yml" | sed -E 's/.*"([^"]+)".*/\1/' || echo "unknown")
 echo "  [INFO] 版本: v${SHORT_VERSION} (Build ${BUILD_NUMBER}) · iOS Deployment Target: ${DEPLOY_TARGET}"
 
@@ -172,7 +175,7 @@ fi
 HAS_ASC_API_KEY=0
 if [ -n "${ASC_KEY_ID}" ] && [ -n "${ASC_ISSUER_ID}" ] && [ -n "${ASC_KEY_PATH}" ] && [ -f "${ASC_KEY_PATH}" ]; then
   HAS_ASC_API_KEY=1
-  echo "  [PASS] 已配置 App Store Connect API Key (${ASC_KEY_ID})"
+  echo "  [PASS] 已配置 App Store Connect API Key"
 else
   echo "  [INFO] 未检测到 ASC API Key（可在 .appstore_credentials 配置 ASC_KEY_ID / ASC_ISSUER_ID / ASC_KEY_PATH）"
 fi
@@ -246,6 +249,7 @@ else
   echo "  [INFO] 已按 --skip-archive 复用现有归档: ${ARCHIVE_PATH}"
 fi
 
+rm -f "${OUTPUT_DIR}"/*.ipa
 if ! xcodebuild -exportArchive \
   -archivePath "${ARCHIVE_PATH}" \
   -exportPath "${OUTPUT_DIR}" \

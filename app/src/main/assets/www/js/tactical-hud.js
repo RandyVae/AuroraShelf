@@ -240,11 +240,15 @@
   };
 
   TacticalHud.prototype.finishTutorial = function () {
-    // 教程结束，关闭所有教程元素
-    if (this.bubble) this.bubble.hidden = true;
-    if (this.handPointer) this.handPointer.hidden = true;
-    if (this.inspector) this.inspector.hidden = true;
-    if (this.lanesOverlay) this.lanesOverlay.innerHTML = '';
+    // 教程结束，彻底移除所有教程 DOM 元素与点击拦截
+    if (this.el) {
+      this.el.onclick = null;
+      this.el.querySelectorAll('.tactical-hud-el').forEach((n) => n.remove());
+    }
+    this.bubble = null;
+    this.handPointer = null;
+    this.inspector = null;
+    this.lanesOverlay = null;
     if (this.opts && typeof this.opts.onComplete === 'function') {
       try { this.opts.onComplete(); } catch (e) {}
     }

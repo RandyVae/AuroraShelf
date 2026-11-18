@@ -94,6 +94,8 @@ internal object ForumPostCache {
             put(url, html)
             Log.i(TAG, "prefetch ms=${System.currentTimeMillis() - started} bytes=${html.length}")
             true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (failure: Exception) {
             Log.i(TAG, "prefetch failed: ${failure.message}")
             false

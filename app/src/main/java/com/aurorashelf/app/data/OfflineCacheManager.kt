@@ -59,6 +59,8 @@ data class OfflineVideo(
     val percentDownloaded: Float = 0f,
     val bytesDownloaded: Long = 0L,
     val contentLength: Long = 0L,
+    val referer: String? = null,
+    val extraHeaders: Map<String, String> = emptyMap(),
 ) {
     val isPlayableOffline: Boolean get() = state == OfflineCacheState.COMPLETED && mediaUrl != null
 
@@ -142,10 +144,36 @@ class OfflineCacheManager private constructor(context: Context) {
         NoOpCacheEvictor(),
         databaseProvider,
     )
-    private val refererByUri = ConcurrentHashMap<String, String>()
-    private val refererByHost = ConcurrentHashMap<String, String>()
-    private val headersByUri = ConcurrentHashMap<String, Map<String, String>>()
-    private val headersByHost = ConcurrentHashMap<String, Map<String, String>>()
+    private val refererByUri = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, String>(64, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 512
+        },
+    )
+    private val refererByPrefix = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, String>(32, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 256
+        },
+    )
+    private val refererByHost = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, String>(16, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 128
+        },
+    )
+    private val headersByUri = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, Map<String, String>>(64, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Map<String, String>>?): Boolean = size > 512
+        },
+    )
+    private val headersByPrefix = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, Map<String, String>>(32, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Map<String, String>>?): Boolean = size > 256
+        },
+    )
+    private val headersByHost = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, Map<String, String>>(16, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Map<String, String>>?): Boolean = size > 128
+        },
+    )
 
     private fun registerRequestHeaders(
         mediaUrl: String?,
@@ -153,15 +181,18 @@ class OfflineCacheManager private constructor(context: Context) {
         extraHeaders: Map<String, String> = emptyMap(),
     ) {
         val url = mediaUrl?.takeIf { it.isNotBlank() } ?: return
+        val prefix = streamPrefixFor(url)
         val host = runCatching { url.toUri().host?.lowercase() }.getOrNull()?.takeIf { it.isNotBlank() }
         val ref = referer?.takeIf { it.isNotBlank() }
         if (ref != null) {
             refererByUri[url] = ref
-            if (host != null) refererByHost[host] = ref
+            if (prefix != null) refererByPrefix[prefix] = ref
+            if (host != null && !refererByHost.containsKey(host)) refererByHost[host] = ref
         }
         if (extraHeaders.isNotEmpty()) {
             headersByUri[url] = extraHeaders
-            if (host != null) headersByHost[host] = extraHeaders
+            if (prefix != null) headersByPrefix[prefix] = extraHeaders
+            if (host != null && !headersByHost.containsKey(host)) headersByHost[host] = extraHeaders
         }
     }
 
@@ -173,9 +204,15 @@ class OfflineCacheManager private constructor(context: Context) {
 
     private val downloadDataSourceFactory = ResolvingDataSource.Factory(upstreamFactory) { dataSpec ->
         val uriStr = dataSpec.uri.toString()
+        val prefix = streamPrefixFor(uriStr)
         val host = dataSpec.uri.host?.lowercase()
-        val ref = refererByUri[uriStr] ?: host?.let { refererByHost[it] }
-        val extra = headersByUri[uriStr] ?: host?.let { headersByHost[it] } ?: emptyMap()
+        val ref = refererByUri[uriStr]
+            ?: prefix?.let { refererByPrefix[it] }
+            ?: host?.let { refererByHost[it] }
+        val extra = headersByUri[uriStr]
+            ?: prefix?.let { headersByPrefix[it] }
+            ?: host?.let { headersByHost[it] }
+            ?: emptyMap()
         if (ref.isNullOrBlank() && extra.isEmpty()) {
             dataSpec
         } else {
@@ -206,6 +243,7 @@ class OfflineCacheManager private constructor(context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val transientEntries = ConcurrentHashMap<String, OfflineVideo>()
     private val resolveJobs = ConcurrentHashMap<String, Job>()
+    private val refreshDirty = java.util.concurrent.atomic.AtomicBoolean(false)
     private var refreshJob: Job? = null
 
     val downloadManager = DownloadManager(
@@ -259,6 +297,7 @@ class OfflineCacheManager private constructor(context: Context) {
     }
 
     fun hasSufficientDiskSpace(): Boolean {
+        val fallbackSpace = runCatching { applicationContext.filesDir.usableSpace }.getOrDefault(0L)
         val usable = runCatching {
             val storageManager = applicationContext.getSystemService(StorageManager::class.java)
             if (storageManager != null) {
@@ -266,9 +305,9 @@ class OfflineCacheManager private constructor(context: Context) {
                     storageManager.getUuidForPath(applicationContext.filesDir),
                 )
             } else {
-                Long.MAX_VALUE
+                fallbackSpace
             }
-        }.getOrDefault(Long.MAX_VALUE)
+        }.getOrDefault(fallbackSpace)
         return usable >= MIN_USABLE_DISK_SPACE_BYTES
     }
 
@@ -392,12 +431,15 @@ class OfflineCacheManager private constructor(context: Context) {
         _entries.value.firstOrNull { it.pageUrl == pageUrl && it.isPlayableOffline }
 
     private fun requestRefresh() {
+        refreshDirty.set(true)
         if (refreshJob?.isActive == true) return
         refreshJob = scope.launch {
-            val indexed = withContext(Dispatchers.IO) { readIndexedEntries() }
-            _entries.value = (indexed + transientEntries.values)
-                .distinctBy(OfflineVideo::id)
-                .sortedByDescending { it.state == OfflineCacheState.DOWNLOADING || it.state == OfflineCacheState.RESOLVING }
+            while (refreshDirty.compareAndSet(true, false)) {
+                val indexed = withContext(Dispatchers.IO) { readIndexedEntries() }
+                _entries.value = (indexed + transientEntries.values)
+                    .distinctBy(OfflineVideo::id)
+                    .sortedByDescending { it.state == OfflineCacheState.DOWNLOADING || it.state == OfflineCacheState.RESOLVING }
+            }
         }
     }
 
@@ -448,6 +490,8 @@ class OfflineCacheManager private constructor(context: Context) {
             percentDownloaded = percentDownloaded.takeIf { it >= 0f } ?: 0f,
             bytesDownloaded = bytesDownloaded,
             contentLength = contentLength.coerceAtLeast(0L),
+            referer = metadata?.referer ?: metadata?.pageUrl?.takeIf(String::isNotBlank),
+            extraHeaders = metadata?.extraHeaders.orEmpty(),
         )
     }
 
@@ -472,6 +516,12 @@ class OfflineCacheManager private constructor(context: Context) {
          */
         internal fun shouldAcceptResolvedDownload(id: String, pendingIds: Set<String>): Boolean =
             id in pendingIds
+
+        internal fun streamPrefixFor(url: String): String? {
+            val clean = url.substringBefore('?').substringBefore('#')
+            val slash = clean.lastIndexOf('/')
+            return if (slash > "https://".length) clean.substring(0, slash) else null
+        }
 
         private fun mimeType(url: String): String? = when {
             url.substringBefore('?').lowercase().endsWith(".m3u8") ||

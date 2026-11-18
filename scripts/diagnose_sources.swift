@@ -49,7 +49,7 @@ let probes: [SourceProbe] = [
 
     // 漫画源
     SourceProbe(type: "漫画", name: "包子漫画", id: "baozi", url: "https://cn.webmota.com/api/bzmhq/amp_comic_list?type=all&region=all&state=all&filter=%2A&page=1&limit=36&language=cn"),
-    SourceProbe(type: "漫画", name: "禁漫天堂", id: "jm", url: "https://www.cdnhjk.net/categories/filter?o=mr&c=0&page=1"),
+    SourceProbe(type: "漫画", name: "禁漫天堂", id: "jm", url: "https://www.cdngwc.cc/categories/filter?o=mr&c=0&page=1"),
     SourceProbe(type: "漫画", name: "Komiic", id: "komiic", url: "https://komiic.com/api/query", method: "POST", body: "{\"query\":\"query recentUpdate($pagination: Pagination!) { recentUpdate(pagination: $pagination) { id title cover } }\",\"variables\":{\"pagination\":{\"limit\":20,\"offset\":0}}}".data(using: .utf8), headers: ["Content-Type": "application/json"]),
     SourceProbe(type: "漫画", name: "91动漫漫画", id: "dongman91_comic", url: "https://91dongman.net/manga/tongrenzhi/"),
     SourceProbe(type: "漫画", name: "8Muses", id: "8muses", url: "https://8muses.io/browse"),
@@ -59,7 +59,7 @@ let probes: [SourceProbe] = [
     SourceProbe(type: "漫画", name: "E-Hentai", id: "ehentai", url: "https://e-hentai.org/"),
 
     // 直播源
-    SourceProbe(type: "直播", name: "Chaturbate", id: "chaturbate", url: "https://chaturbate.com/api/public/affiliates/onlinerooms/?wm=9RhSM&client_ip=request_ip&gender=f&limit=5"),
+    SourceProbe(type: "直播", name: "HornyStudents", id: "hornystudents", url: "https://www.hornystudents.com/"),
     SourceProbe(type: "直播", name: "Stripchat", id: "stripchat", url: "https://stripchat.com/api/front/v2/models?limit=5&primaryTag=girls"),
 
     // 论坛源

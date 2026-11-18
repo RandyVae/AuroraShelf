@@ -1,22 +1,7 @@
-import SwiftUI
 import AVKit
+import SwiftUI
 
-/// 统一委托至 VideoDetailPlaybackScreen，消除双播放器代码分叉，同时对外提供 Apple TV 音轨与字幕选择器
-public struct NativePlayerView: View {
-    public let video: VideoItem
-    public let onDismiss: () -> Void
-
-    public init(video: VideoItem, onDismiss: @escaping () -> Void = {}) {
-        self.video = video
-        self.onDismiss = onDismiss
-    }
-
-    public var body: some View {
-        VideoDetailPlaybackScreen(video: video, onDismiss: onDismiss)
-    }
-}
-
-/// Apple TV 风格字幕与多音轨选择器（iOS 27 Liquid Glass 原生菜单按钮）
+/// Apple TV 风格字幕与多音轨选择器（Liquid Glass 原生菜单按钮）
 public struct PlayerMediaTrackMenu: View {
     public let playerItem: AVPlayerItem
     public let subtitleGroup: AVMediaSelectionGroup?

@@ -1,12 +1,31 @@
 import SwiftUI
 
 public struct SearchSheetView: View {
+    public enum SearchScope: String, CaseIterable, Identifiable, Sendable {
+        case video = "视频"
+        case comic = "漫画"
+        case live = "直播"
+        case forum = "社区"
+
+        public var id: String { rawValue }
+    }
+
     public let onPlayVideo: (VideoItem) -> Void
+    public let onSelectComic: ((ComicItem) -> Void)?
+    public let onSelectLive: ((LiveStreamItem) -> Void)?
+    public let onSelectForumPost: ((ForumPostItem) -> Void)?
     public let onDismiss: () -> Void
     
     @ObservedObject private var repo = VideoRepository.shared
+    @ObservedObject private var comicRepo = ComicRepository.shared
+    @ObservedObject private var liveRepo = LiveRepository.shared
+    @ObservedObject private var forumRepo = ForumRepository.shared
     @ObservedObject private var watchlist = WatchlistStore.shared
     @State private var query: String = ""
+    @State private var activeScope: SearchScope = .video
+    @State private var comicSearchResults: [ComicItem] = []
+    @State private var isSearchingComics: Bool = false
+    @State private var comicSearchError: String? = nil
     @State private var searchTask: Task<Void, Never>?
     @FocusState private var isSearchFocused: Bool
     @AppStorage("recent_video_searches") private var recentSearchesRaw: String = ""
@@ -55,18 +74,36 @@ public struct SearchSheetView: View {
         return repo.searchResults.filter { $0.sourceName == selectedSourceFilter }
     }
 
+    private var filteredLiveStreams: [LiveStreamItem] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return [] }
+        return liveRepo.liveStreams.filter {
+            $0.username.lowercased().contains(trimmed)
+                || $0.title.lowercased().contains(trimmed)
+                || $0.tags.contains(where: { $0.lowercased().contains(trimmed) })
+        }
+    }
+
+    private var filteredForumPosts: [ForumPostItem] {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return [] }
+        return forumRepo.posts.filter {
+            $0.title.lowercased().contains(trimmed)
+                || ($0.author ?? "").lowercased().contains(trimmed)
+                || $0.boardName.lowercased().contains(trimmed)
+        }
+    }
+
     private var resultShelves: [(title: String, items: [VideoItem])] {
         let items = filteredResults
         guard !items.isEmpty else { return [] }
 
         var shelves: [(title: String, items: [VideoItem])] = []
         
-        // 1. 热门最佳匹配（Top Results - 前 4 部）
         let topCount = min(4, items.count)
         let topResults = Array(items.prefix(topCount))
         shelves.append((title: "热门匹配", items: topResults))
 
-        // 2. 按分类或来源归集横向货架（优先置顶当前源与华视影院）
         let sourceGroups = Dictionary(grouping: items) { $0.sourceName }
         if sourceGroups.count > 1 {
             let sortedSources = sourceGroups.sorted { lhs, rhs in
@@ -98,255 +135,49 @@ public struct SearchSheetView: View {
     
     public init(
         initialQuery: String = "",
+        initialScope: SearchScope = .video,
         onPlayVideo: @escaping (VideoItem) -> Void,
+        onSelectComic: ((ComicItem) -> Void)? = nil,
+        onSelectLive: ((LiveStreamItem) -> Void)? = nil,
+        onSelectForumPost: ((ForumPostItem) -> Void)? = nil,
         onDismiss: @escaping () -> Void
     ) {
         self._query = State(initialValue: initialQuery)
+        self._activeScope = State(initialValue: initialScope)
         self.onPlayVideo = onPlayVideo
+        self.onSelectComic = onSelectComic
+        self.onSelectLive = onSelectLive
+        self.onSelectForumPost = onSelectForumPost
         self.onDismiss = onDismiss
     }
     
     public var body: some View {
         NavigationStack {
-            Group {
-                if repo.isSearching && repo.searchResults.isEmpty {
-                    VStack(spacing: AuroraMetrics.spacingL) {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
-                            .scaleEffect(1.3)
-                        
-                        Text("正在搜索 \(searchableSourceCount) 个已接入视频源…")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.secondary)
+            VStack(spacing: 0) {
+                Picker("搜索范围", selection: $activeScope) {
+                    ForEach(SearchScope.allCases) { scope in
+                        Text(scope.rawValue).tag(scope)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if !repo.searchResults.isEmpty {
-                    // Apple TV 标志性分类货架流搜索结果呈现
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
-                            if repo.isSearching {
-                                HStack(spacing: 8) {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                        .tint(AuroraColor.brand)
-                                    Text("已优先显示命中结果，正在同步其余视频源…")
-                                        .font(.caption)
-                                        .foregroundStyle(AuroraColor.textSecondary)
-                                }
-                                .padding(.horizontal, AuroraMetrics.contentInset)
-                                .padding(.top, AuroraMetrics.spacingS)
-                            }
-                            // 1. 顶部分源过滤栏与布局切换胶囊
-                            HStack {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: AuroraMetrics.spacingS) {
-                                        ForEach(availableSources, id: \.self) { src in
-                                            let isSelected = (selectedSourceFilter == src)
-                                            Button {
-                                                selectedSourceFilter = src
-                                            } label: {
-                                                HStack(spacing: 4) {
-                                                    Text(src)
-                                                        .font(.caption.bold())
-                                                    let count = src == "全部" ? repo.searchResults.count : repo.searchResults.filter { $0.sourceName == src }.count
-                                                    Text("\(count)")
-                                                        .font(.system(size: 10, weight: .bold))
-                                                        .padding(.horizontal, 4)
-                                                        .padding(.vertical, 1)
-                                                        .background(isSelected ? Color.white.opacity(0.25) : Color.black.opacity(0.15), in: Capsule())
-                                                }
-                                                .padding(.horizontal, 10)
-                                                .padding(.vertical, 6)
-                                                .background(
-                                                    isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
-                                                    in: Capsule()
-                                                )
-                                                .foregroundStyle(isSelected ? .white : AuroraColor.textPrimary)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                // 布局切换胶囊（货架流 vs 网格）
-                                Button {
-                                    withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
-                                        isGridView.toggle()
-                                    }
-                                } label: {
-                                    Image(systemName: isGridView ? "rectangle.grid.2x2" : "rectangle.stack")
-                                        .font(.caption.bold())
-                                        .foregroundStyle(AuroraColor.textPrimary)
-                                        .frame(width: 32, height: 32)
-                                        .background(AuroraColor.surfaceCard, in: Circle())
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(isGridView ? "切换为货架视图" : "切换为网格视图")
-                            }
-                            .padding(.horizontal, AuroraMetrics.contentInset)
-                            .padding(.top, AuroraMetrics.spacingS)
-
-                            if let searchWarning = repo.searchError {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .font(.caption)
-                                        .foregroundStyle(AuroraColor.warning)
-                                    Text(searchWarning)
-                                        .font(.caption)
-                                        .foregroundStyle(AuroraColor.textSecondary)
-                                }
-                                .padding(.horizontal, AuroraMetrics.contentInset)
-                            }
-
-                            if isGridView {
-                                // 网格视图
-                                LazyVGrid(
-                                    columns: [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: AuroraMetrics.spacingM)],
-                                    spacing: AuroraMetrics.spacingL
-                                ) {
-                                    ForEach(filteredResults) { item in
-                                        searchCard(item: item, width: nil)
-                                    }
-                                }
-                                .padding(.horizontal, AuroraMetrics.contentInset)
-                            } else {
-                                // Apple TV 分类货架流（横滑货架）
-                                ForEach(resultShelves, id: \.title) { shelf in
-                                    VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-                                        HStack {
-                                            Text(shelf.title)
-                                                .font(.title3)
-                                                .fontWeight(.bold)
-                                                .foregroundStyle(AuroraColor.textPrimary)
-                                            
-                                            Spacer()
-                                            
-                                            Text("共 \(shelf.items.count) 部")
-                                                .font(.caption.bold())
-                                                .foregroundStyle(AuroraColor.brand)
-                                        }
-                                        .padding(.horizontal, AuroraMetrics.contentInset)
-
-                                        ScrollView(.horizontal, showsIndicators: false) {
-                                            HStack(spacing: AuroraMetrics.spacingM) {
-                                                ForEach(shelf.items) { item in
-                                                    searchCard(item: item, width: 130)
-                                                }
-                                            }
-                                            .padding(.horizontal, AuroraMetrics.contentInset)
-                                        }
-                                    }
-                                }
-                            }
-
-                            Spacer().frame(height: 60)
-                        }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, AuroraMetrics.contentInset)
+                .padding(.vertical, AuroraMetrics.spacingS)
+                .onChange(of: activeScope) { _, _ in
+                    if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        submitSearch()
                     }
-                } else if !query.isEmpty, let searchError = repo.searchError {
-                    ContentUnavailableView {
-                        Label("搜索失败", systemImage: "wifi.exclamationmark")
-                    } description: {
-                        Text(searchError)
-                    } actions: {
-                        Button("重试", systemImage: "arrow.clockwise") {
-                            submitSearch()
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                } else if !query.isEmpty {
-                    ContentUnavailableView.search(text: query)
-                } else {
-                    // Apple TV 标志性搜索落地页：热门推荐探索 + 最近搜索足迹
-                    ScrollView(.vertical, showsIndicators: false) {
-                        VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
-                            // 1. 最近搜索足迹
-                            if !recentSearches.isEmpty {
-                                VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-                                    HStack {
-                                        Text("最近搜索")
-                                            .font(.headline)
-                                            .foregroundStyle(AuroraColor.textPrimary)
-                                        Spacer()
-                                        Button("清除") {
-                                            clearRecentSearches()
-                                        }
-                                        .font(.subheadline)
-                                        .foregroundStyle(AuroraColor.brand)
-                                    }
+                }
 
-                                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
-                                        ForEach(recentSearches, id: \.self) { item in
-                                            Button {
-                                                query = item
-                                                submitSearch()
-                                            } label: {
-                                                HStack(spacing: 5) {
-                                                    Image(systemName: "clock.arrow.circlepath")
-                                                        .font(.caption2)
-                                                    Text(item)
-                                                        .font(.subheadline)
-                                                        .lineLimit(1)
-                                                }
-                                                .padding(.horizontal, 12)
-                                                .padding(.vertical, 8)
-                                                .frame(maxWidth: .infinity)
-                                                .background(AuroraColor.surfaceCard, in: Capsule())
-                                                .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
-                                                .foregroundStyle(AuroraColor.textSecondary)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                }
-                            }
-
-                            // 2. 热门推荐探索货架
-                            VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
-                                Text("热门探索")
-                                    .font(.headline)
-                                    .foregroundStyle(AuroraColor.textPrimary)
-
-                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 8) {
-                                    ForEach(trendingKeywords, id: \.self) { keyword in
-                                        Button {
-                                            query = keyword
-                                            submitSearch()
-                                        } label: {
-                                            HStack(spacing: 5) {
-                                                Image(systemName: "sparkle")
-                                                    .font(.caption2)
-                                                    .foregroundStyle(AuroraColor.brand)
-                                                Text(keyword)
-                                                    .font(.subheadline.weight(.medium))
-                                                    .lineLimit(1)
-                                            }
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 9)
-                                            .frame(maxWidth: .infinity)
-                                            .background(AuroraColor.surfaceCard, in: Capsule())
-                                            .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
-                                            .foregroundStyle(AuroraColor.textPrimary)
-                                        }
-                                        .buttonStyle(AppleSpringCardButtonStyle())
-                                    }
-                                }
-                            }
-
-                            // 3. 全域聚合说明
-                            HStack(spacing: 6) {
-                                Image(systemName: "network")
-                                    .font(.caption)
-                                    .foregroundStyle(AuroraColor.textTertiary)
-                                Text("全域聚合搜索覆盖 \(searchableSourceCount) 个视频源")
-                                    .font(.caption)
-                                    .foregroundStyle(AuroraColor.textTertiary)
-                            }
-                            .padding(.top, AuroraMetrics.spacingS)
-                        }
-                        .padding(.horizontal, AuroraMetrics.contentInset)
-                        .padding(.top, AuroraMetrics.spacingL)
+                Group {
+                    switch activeScope {
+                    case .video:
+                        videoSearchContent
+                    case .comic:
+                        comicSearchContent
+                    case .live:
+                        liveSearchContent
+                    case .forum:
+                        forumSearchContent
                     }
                 }
             }
@@ -360,6 +191,11 @@ public struct SearchSheetView: View {
             )
             .onSubmit(of: .search) {
                 submitSearch()
+            }
+            .onChange(of: query) { _, newValue in
+                if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    searchTask?.cancel()
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -397,6 +233,400 @@ public struct SearchSheetView: View {
     }
 
     @ViewBuilder
+    private var videoSearchContent: some View {
+        if repo.isSearching && repo.searchResults.isEmpty {
+            VStack(spacing: AuroraMetrics.spacingL) {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: AuroraColor.brand))
+                    .scaleEffect(1.3)
+                
+                Text("search.concurrent_hint".localized(searchableSourceCount))
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !repo.searchResults.isEmpty {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
+                    if repo.isSearching {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(AuroraColor.brand)
+                            Text("已优先显示命中结果，正在同步其余视频源…")
+                                .font(.caption)
+                                .foregroundStyle(AuroraColor.textSecondary)
+                        }
+                        .padding(.horizontal, AuroraMetrics.contentInset)
+                        .padding(.top, AuroraMetrics.spacingS)
+                    }
+                    HStack {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: AuroraMetrics.spacingS) {
+                                ForEach(availableSources, id: \.self) { src in
+                                    let isSelected = (selectedSourceFilter == src)
+                                    Button {
+                                        selectedSourceFilter = src
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            Text(src)
+                                                .font(.caption.bold())
+                                            let count = src == "全部" ? repo.searchResults.count : repo.searchResults.filter { $0.sourceName == src }.count
+                                            Text("\(count)")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(isSelected ? Color.white.opacity(0.25) : Color.black.opacity(0.15), in: Capsule())
+                                        }
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(
+                                            isSelected ? AuroraColor.brand : AuroraColor.surfaceCard,
+                                            in: Capsule()
+                                        )
+                                        .foregroundStyle(isSelected ? .white : AuroraColor.textPrimary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        
+                        Spacer()
+                        
+                        Button {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                isGridView.toggle()
+                            }
+                        } label: {
+                            Image(systemName: isGridView ? "rectangle.grid.2x2" : "rectangle.stack")
+                                .font(.caption.bold())
+                                .foregroundStyle(AuroraColor.textPrimary)
+                                .frame(width: 32, height: 32)
+                                .background(AuroraColor.surfaceCard, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(isGridView ? "切换为货架视图" : "切换为网格视图")
+                    }
+                    .padding(.horizontal, AuroraMetrics.contentInset)
+                    .padding(.top, AuroraMetrics.spacingS)
+
+                    if let searchWarning = repo.searchError {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(AuroraColor.warning)
+                            Text(searchWarning)
+                                .font(.caption)
+                                .foregroundStyle(AuroraColor.textSecondary)
+                        }
+                        .padding(.horizontal, AuroraMetrics.contentInset)
+                    }
+
+                    if isGridView {
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: AuroraMetrics.spacingM)],
+                            spacing: AuroraMetrics.spacingL
+                        ) {
+                            ForEach(filteredResults) { item in
+                                searchCard(item: item, width: nil)
+                            }
+                        }
+                        .padding(.horizontal, AuroraMetrics.contentInset)
+                    } else {
+                        ForEach(resultShelves, id: \.title) { shelf in
+                            VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
+                                HStack {
+                                    Text(shelf.title)
+                                        .font(.title3)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(AuroraColor.textPrimary)
+                                    
+                                    Spacer()
+                                    
+                                    Text("共 \(shelf.items.count) 部")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(AuroraColor.brand)
+                                }
+                                .padding(.horizontal, AuroraMetrics.contentInset)
+
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: AuroraMetrics.spacingM) {
+                                        ForEach(shelf.items) { item in
+                                            searchCard(item: item, width: 130)
+                                        }
+                                    }
+                                    .padding(.horizontal, AuroraMetrics.contentInset)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer().frame(height: 60)
+                }
+            }
+        } else if !query.isEmpty, let searchError = repo.searchError {
+            ContentUnavailableView {
+                Label("搜索失败", systemImage: "wifi.exclamationmark")
+            } description: {
+                Text(searchError)
+            } actions: {
+                Button("重试", systemImage: "arrow.clockwise") {
+                    submitSearch()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        } else if !query.isEmpty {
+            ContentUnavailableView.search(text: query)
+        } else {
+            landingExploreContent
+        }
+    }
+
+    @ViewBuilder
+    private var comicSearchContent: some View {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if isSearchingComics && comicSearchResults.isEmpty {
+            VStack(spacing: AuroraMetrics.spacingL) {
+                ProgressView()
+                    .tint(AuroraColor.brand)
+                Text("comics.loading".localized)
+                    .font(.subheadline)
+                    .foregroundStyle(AuroraColor.textSecondary)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if trimmed.isEmpty {
+            landingExploreContent
+        } else if comicSearchResults.isEmpty, let err = comicSearchError {
+            ContentUnavailableView {
+                Label("搜索失败", systemImage: "wifi.exclamationmark")
+            } description: {
+                Text(err)
+            } actions: {
+                Button("重试", systemImage: "arrow.clockwise") {
+                    submitSearch()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        } else if comicSearchResults.isEmpty {
+            ContentUnavailableView.search(text: trimmed)
+        } else {
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 110, maximum: 160), spacing: AuroraMetrics.spacingM)],
+                    spacing: AuroraMetrics.spacingL
+                ) {
+                    ForEach(comicSearchResults) { comic in
+                        Button {
+                            onSelectComic?(comic)
+                            onDismiss()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                AuroraCoverImage(
+                                    url: comic.coverUrl,
+                                    title: comic.title,
+                                    sourceBaseURL: comic.coverBaseURL,
+                                    aspectRatio: AuroraMetrics.posterAspect,
+                                    contentMode: .fill,
+                                    cornerRadius: 10
+                                )
+                                Text(comic.title)
+                                    .font(.caption.bold())
+                                    .foregroundStyle(AuroraColor.textPrimary)
+                                    .lineLimit(1)
+                                Text(comic.latestChapterTitle.isEmpty ? comic.author : comic.latestChapterTitle)
+                                    .font(.caption2)
+                                    .foregroundStyle(AuroraColor.textSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .buttonStyle(AppleSpringCardButtonStyle())
+                    }
+                }
+                .padding(AuroraMetrics.contentInset)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var liveSearchContent: some View {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matches = filteredLiveStreams
+        if trimmed.isEmpty {
+            landingExploreContent
+        } else if matches.isEmpty {
+            ContentUnavailableView.search(text: trimmed)
+        } else {
+            ScrollView(.vertical, showsIndicators: false) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 150, maximum: 220), spacing: AuroraMetrics.spacingM)],
+                    spacing: AuroraMetrics.spacingL
+                ) {
+                    ForEach(matches) { stream in
+                        Button {
+                            onSelectLive?(stream)
+                            onDismiss()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                AuroraCoverImage(
+                                    url: stream.avatarUrl,
+                                    title: stream.username,
+                                    aspectRatio: AuroraMetrics.liveAspect,
+                                    contentMode: .fill,
+                                    cornerRadius: 10
+                                )
+                                Text(stream.username)
+                                    .font(.caption.bold())
+                                    .foregroundStyle(AuroraColor.textPrimary)
+                                    .lineLimit(1)
+                                Text(stream.title.isEmpty ? LiveSourceCatalog.name(for: stream.sourceID) : stream.title)
+                                    .font(.caption2)
+                                    .foregroundStyle(AuroraColor.textSecondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .buttonStyle(AppleSpringCardButtonStyle())
+                    }
+                }
+                .padding(AuroraMetrics.contentInset)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var forumSearchContent: some View {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matches = filteredForumPosts
+        if trimmed.isEmpty {
+            landingExploreContent
+        } else if matches.isEmpty {
+            ContentUnavailableView.search(text: trimmed)
+        } else {
+            List(matches) { post in
+                Button {
+                    onSelectForumPost?(post)
+                    onDismiss()
+                } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(post.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(AuroraColor.textPrimary)
+                            .lineLimit(2)
+                        HStack(spacing: 8) {
+                            Text(post.boardName)
+                                .font(.caption2.bold())
+                                .foregroundStyle(AuroraColor.brandLabel)
+                            if let author = post.author, !author.isEmpty {
+                                Text(author)
+                                    .font(.caption2)
+                                    .foregroundStyle(AuroraColor.textSecondary)
+                            }
+                            Spacer()
+                            Text("forum.replies".localized(post.replies ?? 0))
+                                .font(.caption2)
+                                .foregroundStyle(AuroraColor.textTertiary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(AuroraColor.surface)
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+        }
+    }
+
+    @ViewBuilder
+    private var landingExploreContent: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
+                if !recentSearches.isEmpty {
+                    VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
+                        HStack {
+                            Text("search.history".localized)
+                                .font(.headline)
+                                .foregroundStyle(AuroraColor.textPrimary)
+                            Spacer()
+                            Button("search.clear_history".localized) {
+                                clearRecentSearches()
+                            }
+                            .font(.subheadline)
+                            .foregroundStyle(AuroraColor.brand)
+                        }
+
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
+                            ForEach(recentSearches, id: \.self) { item in
+                                Button {
+                                    query = item
+                                    submitSearch()
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "clock.arrow.circlepath")
+                                            .font(.caption2)
+                                        Text(item)
+                                            .font(.subheadline)
+                                            .lineLimit(1)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(AuroraColor.surfaceCard, in: Capsule())
+                                    .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
+                                    .foregroundStyle(AuroraColor.textSecondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: AuroraMetrics.spacingM) {
+                    Text("热门探索")
+                        .font(.headline)
+                        .foregroundStyle(AuroraColor.textPrimary)
+
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 8)], spacing: 8) {
+                        ForEach(trendingKeywords, id: \.self) { keyword in
+                            Button {
+                                query = keyword
+                                submitSearch()
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Image(systemName: "sparkle")
+                                        .font(.caption2)
+                                        .foregroundStyle(AuroraColor.brand)
+                                    Text(keyword)
+                                        .font(.subheadline.weight(.medium))
+                                        .lineLimit(1)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 9)
+                                .frame(maxWidth: .infinity)
+                                .background(AuroraColor.surfaceCard, in: Capsule())
+                                .overlay(Capsule().stroke(AuroraColor.hairline, lineWidth: 1))
+                                .foregroundStyle(AuroraColor.textPrimary)
+                            }
+                            .buttonStyle(AppleSpringCardButtonStyle())
+                        }
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Image(systemName: "network")
+                        .font(.caption)
+                        .foregroundStyle(AuroraColor.textTertiary)
+                    Text("search.concurrent_hint".localized(searchableSourceCount))
+                        .font(.caption)
+                        .foregroundStyle(AuroraColor.textTertiary)
+                }
+                .padding(.top, AuroraMetrics.spacingS)
+            }
+            .padding(.horizontal, AuroraMetrics.contentInset)
+            .padding(.top, AuroraMetrics.spacingL)
+        }
+    }
+
+    @ViewBuilder
     private func searchCard(item: VideoItem, width: CGFloat?) -> some View {
         Button {
             selectedDetailVideo = item
@@ -417,7 +647,6 @@ public struct SearchSheetView: View {
                             .stroke(AuroraColor.hairline, lineWidth: 1)
                     )
 
-                    // 视频源微型胶囊
                     Text(item.sourceName)
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(AuroraColor.brandLabel)
@@ -441,7 +670,7 @@ public struct SearchSheetView: View {
                                     .foregroundStyle(.yellow)
                                 Text(item.rating)
                                     .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(AuroraColor.textPrimary)
                             }
                         }
 
@@ -500,8 +729,38 @@ public struct SearchSheetView: View {
         guard !submittedQuery.isEmpty else { return }
         selectedSourceFilter = "全部"
         addRecentSearch(submittedQuery)
-        searchTask = Task {
-            await repo.searchAllSources(query: submittedQuery)
+        switch activeScope {
+        case .video:
+            searchTask = Task {
+                await repo.searchAllSources(query: submittedQuery)
+            }
+        case .comic:
+            isSearchingComics = true
+            comicSearchError = nil
+            searchTask = Task {
+                do {
+                    let results = try await comicRepo.searchComics(query: submittedQuery)
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        self.comicSearchResults = results
+                        self.isSearchingComics = false
+                    }
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    await MainActor.run {
+                        self.comicSearchError = error.localizedDescription
+                        self.isSearchingComics = false
+                    }
+                }
+            }
+        case .live:
+            if liveRepo.liveStreams.isEmpty {
+                liveRepo.loadStreams()
+            }
+        case .forum:
+            if forumRepo.posts.isEmpty {
+                forumRepo.loadPosts()
+            }
         }
     }
 }

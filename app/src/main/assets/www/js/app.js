@@ -2,17 +2,8 @@
 (function () {
   'use strict';
 
-  // 彻底禁用双击放大 (Double-tap to zoom) 与多指捏合缩放手势
-  (function preventDoubleTapZoom() {
-    let lastTouchEnd = 0;
-    document.addEventListener('touchend', function (event) {
-      const now = Date.now();
-      if (now - lastTouchEnd <= 300) {
-        event.preventDefault();
-      }
-      lastTouchEnd = now;
-    }, { passive: false });
-
+  // 禁用多指捏合缩放手势（双击放缩由 CSS touch-action: manipulation 处理，不拦截快速连击 touchend）
+  (function preventPinchZoom() {
     document.addEventListener('touchstart', function (event) {
       if (event.touches.length > 1) {
         event.preventDefault();
@@ -66,40 +57,125 @@
     if (window.LGAudio) {
       LGAudio.appMuted = !!muted;
       if (muted) {
-        LGAudio.stopBgm();
+        LGAudio.isMuted = true;
+        if (LGAudio.pauseBgm) LGAudio.pauseBgm();
+        else LGAudio.stopBgm();
       } else {
         LGAudio.isMuted = (LGAudio.bgmVolume === 0 && LGAudio.sfxVolume === 0);
-        if (!LGAudio.isMuted && APP && APP.screen) {
-          const bgm = { title: 'title', hub: 'hub', campaign: 'campaign', story: 'story', battle: 'battle', gacha: 'gacha', slots: 'gacha' }[APP.screen];
-          if (bgm) LGAudio.playBgm(bgm);
+        if (!LGAudio.isMuted) {
+          if (APP && APP.screen) {
+            const bgm = { title: 'title', hub: 'hub', campaign: 'campaign', story: 'story', battle: 'battle', gacha: 'gacha', slots: 'gacha' }[APP.screen];
+            if (bgm) LGAudio.playBgm(bgm);
+          } else if (LGAudio.resumeBgm) {
+            LGAudio.resumeBgm();
+          }
         }
       }
     }
   };
 
   window.handleAppBack = function () {
-    const openSelectors = [
-      '#cg-cinema-overlay', '#modal-battle-revive', '#slots-paytable', '#slots-feature',
-      '#modal-slots-bailout', '#modal-slots-recharge', '#detail-sheet', '#mission-sheet',
-      '#story-sheet', '#settings-sheet', '#squad-sheet',
-    ];
-    for (let i = 0; i < openSelectors.length; i++) {
-      const el = document.querySelector(openSelectors[i]);
-      if (el && !el.hidden && (el.classList.contains('open') || el.style.display !== 'none')) {
-        if (openSelectors[i] === '#cg-cinema-overlay') {
-          const skip = document.getElementById('btn-cg-skip');
-          if (skip && skip.onclick) skip.onclick();
-          else el.hidden = true;
-          return true;
-        }
+    // 1. Cinema CG overlay
+    const cgCinema = document.querySelector('#cg-cinema-overlay');
+    if (cgCinema && !cgCinema.hidden) {
+      const skip = document.getElementById('btn-cg-skip');
+      if (skip && typeof skip.onclick === 'function') skip.onclick();
+      else if (skip && typeof skip.click === 'function') skip.click();
+      else cgCinema.hidden = true;
+      return true;
+    }
+
+    // 2. CG Lightbox overlay
+    const cgLightbox = document.querySelector('#cg-lightbox-overlay');
+    if (cgLightbox && !cgLightbox.hidden) {
+      const closeLb = document.getElementById('btn-cg-lightbox-close');
+      if (closeLb && typeof closeLb.onclick === 'function') closeLb.onclick();
+      else if (closeLb && typeof closeLb.click === 'function') closeLb.click();
+      else cgLightbox.hidden = true;
+      return true;
+    }
+
+    // 3. Generic confirmation / export / import modal (#modal uses .open)
+    const modal = document.querySelector('#modal');
+    if (modal && modal.classList.contains('open')) {
+      const cancel = document.getElementById('modal-cancel');
+      if (cancel && typeof cancel.onclick === 'function') cancel.onclick();
+      else if (cancel && typeof cancel.click === 'function') cancel.click();
+      else modal.classList.remove('open');
+      return true;
+    }
+
+    // 4. Battle emergency revival modal: must run cancel handler so renderDefeatResult() settles cleanly
+    const reviveModal = document.querySelector('#modal-battle-revive');
+    if (reviveModal && !reviveModal.hidden) {
+      const cancelRevive = document.getElementById('btn-battle-revive-cancel');
+      if (cancelRevive && typeof cancelRevive.onclick === 'function') {
+        cancelRevive.onclick();
+      } else if (cancelRevive && typeof cancelRevive.click === 'function') {
+        cancelRevive.click();
+      } else {
+        reviveModal.classList.remove('open');
+        reviveModal.hidden = true;
+      }
+      return true;
+    }
+
+    // 5. Slots feature reward overlay: trigger #btn-slots-feature-close click so waitForFeatureDismissal resolves
+    const slotsFeature = document.querySelector('#slots-feature');
+    if (slotsFeature && !slotsFeature.hidden) {
+      const closeFeat = document.getElementById('btn-slots-feature-close');
+      if (closeFeat && typeof closeFeat.click === 'function') {
+        closeFeat.click();
+      } else if (closeFeat && typeof closeFeat.onclick === 'function') {
+        closeFeat.onclick();
+      } else {
+        slotsFeature.hidden = true;
+      }
+      return true;
+    }
+
+    // 6. Slots paytable & transient hidden/open modals
+    const transientOverlays = ['#slots-paytable', '#modal-slots-bailout', '#modal-slots-recharge', '#modal-battle-recharge'];
+    for (let i = 0; i < transientOverlays.length; i++) {
+      const el = document.querySelector(transientOverlays[i]);
+      if (el && !el.hidden && (el.classList.contains('open') || !el.classList.contains('sheet'))) {
         el.classList.remove('open');
         el.hidden = true;
         return true;
       }
     }
+
+    // 7. Persistent .sheet & .gacha-reveal overlays (controlled by .open; NEVER leave hidden = true)
+    const openSheets = [
+      '#equip-picker-sheet', '#detail-sheet', '#mission-sheet',
+      '#stage-action-sheet', '#cg-sheet', '#gacha-reveal',
+    ];
+    for (let i = 0; i < openSheets.length; i++) {
+      const sel = openSheets[i];
+      const el = document.querySelector(sel);
+      if (el && el.classList.contains('open')) {
+        if (sel === '#detail-sheet' && window.UI && typeof UI.closeDetail === 'function') {
+          UI.closeDetail();
+        } else if (sel === '#gacha-reveal') {
+          el.classList.remove('open');
+          if (APP.stages && APP.stages.gacha) APP.stages.gacha.stop();
+        } else if (sel === '#cg-sheet') {
+          if (el.querySelectorAll) {
+            el.querySelectorAll('video').forEach((v) => { try { v.pause(); } catch (_) {} });
+          }
+          el.classList.remove('open');
+        } else {
+          el.classList.remove('open');
+        }
+        return true;
+      }
+    }
+
+    // 8. Navigate from sub-screens back to Hub
     if (APP && APP.screen && APP.screen !== 'hub' && APP.screen !== 'title' && APP.screen !== 'boot') {
       if (APP.battle && APP.battle.running) APP.battle.stop();
       if (window.SlotsUI && SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
+      if (window.UI && UI.renderHub && APP.state && APP.data) UI.renderHub(APP.state, APP.data);
       APP.show('hub');
       return true;
     }
@@ -139,6 +215,7 @@
     battle: null, raf: 0, story: null,
     gamePaused: false,
     resultSettled: false,
+    _entranceTimer: null,
   };
   window.APP = APP;
 
@@ -150,7 +227,23 @@
       if (node) node.classList.toggle('active', s === name);
     });
     APP.screen = name;
-    if (name !== 'battle' && APP.battle && APP.battle.running) APP.battle.stop();
+    if (name !== 'battle') {
+      if (APP._entranceTimer) {
+        clearTimeout(APP._entranceTimer);
+        APP._entranceTimer = null;
+      }
+      if (APP.battle && APP.battle.running) APP.battle.stop();
+    }
+    if (name !== 'story') {
+      if (window.IntroTimeline && IntroTimeline.active && typeof IntroTimeline.abort === 'function') {
+        IntroTimeline.abort();
+      }
+      if (APP.story) {
+        clearTimeout(APP.story.timer);
+        clearTimeout(APP.story.typing);
+        APP.story = null;
+      }
+    }
     if (name !== 'slots' && window.SlotsUI && SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
     if (APP.stages && name !== 'hub' && APP.stages.hub) APP.stages.hub.stop();
     if (name === 'slots' && window.SlotsUI && SlotsUI.resumeMascot) {
@@ -166,7 +259,6 @@
     show('slots');
     if (window.SlotsUI) {
       SlotsUI.render();
-      if (SlotsUI.initMascot) SlotsUI.initMascot();
     }
   };
 
@@ -174,14 +266,36 @@
   // visibility changes. It stops active work without clearing saved progress.
   APP.pauseGame = function () {
     APP.gamePaused = true;
+    if (APP._entranceTimer) {
+      clearTimeout(APP._entranceTimer);
+      APP._entranceTimer = null;
+      const entranceBox = $('#battle-entrance-cutin');
+      if (entranceBox) entranceBox.hidden = true;
+      if (APP.stages && APP.stages.entrance) APP.stages.entrance.stop();
+    }
     if (APP.battle) APP.battle.running = false;
-    if (window.SlotsUI && SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
-    if (window.LGAudio && LGAudio.stopBgm) LGAudio.stopBgm();
+    if (window.LGVFX && typeof LGVFX.pause === 'function') LGVFX.pause();
+    if (window.SlotsUI) {
+      if (SlotsUI.stopAutoSpin) SlotsUI.stopAutoSpin();
+      if (SlotsUI.pauseMascot) SlotsUI.pauseMascot();
+    }
+    if (window.LGAudio) {
+      if (typeof LGAudio.pauseBgm === 'function') LGAudio.pauseBgm();
+      else if (typeof LGAudio.stopBgm === 'function') LGAudio.stopBgm();
+    }
   };
 
   APP.resumeGame = function () {
     APP.gamePaused = false;
-    if (APP.screen === 'battle' && APP.battle && !APP.battle.ended) APP.battle.running = true;
+    if (window.LGAudio && typeof LGAudio.resumeBgm === 'function') {
+      LGAudio.resumeBgm();
+    }
+    if (APP.screen === 'battle' && APP.battle && !APP.battle.ended) {
+      APP.battle.running = true;
+      if (window.LGVFX && typeof LGVFX.resume === 'function') LGVFX.resume();
+    } else if (APP.screen === 'slots' && window.SlotsUI && typeof SlotsUI.resumeMascot === 'function') {
+      SlotsUI.resumeMascot();
+    }
   };
 
   APP.destroyGame = function () {
@@ -244,14 +358,66 @@
   function confirmDialog(title, body, okLabel) {
     return new Promise((resolve) => {
       $('#modal-title').textContent = title;
-      $('#modal-body').textContent = body;
+      const bodyEl = $('#modal-body');
+      bodyEl.innerHTML = '';
+      bodyEl.textContent = body;
       const ok = $('#modal-ok');
       const cancel = $('#modal-cancel');
       ok.textContent = okLabel || '确认';
+      cancel.textContent = '取消';
       const close = (v) => { $('#modal').classList.remove('open'); ok.onclick = null; cancel.onclick = null; resolve(v); };
       ok.onclick = () => close(true);
       cancel.onclick = () => close(false);
       $('#modal').classList.add('open');
+    });
+  }
+
+  function saveTextModal(opts) {
+    return new Promise((resolve) => {
+      $('#modal-title').textContent = opts.title || '存档数据';
+      const bodyEl = $('#modal-body');
+      bodyEl.innerHTML = '';
+      const hint = document.createElement('p');
+      hint.style.margin = '0 0 8px';
+      hint.style.fontSize = 'var(--type-caption)';
+      hint.style.color = 'var(--text-secondary)';
+      hint.textContent = opts.hint || '';
+      const ta = document.createElement('textarea');
+      ta.className = 'modal-textarea';
+      ta.rows = 6;
+      ta.spellcheck = false;
+      ta.value = opts.initialValue || '';
+      if (opts.placeholder) ta.placeholder = opts.placeholder;
+      if (opts.readOnly) ta.readOnly = true;
+      bodyEl.appendChild(hint);
+      bodyEl.appendChild(ta);
+
+      const ok = $('#modal-ok');
+      const cancel = $('#modal-cancel');
+      ok.textContent = opts.okLabel || '确认';
+      cancel.textContent = opts.cancelLabel || '关闭';
+      const close = (val) => {
+        $('#modal').classList.remove('open');
+        ok.onclick = null;
+        cancel.onclick = null;
+        bodyEl.innerHTML = '';
+        resolve(val);
+      };
+      ok.onclick = () => {
+        if (opts.onConfirm) {
+          const keepOpen = opts.onConfirm(ta);
+          if (keepOpen === true) return;
+        }
+        close(ta.value);
+      };
+      cancel.onclick = () => close(null);
+      $('#modal').classList.add('open');
+      setTimeout(() => {
+        try {
+          ta.focus();
+          if (opts.readOnly) ta.select();
+        } catch (_) {}
+      }, 30);
     });
   }
 
@@ -285,7 +451,7 @@
   window.safeFetchJson = safeFetchJson;
 
   async function loadData() {
-    const files = ['heroes', 'enemies', 'chapters', 'gacha', 'shop', 'constants', 'strings', 'videos', 'cgs', 'battle', 'skills', 'equipment', 'missions', 'slots'];
+    const files = ['heroes', 'enemies', 'chapters', 'gacha', 'shop', 'constants', 'strings', 'videos', 'cgs', 'battle', 'skills', 'equipment', 'missions', 'slots', 'intro-sequences'];
     const out = {};
     await Promise.all(files.map((file, index) => {
       return safeFetchJson('data/' + file + '.json').then((payload) => {
@@ -294,6 +460,9 @@
         return payload;
       });
     }));
+    if (out['intro-sequences'] && out['intro-sequences'].sequences && window.IntroTimeline) {
+      Object.assign(window.IntroTimeline.sequences, out['intro-sequences'].sequences);
+    }
     try {
       const origData = await safeFetchJson('data/original-assets-manifest.json');
       if (origData) {
@@ -334,8 +503,33 @@
       return;
     }
     if (!lines || !lines.length) { onDone(); return; }
+    // Ensure Prologue-only widgets are hidden when playing standard chapter story
+    if (window.IntroTimeline) window.IntroTimeline.active = false;
+    const scr = $('#screen-story');
+    if (scr) {
+      scr.classList.remove('prologue-mode');
+      const track = scr.querySelector('.story-timeline-track');
+      if (track) track.hidden = true;
+    }
+    ['#story-event-chip', '#story-tactical-prompt', '#story-role-badge', '#story-supp-actor', '#story-enemy-actor', '#story-spine-canvas', '#story-speedlines'].forEach((sel) => {
+      const n = $(sel);
+      if (n) n.hidden = true;
+    });
+    const bgEl = $('#story-bg');
+    if (bgEl) {
+      bgEl.style.transform = '';
+      bgEl.classList.remove('shake');
+      bgEl.style.backgroundImage = bg ? 'url(' + bg + ')' : 'none';
+    }
+    const dlgEl = $('.story-dialog');
+    if (dlgEl) dlgEl.style.opacity = '1';
+    const autoBtn = $('#btn-story-auto');
+    if (autoBtn) {
+      autoBtn.textContent = '自动播放';
+      autoBtn.setAttribute('aria-pressed', 'false');
+    }
+
     APP.story = { lines, i: 0, timer: 0, auto: false, done: onDone, typing: null };
-    $('#story-bg').style.backgroundImage = bg ? 'url(' + bg + ')' : 'none';
     show('story');
     LGAudio.playBgm('story');
     renderLine();
@@ -486,9 +680,15 @@
     }).filter(Boolean);
 
     const enemies = (stage.enemy || []).filter((e) => e && e.unit);
-    const chapId = (chapter && chapter.id) || (stage && stage.id && parseInt(stage.id.split('-')[0], 10)) || 1;
-    const bgFile = (chapId >= 1 && chapId <= 8) ? `ch${chapId}.webp` : 'battle.webp';
-    $('#battle-field').style.backgroundImage = `url(assets/bg/${bgFile})`;
+    const chapId = (chapter && chapter.id) || (stage && stage.id && parseInt(String(stage.id).split('-')[0], 10)) || 1;
+    let bgUrl = (chapter && chapter.bgWeb) || '';
+    if (!bgUrl) {
+      if (chapId === 9) bgUrl = 'assets/bg/rea_temple_b001.webp';
+      else if (chapId === 10) bgUrl = 'assets/bg/rea_throne_b002.webp';
+      else if (chapId >= 1 && chapId <= 8) bgUrl = `assets/bg/ch${chapId}.webp`;
+      else bgUrl = 'assets/bg/battle.webp';
+    }
+    $('#battle-field').style.backgroundImage = `url(${bgUrl})`;
     show('battle');
     const canvas = $('#battle-canvas');
 
@@ -496,19 +696,21 @@
     APP.currentStage = stage;
     APP.currentHeroes = heroes;
 
+    const playerLevel = Math.min(30, 1 + Math.floor(Object.keys(st.cleared || {}).length / 2));
+    const stageConstants = Object.assign({}, APP.data.battle || { timerSeconds: 60, skillDeliveryCooldown: 4 }, {
+      timerSeconds: (stage.level || 1) <= 10
+        ? ((APP.data.battle && APP.data.battle.noobTimerSeconds) || 120)
+        : ((APP.data.battle && APP.data.battle.timerSeconds) || 60),
+    });
+
     if (APP.battle) {
       APP.battle.stop();
     } else {
-      const playerLevel = Math.min(30, 1 + Math.floor(Object.keys(st.cleared).length / 2));
       APP.battle = new Battle({
         field: $('#battle-field'), canvas,
         playerLevel,
         onEnd: (r) => endBattle(APP.currentChapter || chapter, APP.currentStage || stage, r, APP.currentHeroes || heroes),
-        constants: Object.assign({}, APP.data.battle || { timerSeconds: 60, skillDeliveryCooldown: 4 }, {
-          timerSeconds: (stage.level || 1) <= 10
-            ? ((APP.data.battle && APP.data.battle.noobTimerSeconds) || 120)
-            : ((APP.data.battle && APP.data.battle.timerSeconds) || 60),
-        }),
+        constants: stageConstants,
         onLog: (t) => {
           $('#battle-log').textContent = t;
           const list = $('#battle-loglist');
@@ -522,6 +724,8 @@
       });
     }
     const b = APP.battle;
+    b.playerLevel = playerLevel;
+    b.constants = stageConstants;
     b.chapter = chapter;
     b.stage = stage;
     b.heroes = heroes;
@@ -530,6 +734,11 @@
     b.running = false;
     b.units = [];
     b.skipping = false;
+    b.nextDelivery = 0;
+    b._reviveUsed = false;
+    b._reviving = false;
+    b.comboCount = 0;
+    b.lastHitTime = 0;
     $('#battle-log').textContent = fromPrologue
       ? '【战术无线电】先锋突入完成，第一波敌兵进入射程！'
       : '正在载入特勤作战单位…';
@@ -570,6 +779,10 @@
     }
 
     // 戰鬥入場 Spine 骨骼特寫展示：序章已完整演繹時不再冗餘阻斷，非序章時展示短特寫
+    if (APP._entranceTimer) {
+      clearTimeout(APP._entranceTimer);
+      APP._entranceTimer = null;
+    }
     const entranceBox = $('#battle-entrance-cutin');
     const leaderHero = heroes[0];
     if (!fromPrologue && entranceBox && leaderHero && window.SpineStage) {
@@ -588,10 +801,11 @@
       }
       APP.stages.entrance.show(leaderHero.unit);
       b.running = false;
-      setTimeout(() => {
+      APP._entranceTimer = setTimeout(() => {
+        APP._entranceTimer = null;
         entranceBox.hidden = true;
         if (APP.stages.entrance) APP.stages.entrance.stop();
-        b.running = true;
+        if (!APP.gamePaused && !b.ended && !b.stopped) b.running = true;
       }, 1200);
     }
 
@@ -602,10 +816,12 @@
         const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
         last = now;
         const scaled = dt * (battleInst.speed || 1);
-        if (!APP.gamePaused) battleInst.step(scaled);
-        if (battleInst.spine) {
-          battleInst.spine.update(scaled);
-          battleInst.spine.draw();
+        if (!APP.gamePaused) {
+          battleInst.step(scaled);
+          if (battleInst.spine) {
+            battleInst.spine.update(scaled);
+            battleInst.spine.draw();
+          }
         }
         if (!battleInst.ended && !battleInst.stopped) {
           APP.raf = requestAnimationFrame(loop);
@@ -694,19 +910,26 @@
         const rechModal = $('#modal-battle-recharge');
         if (rechModal) {
           rechModal.hidden = false;
-          $('#btn-battle-recharge-close').onclick = () => { rechModal.hidden = true; };
+          rechModal.classList.add('open');
+          $('#btn-battle-recharge-close').onclick = () => {
+            rechModal.classList.remove('open');
+            rechModal.hidden = true;
+          };
           $('#btn-battle-recharge-pay').onclick = () => {
             st.firstBattleRecharge = true;
+            st.isVip = true;
             st.energy = (st.energy || 0) + 200;
             st.keys = (st.keys || 0) + 10;
             st.gold = (st.gold || 0) + 2000;
             st.owned = st.owned || [];
             if (!st.owned.includes('esther')) {
               st.owned.push('esther');
-              st.roster['esther'] = LGSave.createHeroInstance('esther', { level: 35, stars: 5, skillLevel: 10 });
+              st.roster['esther'] = LGSave.createHeroInstance('esther', { level: 30, stars: 5, skillLevel: 10 });
             }
             save();
+            rechModal.classList.remove('open');
             rechModal.hidden = true;
+            UI.renderHud(st);
             if (window.NativeBridge) NativeBridge.haptic('bigWin');
             UI.toast('👑 SSR 顶级战神 Esther 已加入作战特勤！行动力 +200，金钥匙 +10！');
           };
@@ -728,7 +951,7 @@
           if (APP.isTransitioning) return;
           APP.isTransitioning = true;
           setTimeout(() => { APP.isTransitioning = false; }, 600);
-          runBattle(chapter, stage);
+          APP.startStage(chapter, stage);
         };
         show('result');
         UI.renderHud(st);
@@ -739,9 +962,11 @@
         const reviveModal = $('#modal-battle-revive');
         if (reviveModal) {
           reviveModal.hidden = false;
+          reviveModal.classList.add('open');
           $('#btn-battle-revive-ok').onclick = () => {
             if (APP.battle && APP.battle._reviving) return;
             if (APP.battle) APP.battle._reviving = true;
+            reviveModal.classList.remove('open');
             reviveModal.hidden = true;
             if (APP.battle) {
               APP.resultSettled = false;
@@ -749,11 +974,13 @@
               APP.battle.isSettling = false;
               APP.battle.running = true;
               APP.battle._reviveUsed = true;
+              APP.battle._reviving = false;
               APP.battle.triggerReviveProtocol();
               startBattleLoop(APP.battle);
             }
           };
           $('#btn-battle-revive-cancel').onclick = () => {
+            reviveModal.classList.remove('open');
             reviveModal.hidden = true;
             renderDefeatResult();
           };
@@ -793,7 +1020,7 @@
         APP.isTransitioning = true;
         setTimeout(() => { APP.isTransitioning = false; }, 600);
         if (r.win) { show('campaign'); UI.renderCampaign(st, APP.data); UI.openChapter(st, APP.data, chapter.id); }
-        else { runBattle(chapter, stage); }
+        else { APP.startStage(chapter, stage); }
       };
     }
     $('#btn-result-back').onclick = () => {
@@ -904,18 +1131,31 @@
     return { hero, isNew, shards, rarity };
   }
 
-  APP.doPull = function (count) {
+  APP.doPull = async function (count) {
+    if (APP._pulling) return;
     const st = APP.state;
     const g = APP.data.gacha;
-    const useKeys = st.keys >= (count === 10 ? g.costTen.keys : g.costSingle.keys);
+    const needKeys = count === 10 ? g.costTen.keys : g.costSingle.keys;
+    const needGold = count === 10 ? g.costTen.gold : g.costSingle.gold;
+    const useKeys = st.keys >= needKeys;
     if (useKeys) {
-      const cost = count === 10 ? g.costTen.keys : g.costSingle.keys;
-      st.keys -= cost;
-      if (LGSave.recordTransaction) LGSave.recordTransaction(st, 'keys', -cost, 'gacha_pull:' + count);
-    } else if (st.gold >= (count === 10 ? g.costTen.gold : g.costSingle.gold)) {
-      const cost = count === 10 ? g.costTen.gold : g.costSingle.gold;
-      st.gold -= cost;
-      if (LGSave.recordTransaction) LGSave.recordTransaction(st, 'gold', -cost, 'gacha_pull:' + count);
+      st.keys -= needKeys;
+      if (LGSave.recordTransaction) LGSave.recordTransaction(st, 'keys', -needKeys, 'gacha_pull:' + count);
+    } else if (st.gold >= needGold) {
+      APP._pulling = true;
+      const ok = await confirmDialog(
+        '契约钥匙不足',
+        `当前契约钥匙不足 ${needKeys} 把（剩余 ${st.keys}），是否消耗 ${needGold.toLocaleString()} 金币进行${count === 10 ? '十连' : '单次'}招募？`,
+        '消耗金币招募'
+      );
+      APP._pulling = false;
+      if (!ok) return;
+      if (st.gold < needGold) {
+        toast('金币不足');
+        return;
+      }
+      st.gold -= needGold;
+      if (LGSave.recordTransaction) LGSave.recordTransaction(st, 'gold', -needGold, 'gacha_pull:' + count);
     } else {
       toast('契约钥匙与金币都不够');
       return;
@@ -932,7 +1172,6 @@
 
     if (window.Missions) {
       Missions.track(st, APP.data.missions, 'recruit', count);
-      Missions.track(st, APP.data.missions, 'pulls_count', count);
     }
 
     save();
@@ -969,7 +1208,7 @@
 
     for (const [k, v] of Object.entries(item.gain)) {
       if (k === 'shards') st.shards += v;
-      else if (k === 'energy') st.energy = Math.min((APP.data.constants && APP.data.constants.maxEnergy) || 100, st.energy + v);
+      else if (k === 'energy') st.energy = (st.energy || 0) + v;
       else if (k === 'equipment') {
         const catalog = APP.data.equipment || [];
         if (catalog.length) {
@@ -1006,7 +1245,12 @@
       document.documentElement.classList.toggle('reduce-motion', sys || motion.checked);
       save();
     });
-    adult.addEventListener('change', () => { st.settings.adult = adult.checked; save(); });
+    adult.onchange = () => {
+      st.settings.adult = adult.checked;
+      if (!adult.checked && st.hubOutfit === 'nude') st.hubOutfit = 'lega';
+      save();
+      if (window.SlotsUI && SlotsUI.syncMascotLabels) SlotsUI.syncMascotLabels(false);
+    };
     const btnQaMax = $('#btn-qa-max');
     if (btnQaMax) {
       btnQaMax.onclick = () => {
@@ -1014,23 +1258,64 @@
         save();
         UI.renderHud(st);
         if (APP.screen === 'hub') UI.renderHub(st, APP.data);
-        toast('🎉 全 ' + (APP.data.heroes ? APP.data.heroes.length : 58) + ' 名特勤英雄已解锁！金币/钥匙/体力/碎片已全部拉满！');
+        toast('🎉 全 ' + (APP.data.heroes ? APP.data.heroes.length : 62) + ' 名特勤英雄已解锁！金币/钥匙/体力/碎片已全部拉满！');
       };
     }
     $('#btn-export').onclick = async () => {
-      const text = LGSave.exportText(st);
-      try { await navigator.clipboard.writeText(text); toast('存档已复制到剪贴板'); }
-      catch (e) { prompt('复制下面的存档：', text); }
+      const text = LGSave.exportText(APP.state);
+      let copied = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          copied = true;
+        }
+      } catch (e) { /* fall through to in-page modal */ }
+      await saveTextModal({
+        title: '导出存档',
+        hint: copied ? '已尝试复制到剪贴板，您也可在下方全选复制备份文本：' : '请复制下方 JSON 存档备份文本：',
+        initialValue: text,
+        readOnly: true,
+        okLabel: '复制文本',
+        cancelLabel: '关闭',
+        onConfirm: (ta) => {
+          try {
+            ta.select();
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(ta.value).catch(() => {});
+            } else {
+              document.execCommand('copy');
+            }
+            toast('存档已复制');
+          } catch (_) {
+            toast('请长按选中框内文本复制');
+          }
+          return false;
+        },
+      });
     };
     $('#btn-import').onclick = async () => {
-      let text = '';
-      try { text = await navigator.clipboard.readText(); } catch (e) { /* fall through */ }
-      if (!text) text = prompt('粘贴存档内容：') || '';
-      if (!text) return;
+      let clip = '';
       try {
-        const next = LGSave.importText(text);
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          const rawClip = await navigator.clipboard.readText();
+          if (rawClip && rawClip.trim().startsWith('{')) clip = rawClip.trim();
+        }
+      } catch (e) { /* ignore clipboard read errors in WKWebView */ }
+      const text = await saveTextModal({
+        title: '导入存档',
+        hint: '请粘贴导出的 JSON 存档文本并点击「确认导入」：',
+        initialValue: clip,
+        placeholder: '{"v":2,"wallet":{...}}',
+        readOnly: false,
+        okLabel: '确认导入',
+        cancelLabel: '取消',
+      });
+      if (!text || !text.trim()) return;
+      try {
+        const next = LGSave.importText(text.trim());
         APP.state = next;
         LGSave.persist(next);
+        if (window.SlotsUI && SlotsUI.syncFromState) SlotsUI.syncFromState(APP.state);
         bindSettings();
         UI.renderHub(APP.state, APP.data);
         toast('存档已成功导入');
@@ -1040,6 +1325,7 @@
       const ok = await confirmDialog('重置存档', '这会清空全部本机进度与养成数据，且无法撤销。', '重置');
       if (!ok) return;
       APP.state = LGSave.reset();
+      if (window.SlotsUI && SlotsUI.syncFromState) SlotsUI.syncFromState(APP.state);
       bindSettings();
       UI.renderHub(APP.state, APP.data);
       show('hub');
@@ -1077,13 +1363,29 @@
     $('#btn-pull1').onclick = () => APP.doPull(1);
     $('#btn-pull10').onclick = () => APP.doPull(10);
 
-    // story controls
+    // story controls (dynamically route between IntroTimeline and standard APP.story)
     $('#screen-story').addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
+      if (window.IntroTimeline && IntroTimeline.active) {
+        IntroTimeline.handleTap();
+        return;
+      }
       advanceStory();
     });
-    $('#btn-story-skip').onclick = () => finishStory();
+    $('#btn-story-skip').onclick = (e) => {
+      if (e) e.stopPropagation();
+      if (window.IntroTimeline && IntroTimeline.active) {
+        IntroTimeline.skip();
+        return;
+      }
+      finishStory();
+    };
     $('#btn-story-auto').onclick = (e) => {
+      if (e) e.stopPropagation();
+      if (window.IntroTimeline && IntroTimeline.active) {
+        IntroTimeline.toggleAuto(e.currentTarget);
+        return;
+      }
       const s = APP.story;
       if (!s) return;
       s.auto = !s.auto;
@@ -1092,14 +1394,18 @@
       if (s.auto) scheduleAuto(); else clearTimeout(s.timer);
     };
     document.addEventListener('keydown', (e) => {
-      if (APP.screen === 'story' && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); advanceStory(); }
+      if (APP.screen === 'story' && (e.key === ' ' || e.key === 'Enter')) {
+        e.preventDefault();
+        if (window.IntroTimeline && IntroTimeline.active) IntroTimeline.handleTap();
+        else advanceStory();
+      }
       if (e.key === 'Escape') { UI.closeDetail(); closeReveal(); $('#mission-sheet').classList.remove('open'); $('#stage-action-sheet').classList.remove('open'); $('#equip-picker-sheet').classList.remove('open'); }
     });
   }
 
   function finishBoot() {
     regenEnergy();
-    if (window.Missions) Missions.checkDailyReset(APP.state);
+    if (window.Missions) Missions.checkDailyReset(APP.state, APP.data && APP.data.missions);
     const params = new URLSearchParams(window.location.search);
     const heroParam = params.get('hero');
     if (heroParam) {
@@ -1111,7 +1417,6 @@
       show('slots');
       if (window.SlotsUI) {
         SlotsUI.render();
-        if (SlotsUI.initMascot) SlotsUI.initMascot();
       }
     } else {
       show('hub');

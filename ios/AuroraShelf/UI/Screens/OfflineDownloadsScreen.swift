@@ -334,7 +334,11 @@ public struct OfflineDownloadsScreen: View {
                         .onTapGesture {
                             guard editMode == .inactive else { return }
                             if item.status.isCompleted {
-                                onPlayVideo(item.toVideoItem())
+                                let videoItem = item.toVideoItem()
+                                if showCloseButton {
+                                    dismiss()
+                                }
+                                onPlayVideo(videoItem)
                             } else if case .failed = item.status {
                                 downloadManager.retryDownload(id: item.id)
                             }
@@ -585,19 +589,49 @@ public struct OfflineDownloadsScreen: View {
     }
 
     private func openOfflineComic(_ item: DownloadedComicChapter) {
-        let chapter = ComicChapter(
-            id: item.chapterId,
-            title: item.chapterTitle,
-            pageCount: item.totalPages
-        )
+        let siblingDownloads = comicDownloadManager.completedChapters.filter { candidate in
+            candidate.comicId == item.comicId &&
+                (candidate.sourceId == item.sourceId || candidate.sourceId.isEmpty || item.sourceId.isEmpty)
+        }
+        let sortedSiblings = siblingDownloads.sorted { lhs, rhs in
+            let cmp = lhs.chapterTitle.localizedStandardCompare(rhs.chapterTitle)
+            if cmp != .orderedSame {
+                return cmp == .orderedAscending
+            }
+            return lhs.createdAt < rhs.createdAt
+        }
+        var seenChapterIDs = Set<String>()
+        var bundledChapters: [ComicChapter] = []
+        for entry in sortedSiblings where seenChapterIDs.insert(entry.chapterId).inserted {
+            bundledChapters.append(
+                ComicChapter(
+                    id: entry.chapterId,
+                    title: entry.chapterTitle,
+                    pageCount: max(entry.totalPages, entry.downloadedPages)
+                )
+            )
+        }
+        if bundledChapters.isEmpty {
+            bundledChapters = [
+                ComicChapter(
+                    id: item.chapterId,
+                    title: item.chapterTitle,
+                    pageCount: max(item.totalPages, item.downloadedPages)
+                )
+            ]
+        }
+        let initialIdx = bundledChapters.firstIndex(where: { $0.id == item.chapterId }) ?? 0
         let comic = ComicItem(
             id: item.comicId,
             sourceId: item.sourceId,
             title: item.comicTitle,
             author: "",
             coverUrl: item.coverUrl,
-            chapters: [chapter]
+            chapters: bundledChapters
         )
-        PlayerCoordinator.shared.openComic(comic)
+        if showCloseButton {
+            dismiss()
+        }
+        PlayerCoordinator.shared.openComic(comic, initialChapterIndex: initialIdx, restoreProgress: false)
     }
 }

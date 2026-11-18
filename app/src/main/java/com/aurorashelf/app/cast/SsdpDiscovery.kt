@@ -10,11 +10,14 @@ import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.OkHttpClient
@@ -25,14 +28,20 @@ import okhttp3.Request
  */
 internal class SsdpDiscovery(
     private val context: Context,
-    private val okHttpClient: OkHttpClient = OkHttpClient.Builder().build(),
+    okHttpClient: OkHttpClient = OkHttpClient.Builder().build(),
 ) {
+    private val noRedirectClient: OkHttpClient = okHttpClient.newBuilder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .build()
+
     suspend fun discover(
         timeoutMs: Int = 3500,
         onDeviceFound: ((List<CastDevice>) -> Unit)? = null,
     ): List<CastDevice> = withContext(Dispatchers.IO) {
         val devices = ConcurrentHashMap<String, CastDevice>()
         val parseJobs = mutableListOf<Deferred<CastDevice?>>()
+        val fetchGate = Semaphore(MAX_CONCURRENT_XML_FETCHES)
         var socket: DatagramSocket? = null
         val localLock = acquireMulticastLock()
 
@@ -71,20 +80,25 @@ internal class SsdpDiscovery(
                         socket.receive(receivePacket)
                         val response = String(receivePacket.data, 0, receivePacket.length, StandardCharsets.UTF_8)
                         val location = extractHeader(response, "LOCATION")
-                        if (!location.isNullOrBlank() && seenLocations.add(location)) {
+                        if (!location.isNullOrBlank() &&
+                            seenLocations.size < MAX_SSDP_LOCATIONS &&
+                            seenLocations.add(location)
+                        ) {
                             val senderIp = receivePacket.address.hostAddress ?: ""
-                            // Parse each discovered XML asynchronously so slow routers/IoT nodes
-                            // never stall the UDP receive loop from capturing fast TV responses.
                             parseJobs += async(Dispatchers.IO) {
-                                parseDeviceFromLocation(location, senderIp)?.also { device ->
-                                    devices[device.id] = device
-                                    onDeviceFound?.invoke(devices.values.toList())
-                                    Log.i(TAG, "Discovered DLNA device: ${device.name} at ${device.location}")
+                                fetchGate.withPermit {
+                                    parseDeviceFromLocation(location, senderIp)?.also { device ->
+                                        devices[device.id] = device
+                                        onDeviceFound?.invoke(devices.values.toList())
+                                        Log.i(TAG, "Discovered DLNA device: ${device.name} at ${device.location}")
+                                    }
                                 }
                             }
                         }
                     } catch (_: java.net.SocketTimeoutException) {
                         // Continue listening until timeoutMs expires
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
                     } catch (e: Exception) {
                         Log.w(TAG, "Socket receive error: ${e.message}")
                         break
@@ -100,6 +114,8 @@ internal class SsdpDiscovery(
                     }
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "SSDP discovery error", e)
         } finally {
@@ -115,6 +131,8 @@ internal class SsdpDiscovery(
     internal fun parseDeviceFromLocation(location: String, senderIp: String): CastDevice? {
         return try {
             val uri = runCatching { URI(location) }.getOrNull() ?: return null
+            val scheme = uri.scheme?.lowercase()
+            if (scheme != "http" && scheme != "https") return null
             val locationHost = uri.host.orEmpty()
             if (senderIp.isNotBlank() && !locationHost.equals(senderIp, ignoreCase = true)) {
                 Log.w(TAG, "Rejected SSDP LOCATION host mismatch: $locationHost != sender $senderIp")
@@ -125,9 +143,12 @@ internal class SsdpDiscovery(
                 return null
             }
             val request = Request.Builder().url(location).build()
-            okHttpClient.newCall(request).execute().use { response ->
+            noRedirectClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
-                val xml = response.body?.string() ?: return null
+                val declaredLen = response.body?.contentLength() ?: -1L
+                if (declaredLen > MAX_DEVICE_XML_BYTES) return null
+                val xml = LocalMediaProxy.readTextCapped(response.body?.byteStream(), MAX_DEVICE_XML_BYTES)
+                if (xml.isBlank()) return null
 
                 val friendlyName = DlnaSoap.parseTagValue(xml, "friendlyName") ?: return null
                 val manufacturer = DlnaSoap.parseTagValue(xml, "manufacturer").orEmpty()
@@ -160,28 +181,13 @@ internal class SsdpDiscovery(
         }
     }
 
-    internal fun extractControlUrl(xml: String, serviceType: String): String? {
-        var startIdx = 0
-        while (true) {
-            val serviceIdx = xml.indexOf(serviceType, startIdx)
-            if (serviceIdx == -1) return null
-
-            // Find enclosing <service>...</service> block
-            val serviceStart = xml.lastIndexOf("<service>", serviceIdx)
-            val serviceEnd = xml.indexOf("</service>", serviceIdx)
-            if (serviceStart != -1 && serviceEnd != -1 && serviceStart < serviceEnd) {
-                val serviceBlock = xml.substring(serviceStart, serviceEnd)
-                val controlUrl = DlnaSoap.parseTagValue(serviceBlock, "controlURL")
-                if (!controlUrl.isNullOrBlank()) return controlUrl
-            }
-            startIdx = serviceIdx + serviceType.length
-        }
-    }
+    internal fun extractControlUrl(xml: String, serviceType: String): String? =
+        DlnaSoap.extractServiceControlUrl(xml, serviceType)
 
     private fun isPrivateOrLocalHost(host: String): Boolean {
         if (host.equals("localhost", ignoreCase = true) || host == "127.0.0.1" || host == "::1") return true
         return runCatching {
-            val address = java.net.InetAddress.getByName(host)
+            val address = InetAddress.getByName(host)
             address.isSiteLocalAddress || address.isLoopbackAddress || address.isLinkLocalAddress
         }.getOrDefault(false)
     }
@@ -219,10 +225,10 @@ internal class SsdpDiscovery(
 
     private fun buildSearchMessage(target: String): String =
         "M-SEARCH * HTTP/1.1\r\n" +
-        "HOST: $SSDP_ADDRESS:$SSDP_PORT\r\n" +
-        "MAN: \"ssdp:discover\"\r\n" +
-        "MX: 3\r\n" +
-        "ST: $target\r\n\r\n"
+            "HOST: $SSDP_ADDRESS:$SSDP_PORT\r\n" +
+            "MAN: \"ssdp:discover\"\r\n" +
+            "MX: 3\r\n" +
+            "ST: $target\r\n\r\n"
 
     private fun acquireMulticastLock(): WifiManager.MulticastLock? {
         return try {
@@ -249,5 +255,8 @@ internal class SsdpDiscovery(
         private const val TAG = "SsdpDiscovery"
         private const val SSDP_ADDRESS = "239.255.255.250"
         private const val SSDP_PORT = 1900
+        internal const val MAX_CONCURRENT_XML_FETCHES = 4
+        internal const val MAX_SSDP_LOCATIONS = 32
+        internal const val MAX_DEVICE_XML_BYTES = 256 * 1024
     }
 }

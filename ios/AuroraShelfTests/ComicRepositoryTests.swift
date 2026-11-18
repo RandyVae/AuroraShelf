@@ -209,7 +209,7 @@ final class ComicRepositoryTests: XCTestCase {
 
         let chapters = ComicSourceAdapter.parseChapters(html, sourceID: "gedecomix", finalURL: finalURL)
 
-        XCTAssertEqual(chapters.map(\.title), ["5 . Bikini Teacher", "4 . Anna Sexy Teacher"])
+        XCTAssertEqual(chapters.map(\.title), ["4 . Anna Sexy Teacher", "5 . Bikini Teacher"])
         XCTAssertTrue(chapters.allSatisfy { $0.id.contains("anna-sexy-teacher-ruidx/") })
     }
 

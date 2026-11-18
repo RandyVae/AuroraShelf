@@ -142,14 +142,20 @@ public final class LocalizationManager: ObservableObject, @unchecked Sendable {
         UserDefaults.standard.set(language.rawValue, forKey: Self.storageKey)
         
         if Thread.isMainThread {
-            self.selectedLanguage = language
-            self.activeLocale = locale
-            self.objectWillChange.send()
+            if self.selectedLanguage != language {
+                self.selectedLanguage = language
+            }
+            if self.activeLocale != locale {
+                self.activeLocale = locale
+            }
         } else {
             DispatchQueue.main.async {
-                self.selectedLanguage = language
-                self.activeLocale = locale
-                self.objectWillChange.send()
+                if self.selectedLanguage != language {
+                    self.selectedLanguage = language
+                }
+                if self.activeLocale != locale {
+                    self.activeLocale = locale
+                }
             }
         }
     }

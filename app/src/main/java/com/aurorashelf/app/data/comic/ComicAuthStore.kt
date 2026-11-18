@@ -39,9 +39,37 @@ internal class EncryptedComicAuthStore(context: Context) : ComicAuthStore {
         }
         set(value) {
             preferences.edit {
-                if (value.isBlank()) remove(KEY_PICACG_TOKEN) else putString(KEY_PICACG_TOKEN, encrypt(value))
+                if (value.isBlank()) {
+                    remove(KEY_PICACG_TOKEN)
+                } else {
+                    runCatching { encryptWithSelfHeal(value) }
+                        .onSuccess { putString(KEY_PICACG_TOKEN, it) }
+                        .onFailure { error ->
+                            Log.w(TAG, "Failed to encrypt comic token; skipping persistence", error)
+                            remove(KEY_PICACG_TOKEN)
+                        }
+                }
             }
         }
+
+    @Synchronized
+    private fun encryptWithSelfHeal(value: String): String {
+        return try {
+            encrypt(value)
+        } catch (_: java.security.GeneralSecurityException) {
+            deleteKeyQuietly()
+            encrypt(value)
+        }
+    }
+
+    private fun deleteKeyQuietly() {
+        runCatching {
+            val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+            if (keyStore.containsAlias(KEY_ALIAS)) {
+                keyStore.deleteEntry(KEY_ALIAS)
+            }
+        }
+    }
 
     private fun encrypt(value: String): String {
         val cipher = Cipher.getInstance(TRANSFORMATION)

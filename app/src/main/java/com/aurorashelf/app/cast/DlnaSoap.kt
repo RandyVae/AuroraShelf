@@ -1,8 +1,15 @@
 package com.aurorashelf.app.cast
 
+import java.io.StringReader
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.util.Locale
+import javax.xml.XMLConstants
+import javax.xml.parsers.DocumentBuilderFactory
+import org.w3c.dom.Document
+import org.w3c.dom.Element
+import org.w3c.dom.Node
+import org.xml.sax.InputSource
 
 internal object DlnaSoap {
     private const val AV_TRANSPORT_SERVICE = "urn:schemas-upnp-org:service:AVTransport:1"
@@ -24,18 +31,19 @@ internal object DlnaSoap {
     ): String {
         val escapedUrl = escapeXml(mediaUrl)
         val escapedTitle = escapeXml(title)
-        val mimeType = mimeTypeOverride ?: if (isHlsUrl(mediaUrl)) {
+        val rawMimeType = mimeTypeOverride ?: if (isHlsUrl(mediaUrl)) {
             "application/vnd.apple.mpegurl"
         } else {
             "video/mp4"
         }
+        val escapedMimeType = escapeXml(rawMimeType)
 
         val didlMetadata = """
             <DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="http://schemas.upnp.org/metadata-1-0/upnp/">
               <item id="0" parentID="-1" restricted="1">
                 <dc:title>$escapedTitle</dc:title>
                 <upnp:class>object.item.videoItem</upnp:class>
-                <res protocolInfo="http-get:*:$mimeType:*">$escapedUrl</res>
+                <res protocolInfo="http-get:*:$escapedMimeType:*">$escapedUrl</res>
               </item>
             </DIDL-Lite>
         """.trimIndent()
@@ -148,16 +156,96 @@ internal object DlnaSoap {
     }
 
     fun parseTagValue(xml: String, tag: String): String? {
-        val openTag = "<$tag"
-        val closeTag = "</$tag>"
-        val startIdx = xml.indexOf(openTag)
-        if (startIdx == -1) return null
-        val contentStart = xml.indexOf(">", startIdx)
-        if (contentStart == -1) return null
-        val endIdx = xml.indexOf(closeTag, contentStart)
-        if (endIdx == -1) return null
-        return xml.substring(contentStart + 1, endIdx).trim()
+        if (xml.isBlank() || tag.isBlank()) return null
+        val parsed = parseSafeXmlDocument(xml)
+        if (parsed != null) {
+            findFirstElementText(parsed.documentElement, tag)?.let { return it }
+        }
+        // Fallback for non-well-formed device XML snippets, ensuring XML entities are properly unescaped
+        val regex = Regex("""<(?:[A-Za-z0-9_-]+:)?${Regex.escape(tag)}(?:\s[^>]*)?>(.*?)</(?:[A-Za-z0-9_-]+:)?${Regex.escape(tag)}>""", RegexOption.DOT_MATCHES_ALL)
+        val raw = regex.find(xml)?.groupValues?.get(1)?.trim() ?: return null
+        return unescapeXml(raw)
     }
+
+    fun extractServiceControlUrl(xml: String, serviceType: String): String? {
+        if (xml.isBlank() || serviceType.isBlank()) return null
+        val doc = parseSafeXmlDocument(xml)
+        if (doc != null) {
+            val services = doc.getElementsByTagNameNS("*", "service")
+            for (i in 0 until services.length) {
+                val serviceElem = services.item(i) as? Element ?: continue
+                val typeVal = findDirectChildText(serviceElem, "serviceType")
+                if (typeVal == serviceType) {
+                    val controlUrl = findDirectChildText(serviceElem, "controlURL")
+                    if (!controlUrl.isNullOrBlank()) return controlUrl
+                }
+            }
+        }
+        // Fallback for partial/quirky XML blocks
+        val serviceRegex = Regex("""<(?:[A-Za-z0-9_-]+:)?service(?:\s[^>]*)?>(.*?)</(?:[A-Za-z0-9_-]+:)?service>""", RegexOption.DOT_MATCHES_ALL)
+        for (match in serviceRegex.findAll(xml)) {
+            val block = match.groupValues[1]
+            if (parseTagValue(block, "serviceType") == serviceType) {
+                val controlUrl = parseTagValue(block, "controlURL")
+                if (!controlUrl.isNullOrBlank()) return controlUrl
+            }
+        }
+        return null
+    }
+
+    private fun parseSafeXmlDocument(xml: String): Document? {
+        return runCatching {
+            val factory = DocumentBuilderFactory.newInstance().apply {
+                isNamespaceAware = true
+                isExpandEntityReferences = false
+                runCatching { setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true) }
+                runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
+                runCatching { setFeature("http://xml.org/sax/features/external-general-entities", false) }
+                runCatching { setFeature("http://xml.org/sax/features/external-parameter-entities", false) }
+                runCatching { setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false) }
+            }
+            factory.newDocumentBuilder().parse(InputSource(StringReader(xml.trim())))
+        }.getOrNull()
+    }
+
+    private fun matchesTagName(node: Node, targetTag: String): Boolean {
+        val local = node.localName
+        if (local != null && local == targetTag) return true
+        val name = node.nodeName ?: return false
+        return name == targetTag || name.endsWith(":$targetTag")
+    }
+
+    private fun findFirstElementText(node: Node?, targetTag: String): String? {
+        if (node == null) return null
+        if (node.nodeType == Node.ELEMENT_NODE && matchesTagName(node, targetTag)) {
+            return node.textContent?.trim()
+        }
+        val children = node.childNodes ?: return null
+        for (i in 0 until children.length) {
+            findFirstElementText(children.item(i), targetTag)?.let { return it }
+        }
+        return null
+    }
+
+    private fun findDirectChildText(parent: Element, targetTag: String): String? {
+        val children = parent.childNodes ?: return null
+        for (i in 0 until children.length) {
+            val child = children.item(i)
+            if (child.nodeType == Node.ELEMENT_NODE && matchesTagName(child, targetTag)) {
+                return child.textContent?.trim()
+            }
+        }
+        return null
+    }
+
+    fun unescapeXml(text: String): String = text
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&#39;", "'")
+        .replace("&#34;", "\"")
+        .replace("&amp;", "&")
 
     fun escapeXml(text: String): String = text
         .replace("&", "&amp;")

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,6 +38,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -54,13 +57,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aurorashelf.app.R
 import com.aurorashelf.app.cast.CastDevice
 import com.aurorashelf.app.cast.CastManager
 import com.aurorashelf.app.cast.CastState
-import com.aurorashelf.app.ui.theme.AuroraCoral
 
 /**
- * Apple HIG / Netflix styled bottom sheet for DLNA / UPnP device discovery and cast control.
+ * Apple HIG / Material 3 theme-adaptive bottom sheet for DLNA / UPnP device discovery and cast control.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,6 +79,7 @@ internal fun CastDeviceSheet(
     val isSearching by castManager.isSearching.collectAsStateWithLifecycle()
     val castState by castManager.castState.collectAsStateWithLifecycle()
     val preselectedDevice by castManager.selectedDevice.collectAsStateWithLifecycle()
+    val scheme = MaterialTheme.colorScheme
 
     LaunchedEffect(Unit) {
         if (!isSearching && devices.isEmpty()) {
@@ -86,12 +90,12 @@ internal fun CastDeviceSheet(
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
         sheetState = sheetState,
-        containerColor = Color(0xFF14171F),
-        contentColor = Color.White,
+        containerColor = scheme.surface,
+        contentColor = scheme.onSurface,
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         dragHandle = {
             Surface(
-                color = Color.White.copy(alpha = 0.25f),
+                color = scheme.onSurfaceVariant.copy(alpha = 0.35f),
                 shape = RoundedCornerShape(3.dp),
                 modifier = Modifier
                     .padding(top = 10.dp, bottom = 6.dp)
@@ -116,42 +120,47 @@ internal fun CastDeviceSheet(
                 Icon(
                     imageVector = Icons.Outlined.Cast,
                     contentDescription = null,
-                    tint = AuroraCoral,
+                    tint = scheme.primary,
                     modifier = Modifier.size(24.dp),
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "投屏至電視",
+                        text = stringResource(R.string.cast_sheet_title),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
                         ),
-                        color = Color.White,
+                        color = scheme.onSurface,
                         modifier = Modifier.semantics { heading() },
                     )
                     Text(
-                        text = "請確保電視與手機在同一個 Wi-Fi 網絡",
+                        text = "请确认电视与手机连接在同一 Wi-Fi 网络",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.6f),
+                        color = scheme.onSurfaceVariant,
                     )
                 }
 
                 if (isSearching) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = AuroraCoral,
-                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.dp,
+                            color = scheme.primary,
+                        )
+                    }
                 } else {
                     IconButton(
                         onClick = { castManager.startDiscovery() },
-                        modifier = Modifier.size(36.dp),
+                        modifier = Modifier.minimumInteractiveComponentSize(),
                     ) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
-                            contentDescription = "重新搜尋設備",
-                            tint = Color.White.copy(alpha = 0.85f),
+                            contentDescription = stringResource(R.string.cast_rescan),
+                            tint = scheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp),
                         )
                     }
@@ -173,9 +182,9 @@ internal fun CastDeviceSheet(
             } else if (castState is CastState.Error) {
                 val err = castState as CastState.Error
                 Surface(
-                    color = Color(0xFF2B1922),
+                    color = scheme.errorContainer,
                     shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.5f)),
+                    border = BorderStroke(1.dp, scheme.error.copy(alpha = 0.4f)),
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 12.dp),
@@ -183,7 +192,7 @@ internal fun CastDeviceSheet(
                     Text(
                         text = err.message,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.9f),
+                        color = scheme.onErrorContainer,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                     )
                 }
@@ -191,12 +200,12 @@ internal fun CastDeviceSheet(
 
             // Device list section title
             Text(
-                text = "可投屏設備",
+                text = "可投屏设备",
                 style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 0.5.sp,
                 ),
-                color = Color.White.copy(alpha = 0.5f),
+                color = scheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 6.dp),
             )
 
@@ -215,19 +224,19 @@ internal fun CastDeviceSheet(
                         Icon(
                             imageVector = Icons.Outlined.Tv,
                             contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.3f),
+                            tint = scheme.onSurfaceVariant.copy(alpha = 0.55f),
                             modifier = Modifier.size(44.dp),
                         )
                         Text(
-                            text = if (isSearching) "正在搜尋局域網內的電視設備..." else "未搜尋到可投屏設備",
+                            text = if (isSearching) stringResource(R.string.cast_searching_lan) else stringResource(R.string.cast_empty_title),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.7f),
+                            color = scheme.onSurface,
                         )
                         if (!isSearching) {
                             Text(
-                                text = "請檢查電視是否已開機，且開啟 DLNA/投屏功能",
+                                text = stringResource(R.string.cast_empty_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.45f),
+                                color = scheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -285,10 +294,11 @@ private fun ActiveCastCard(
     onDisconnect: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val scheme = MaterialTheme.colorScheme
     Surface(
-        color = Color(0xFF1E2330),
+        color = scheme.surfaceVariant,
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.4f)),
+        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.4f)),
         modifier = modifier,
     ) {
         Column(
@@ -300,15 +310,15 @@ private fun ActiveCastCard(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Surface(
-                    color = AuroraCoral.copy(alpha = 0.15f),
+                    color = scheme.primary.copy(alpha = 0.14f),
                     shape = CircleShape,
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(36.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Filled.CastConnected,
                             contentDescription = null,
-                            tint = AuroraCoral,
+                            tint = scheme.primary,
                             modifier = Modifier.size(18.dp),
                         )
                     }
@@ -318,7 +328,7 @@ private fun ActiveCastCard(
                     Text(
                         text = "正在投屏至 ${connected.device.name}",
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = Color.White,
+                        color = scheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -326,7 +336,7 @@ private fun ActiveCastCard(
                         Text(
                             text = connected.title,
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.65f),
+                            color = scheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -341,12 +351,12 @@ private fun ActiveCastCard(
             ) {
                 IconButton(
                     onClick = { if (connected.isPlaying) onPause() else onPlay() },
-                    modifier = Modifier.size(36.dp),
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Icon(
                         imageVector = if (connected.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (connected.isPlaying) "暫停電視播放" else "播放",
-                        tint = Color.White,
+                        contentDescription = if (connected.isPlaying) "暂停电视播放" else "播放",
+                        tint = scheme.onSurface,
                         modifier = Modifier.size(22.dp),
                     )
                 }
@@ -356,10 +366,11 @@ private fun ActiveCastCard(
                 TextButton(
                     onClick = onDisconnect,
                     shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Text(
-                        text = "斷開投屏",
-                        color = AuroraCoral,
+                        text = stringResource(R.string.cast_disconnect),
+                        color = scheme.primary,
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                     )
                 }
@@ -377,24 +388,26 @@ private fun CastDeviceItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val scheme = MaterialTheme.colorScheme
     val activeHighlight = isSelected || isPreselected
     Surface(
-        color = if (activeHighlight) Color(0xFF222838) else Color(0xFF1B1E28),
+        color = if (activeHighlight) scheme.primaryContainer.copy(alpha = 0.45f) else scheme.surfaceVariant.copy(alpha = 0.65f),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(
             1.dp,
-            if (activeHighlight) AuroraCoral.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.08f),
+            if (activeHighlight) scheme.primary.copy(alpha = 0.6f) else scheme.outlineVariant,
         ),
         modifier = modifier
             .fillMaxWidth()
+            .heightIn(min = 56.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
             .semantics {
                 contentDescription = "${device.name}, ${
                     when {
-                        isSelected -> "已連接"
-                        isPreselected -> "已選中待播放"
-                        else -> "點擊投屏"
+                        isSelected -> "已连接"
+                        isPreselected -> "已选中待播放"
+                        else -> "点击投屏"
                     }
                 }"
             },
@@ -404,7 +417,7 @@ private fun CastDeviceItem(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
         ) {
             Surface(
-                color = if (activeHighlight) AuroraCoral.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f),
+                color = if (activeHighlight) scheme.primary.copy(alpha = 0.16f) else scheme.surface,
                 shape = CircleShape,
                 modifier = Modifier.size(38.dp),
             ) {
@@ -412,7 +425,7 @@ private fun CastDeviceItem(
                     Icon(
                         imageVector = Icons.Outlined.Tv,
                         contentDescription = null,
-                        tint = if (activeHighlight) AuroraCoral else Color.White.copy(alpha = 0.85f),
+                        tint = if (activeHighlight) scheme.primary else scheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp),
                     )
                 }
@@ -426,7 +439,7 @@ private fun CastDeviceItem(
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = if (activeHighlight) FontWeight.Bold else FontWeight.Medium,
                     ),
-                    color = Color.White,
+                    color = scheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -436,11 +449,11 @@ private fun CastDeviceItem(
                         if (isNotEmpty()) append(" · ")
                         append(device.manufacturer)
                     }
-                }.ifBlank { "DLNA 媒體接收器" }
+                }.ifBlank { "DLNA 媒体接收器" }
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.5f),
+                    color = scheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -453,17 +466,17 @@ private fun CastDeviceItem(
                     CircularProgressIndicator(
                         modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
-                        color = AuroraCoral,
+                        color = scheme.primary,
                     )
                 }
                 isSelected -> {
                     Surface(
-                        color = AuroraCoral,
+                        color = scheme.primary,
                         shape = RoundedCornerShape(10.dp),
                     ) {
                         Text(
-                            text = "已連接",
-                            color = Color.White,
+                            text = "已连接",
+                            color = scheme.onPrimary,
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         )
@@ -471,13 +484,13 @@ private fun CastDeviceItem(
                 }
                 isPreselected -> {
                     Surface(
-                        color = AuroraCoral.copy(alpha = 0.22f),
+                        color = scheme.primary.copy(alpha = 0.14f),
                         shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.6f)),
+                        border = BorderStroke(1.dp, scheme.primary.copy(alpha = 0.6f)),
                     ) {
                         Text(
                             text = "待投屏",
-                            color = AuroraCoral,
+                            color = scheme.primary,
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         )
@@ -486,7 +499,7 @@ private fun CastDeviceItem(
                 else -> {
                     Text(
                         text = "投屏",
-                        color = AuroraCoral,
+                        color = scheme.primary,
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                     )
                 }
@@ -500,14 +513,17 @@ private fun SystemCastFallbackButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val scheme = MaterialTheme.colorScheme
+    val mirrorTitle = stringResource(R.string.cast_system_mirror_title)
     Surface(
         color = Color.Transparent,
         shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+        border = BorderStroke(1.dp, scheme.outlineVariant),
         modifier = modifier
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick)
-            .semantics { contentDescription = "系統無線投屏與螢幕鏡像" },
+            .semantics { contentDescription = mirrorTitle },
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -517,14 +533,14 @@ private fun SystemCastFallbackButton(
             Icon(
                 imageVector = Icons.AutoMirrored.Outlined.ScreenShare,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.8f),
+                tint = scheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "系統無線投屏 / 螢幕鏡像",
+                text = mirrorTitle,
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                color = Color.White.copy(alpha = 0.85f),
+                color = scheme.onSurface,
             )
         }
     }

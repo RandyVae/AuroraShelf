@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">bananarey.us</domain>
+        <domain includeSubdomains="true">picacomic.com</domain>
+        <domain includeSubdomains="true">picaapi.picacomic.com</domain>
+        <domain includeSubdomains="true">douban.com</domain>
+        <domain includeSubdomains="true">movie.douban.com</domain>
+    </domain-config>
     <debug-overrides>
         <trust-anchors>
             <certificates src="user" />

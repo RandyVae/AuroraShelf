@@ -2,6 +2,7 @@ package com.aurorashelf.app.ui
 
 import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.media.AudioManager
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Speed
@@ -54,6 +56,11 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
@@ -83,12 +90,16 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import com.aurorashelf.app.LocalIsInPipMode
+import com.aurorashelf.app.MainActivity
 import com.aurorashelf.app.R
+import com.aurorashelf.app.data.AppPreferences
 import com.aurorashelf.app.data.OfflineCacheManager
 import com.aurorashelf.app.data.PlaybackResolver
 import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.data.playback.ResilientHttpDataSourceFactory
 import com.aurorashelf.app.data.playback.ResilientLoadErrorHandlingPolicy
+import com.aurorashelf.app.ui.theme.AuroraBrandAccentDeep
 import com.aurorashelf.app.ui.theme.AuroraCoral
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -122,6 +133,9 @@ internal fun NativeSitePlayer(
     topBarEnd: (@Composable () -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val mainActivity = remember(context) { context.findMainActivity() }
+    val isInPipMode = LocalIsInPipMode.current
+    val appPreferences = remember(context) { AppPreferences.get(context) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
     val offlineEntries by cacheManager.entries.collectAsStateWithLifecycle()
@@ -154,10 +168,11 @@ internal fun NativeSitePlayer(
                     .build()
             }
     }
-    var position by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
-    var currentPositionMs by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
+    var position by rememberSaveable(pageUrl) { mutableLongStateOf(appPreferences.getPlaybackProgress(pageUrl)) }
+    var currentPositionMs by rememberSaveable(pageUrl) { mutableLongStateOf(position) }
     var bufferedPositionMs by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
     var durationMs by rememberSaveable(pageUrl) { mutableLongStateOf(0L) }
+    var videoSizePx by remember(pageUrl) { mutableStateOf(16 to 9) }
     var isControllerVisible by remember(pageUrl) { mutableStateOf(true) }
     var isPlaying by remember(pageUrl) { mutableStateOf(true) }
     var isScrubbing by remember(pageUrl) { mutableStateOf(false) }
@@ -219,6 +234,24 @@ internal fun NativeSitePlayer(
         }
     }
 
+    LaunchedEffect(mainActivity, isPlaying, error, suppressPlayback, videoSizePx, castState) {
+        val canAutoPip = isPlaying &&
+            error == null &&
+            !suppressPlayback &&
+            castState !is com.aurorashelf.app.cast.CastState.Connected
+        mainActivity?.updatePipPlaybackState(
+            isPlayingVideo = canAutoPip,
+            videoWidth = videoSizePx.first,
+            videoHeight = videoSizePx.second,
+        )
+    }
+
+    DisposableEffect(mainActivity) {
+        onDispose {
+            mainActivity?.updatePipPlaybackState(isPlayingVideo = false)
+        }
+    }
+
     LaunchedEffect(pageUrl, attempt) {
         loadStartedAtMs.longValue = android.os.SystemClock.elapsedRealtime()
         timingReadyLogged.value = false
@@ -232,7 +265,11 @@ internal fun NativeSitePlayer(
             val forceRefresh = recoveryStage > 0
             val altLineIndex = (recoveryStage - 1).coerceAtLeast(0)
             val source = activeOffline?.mediaUrl?.let { cachedUrl ->
-                com.aurorashelf.app.data.PlaybackSource(cachedUrl, pageUrl)
+                com.aurorashelf.app.data.PlaybackSource(
+                    url = cachedUrl,
+                    referer = activeOffline.referer?.ifBlank { pageUrl } ?: pageUrl,
+                    extraHeaders = activeOffline.extraHeaders,
+                )
             } ?: resolver.resolve(pageUrl, forceRefresh = forceRefresh, alternateLineIndex = altLineIndex)
             Log.i(TAG, "source resolved type=${mediaType(source.url)} host=${runCatching { java.net.URI(source.url).host }.getOrNull()} refererHost=${runCatching { java.net.URI(source.referer).host }.getOrNull()} stage=$recoveryStage")
             Log.i(TAG, "timing source resolved ms=${android.os.SystemClock.elapsedRealtime() - loadStartedAtMs.longValue}")
@@ -271,7 +308,7 @@ internal fun NativeSitePlayer(
                 player.pause()
             } else {
                 player.prepare()
-                val canAutoStart = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+                val canAutoStart = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
                 player.playWhenReady = shouldResume && !isCurrentlyCasting && canAutoStart
             }
             Log.i(TAG, "player prepared playWhenReady=${player.playWhenReady}")
@@ -293,6 +330,9 @@ internal fun NativeSitePlayer(
         }
     }
     LaunchedEffect(player, isPlaying, isScrubbing, suppressPlayback) {
+        var lastReportedSecond = -1L
+        var lastReportedDuration = -1L
+        var lastPersistedAtMs = 0L
         while (true) {
             val state = player.playbackState
             val current = player.currentPosition.coerceAtLeast(0L)
@@ -306,9 +346,21 @@ internal fun NativeSitePlayer(
             isPlaying = player.isPlaying
             if (!suppressPlayback && (state == Player.STATE_READY || state == Player.STATE_BUFFERING)) {
                 position = current
-                positionChange(current)
+                val currentSec = current / 1_000L
+                if (currentSec != lastReportedSecond) {
+                    lastReportedSecond = currentSec
+                    positionChange(current)
+                }
+                val nowMs = android.os.SystemClock.elapsedRealtime()
+                if (state == Player.STATE_READY && dur > 0L && nowMs - lastPersistedAtMs >= 2_500L) {
+                    lastPersistedAtMs = nowMs
+                    appPreferences.savePlaybackProgress(pageUrl, current, dur)
+                }
             }
-            durationChange(dur)
+            if (dur != lastReportedDuration) {
+                lastReportedDuration = dur
+                durationChange(dur)
+            }
             if (!player.isPlaying && !isScrubbing && state != Player.STATE_BUFFERING) {
                 delay(500)
             } else {
@@ -325,6 +377,9 @@ internal fun NativeSitePlayer(
                     timingReadyLogged.value = true
                     Log.i(TAG, "timing ready ms=${android.os.SystemClock.elapsedRealtime() - loadStartedAtMs.longValue}")
                     val currentSize = player.videoSize
+                    if (currentSize.width > 0 && currentSize.height > 0) {
+                        videoSizePx = currentSize.width to currentSize.height
+                    }
                     val ratio = calculateVideoAspectRatio(
                         width = currentSize.width,
                         height = currentSize.height,
@@ -336,6 +391,10 @@ internal fun NativeSitePlayer(
                     }
                 }
                 if (state == Player.STATE_ENDED) {
+                    val dur = player.duration.coerceAtLeast(0L)
+                    if (dur > 0L) {
+                        appPreferences.savePlaybackProgress(pageUrl, dur, dur)
+                    }
                     Log.i(TAG, "playback state ended, invoking playbackEnded callback")
                     playbackEndedChange?.invoke()
                 }
@@ -353,6 +412,9 @@ internal fun NativeSitePlayer(
             }
             @Suppress("DEPRECATION")
             override fun onVideoSizeChanged(videoSize: VideoSize) {
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    videoSizePx = videoSize.width to videoSize.height
+                }
                 val ratio = calculateVideoAspectRatio(
                     width = videoSize.width,
                     height = videoSize.height,
@@ -396,17 +458,25 @@ internal fun NativeSitePlayer(
         }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> {
+                Lifecycle.Event.ON_STOP -> {
+                    if (mainActivity?.isInPictureInPictureMode == true) return@LifecycleEventObserver
                     if (player.playbackState != Player.STATE_IDLE) {
                         val current = player.currentPosition.coerceAtLeast(0L)
+                        val dur = player.duration.coerceAtLeast(0L)
                         position = current
                         positionChange(current)
+                        if (dur > 0L) {
+                            appPreferences.savePlaybackProgress(pageUrl, current, dur)
+                        }
                         shouldResume = player.playWhenReady
                     }
                     player.pause()
                 }
-                Lifecycle.Event.ON_RESUME -> {
-                    if (shouldResume && currentCastState !is com.aurorashelf.app.cast.CastState.Connected) {
+                Lifecycle.Event.ON_START -> {
+                    if (shouldResume &&
+                        !suppressPlayback &&
+                        currentCastState !is com.aurorashelf.app.cast.CastState.Connected
+                    ) {
                         player.play()
                     }
                 }
@@ -416,6 +486,13 @@ internal fun NativeSitePlayer(
         player.addListener(listener)
         lifecycle.addObserver(observer)
         onDispose {
+            if (player.playbackState != Player.STATE_IDLE && player.playbackState != Player.STATE_ENDED) {
+                val current = player.currentPosition.coerceAtLeast(0L)
+                val dur = player.duration.coerceAtLeast(0L)
+                if (dur > 0L) {
+                    appPreferences.savePlaybackProgress(pageUrl, current, dur)
+                }
+            }
             lifecycle.removeObserver(observer)
             player.removeListener(listener)
             player.playWhenReady = false
@@ -639,9 +716,9 @@ internal fun NativeSitePlayer(
             }
         }
 
-        // 顶部控制栏（与调用方返回/投屏/全屏共享单行排布，零重叠）
+        // 顶部控制栏（与调用方返回/投屏/全屏共享单行排布，零重叠；画中画模式下隐藏全部控制浮层）
         AnimatedVisibility(
-            visible = isControllerVisible || keepTopBarVisible || error != null,
+            visible = !isInPipMode && (isControllerVisible || keepTopBarVisible || error != null),
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.fillMaxSize(),
@@ -817,6 +894,28 @@ internal fun NativeSitePlayer(
                             }
                         }
 
+                        // 画中画（PiP）手动入口
+                        if (mainActivity?.supportsPip() == true && !isInPipMode) {
+                            Surface(
+                                onClick = {
+                                    mainActivity.requestEnterPip(videoSizePx.first, videoSizePx.second)
+                                },
+                                shape = CircleShape,
+                                color = Color.Black.copy(alpha = 0.54f),
+                                contentColor = Color.White,
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
+                                modifier = Modifier.size(44.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.PictureInPictureAlt,
+                                        contentDescription = "画中画",
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                        }
+
                         // 画幅裁切切换（Fit / Fill）
                         if (isFullscreen) {
                             Surface(
@@ -847,7 +946,7 @@ internal fun NativeSitePlayer(
 
         // Apple TV 原生风格主播放控制与底部弹性时间轴
         AnimatedVisibility(
-            visible = isControllerVisible && error == null,
+            visible = !isInPipMode && isControllerVisible && error == null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.fillMaxSize(),
@@ -881,7 +980,9 @@ internal fun NativeSitePlayer(
                                 containerColor = Color.Black.copy(alpha = 0.52f),
                                 contentColor = Color.White,
                             ),
-                            modifier = Modifier.size(if (isFullscreen) 48.dp else 40.dp),
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .size(if (isFullscreen) 48.dp else 44.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Replay10,
@@ -902,7 +1003,7 @@ internal fun NativeSitePlayer(
                                 controlInteractionTick++
                             },
                             colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = AuroraCoral.copy(alpha = 0.92f),
+                                containerColor = AuroraBrandAccentDeep.copy(alpha = 0.94f),
                                 contentColor = Color.White,
                             ),
                             modifier = Modifier.size(if (isFullscreen) 64.dp else 52.dp),
@@ -923,7 +1024,9 @@ internal fun NativeSitePlayer(
                                 containerColor = Color.Black.copy(alpha = 0.52f),
                                 contentColor = Color.White,
                             ),
-                            modifier = Modifier.size(if (isFullscreen) 48.dp else 40.dp),
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .size(if (isFullscreen) 48.dp else 44.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Forward10,
@@ -996,7 +1099,9 @@ internal fun NativeSitePlayer(
                                 containerColor = Color.Black.copy(alpha = 0.54f),
                                 contentColor = Color.White,
                             ),
-                            modifier = Modifier.size(36.dp),
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .size(36.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FullscreenExit,
@@ -1011,7 +1116,7 @@ internal fun NativeSitePlayer(
 
         // 顶部偏上紧凑动态 HUD 胶囊（音量、亮度、快进退、画幅、倍速 — 不遮挡中央播放键）
         AnimatedVisibility(
-            visible = hudState != null,
+            visible = !isInPipMode && hudState != null,
             enter = fadeIn() + scaleIn(initialScale = 0.92f),
             exit = fadeOut() + scaleOut(targetScale = 0.92f),
             modifier = Modifier
@@ -1062,8 +1167,8 @@ internal fun NativeSitePlayer(
             }
         }
 
-        // 仅在非全屏且控制栏隐藏时保留底部 1.5dp 极细分割微线，全屏观影时 100% 零遮挡
-        if (!isFullscreen && !isControllerVisible) {
+        // 仅在非全屏、非画中画且控制栏隐藏时保留底部 1.5dp 极细分割微线，全屏/PiP 观影时 100% 零遮挡
+        if (!isFullscreen && !isInPipMode && !isControllerVisible) {
             PlayerBottomProgressBar(
                 currentPositionMs = currentPositionMs,
                 bufferedPositionMs = bufferedPositionMs,
@@ -1105,6 +1210,19 @@ private fun AppleTvScrubberBar(
     Box(
         contentAlignment = Alignment.CenterStart,
         modifier = modifier
+            .semantics {
+                contentDescription = "播放进度"
+                progressBarRangeInfo = ProgressBarRangeInfo(progressFraction, 0f..1f)
+                setProgress { target ->
+                    if (durationMs <= 0L) {
+                        false
+                    } else {
+                        val clamped = target.coerceIn(0f, 1f)
+                        onScrubCommit((clamped * durationMs).toLong())
+                        true
+                    }
+                }
+            }
             .onSizeChanged { widthPx = it.width.coerceAtLeast(1) }
             .pointerInput(durationMs) {
                 detectTapGestures { offset ->
@@ -1343,6 +1461,12 @@ private fun originOf(referer: String): String = runCatching {
     val uri = java.net.URI(referer)
     "${uri.scheme}://${uri.host}${if (uri.port > 0) ":${uri.port}" else ""}"
 }.getOrDefault(referer)
+
+private tailrec fun Context.findMainActivity(): MainActivity? = when (this) {
+    is MainActivity -> this
+    is ContextWrapper -> baseContext.findMainActivity()
+    else -> null
+}
 
 /** One selectable text track from the player's current tracks. */
 private data class SubtitleOption(

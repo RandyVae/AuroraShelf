@@ -17,9 +17,27 @@ public enum DeviceFormFactor: String, Equatable, Sendable {
     }
 }
 
+private struct AuroraContainerSizeKey: EnvironmentKey {
+    static let defaultValue: CGSize = .zero
+}
+
+public extension EnvironmentValues {
+    var auroraContainerSize: CGSize {
+        get { self[AuroraContainerSizeKey.self] }
+        set { self[AuroraContainerSizeKey.self] = newValue }
+    }
+}
+
 /// 设备屏幕尺寸与折叠形态判定引擎
 @MainActor
 public struct DeviceLayout {
+    private static var measuredWindowSizeOverride: CGSize = .zero
+
+    public static func updateMeasuredWindowSize(_ size: CGSize) {
+        if size.width > 0 && size.height > 0 {
+            measuredWindowSizeOverride = size
+        }
+    }
     /// 判定当前上下文形态（以实际可用窗口宽度为首要判定标准，杜绝 iPad 分屏时强判 pad 导致布局溢出）
     public static func resolve(
         size: CGSize,
@@ -58,6 +76,9 @@ public struct DeviceLayout {
 
     /// 获取当前活动窗口真实尺寸（精准支持 iPad Split View、Slide Over、Stage Manager 与各种 iPhone 窗口）
     public static var currentWindowSize: CGSize {
+        if measuredWindowSizeOverride.width > 0 && measuredWindowSizeOverride.height > 0 {
+            return measuredWindowSizeOverride
+        }
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         let activeScene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
         let window = activeScene?.windows.first(where: { $0.isKeyWindow }) ?? activeScene?.windows.first
@@ -67,12 +88,14 @@ public struct DeviceLayout {
         return CGSize(width: 393, height: 852)
     }
 
-    /// 判定当前上下文形态（自动读取当前活动窗口尺寸，彻底消除对过时 UIScreen.main 的依赖）
+    /// 判定当前上下文形态（自动读取当前活动窗口尺寸或传入的容器尺寸，彻底消除对过时 UIScreen.main 的依赖）
     public static func resolveCurrent(
+        containerSize: CGSize = .zero,
         horizontalSizeClass: UserInterfaceSizeClass? = nil,
         idiom: UIUserInterfaceIdiom = UIDevice.current.userInterfaceIdiom
     ) -> DeviceFormFactor {
-        resolve(size: currentWindowSize, horizontalSizeClass: horizontalSizeClass, idiom: idiom)
+        let effectiveSize = (containerSize.width > 0 && containerSize.height > 0) ? containerSize : currentWindowSize
+        return resolve(size: effectiveSize, horizontalSizeClass: horizontalSizeClass, idiom: idiom)
     }
 
     /// 检测是否为 iPhone Duo 硬件/模拟器环境

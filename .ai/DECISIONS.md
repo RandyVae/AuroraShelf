@@ -1,5 +1,17 @@
 # Existing Architectural Decisions
 
+## Full-Stack 86-Item Optimization Audit Remediation (v2.17.0 Build 267)
+
+Date: 2026-11-18
+
+Status: Implemented, dual-platform Release verified, and published in `v2.17.0 (Build 267)`.
+
+Decisions:
+1. **OTA UDID Enrollment & State Isolation (`SEC-01`, `SEC-02`, `OPS-01`)**: Relocate `devices.json` and `testflight_invites.json` out of `/var/www/netgrey/` into `/var/lib/netgrey-ota/` (`0700` dir / `0600` files) and block static `.json/.py/.sh` in Nginx (except `/source-manifest.json`). Gate `.mobileconfig` UDID enrollment behind the shared invite code + 10-minute single-use HMAC-SHA256 `enrollment_token`, extract `provisioned_udids.json` from `embedded.mobileprovision` during `publish_ota.sh`, and unlock Step 2 direct OTA install on `index.html` only when `provisioned === true`.
+2. **Cross-Platform Native Game Save Bridge (`GAM-01`)**: Inject `window.AuroraSaveBridge` at `.atDocumentStart` on iOS (`GameContainerView.swift` + `GameSaveStore.swift` backed by atomic `Application Support/GameSave/lg_save.json`), align `save.js` (`window.AuroraSaveBridge || window.AndroidSave`) and `GameSaveBridge.kt` (`PRIMARY_WEB_KEY = "lg-local-edition-v2"`), and snapshot `KEY` into `BACKUP_KEY` *before* overwriting `KEY`.
+3. **Domain-Scoped Permissive TLS & Loopback Proxy Hardening (`SEC-03..07`)**: Remove `<certificates src="user" />` from Android `network_security_config.xml`; forbid permissive TLS fallback on first-party auth (`bananarey.us`) and strict API hosts (`picacomic.com`); bind `GameAssetServer` and `HLSLoopbackRelayServer` strictly to `127.0.0.1` with active connection caps and safe header allowlists on `LocalMediaProxy`.
+4. **Per-Tab Scoped Search, Three-State Appearance & Open-Source Attribution (`DAT-03`, `UIX-03`, `OPS-02`)**: Provide real per-domain search across Video, Comic, Live, and Forum on both iOS (`SearchSheetView.SearchScope`) and Android (`LiveScreen` / `ForumScreen` inline search); expose System / Light / Dark appearance selection on both platforms; finalize `THIRD_PARTY_NOTICES.md` and expose open-source notices in iOS/Android Settings and the OTA web footer.
+
 ## 5-Layer Autonomous Source Self-Healing & Instant-Load Engine
 
 Date: 2026-11-18

@@ -1,4 +1,6 @@
+import SafariServices
 import SwiftUI
+import UIKit
 
 public struct ForumPostDetailView: View {
     public let post: ForumPostItem
@@ -9,6 +11,8 @@ public struct ForumPostDetailView: View {
     @State private var isLoading = false
     @State private var saveFeedbackMessage: String?
     @State private var feedbackDismissTask: Task<Void, Never>?
+    @State private var showPhotoPermissionAlert = false
+    @State private var showOriginalPostSafari = false
     @Environment(\.dismiss) private var dismiss
 
     public init(post: ForumPostItem, onDismiss: (() -> Void)? = nil) {
@@ -17,6 +21,19 @@ public struct ForumPostDetailView: View {
         if let cached = ForumRepository.shared.cachedDetail(for: post) {
             _loadedPost = State(initialValue: cached)
         }
+    }
+
+    private var activeBatchProgress: (completed: Int, total: Int)? {
+        imageSaver.batchProgress(for: post.compositeID)
+    }
+
+    private var originalThreadURL: URL? {
+        guard let url = URL(string: displayPost.threadUrl),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https" || scheme == "http" else {
+            return nil
+        }
+        return url
     }
 
     public var body: some View {
@@ -32,7 +49,7 @@ public struct ForumPostDetailView: View {
                 Divider()
                     .overlay(AuroraColor.hairline)
 
-                if let batch = imageSaver.batchProgress {
+                if let batch = activeBatchProgress {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
                             Label("正在下载论坛图片 \(batch.completed) / \(batch.total)", systemImage: "arrow.down.circle.fill")
@@ -76,15 +93,22 @@ public struct ForumPostDetailView: View {
                         .textSelection(.enabled)
                 }
 
-                ForEach(detailImageURLs, id: \.self) { imageURL in
-                    if let url = URL(string: imageURL) {
-                        ForumPostImage(
-                            url: url,
-                            referer: post.threadUrl,
-                            onSaveCompleted: { message in
-                                showFeedback(message)
+                if !detailImageURLs.isEmpty {
+                    LazyVStack(spacing: AuroraMetrics.spacingM) {
+                        ForEach(detailImageURLs, id: \.self) { imageURL in
+                            if let url = URL(string: imageURL) {
+                                ForumPostImage(
+                                    url: url,
+                                    referer: post.threadUrl,
+                                    onSaveCompleted: { message, permissionDenied in
+                                        showFeedback(message)
+                                        if permissionDenied {
+                                            showPhotoPermissionAlert = true
+                                        }
+                                    }
+                                )
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -129,7 +153,11 @@ public struct ForumPostDetailView: View {
                         Button {
                             Task {
                                 let urls = detailImageURLs
-                                let result = await imageSaver.saveAllImages(urls, referer: post.threadUrl)
+                                let result = await imageSaver.saveAllImages(
+                                    urls,
+                                    referer: post.threadUrl,
+                                    postKey: post.compositeID
+                                )
                                 if result.succeeded == 0 {
                                     showFeedback("图片下载失败，请检查网络连接")
                                 } else if result.savedToPhotoLibraryCount > 0 {
@@ -137,9 +165,12 @@ public struct ForumPostDetailView: View {
                                 } else {
                                     showFeedback("已缓存 \(result.succeeded)/\(result.total) 张原图到本地文档")
                                 }
+                                if result.photoPermissionDenied {
+                                    showPhotoPermissionAlert = true
+                                }
                             }
                         } label: {
-                            if let batch = imageSaver.batchProgress {
+                            if let batch = activeBatchProgress {
                                 HStack(spacing: 4) {
                                     ProgressView()
                                         .controlSize(.mini)
@@ -151,8 +182,19 @@ public struct ForumPostDetailView: View {
                                     .font(.caption.weight(.semibold))
                             }
                         }
-                        .disabled(imageSaver.batchProgress != nil)
+                        .disabled(activeBatchProgress != nil)
                         .accessibilityLabel("下载本帖全部 \(detailImageURLs.count) 张图片")
+                    }
+
+                    if originalThreadURL != nil {
+                        Button {
+                            showOriginalPostSafari = true
+                        } label: {
+                            Image(systemName: "safari")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(width: 36, height: 36)
+                        }
+                        .accessibilityLabel("forum.original_post".localized)
                     }
 
                     Text(post.boardName)
@@ -167,6 +209,22 @@ public struct ForumPostDetailView: View {
                         .accessibilityHidden(true)
                 }
             }
+        }
+        .sheet(isPresented: $showOriginalPostSafari) {
+            if let url = originalThreadURL {
+                ForumSafariView(url: url)
+                    .ignoresSafeArea()
+            }
+        }
+        .alert("无法写入系统相册", isPresented: $showPhotoPermissionAlert) {
+            Button("前往设置") {
+                if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(settingsURL)
+                }
+            }
+            Button("common.cancel".localized, role: .cancel) {}
+        } message: {
+            Text("原图已缓存至应用本地文档。若需同步存入系统相册，请在设置中开启「照片（仅添加）」权限。")
         }
         .enableSwipeBack {
             closeDetail()
@@ -233,7 +291,7 @@ public struct ForumPostDetailView: View {
                                 .foregroundStyle(AuroraColor.textPrimary)
                         }
                         .accessibilityHidden(true)
-                    }
+                }
 
                 VStack(alignment: .leading, spacing: AuroraMetrics.spacingXS) {
                     if let author = post.author {
@@ -276,13 +334,26 @@ public struct ForumPostDetailView: View {
     }
 }
 
+private struct ForumSafariView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let vc = SFSafariViewController(url: url)
+        vc.dismissButtonStyle = .done
+        return vc
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+}
+
 private struct ForumPostImage: View {
     let url: URL
     let referer: String
-    let onSaveCompleted: (String) -> Void
+    let onSaveCompleted: (_ message: String, _ photoPermissionDenied: Bool) -> Void
     @ObservedObject private var saver = ForumImageSaver.shared
     @State private var image: UIImage?
     @State private var didFail = false
+    @State private var reloadToken = UUID()
 
     private var isSaving: Bool {
         saver.activeSavingURLs.contains(url.absoluteString)
@@ -318,14 +389,17 @@ private struct ForumPostImage: View {
                                         .foregroundStyle(.white)
                                 }
                             }
-                            .frame(width: 38, height: 38)
+                            .frame(width: 40, height: 40)
                             .background(.ultraThinMaterial, in: Circle())
+                            .background(Color.black.opacity(0.35), in: Circle())
                             .overlay(Circle().stroke(Color.white.opacity(0.22), lineWidth: 0.75))
                             .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+                            .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                         .disabled(isSaving)
-                        .padding(10)
+                        .padding(6)
                         .accessibilityLabel(isSaved ? "原图已保存" : "下载原图")
                     }
                     .contextMenu {
@@ -341,23 +415,36 @@ private struct ForumPostImage: View {
                         }
                         Button {
                             UIPasteboard.general.string = url.absoluteString
-                            onSaveCompleted("已复制图片链接")
+                            onSaveCompleted("已复制图片链接", false)
                         } label: {
                             Label("复制图片链接", systemImage: "doc.on.doc")
                         }
                     }
             } else if didFail {
-                ContentUnavailableView(
-                    "图片无法加载",
-                    systemImage: "photo",
-                    description: Text("请检查网络连接后重试。")
-                )
+                VStack(spacing: AuroraMetrics.spacingS) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.title2)
+                        .foregroundStyle(AuroraColor.textSecondary)
+                    Text("图片无法加载")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AuroraColor.textPrimary)
+                    Button("重试", systemImage: "arrow.clockwise") {
+                        didFail = false
+                        reloadToken = UUID()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(AuroraColor.brand)
+                }
+                .frame(maxWidth: .infinity, minHeight: 160)
+                .padding(AuroraMetrics.spacingM)
+                .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous))
             } else {
-                ProgressView("正在加载图片…")
-                    .frame(maxWidth: .infinity)
+                ProgressView("reader.loading_image".localized)
+                    .frame(maxWidth: .infinity, minHeight: 180)
             }
         }
-        .task(id: url.absoluteString) {
+        .task(id: "\(url.absoluteString)#\(reloadToken.uuidString)") {
+            didFail = false
             image = await CoverImageLoader.shared.loadImage(
                 from: url.absoluteString,
                 requestReferer: referer
@@ -371,12 +458,12 @@ private struct ForumPostImage: View {
             do {
                 let outcome = try await saver.saveImage(urlString: url.absoluteString, referer: referer)
                 if outcome.savedToPhotoLibrary {
-                    onSaveCompleted("图片已保存到系统相册")
+                    onSaveCompleted("图片已保存到系统相册", false)
                 } else {
-                    onSaveCompleted("已保存到本地文档")
+                    onSaveCompleted("已保存到本地文档", outcome.photoPermissionDenied)
                 }
             } catch {
-                onSaveCompleted(error.localizedDescription)
+                onSaveCompleted(error.localizedDescription, false)
             }
         }
     }

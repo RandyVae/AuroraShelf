@@ -63,7 +63,7 @@ public actor DoubanPosterResolver {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 4
         config.timeoutIntervalForResource = 6
-        self.session = URLSession.permissive(configuration: config)
+        self.session = URLSession(configuration: config)
 
         // 预热内存缓存
         for (k, v) in staticCoverMap {

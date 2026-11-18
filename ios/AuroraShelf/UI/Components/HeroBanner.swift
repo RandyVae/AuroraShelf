@@ -17,6 +17,8 @@ public struct HeroBanner: View {
     @State private var watchlistError: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
 
     private var formFactor: DeviceFormFactor {
         DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
@@ -74,9 +76,9 @@ public struct HeroBanner: View {
                 HStack(spacing: 6) {
                     ForEach(0..<videos.count, id: \.self) { idx in
                         Capsule()
-                            .fill(currentIndex == idx ? Color.white : Color.white.opacity(0.35))
+                            .fill(currentIndex == idx ? AuroraColor.brand : AuroraColor.textPrimary.opacity(0.35))
                             .frame(width: currentIndex == idx ? 22 : 6, height: 6)
-                            .shadow(color: currentIndex == idx ? Color.white.opacity(0.6) : Color.clear, radius: 4)
+                            .shadow(color: currentIndex == idx ? AuroraColor.brand.opacity(0.5) : Color.clear, radius: 4)
                             .animation(AuroraMotion.smooth, value: currentIndex)
                             .onTapGesture {
                                 withAnimation(AuroraMotion.smooth) {
@@ -90,7 +92,7 @@ public struct HeroBanner: View {
         }
         .frame(maxWidth: .infinity, maxHeight: heroHeight + activePull)
         .onReceive(Timer.publish(every: 6.5, on: .main, in: .common).autoconnect()) { _ in
-            guard videos.count > 1 else { return }
+            guard videos.count > 1, !reduceMotion, !voiceOverEnabled else { return }
             withAnimation(AuroraMotion.smooth) {
                 currentIndex = (currentIndex + 1) % videos.count
             }
@@ -166,7 +168,7 @@ public struct HeroBanner: View {
 
             // 底部内容信息与操作区
             VStack(spacing: AuroraMetrics.spacingM) {
-                // 标题（语义样式 .title2 + .bold，带柔和阴影确保阅读舒适度）
+                // 标题（语义样式 .title2 + .bold，自适应浅色/深色高对比度）
                 Text(videoItem.title)
                     .font(.title2)
                     .fontWeight(.bold)
@@ -174,12 +176,10 @@ public struct HeroBanner: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .shadow(color: .black.opacity(0.95), radius: 8, x: 0, y: 3)
                     .padding(.horizontal, AuroraMetrics.contentInset)
 
                 // 元信息行（4K · 评分 · 来源）
                 metadataView(for: videoItem)
-                    .shadow(color: .black.opacity(0.9), radius: 6, x: 0, y: 2)
 
                 // Apple TV 标志性三元动作按钮栏（[ 播放 ] + [ 片单 ] + [ 详情 ]）
                 HStack(spacing: AuroraMetrics.spacingM) {
@@ -204,10 +204,10 @@ public struct HeroBanner: View {
             if !targetVideo.duration.isEmpty {
                 Text(targetVideo.duration)
                     .font(.caption2.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AuroraColor.textPrimary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(.white.opacity(0.2), in: Capsule())
+                    .background(AuroraColor.surfaceCard.opacity(0.85), in: Capsule())
             }
 
             if !targetVideo.rating.isEmpty {
@@ -217,12 +217,12 @@ public struct HeroBanner: View {
                         .foregroundStyle(.yellow)
                     Text(targetVideo.rating)
                         .font(.caption.bold())
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AuroraColor.textPrimary)
                 }
             }
 
             Text("•")
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(AuroraColor.textSecondary)
 
             Text(targetVideo.sourceName)
                 .font(.caption.bold())

@@ -2,10 +2,13 @@ import SwiftUI
 
 public struct MainContainerView: View {
     @ObservedObject private var locManager = LocalizationManager.shared
+    @AppStorage("aurora_theme_mode") private var themeModeRaw: String = AuroraThemeMode.system.rawValue
     @State private var selectedTab: MainTab = .home
     @State private var playerCoordinator = PlayerCoordinator.shared
     @State private var showSearchSheet: Bool = false
     @State private var searchInitialQuery: String = ""
+    @State private var searchInitialScope: SearchSheetView.SearchScope = .video
+    @State private var measuredWindowSize: CGSize = DeviceLayout.currentWindowSize
     @State private var autoPlayTask: Task<Void, Never>?
     
     public init() {
@@ -26,6 +29,10 @@ public struct MainContainerView: View {
             }
         }
     }
+
+    private var activePreferredColorScheme: ColorScheme? {
+        AuroraThemeMode(rawValue: themeModeRaw)?.preferredColorScheme
+    }
     
     public var body: some View {
         @Bindable var coordinator = playerCoordinator
@@ -45,6 +52,7 @@ public struct MainContainerView: View {
                     },
                     onOpenSearch: {
                         searchInitialQuery = ""
+                        searchInitialScope = .video
                         showSearchSheet = true
                     },
                     onOpenAccount: {
@@ -52,6 +60,7 @@ public struct MainContainerView: View {
                     },
                     onOpenSearchWithKeyword: { keyword in
                         searchInitialQuery = keyword
+                        searchInitialScope = .video
                         showSearchSheet = true
                     }
                 )
@@ -71,6 +80,8 @@ public struct MainContainerView: View {
             
             NavigationStack {
                 ComicsScreen(onOpenSearch: {
+                    searchInitialQuery = ""
+                    searchInitialScope = .comic
                     showSearchSheet = true
                 })
             }
@@ -81,6 +92,8 @@ public struct MainContainerView: View {
             
             NavigationStack {
                 LiveScreen(onOpenSearch: {
+                    searchInitialQuery = ""
+                    searchInitialScope = .live
                     showSearchSheet = true
                 })
             }
@@ -91,6 +104,8 @@ public struct MainContainerView: View {
             
             NavigationStack {
                 ForumScreen(onOpenSearch: {
+                    searchInitialQuery = ""
+                    searchInitialScope = .forum
                     showSearchSheet = true
                 })
             }
@@ -109,8 +124,7 @@ public struct MainContainerView: View {
             }
             .tag(MainTab.profile)
         }
-        // iPadOS presents the same top-level navigation as a sidebar while
-        // retaining the floating tab bar on iPhone.
+        .id(locManager.selectedLanguage.rawValue)
         .tabViewStyle(.sidebarAdaptable)
         .tabViewSidebarHeader {
             HStack {
@@ -122,20 +136,42 @@ public struct MainContainerView: View {
         }
         .tint(AuroraColor.brand)
         .environment(\.locale, locManager.activeLocale)
+        .environment(\.auroraContainerSize, measuredWindowSize)
         .sheet(isPresented: $showSearchSheet) {
             SearchSheetView(
                 initialQuery: searchInitialQuery,
+                initialScope: searchInitialScope,
                 onPlayVideo: { video in
                     showSearchSheet = false
                     searchInitialQuery = ""
                     selectedTab = .home
                     coordinator.play(video)
                 },
+                onSelectComic: { comic in
+                    showSearchSheet = false
+                    searchInitialQuery = ""
+                    selectedTab = .comics
+                    coordinator.openComic(comic)
+                },
+                onSelectLive: { stream in
+                    showSearchSheet = false
+                    searchInitialQuery = ""
+                    selectedTab = .live
+                    let related = LiveRepository.shared.liveStreams.filter { $0.id != stream.id }
+                    coordinator.openLive(stream, relatedStreams: related)
+                },
+                onSelectForumPost: { post in
+                    showSearchSheet = false
+                    searchInitialQuery = ""
+                    selectedTab = .forum
+                    coordinator.openForumPost(post)
+                },
                 onDismiss: {
                     showSearchSheet = false
                     searchInitialQuery = ""
                 }
             )
+            .preferredColorScheme(activePreferredColorScheme)
         }
         .onAppear {
             PictureInPictureManager.shared.onRestoreUserInterface = { completion in
@@ -194,8 +230,18 @@ public struct MainContainerView: View {
                     .id(route)
                     .tint(AuroraColor.brand)
                     .environment(\.locale, locManager.activeLocale)
+                    .environment(\.auroraContainerSize, measuredWindowSize)
             }
         )
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { _, newSize in
+            if newSize.width > 0 && newSize.height > 0 {
+                measuredWindowSize = newSize
+                DeviceLayout.updateMeasuredWindowSize(newSize)
+            }
+        }
+        .preferredColorScheme(activePreferredColorScheme)
         .ignoresSafeArea()
     }
 
@@ -214,6 +260,7 @@ public struct MainContainerView: View {
                 onOpenSearchKeyword: { keyword in
                     coordinator.dismiss()
                     searchInitialQuery = keyword
+                    searchInitialScope = .video
                     showSearchSheet = true
                 }
             )
@@ -237,8 +284,8 @@ public struct MainContainerView: View {
             .toolbar(.hidden, for: .tabBar)
             .toolbar(.hidden, for: .navigationBar)
             .navigationBarBackButtonHidden(true)
-        case .comic(let comic):
-            ComicReaderView(comic: comic) {
+        case .comic(let comic, let initialChapterIndex, let restoreProgress):
+            ComicReaderView(comic: comic, initialChapterIndex: initialChapterIndex, restoreProgress: restoreProgress) {
                 coordinator.dismiss()
             }
             .toolbar(.hidden, for: .tabBar)
@@ -327,7 +374,7 @@ private struct ImmersiveNavigationHost<Route: Hashable, RootContent: View, Desti
                 }
             } else {
                 let destVC = UIHostingController(rootView: destinationContent(route))
-                destVC.view.backgroundColor = .black
+                destVC.view.backgroundColor = UIColor(AuroraColor.canvas)
                 destVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
                 coord.destinationController = destVC
                 coord.displayedRoute = route

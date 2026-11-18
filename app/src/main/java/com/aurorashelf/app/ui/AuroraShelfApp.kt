@@ -24,14 +24,11 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import com.aurorashelf.app.data.HornyStudentsLiveRepository
-import com.aurorashelf.app.data.StripchatLiveRepository
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -132,6 +129,7 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -157,6 +155,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import coil3.compose.AsyncImage
+import com.aurorashelf.app.LocalIsInPipMode
 import com.aurorashelf.app.model.AppDestination
 import com.aurorashelf.app.model.ContentSource
 import com.aurorashelf.app.model.ContentSourceCatalog
@@ -228,17 +227,6 @@ fun AuroraShelfApp(
         state.historyIds.mapNotNull { id -> videosById[id] }
     }
 
-    // Staggered background pre-warming across all tabs so switching to any section is instantaneous
-    LaunchedEffect(Unit) {
-        // Step 1: Pre-warm forum feed and live stream DNS immediately off the main thread
-        forumViewModel.ensureLoaded()
-        StripchatLiveRepository.prefetchDns()
-        HornyStudentsLiveRepository.prefetchDns()
-        // Step 2: After Home's initial layout pass settles, warm comic and live streams
-        kotlinx.coroutines.delay(600)
-        comicViewModel.ensureLoaded()
-        liveViewModel.ensureLoaded()
-    }
     var isPlayerFullscreen by rememberSaveable(state.selectedVideo?.id) { mutableStateOf(false) }
     var isLiveFullscreen by rememberSaveable { mutableStateOf(false) }
     var isCurrentVideoPortrait by remember(state.selectedVideo?.id) { mutableStateOf<Boolean?>(null) }
@@ -246,7 +234,8 @@ fun AuroraShelfApp(
     var personalRoute by rememberSaveable { mutableStateOf(PersonalRoute.OVERVIEW) }
     val originalOrientation = remember(activity) { activity?.requestedOrientation }
     val isAnyFullscreen = isPlayerFullscreen || isLiveFullscreen
-    val systemInDarkTheme = isSystemInDarkTheme()
+    val isInPipMode = LocalIsInPipMode.current
+    val effectiveDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
 
     LaunchedEffect(
         activity,
@@ -258,23 +247,36 @@ fun AuroraShelfApp(
         state.selectedVideo,
         state.destination,
         state.isSearchOpen,
+        state.videos.isEmpty(),
         comicState.details,
         comicState.reader,
+        comicState.comics.isEmpty(),
+        comicState.activeQuery,
         liveState.selectedItem,
-        systemInDarkTheme,
+        liveState.items.isEmpty(),
+        liveState.isSearchOpen,
+        liveState.searchQuery,
+        effectiveDarkTheme,
     ) {
         activity ?: return@LaunchedEffect
         val insetsController = WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         if (!introActive) {
-            val hasDarkStatusBarSurface = systemInDarkTheme ||
+            val homeHasDarkHero = state.destination == AppDestination.HOME && state.videos.isNotEmpty()
+            val liveHasDarkHero = state.destination == AppDestination.LIVE &&
+                liveState.items.isNotEmpty() &&
+                !liveState.isSearchOpen &&
+                liveState.searchQuery.isBlank()
+            val comicsHasDarkHero = state.destination == AppDestination.COMICS &&
+                comicState.details == null &&
+                comicState.reader == null &&
+                comicState.comics.isNotEmpty() &&
+                comicState.activeQuery.isBlank()
+            val hasDarkStatusBarSurface = effectiveDarkTheme ||
                 state.selectedVideo != null ||
                 liveState.selectedItem != null ||
-                (!state.isSearchOpen && (
-                    state.destination == AppDestination.HOME ||
-                        state.destination == AppDestination.LIVE ||
-                        (state.destination == AppDestination.COMICS && comicState.details == null)
-                ))
-            val hasDarkNavigationBarSurface = systemInDarkTheme ||
+                (state.destination == AppDestination.COMICS && comicState.reader != null) ||
+                (!state.isSearchOpen && (homeHasDarkHero || liveHasDarkHero || comicsHasDarkHero))
+            val hasDarkNavigationBarSurface = effectiveDarkTheme ||
                 isAnyFullscreen ||
                 (state.destination == AppDestination.COMICS && comicState.reader != null && !state.isSearchOpen)
             insetsController.isAppearanceLightStatusBars = !hasDarkStatusBarSurface
@@ -314,8 +316,8 @@ fun AuroraShelfApp(
     BackHandler(
         enabled = state.selectedVideo != null || state.isSearchOpen || state.destination != AppDestination.HOME ||
             (state.destination == AppDestination.COMICS && (comicState.reader != null || comicState.details != null || comicState.isDetailsLoading || comicState.detailsError != null)) ||
-            (state.destination == AppDestination.FORUM && forumState.selectedPost != null) ||
-            (state.destination == AppDestination.LIVE && liveState.selectedItem != null),
+            (state.destination == AppDestination.FORUM && (forumState.selectedPost != null || forumState.isSearchOpen)) ||
+            (state.destination == AppDestination.LIVE && (liveState.selectedItem != null || liveState.isSearchOpen)),
     ) {
         when {
             state.selectedVideo != null && isPlayerFullscreen -> isPlayerFullscreen = false
@@ -330,7 +332,15 @@ fun AuroraShelfApp(
                 isLiveFullscreen = false
                 liveViewModel.close()
             }
+            state.destination == AppDestination.LIVE && liveState.isSearchOpen -> {
+                liveViewModel.updateSearchQuery("")
+                liveViewModel.setSearchOpen(false)
+            }
             state.destination == AppDestination.FORUM && forumState.selectedPost != null -> forumViewModel.closePost()
+            state.destination == AppDestination.FORUM && forumState.isSearchOpen -> {
+                forumViewModel.updateSearchQuery("")
+                forumViewModel.setSearchOpen(false)
+            }
             state.destination == AppDestination.ME && personalRoute != PersonalRoute.OVERVIEW -> {
                 personalRoute = PersonalRoute.OVERVIEW
             }
@@ -347,13 +357,14 @@ fun AuroraShelfApp(
           modifier = Modifier
               .fillMaxSize()
               .then(
-                  if (isAnyFullscreen) Modifier
+                  if (isAnyFullscreen || isInPipMode) Modifier
                   else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
               ),
       ) {
         val density = LocalDensity.current
         val isLandscape = maxWidth > maxHeight
-        var dockHeight by remember(isLandscape) { mutableStateOf(if (isLandscape) 0.dp else 112.dp) }
+        val usesCompactDock = isLandscape || maxWidth >= 600.dp
+        var dockHeight by remember(usesCompactDock) { mutableStateOf(if (usesCompactDock) 0.dp else 112.dp) }
         val statusHeight = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
         val windowLayout = WindowLayout.calculate(
             maxWidth.value, (maxHeight - statusHeight - dockHeight).value, isLandscape,
@@ -365,7 +376,8 @@ fun AuroraShelfApp(
             LocalBackdrop provides liquidBackdrop,
             LocalCastController provides castController,
         ) {
-        val showNavigation = state.selectedVideo == null &&
+        val showNavigation = !isInPipMode &&
+            state.selectedVideo == null &&
             !state.isSearchOpen &&
             comicState.reader == null &&
             forumState.selectedPost == null &&
@@ -463,7 +475,12 @@ fun AuroraShelfApp(
                         onVideoOrientationChange = { isCurrentLivePortrait = it },
                         onCategory = liveViewModel::selectCategory,
                         onSelectSource = liveViewModel::selectSource,
-                        onSearch = { viewModel.setSearchOpen(true) },
+                        onSearch = { liveViewModel.setSearchOpen(true) },
+                        onSearchQueryChange = liveViewModel::updateSearchQuery,
+                        onCloseSearch = {
+                            liveViewModel.updateSearchQuery("")
+                            liveViewModel.setSearchOpen(false)
+                        },
                         onRefresh = liveViewModel::refresh,
                         onLoadMore = liveViewModel::loadMore,
                         onOpen = liveViewModel::open,
@@ -489,7 +506,12 @@ fun AuroraShelfApp(
                     onPost = forumViewModel::open,
                     onClosePost = forumViewModel::closePost,
                     onSelectSource = forumViewModel::selectSource,
-                    onSearch = { viewModel.setSearchOpen(true) },
+                    onSearch = { forumViewModel.setSearchOpen(true) },
+                    onSearchQueryChange = forumViewModel::updateSearchQuery,
+                    onCloseSearch = {
+                        forumViewModel.updateSearchQuery("")
+                        forumViewModel.setSearchOpen(false)
+                    },
                     onSettings = {
                         personalRoute = PersonalRoute.SETTINGS
                         viewModel.selectDestination(AppDestination.ME)
@@ -514,6 +536,10 @@ fun AuroraShelfApp(
                     onComicSource = comicViewModel::selectSource,
                     onLiveSource = liveViewModel::selectSource,
                     onOpenCached = viewModel::openVideo,
+                    onOpenComicDownload = { chapter ->
+                        comicViewModel.openDownloadedChapter(chapter)
+                        viewModel.selectDestination(AppDestination.COMICS)
+                    },
                     onRemoveComicDownload = comicViewModel::removeComicDownload,
                     onRetryComicDownload = comicViewModel::retryComicDownload,
                     onClearComicDownloads = comicViewModel::clearAllComicDownloads,
@@ -613,7 +639,7 @@ fun AuroraShelfApp(
                     viewModel.closeVideo()
                 }
                 PredictiveBackContainer(
-                    enabled = !isPlayerFullscreen,
+                    enabled = !isPlayerFullscreen && !isInPipMode,
                     onBack = handleCloseVideo,
                 ) {
                     PlayerScreen(
@@ -634,7 +660,7 @@ fun AuroraShelfApp(
             }
         }
 
-        if (isCastSheetVisible) {
+        if (isCastSheetVisible && !isInPipMode) {
             CastDeviceSheet(
                 castManager = castManager,
                 onDismissRequest = { isCastSheetVisible = false },
@@ -668,6 +694,9 @@ private fun ExpressiveBottomBar(
     // icon + label still fit at 200% instead of drawing outside the glass capsule.
     val fontScale = LocalDensity.current.fontScale
     val extraDockHeight = ((fontScale - 1f).coerceIn(0f, 1f) * 44f).dp
+    val isDark = MaterialTheme.colorScheme.background.luminance() <= 0.5f
+    val selectedContentColor = if (isDark) Color.White else MaterialTheme.colorScheme.primary
+    val unselectedContentColor = if (isDark) Color(0xFFA0AAB8) else MaterialTheme.colorScheme.onSurfaceVariant
     LiquidBottomNavigation(
         selectedTabIndex = lastNavigationIndex,
         onTabSelected = { index -> onSelect(navigationDestinations[index]) },
@@ -710,13 +739,13 @@ private fun ExpressiveBottomBar(
                     Icon(
                         imageVector = icon,
                         contentDescription = destination.label,
-                        tint = if (isTabSelected) Color.White else Color(0xFFA0AAB8),
+                        tint = if (isTabSelected) selectedContentColor else unselectedContentColor,
                         modifier = Modifier.size(22.dp),
                     )
                 }
                 Text(
                     text = destination.label,
-                    color = if (isTabSelected) Color.White else Color(0xFFA0AAB8),
+                    color = if (isTabSelected) selectedContentColor else unselectedContentColor,
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontSize = 11.sp,
                         lineHeight = 11.sp,
@@ -769,7 +798,11 @@ private fun CompactNavigationRail(
                         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
                     ) {
                         if (destination == AppDestination.HOME) {
-                            NetflixNLogo(modifier = Modifier.size(width = 16.dp, height = 22.dp))
+                            NetflixNLogo(
+                                modifier = Modifier
+                                    .size(width = 16.dp, height = 22.dp)
+                                    .semantics { contentDescription = destination.label },
+                            )
                         } else {
                             Icon(icon, contentDescription = destination.label, modifier = Modifier.size(22.dp))
                         }

@@ -9,43 +9,105 @@ if [ -f "${CRED_FILE}" ]; then
   source "${CRED_FILE}"
 fi
 
-SERVER_IP="${SERVER_IP:-123.108.70.177}"
+: "${SERVER_IP:?Missing SERVER_IP in .server_credentials or env}"
+SERVER_USER="${SERVER_USER:-root}"
 SERVER_PASS="${SERVER_PASS:-}"
-SSHPASS_BIN="$(command -v sshpass 2>/dev/null || echo /opt/homebrew/bin/sshpass)"
-SSH_OPTS=(-o StrictHostKeyChecking=no -o PubkeyAuthentication=no -o ConnectTimeout=10 -o PreferredAuthentications=password)
 
-if [ -z "${SERVER_PASS}" ] || [ ! -x "${SSHPASS_BIN}" ]; then
-  echo "Missing SERVER_PASS or sshpass" >&2
-  exit 1
+SSH_OPTS=(
+  -o StrictHostKeyChecking=accept-new
+  -o ConnectTimeout=15
+  -o ControlMaster=auto
+  -o ControlPath=/tmp/netgrey-proxy-%r@%h:%p
+  -o ControlPersist=60s
+)
+SSHPASS_BIN=""
+if [ -n "${SERVER_PASS}" ]; then
+  SSH_OPTS+=(-o PubkeyAuthentication=no)
+  SSHPASS_BIN="$(command -v sshpass 2>/dev/null || echo /opt/homebrew/bin/sshpass)"
+  if [ ! -x "${SSHPASS_BIN}" ]; then
+    echo "Missing sshpass executable required for SERVER_PASS authentication" >&2
+    exit 1
+  fi
 fi
 
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "${TMP_DIR}"' EXIT
-REMOTE="root@${SERVER_IP}"
-"${SSHPASS_BIN}" -p "${SERVER_PASS}" scp "${SSH_OPTS[@]}" \
-  "${PROJECT_ROOT}/server/pocketbase/netgrey-auth-location.conf" \
-  "${REMOTE}:/tmp/netgrey-auth-location.conf"
+REMOTE="${SERVER_USER}@${SERVER_IP}"
 
-"${SSHPASS_BIN}" -p "${SERVER_PASS}" ssh "${SSH_OPTS[@]}" "${REMOTE}" 'set -e; cp -a /etc/nginx/sites-available/netgrey /etc/nginx/sites-available/netgrey.auth-backup.$(date +%Y%m%d%H%M%S); python3 - <<"PY"
+run_ssh() {
+  local cmd="$1"
+  if [ -n "${SERVER_PASS}" ]; then
+    SSHPASS="${SERVER_PASS}" "${SSHPASS_BIN}" -e ssh "${SSH_OPTS[@]}" "${REMOTE}" "${cmd}"
+  else
+    ssh "${SSH_OPTS[@]}" "${REMOTE}" "${cmd}"
+  fi
+}
+
+run_scp() {
+  local src="$1"
+  local dest="$2"
+  if [ -n "${SERVER_PASS}" ]; then
+    SSHPASS="${SERVER_PASS}" "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${src}" "${REMOTE}:${dest}"
+  else
+    scp "${SSH_OPTS[@]}" "${src}" "${REMOTE}:${dest}"
+  fi
+}
+
+run_scp "${PROJECT_ROOT}/server/pocketbase/netgrey-auth-location.conf" "/tmp/netgrey-auth-location.conf"
+
+run_ssh 'set -e
+mkdir -p /var/backups/netgrey-auth
+BACKUP_FILE="/var/backups/netgrey-auth/nginx.netgrey.$(date +%Y%m%d%H%M%S).conf"
+cp -a /etc/nginx/sites-available/netgrey "${BACKUP_FILE}"
+ls -1dt /var/backups/netgrey-auth/nginx.netgrey.*.conf 2>/dev/null | tail -n +6 | xargs -r rm -f
+rm -f /etc/nginx/sites-available/netgrey.auth-backup.* 2>/dev/null || true
+
+python3 - <<"PY"
 from pathlib import Path
+
 site = Path("/etc/nginx/sites-available/netgrey")
-fragment = Path("/tmp/netgrey-auth-location.conf").read_text()
+fragment = Path("/tmp/netgrey-auth-location.conf").read_text().rstrip() + "\n"
 text = site.read_text()
-marker = "    location /api/ {"
-if marker not in text:
+
+begin_marker = "    # BEGIN NETGREY AUTH & STATIC HARDENING"
+end_marker = "    # END NETGREY AUTH & STATIC HARDENING"
+api_marker = "    location /api/ {"
+
+if api_marker not in text:
     raise SystemExit("nginx API location marker missing")
-if "location = /auth-api" in text:
-    start = text.index("    location = /auth-api")
-    end = text.index("    location /api/ {", start)
-    text = text[:start] + fragment + "\n" + text[end:]
-elif "location ^~ /auth-api/" in text:
-    start = text.index("    location ^~ /auth-api/")
-    end = text.index("    location /api/ {", start)
-    text = text[:start] + fragment + "\n" + text[end:]
+
+if begin_marker in text and end_marker in text:
+    start = text.index(begin_marker)
+    end = text.index(end_marker, start) + len(end_marker)
+    if end < len(text) and text[end:end + 1] == "\n":
+        end += 1
+    text = text[:start] + fragment + text[end:]
 else:
-    text = text.replace(marker, fragment + "\n" + marker, 1)
+    legacy_starts = [
+        "    location ^~ /auth-api/_/ {",
+        "    location = /auth-api {",
+        "    location ^~ /auth-api/ {",
+    ]
+    matched_start = None
+    for candidate in legacy_starts:
+        if candidate in text:
+            idx = text.index(candidate)
+            if matched_start is None or idx < matched_start:
+                matched_start = idx
+    if matched_start is not None:
+        end = text.index(api_marker, matched_start)
+        text = text[:matched_start] + fragment + "\n" + text[end:]
+    else:
+        text = text.replace(api_marker, fragment + "\n" + api_marker, 1)
+
 site.write_text(text)
 PY
-nginx -t; systemctl reload nginx; rm -f /tmp/netgrey-auth-location.conf; echo auth_proxy=enabled'
 
-echo "Auth API proxy enabled at https://bananarey.us/auth-api"
+if ! nginx -t; then
+  cp -a "${BACKUP_FILE}" /etc/nginx/sites-available/netgrey
+  rm -f /tmp/netgrey-auth-location.conf
+  exit 1
+fi
+systemctl reload nginx
+rm -f /tmp/netgrey-auth-location.conf
+echo auth_proxy=enabled'
+
+echo "Auth API allowlist proxy enabled at https://bananarey.us/auth-api"

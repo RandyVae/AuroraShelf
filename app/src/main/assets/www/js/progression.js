@@ -83,6 +83,8 @@
 
     // Apply equipment and set bonuses
     const activeSets = [];
+    let nanoRegen = 0;
+    let critDmgBonus = 0;
     if (instance && instance.equips && equipCatalog) {
       const setCounts = {};
       ['weapon', 'armor', 'core'].forEach((slot) => {
@@ -119,6 +121,7 @@
             if (count >= 3) {
               mitigation += 0.08;
               addHp += Math.round(baseHp * 0.10);
+              nanoRegen = 0.04;
               activeSets.push('纳米生化 3件套 (+8% 减伤, 持续自愈)');
             }
           } else if (key === 'set_quantum') {
@@ -127,6 +130,7 @@
             if (count >= 3) {
               crit += 0.08;
               addAtk += Math.round(baseAtk * 0.15);
+              critDmgBonus = 0.35;
               activeSets.push('量子终结 3件套 (+20% 暴击, 致命伤害)');
             }
           }
@@ -149,6 +153,8 @@
       mitigation: Math.min(0.50, mitigation),
       power,
       skillMult,
+      nanoRegen,
+      critDmgBonus,
       level: lvl,
       stars,
       skillLevel: skillLvl,
@@ -209,6 +215,11 @@
   }
 
   function equipItem(state, heroKey, slot, itemId) {
+    const invKey = slot + 's';
+    const ownedList = (state && state.inventory && Array.isArray(state.inventory[invKey])) ? state.inventory[invKey] : [];
+    if (!ownedList.includes(itemId)) {
+      return { ok: false, msg: '未获得（军需商店开启装备箱）' };
+    }
     const inst = getHeroInstance(state, heroKey);
     const current = inst.equips[slot];
     // Un-equip from whoever is wearing it

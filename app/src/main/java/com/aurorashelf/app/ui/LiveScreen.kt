@@ -52,6 +52,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -98,6 +99,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -126,7 +128,6 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -154,6 +155,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
 import coil3.request.ImageRequest
 import com.aurorashelf.app.data.StripchatLiveRepository
 import com.aurorashelf.app.data.LiveStreamResolveResult
@@ -175,6 +178,7 @@ import com.aurorashelf.app.model.LiveCategory
 import com.aurorashelf.app.model.LiveComment
 import com.aurorashelf.app.model.LiveItem
 import com.aurorashelf.app.model.LiveSourceCatalog
+import com.aurorashelf.app.ui.theme.AuroraBrandAccentDeep
 import com.aurorashelf.app.ui.theme.AuroraCoral
 import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
 import com.aurorashelf.app.ui.theme.AuroraMediaLabel
@@ -204,6 +208,8 @@ internal fun LiveScreen(
     onCategory: (LiveCategory) -> Unit,
     onSelectSource: (String) -> Unit = {},
     onSearch: () -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
+    onCloseSearch: () -> Unit = {},
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onOpen: (LiveItem) -> Unit,
@@ -239,21 +245,13 @@ internal fun LiveScreen(
                 onCategory = onCategory,
                 onSelectSource = onSelectSource,
                 onSearch = onSearch,
+                onSearchQueryChange = onSearchQueryChange,
+                onCloseSearch = onCloseSearch,
                 onRefresh = onRefresh,
                 onLoadMore = onLoadMore,
-                onOpen = { item ->
-                    LiveSessionCache.prepareFor(item.playerUrl)
-                    onOpen(item)
-                },
+                onOpen = onOpen,
                 onSettings = onSettings,
             )
-            // Keep the last opened room's WebView alive so re-entering it is instant.
-            val retained = LiveSessionCache.retained
-            if (state.selectedItem == null && !isFullscreen && retained != null) {
-                key(retained) {
-                    AndroidView(factory = { retained }, modifier = Modifier.size(1.dp))
-                }
-            }
         }
     }
     DisposableEffect(Unit) {
@@ -268,6 +266,8 @@ private fun LiveFeed(
     onCategory: (LiveCategory) -> Unit,
     onSelectSource: (String) -> Unit,
     onSearch: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onCloseSearch: () -> Unit,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onOpen: (LiveItem) -> Unit,
@@ -280,13 +280,20 @@ private fun LiveFeed(
     // so the adaptive grid collapses to one column instead of clipping card text.
     val gridState = rememberLazyGridState()
     var headerHeightPx by remember { mutableIntStateOf(0) }
-    val emptyHeaderClearanceDp = if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() } else 96.dp
+    val emptyHeaderClearanceDp = if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() + 8.dp } else 96.dp
+    val visibleItems = remember(state.items, state.searchQuery) {
+        filterLiveItems(state.items, state.searchQuery)
+    }
+    BackHandler(enabled = state.isSearchOpen) {
+        onCloseSearch()
+    }
     val isScrolled by remember {
         derivedStateOf {
             gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 40
         }
     }
-    val overlayDarkHeader = !isScrolled && (state.items.isNotEmpty() || !isLightTheme)
+    val hasHeroBillboard = visibleItems.isNotEmpty() && state.searchQuery.isBlank() && !state.isSearchOpen
+    val overlayDarkHeader = !isScrolled && (hasHeroBillboard || (!isLightTheme && !state.isSearchOpen))
     val prefetchContext = LocalContext.current
     // task-17: warm the first screen's previews (bytes + decode) without touching card layout.
     LaunchedEffect(state.items) {
@@ -347,36 +354,58 @@ private fun LiveFeed(
                         switchSourceLabel = "切换至 $altSourceName 备用源",
                     )
                 }
-            } else if (state.items.isEmpty()) {
+            } else if (visibleItems.isEmpty()) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Spacer(Modifier.height(emptyHeaderClearanceDp))
                 }
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    val altSourceId = if (state.selectedSourceId == LiveSourceCatalog.STRIPCHAT.id) {
-                        LiveSourceCatalog.HORNYSTUDENTS.id
+                    if (state.searchQuery.isNotBlank()) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(260.dp),
+                        ) {
+                            Text(
+                                "未找到与「${state.searchQuery}」匹配的直播间",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            OutlinedButton(onClick = { onSearchQueryChange("") }) {
+                                Text("清除筛选")
+                            }
+                        }
                     } else {
-                        LiveSourceCatalog.STRIPCHAT.id
-                    }
-                    val altSourceName = LiveSourceCatalog.find(altSourceId).name
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(260.dp),
-                    ) {
-                        Text("当前分类没有公开直播", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        OutlinedButton(onClick = { onSelectSource(altSourceId) }) {
-                            Text("切换至 $altSourceName")
+                        val altSourceId = if (state.selectedSourceId == LiveSourceCatalog.STRIPCHAT.id) {
+                            LiveSourceCatalog.HORNYSTUDENTS.id
+                        } else {
+                            LiveSourceCatalog.STRIPCHAT.id
+                        }
+                        val altSourceName = LiveSourceCatalog.find(altSourceId).name
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth().height(260.dp),
+                        ) {
+                            Text("当前分类没有公开直播", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            OutlinedButton(onClick = { onSelectSource(altSourceId) }) {
+                                Text("切换至 $altSourceName")
+                            }
                         }
                     }
                 }
             } else {
-                // 1. Netflix Live Hero Billboard at item 0 (full screen bleed)
-                val heroItem = state.items.first()
-                item(key = "hero-billboard", span = { GridItemSpan(maxLineSpan) }) {
-                    NetflixLiveHeroBillboard(
-                        item = heroItem,
-                        onOpen = { onOpen(heroItem) },
-                    )
+                if (hasHeroBillboard) {
+                    // 1. Netflix Live Hero Billboard at item 0 (full screen bleed)
+                    val heroItem = visibleItems.first()
+                    item(key = "hero-billboard", span = { GridItemSpan(maxLineSpan) }) {
+                        NetflixLiveHeroBillboard(
+                            item = heroItem,
+                            onOpen = { onOpen(heroItem) },
+                        )
+                    }
+                } else {
+                    item(key = "live-search-spacer", span = { GridItemSpan(maxLineSpan) }) {
+                        Spacer(Modifier.height(emptyHeaderClearanceDp))
+                    }
                 }
 
                 // 2. Pinned Categories Strip with Source Selection
@@ -406,7 +435,7 @@ private fun LiveFeed(
                 }
 
                 // 3. Featured Live Streamers Shelf (Apple TV 4:3 native ratio)
-                if (state.items.size >= 5) {
+                if (hasHeroBillboard && visibleItems.size >= 5) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
                         NetflixSectionHeader(
                             title = "热门推荐 FEATURED",
@@ -419,7 +448,7 @@ private fun LiveFeed(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            val topPerformers = state.items.take(10)
+                            val topPerformers = visibleItems.take(10)
                             items(topPerformers, key = { "live-featured-${it.id}" }) { item ->
                                 LiveFeaturedCard(
                                     item = item,
@@ -435,7 +464,8 @@ private fun LiveFeed(
                     }
                 }
 
-                items(state.items.drop(1), key = LiveItem::id) { item ->
+                val gridItems = if (hasHeroBillboard) visibleItems.drop(1) else visibleItems
+                items(gridItems, key = LiveItem::id) { item ->
                     LiveCard(item = item, onClick = { onOpen(item) })
                 }
             }
@@ -487,11 +517,27 @@ private fun LiveFeed(
                 .then(headerModifier)
                 .windowInsetsPadding(WindowInsets.statusBars),
         ) {
-            LiveHeader(
-                onSearch = onSearch,
-                onSettings = onSettings,
-                forceDark = overlayDarkHeader,
-            )
+            if (state.isSearchOpen) {
+                CenteredSearchBar(
+                    query = state.searchQuery,
+                    onQueryChange = onSearchQueryChange,
+                    placeholder = "搜索主播昵称或国家/地区",
+                    onSearch = {},
+                    onBack = onCloseSearch,
+                    onClear = { onSearchQueryChange("") },
+                    isSearching = state.isLoading,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    testTag = "live-search-field",
+                    forceDark = false,
+                )
+            } else {
+                LiveHeader(
+                    onSearch = onSearch,
+                    onSettings = onSettings,
+                    searchLabel = if (state.searchQuery.isNotBlank()) state.searchQuery else "搜索直播",
+                    forceDark = overlayDarkHeader,
+                )
+            }
             if (state.isLoading) {
                 LinearProgressIndicator(
                     color = AuroraCoral,
@@ -509,11 +555,12 @@ private fun LiveFeed(
 private fun LiveHeader(
     onSearch: () -> Unit,
     onSettings: () -> Unit = {},
+    searchLabel: String = "搜索直播",
     forceDark: Boolean = false,
 ) {
     NetflixTopBar(forceDark = forceDark) {
         NetflixSearchCapsule(
-            label = "搜索直播",
+            label = searchLabel,
             onClick = onSearch,
             forceDark = forceDark,
         )
@@ -529,9 +576,11 @@ private fun NetflixLiveHeroBillboard(
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val flag = countryFlag(item.countryCode)
-    val previewBytes by produceState<ByteArray?>(initialValue = null, key1 = item.thumbnailUrl) {
-        value = withContext(Dispatchers.IO) {
-            CoverImageLoader.load(item.thumbnailUrl, liveReferer(item))
+    val previewBytes by produceState<ByteArray?>(initialValue = CoverImageLoader.peekMemory(item.thumbnailUrl), key1 = item.thumbnailUrl) {
+        if (value == null) {
+            value = withContext(Dispatchers.IO) {
+                CoverImageLoader.load(item.thumbnailUrl, liveReferer(item))
+            }
         }
     }
     val previewRequest = remember(previewBytes, item.thumbnailUrl, context) {
@@ -543,18 +592,44 @@ private fun NetflixLiveHeroBillboard(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(460.dp)
             .clickable(role = Role.Button, onClick = onOpen),
     ) {
+        val isWideStage = maxWidth > 500.dp
         AsyncImage(
             model = previewRequest,
             contentDescription = "${item.username} 直播预览",
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize(),
         )
+        if (isWideStage) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.56f)),
+            )
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                shadowElevation = 12.dp,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
+                color = AuroraMediaPlaceholder,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 64.dp)
+                    .height(220.dp)
+                    .aspectRatio(4f / 3f),
+            ) {
+                AsyncImage(
+                    model = previewRequest,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
 
         // Top dark vignette gradient
         Box(
@@ -824,7 +899,7 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
                 )
                 DarkModeArtworkScrim()
                 Surface(
-                    color = AuroraCoral,
+                    color = AuroraBrandAccentDeep,
                     contentColor = Color.White,
                     shape = RoundedCornerShape(4.dp),
                     modifier = Modifier.padding(6.dp),
@@ -1001,7 +1076,7 @@ private fun LiveRoomStatusOverlay(
                 Button(
                     onClick = onBack,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AuroraCoral,
+                        containerColor = AuroraBrandAccentDeep,
                         contentColor = Color.White,
                     ),
                 ) {
@@ -1013,7 +1088,7 @@ private fun LiveRoomStatusOverlay(
                 Button(
                     onClick = onRetry,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = AuroraCoral,
+                        containerColor = AuroraBrandAccentDeep,
                         contentColor = Color.White,
                     ),
                 ) {
@@ -1058,19 +1133,20 @@ private fun StreamerInfoBar(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFF141414))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Surface(
             shape = CircleShape,
-            color = Color(0xFF262626),
+            color = MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.size(38.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = item.username.take(1).uppercase(),
                     fontWeight = FontWeight.Bold,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 15.sp,
                 )
             }
@@ -1080,7 +1156,7 @@ private fun StreamerInfoBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = item.username,
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1,
@@ -1094,7 +1170,7 @@ private fun StreamerInfoBar(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Surface(
-                    color = AuroraCoral,
+                    color = AuroraBrandAccentDeep,
                     shape = RoundedCornerShape(3.dp),
                 ) {
                     Text(
@@ -1107,17 +1183,17 @@ private fun StreamerInfoBar(
                 }
                 Text(
                     text = "${formatViewerCount(item.viewersCount)} 人观看",
-                    color = AuroraMediaMuted,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 11.sp,
                 )
                 if (item.isHd) {
                     Surface(
-                        color = Color(0xFF2E333D),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(3.dp),
                     ) {
                         Text(
                             "HD",
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
@@ -1126,19 +1202,19 @@ private fun StreamerInfoBar(
                 }
             }
         }
-        IconButton(onClick = onFullscreenToggle, modifier = Modifier.size(36.dp)) {
+        IconButton(onClick = onFullscreenToggle, modifier = Modifier.minimumInteractiveComponentSize().size(36.dp)) {
             Icon(
                 Icons.Default.Fullscreen,
                 contentDescription = "全屏播放",
-                tint = Color.White,
+                tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(22.dp),
             )
         }
-        IconButton(onClick = onOpenExternal, modifier = Modifier.size(36.dp)) {
+        IconButton(onClick = onOpenExternal, modifier = Modifier.minimumInteractiveComponentSize().size(36.dp)) {
             Icon(
                 Icons.AutoMirrored.Filled.OpenInNew,
                 contentDescription = "在系统浏览器中打开",
-                tint = AuroraMediaMuted,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -1165,8 +1241,6 @@ private fun LivePlayerScreen(
             if (w > 0 && h > 0) w.toFloat() / h.toFloat() else null
         } ?: if (item.playerUrl.contains("hornystudents.com")) (4f / 3f) else (16f / 9f)
     }
-    val cachedSession = remember(item.playerUrl) { LiveSessionCache.consumePrepared(item.playerUrl) }
-    LaunchedEffect(item.playerUrl) { LiveSessionCache.releaseIfNot(item.playerUrl) }
     val openInBrowser: () -> Unit = remember(item.playerUrl, context) {
         {
             runCatching {
@@ -1178,7 +1252,7 @@ private fun LivePlayerScreen(
         }
     }
 
-    val resolver = remember { LiveStreamResolver() }
+    val resolver = remember { LiveStreamResolver(verifyConstructedStream = true) }
     var resolveAttempt by remember(item.id) { mutableIntStateOf(0) }
     var forceEmbedded by remember(item.id) { mutableStateOf(false) }
     val resolveResult by produceState<LiveStreamResolveResult?>(initialValue = null, item.id, resolveAttempt) {
@@ -1188,7 +1262,7 @@ private fun LivePlayerScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(AuroraImmersiveBackground)
+            .background(if (isFullscreen) AuroraImmersiveBackground else MaterialTheme.colorScheme.background)
             .testTag("live-player"),
     ) {
         val isTwoPaneLandscape = shouldUseTwoPaneLandscapeLayout(
@@ -1234,7 +1308,6 @@ private fun LivePlayerScreen(
                     onBack = onBack,
                     modifier = playerModifier,
                     posterUrl = item.thumbnailUrl,
-                    reused = cachedSession,
                     comments = comments,
                     item = item,
                 )
@@ -1282,7 +1355,6 @@ private fun LivePlayerScreen(
                             onBack = onBack,
                             modifier = playerModifier,
                             posterUrl = item.thumbnailUrl,
-                            reused = cachedSession,
                             comments = comments,
                             item = item,
                         )
@@ -1291,7 +1363,7 @@ private fun LivePlayerScreen(
                         Box(playerModifier.background(AuroraImmersiveBackground)) {
                             item.thumbnailUrl.takeIf { it.isNotBlank() }?.let { poster ->
                                 AsyncImage(
-                                    model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
+                                    model = livePosterRequest(context, poster, liveReferer(item)),
                                     contentDescription = null,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize(),
@@ -1429,8 +1501,8 @@ private fun NativeLivePlayer(
     DisposableEffect(player, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> player.pause()
-                Lifecycle.Event.ON_RESUME -> if (!isPaused) player.play()
+                Lifecycle.Event.ON_STOP -> player.pause()
+                Lifecycle.Event.ON_START -> if (!isPaused) player.play()
                 else -> Unit
             }
         }
@@ -1502,7 +1574,7 @@ private fun NativeLivePlayer(
             .createMediaSource(mediaItem)
         player.setMediaSource(mediaSource)
         player.prepare()
-        player.playWhenReady = !isPaused && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        player.playWhenReady = !isPaused && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
     }
 
     LaunchedEffect(controlsVisible, isFullscreen, isPaused) {
@@ -1557,7 +1629,7 @@ private fun NativeLivePlayer(
             Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground)) {
                 posterUrl?.let { poster ->
                     AsyncImage(
-                        model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
+                        model = livePosterRequest(context, poster, referer),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
@@ -1812,7 +1884,13 @@ private fun LiveComments(
         }
     }
 
-    Column(modifier.background(AuroraImmersiveBackground).padding(horizontal = 16.dp).testTag("live-comments")) {
+    Column(
+        modifier
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp)
+            .testTag("live-comments"),
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -1828,32 +1906,32 @@ private fun LiveComments(
         ) {
             Text(
                 text = "实时互动",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onBackground,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.semantics { heading() },
             )
             Spacer(Modifier.width(8.dp))
             Surface(
-                color = Color(0xFF262626),
+                color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(10.dp),
             ) {
                 Text(
                     text = "${comments.size} 条",
-                    color = AuroraCoral,
+                    color = MaterialTheme.colorScheme.primary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                 )
             }
             Spacer(Modifier.weight(1f))
-            Text("公开聊天室 · 只读", color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+            Text("公开聊天室 · 只读", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
             if (onToggleExpand != null) {
                 Spacer(Modifier.width(4.dp))
                 Icon(
                     imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                     contentDescription = if (isExpanded) "收起实时互动" else "展开实时互动",
-                    tint = Color.LightGray,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp),
                 )
             }
@@ -1867,7 +1945,7 @@ private fun LiveComments(
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                     Text(
                         if (isLoading) "正在连接直播间实时评论…" else "当前暂无公开评论",
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -1883,14 +1961,15 @@ private fun LiveComments(
                             verticalAlignment = Alignment.Top,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color(0xFF141414), RoundedCornerShape(8.dp))
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 10.dp, vertical = 8.dp),
                         ) {
                             Surface(
                                 shape = CircleShape,
-                                color = Color(0xFF242730),
-                                contentColor = Color.White,
-                                border = BorderStroke(1.dp, Color(0xFF383E4C)),
+                                color = MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                 modifier = Modifier.size(28.dp),
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
@@ -1905,7 +1984,7 @@ private fun LiveComments(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = comment.username,
-                                    color = AuroraCoral,
+                                    color = MaterialTheme.colorScheme.primary,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1,
@@ -1914,7 +1993,7 @@ private fun LiveComments(
                                 Spacer(Modifier.height(2.dp))
                                 Text(
                                     text = comment.message,
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 18.sp),
                                 )
                             }
@@ -1935,7 +2014,8 @@ private fun LiveLeftDetailPanel(
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier
-            .background(AuroraImmersiveBackground)
+            .background(MaterialTheme.colorScheme.background)
+            .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
         Row(
@@ -1943,36 +2023,36 @@ private fun LiveLeftDetailPanel(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Surface(
-                color = Color(0xFF262626),
+                color = MaterialTheme.colorScheme.surfaceVariant,
                 shape = RoundedCornerShape(8.dp),
             ) {
                 Text(
                     text = if (item.isHd) "高清直播" else "标清直播",
-                    color = Color.White,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                 )
             }
             if (item.countryCode.isNotBlank()) {
                 Surface(
-                    color = Color(0xFF262626),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
                     shape = RoundedCornerShape(8.dp),
                 ) {
                     Text(
                         text = item.countryCode.uppercase(),
-                        color = Color.LightGray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                     )
                 }
             }
             Surface(
-                color = AuroraCoral.copy(alpha = 0.16f),
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
                 shape = RoundedCornerShape(8.dp),
             ) {
                 Text(
                     text = "${item.viewersCount} 人在线",
-                    color = AuroraCoral,
+                    color = MaterialTheme.colorScheme.primary,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -1981,8 +2061,8 @@ private fun LiveLeftDetailPanel(
         }
         OutlinedButton(
             onClick = onOpenExternal,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
         ) {
             Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(6.dp))
@@ -2001,7 +2081,7 @@ private fun LiveRightRail(
     onSelectRelated: (LiveItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier.background(AuroraImmersiveBackground)) {
+    Column(modifier = modifier.background(MaterialTheme.colorScheme.background)) {
         LiveComments(
             comments = comments,
             isLoading = isLoadingComments,
@@ -2040,10 +2120,10 @@ private fun LiveRelatedStreamsList(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    Column(modifier = modifier.padding(horizontal = 16.dp)) {
+    Column(modifier = modifier.navigationBarsPadding().padding(horizontal = 16.dp)) {
         Text(
             text = "更多直播",
-            color = Color.White,
+            color = MaterialTheme.colorScheme.onBackground,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
@@ -2061,7 +2141,8 @@ private fun LiveRelatedStreamsList(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF191919))
+                        .background(MaterialTheme.colorScheme.surface)
+                        .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RoundedCornerShape(10.dp))
                         .clickable { onSelectRelated(related) }
                         .padding(8.dp),
                 ) {
@@ -2070,21 +2151,18 @@ private fun LiveRelatedStreamsList(
                             .width(126.dp)
                             .aspectRatio(16f / 9f)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF242424)),
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
                     ) {
                         if (related.thumbnailUrl.isNotBlank()) {
                             AsyncImage(
-                                model = ImageRequest.Builder(context)
-                                    .data(related.thumbnailUrl)
-                                    .memoryCacheKey(related.thumbnailUrl)
-                                    .build(),
+                                model = livePosterRequest(context, related.thumbnailUrl, liveReferer(related)),
                                 contentDescription = related.username,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
                         Surface(
-                            color = Color(0xFFD92D20).copy(alpha = 0.9f),
+                            color = AuroraBrandAccentDeep.copy(alpha = 0.92f),
                             shape = RoundedCornerShape(4.dp),
                             modifier = Modifier.align(Alignment.TopStart).padding(5.dp),
                         ) {
@@ -2101,7 +2179,7 @@ private fun LiveRelatedStreamsList(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = related.username,
-                            color = Color.White,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
@@ -2110,14 +2188,14 @@ private fun LiveRelatedStreamsList(
                         Spacer(Modifier.height(4.dp))
                         Text(
                             text = "${related.viewersCount} 观看",
-                            color = Color.LightGray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelSmall,
                         )
                         if (related.countryCode.isNotBlank()) {
                             Spacer(Modifier.height(3.dp))
                             Text(
                                 text = related.countryCode.uppercase(),
-                                color = AuroraCoral,
+                                color = MaterialTheme.colorScheme.primary,
                                 style = MaterialTheme.typography.labelSmall,
                             )
                         }
@@ -2160,7 +2238,6 @@ private fun EmbeddedLivePlayer(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     posterUrl: String? = null,
-    reused: CachedLiveSession? = null,
     comments: List<LiveComment> = emptyList(),
     item: LiveItem? = null,
 ) {
@@ -2170,7 +2247,7 @@ private fun EmbeddedLivePlayer(
         LiveOrientationBridge(onVideoOrientationChange, onVideoSizeChange)
     }
     var roomStatus by remember(url) {
-        mutableStateOf(if (reused?.ready == true) LiveRoomStatus.READY else LiveRoomStatus.CONNECTING)
+        mutableStateOf(LiveRoomStatus.CONNECTING)
     }
     var isPaused by remember(url) { mutableStateOf(false) }
     var isMuted by remember(url) { mutableStateOf(false) }
@@ -2198,7 +2275,7 @@ private fun EmbeddedLivePlayer(
     }
 
     val webView = remember(url) {
-        (reused?.webView ?: WebView(context)).apply webView@{
+        WebView(context).apply webView@{
             setBackgroundColor(android.graphics.Color.BLACK)
             addJavascriptInterface(orientationBridge, "AuroraLiveBridge")
             settings.apply {
@@ -2303,11 +2380,7 @@ private fun EmbeddedLivePlayer(
                     onFullscreenChange(false)
                 }
             }
-            if (reused == null) {
-                loadUrl(url)
-            } else {
-                settings.mediaPlaybackRequiresUserGesture = false
-            }
+            loadUrl(url)
         }
     }
 
@@ -2433,8 +2506,12 @@ private fun EmbeddedLivePlayer(
     DisposableEffect(webView, lifecycle) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> webView.onPause()
-                Lifecycle.Event.ON_RESUME -> webView.onResume()
+                Lifecycle.Event.ON_STOP -> LiveSessionCache.pauseAndMute(webView)
+                Lifecycle.Event.ON_START -> LiveSessionCache.resumeView(
+                    webView = webView,
+                    shouldPlay = !isPaused,
+                    shouldMute = isMuted,
+                )
                 else -> Unit
             }
         }
@@ -2443,14 +2520,7 @@ private fun EmbeddedLivePlayer(
             lifecycle.removeObserver(observer)
             fullscreenCallback?.onCustomViewHidden()
             onFullscreenChange(false)
-            (webView.parent as? ViewGroup)?.removeView(webView)
-            if (isPlayerReady && roomStatus == LiveRoomStatus.READY) {
-                // Pause + mute and keep it for an instant re-entry; released when leaving the tab.
-                LiveSessionCache.retain(webView, url, isPlayerReady)
-            } else {
-                webView.stopLoading()
-                webView.destroy()
-            }
+            LiveSessionCache.destroyView(webView)
         }
     }
 
@@ -2472,8 +2542,9 @@ private fun EmbeddedLivePlayer(
         if (roomStatus == LiveRoomStatus.CONNECTING) {
             Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground)) {
                 posterUrl?.let { poster ->
+                    val fallbackReferer = item?.let(::liveReferer) ?: "${StripchatLiveRepository.SITE_BASE}/"
                     AsyncImage(
-                        model = ImageRequest.Builder(context).data(poster).memoryCacheKey(poster).build(),
+                        model = livePosterRequest(context, poster, fallbackReferer),
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize(),
@@ -2892,6 +2963,31 @@ private val BLOCKED_PATH_KEYWORDS = listOf(
 
 private fun liveReferer(item: LiveItem): String =
     if (item.playerUrl.contains("hornystudents.com")) "https://www.hornystudents.com/" else "${StripchatLiveRepository.SITE_BASE}/"
+
+private fun livePosterRequest(
+    context: android.content.Context,
+    posterUrl: String,
+    referer: String,
+): ImageRequest = ImageRequest.Builder(context)
+    .data(posterUrl)
+    .httpHeaders(
+        NetworkHeaders.Builder()
+            .set("Referer", referer)
+            .set("User-Agent", VideoRepository.USER_AGENT)
+            .build(),
+    )
+    .memoryCacheKey(posterUrl)
+    .build()
+
+internal fun filterLiveItems(items: List<LiveItem>, searchQuery: String): List<LiveItem> {
+    val needle = searchQuery.trim()
+    if (needle.isEmpty()) return items
+    return items.filter { item ->
+        item.username.contains(needle, ignoreCase = true) ||
+            item.countryCode.contains(needle, ignoreCase = true) ||
+            liveRoomSlug(item.playerUrl).contains(needle, ignoreCase = true)
+    }
+}
 
 internal fun shouldBlockLiveResource(url: String): Boolean {
     val lower = url.lowercase()

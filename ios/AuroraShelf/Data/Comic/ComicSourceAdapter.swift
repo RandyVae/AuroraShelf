@@ -220,7 +220,7 @@ enum ComicSourceAdapter {
             chapters.append(ComicChapter(id: url.absoluteString, title: title))
             if chapters.count == 500 { break }
         }
-        return chapters
+        return sourceID == "gedecomix" ? Array(chapters.reversed()) : chapters
     }
 
     static func parseEHentaiImagePageLinks(_ html: String, baseURL: URL) -> [String] {
@@ -287,8 +287,9 @@ enum ComicSourceAdapter {
         return Int(ns.substring(with: match.range(at: 1)))
     }
 
-    /// 禁漫天堂动态反混淆分段计算公式（与 Android 端 JmImageScrambler 保持 100% 像素级一致）
+    /// 禁漫天堂动态反混淆分段计算公式（与 Android 端 JmImageScrambler 保持 100% 像素级一致；GIF 不分割）
     static func jmSegmentCount(scrambleID: Int, photoID: String, imageName: String) -> Int {
+        if imageName.lowercased().hasSuffix(".gif") { return 0 }
         guard let id = Int(photoID), id >= scrambleID else { return 0 }
         if id < 268_850 { return 10 }
         let modulus = id < 421_926 ? 10 : 8
@@ -361,7 +362,7 @@ enum ComicSourceAdapter {
 
     private static func query(_ value: String) -> String { queryValue(value) }
 
-    private static func queryValue(_ value: String) -> String {
+    static func queryValue(_ value: String) -> String {
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&+=#?")
         return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value

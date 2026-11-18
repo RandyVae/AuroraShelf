@@ -3,8 +3,8 @@ import XCTest
 
 @MainActor
 final class PlaybackProgressStoreTests: XCTestCase {
-    private var testDefaults: UserDefaults!
-    private var suiteName: String!
+    nonisolated(unsafe) private var testDefaults: UserDefaults!
+    nonisolated(unsafe) private var suiteName: String!
 
     override func setUp() {
         super.setUp()

@@ -114,7 +114,15 @@ internal class ResilientOkHttpDataSource(
         val headers = executed.headers.toMultimap()
 
         if (!executed.isSuccessful) {
-            val errorBytes = runCatching { body?.bytes() ?: ByteArray(0) }.getOrDefault(ByteArray(0))
+            if (code == 416 && isExactRangeEnd416(dataSpec.position, executed.header("Content-Range"))) {
+                closeConnectionQuietly()
+                responseByteStream = java.io.ByteArrayInputStream(ByteArray(0))
+                bytesToRead = 0L
+                opened = true
+                transferStarted(dataSpec)
+                return 0L
+            }
+            val errorBytes = readUpToBytes(body?.byteStream(), MAX_ERROR_BODY_BYTES)
             closeConnectionQuietly()
             throw HttpDataSource.InvalidResponseCodeException(
                 code,
@@ -129,12 +137,37 @@ internal class ResilientOkHttpDataSource(
         val isAutoDecompressed =
             executed.networkResponse?.header("Content-Encoding")?.equals("gzip", ignoreCase = true) == true
         val contentLength = if (isAutoDecompressed) -1L else (body?.contentLength() ?: -1L)
-        bytesToRead = when {
-            dataSpec.length != C.LENGTH_UNSET.toLong() -> dataSpec.length
-            contentLength >= 0L -> contentLength
-            else -> C.LENGTH_UNSET.toLong()
+        val stream = body?.byteStream() ?: java.io.ByteArrayInputStream(ByteArray(0))
+        if (code == 200 && dataSpec.position > 0L) {
+            try {
+                if (!skipStreamBytes(stream, dataSpec.position)) {
+                    closeConnectionQuietly()
+                    runCatching { stream.close() }
+                    throw HttpDataSource.HttpDataSourceException(
+                        dataSpec,
+                        PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE,
+                        HttpDataSource.HttpDataSourceException.TYPE_OPEN,
+                    )
+                }
+            } catch (e: HttpDataSource.HttpDataSourceException) {
+                throw e
+            } catch (e: IOException) {
+                closeConnectionQuietly()
+                runCatching { stream.close() }
+                throw HttpDataSource.HttpDataSourceException.createForIOException(
+                    e,
+                    dataSpec,
+                    HttpDataSource.HttpDataSourceException.TYPE_OPEN,
+                )
+            }
         }
-        responseByteStream = body?.byteStream() ?: java.io.ByteArrayInputStream(ByteArray(0))
+        bytesToRead = computeBytesToRead(
+            responseCode = code,
+            requestedPosition = dataSpec.position,
+            requestedLength = dataSpec.length,
+            contentLength = contentLength,
+        )
+        responseByteStream = stream
         opened = true
         transferStarted(dataSpec)
         return bytesToRead
@@ -209,11 +242,14 @@ internal class ResilientOkHttpDataSource(
                 )
             } catch (e: SSLException) {
                 lastException = e
-                if (!usePermissiveTls) {
+                val targetHost = dataSpec.uri.host
+                val canFallbackPermissive = !usePermissiveTls &&
+                    isPermissiveTlsFallbackAllowed(targetHost)
+                if (canFallbackPermissive) {
                     usePermissiveTls = true
                     continue
                 }
-                if (attempt == MAX_HTTP_ATTEMPTS - 1) {
+                if (attempt == MAX_HTTP_ATTEMPTS - 1 || !isPermissiveTlsFallbackAllowed(targetHost)) {
                     throw HttpDataSource.HttpDataSourceException.createForIOException(
                         e,
                         dataSpec,
@@ -300,6 +336,14 @@ internal class ResilientOkHttpDataSource(
         private const val DEFAULT_CONNECT_TIMEOUT_MS = 15_000
         private const val DEFAULT_READ_TIMEOUT_MS = 20_000
         private const val MAX_HTTP_ATTEMPTS = 3
+        internal const val MAX_ERROR_BODY_BYTES = 4096
+
+        private val STRICT_TLS_ONLY_SUFFIXES = listOf(
+            "bananarey.us",
+            "picacomic.com",
+            "douban.com",
+            "doubanio.com",
+        )
 
         private val sharedPool = ConnectionPool(8, 2, TimeUnit.MINUTES)
 
@@ -326,8 +370,88 @@ internal class ResilientOkHttpDataSource(
             }
             strictClient.newBuilder()
                 .sslSocketFactory(sslContext.socketFactory, trustAll)
-                .hostnameVerifier { _, _ -> true }
+                .hostnameVerifier { hostname, _ -> isPermissiveTlsFallbackAllowed(hostname) }
+                .addNetworkInterceptor { chain ->
+                    val host = chain.request().url.host
+                    if (!isPermissiveTlsFallbackAllowed(host)) {
+                        throw javax.net.ssl.SSLPeerUnverifiedException("Strict TLS required for host: $host")
+                    }
+                    chain.proceed(chain.request())
+                }
                 .build()
+        }
+
+        internal fun isPermissiveTlsFallbackAllowed(host: String?): Boolean {
+            val normalized = host?.trim()?.trimEnd('.')?.lowercase().orEmpty()
+            if (normalized.isEmpty()) return false
+            if (normalized == "localhost" || normalized == "127.0.0.1" || normalized == "::1" || normalized == "[::1]") {
+                return false
+            }
+            return STRICT_TLS_ONLY_SUFFIXES.none { suffix ->
+                normalized == suffix || normalized.endsWith(".$suffix")
+            }
+        }
+
+        internal fun isExactRangeEnd416(requestedPosition: Long, contentRangeHeader: String?): Boolean {
+            if (requestedPosition <= 0L || contentRangeHeader.isNullOrBlank()) return false
+            val totalStr = contentRangeHeader.trim()
+                .substringAfter("*/", missingDelimiterValue = "")
+                .trim()
+            val total = totalStr.toLongOrNull() ?: return false
+            return total >= 0L && requestedPosition == total
+        }
+
+        internal fun readUpToBytes(stream: InputStream?, maxBytes: Int): ByteArray {
+            if (stream == null || maxBytes <= 0) return ByteArray(0)
+            return runCatching {
+                stream.use { input ->
+                    val out = java.io.ByteArrayOutputStream(minOf(maxBytes, 1024))
+                    val buf = ByteArray(minOf(maxBytes, 1024))
+                    var remaining = maxBytes
+                    while (remaining > 0) {
+                        val read = input.read(buf, 0, minOf(buf.size, remaining))
+                        if (read <= 0) break
+                        out.write(buf, 0, read)
+                        remaining -= read
+                    }
+                    out.toByteArray()
+                }
+            }.getOrDefault(ByteArray(0))
+        }
+
+        internal fun skipStreamBytes(stream: InputStream, bytesToSkip: Long): Boolean {
+            if (bytesToSkip <= 0L) return true
+            val skipBuffer = ByteArray(8192)
+            var remaining = bytesToSkip
+            while (remaining > 0L) {
+                val skipped = stream.skip(remaining)
+                if (skipped > 0L) {
+                    remaining -= skipped
+                } else {
+                    val toRead = minOf(remaining, skipBuffer.size.toLong()).toInt()
+                    val read = stream.read(skipBuffer, 0, toRead)
+                    if (read < 0) {
+                        return false
+                    }
+                    remaining -= read
+                }
+            }
+            return true
+        }
+
+        internal fun computeBytesToRead(
+            responseCode: Int,
+            requestedPosition: Long,
+            requestedLength: Long,
+            contentLength: Long,
+        ): Long {
+            if (requestedLength != C.LENGTH_UNSET.toLong()) return requestedLength
+            if (contentLength < 0L) return C.LENGTH_UNSET.toLong()
+            return if (responseCode == 200 && requestedPosition > 0L) {
+                (contentLength - requestedPosition).coerceAtLeast(0L)
+            } else {
+                contentLength
+            }
         }
 
         internal fun isInlineRetryableHttpStatus(code: Int): Boolean =

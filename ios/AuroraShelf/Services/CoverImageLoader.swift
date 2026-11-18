@@ -74,18 +74,41 @@ public actor CoverImageLoader {
             finalData = decrypted
         }
         guard Self.decodeForDisplay(finalData) != nil else { return nil }
-        try? finalData.write(to: diskPath)
+        try? finalData.write(to: diskPath, options: .atomic)
         return finalData
+    }
+
+    /// 仅针对华人影视（huavod）及关联主流影视域名允许调用豆瓣电影海报解析，严禁向豆瓣泄露成人视频/漫画/直播/论坛标题
+    static func allowsDoubanPosterFallback(urlString: String, baseURL: URL?, requestReferer: String?) -> Bool {
+        let mainstreamHosts = [
+            "huavod.com", "dbzy.tv", "dbzy5.com", "douban.com", "doubanio.com",
+            "huarenlivewebsite", "okokserver", "qpic.cn", "iqiyipic.com",
+            "hitv.com", "alicdn.com", "hhmage.com"
+        ]
+        if let baseHost = baseURL?.host?.lowercased(),
+           mainstreamHosts.contains(where: { baseHost == $0 || baseHost.hasSuffix(".\($0)") || baseHost.contains($0) }) {
+            return true
+        }
+        if let ref = requestReferer?.lowercased(),
+           mainstreamHosts.contains(where: { ref.contains($0) }) {
+            return true
+        }
+        if let urlHost = URL(string: urlString)?.host?.lowercased(),
+           mainstreamHosts.contains(where: { urlHost == $0 || urlHost.hasSuffix(".\($0)") || urlHost.contains($0) }) {
+            return true
+        }
+        return false
     }
 
     public func loadImage(from urlString: String, title: String? = nil, baseURL: URL? = nil, requestReferer: String? = nil) async -> UIImage? {
         let rawNormalized = Self.normalizeUrl(urlString, baseURL: baseURL)
         let normalized = DoubanPosterResolver.upgradePosterURL(rawNormalized) ?? rawNormalized
+        let canUseDouban = Self.allowsDoubanPosterFallback(urlString: normalized, baseURL: baseURL, requestReferer: requestReferer)
         let isPlaceholderDouban = normalized.lowercased().contains("tv_default_small")
             || normalized.lowercased().contains("movie_default_small")
             || normalized.lowercased().contains("/cuphead/movie-static/pics/")
         guard !isPlaceholderDouban, let url = URL(string: normalized), !normalized.isEmpty else {
-            if let title, !title.isEmpty {
+            if canUseDouban, let title, !title.isEmpty {
                 if let fallbackUrl = await DoubanPosterResolver.shared.resolvePosterURL(for: title) {
                     return await loadImage(from: fallbackUrl, title: nil, baseURL: nil, requestReferer: nil)
                 }
@@ -95,7 +118,7 @@ public actor CoverImageLoader {
 
         // 对已确认为无效/死链的 CDN 域名（如 dbzy.tv / dbzy5.com）优先调用豆瓣电影海报引擎重定向
         if let host = url.host?.lowercased(), host == "dbzy.tv" || host == "dbzy5.com" {
-            if let title, !title.isEmpty {
+            if canUseDouban, let title, !title.isEmpty {
                 if let fallbackUrl = await DoubanPosterResolver.shared.resolvePosterURL(for: title) {
                     return await loadImage(from: fallbackUrl, title: nil, baseURL: nil, requestReferer: nil)
                 }
@@ -177,7 +200,7 @@ public actor CoverImageLoader {
                     return nil
                 }
 
-                try? finalData.write(to: diskPath)
+                try? finalData.write(to: diskPath, options: .atomic)
                 return image
             } catch {
                 return nil
@@ -194,7 +217,7 @@ public actor CoverImageLoader {
         if let image = await task.value {
             memoryCache.setObject(image, forKey: cacheKey as NSString, cost: Self.imageCost(image))
             return image
-        } else if let title, !title.isEmpty {
+        } else if canUseDouban, let title, !title.isEmpty {
             if let fallbackUrl = await DoubanPosterResolver.shared.resolvePosterURL(for: title), fallbackUrl != normalized {
                 if let fallbackImage = await loadImage(from: fallbackUrl, title: nil, baseURL: nil, requestReferer: nil) {
                     memoryCache.setObject(fallbackImage, forKey: cacheKey as NSString, cost: Self.imageCost(fallbackImage))

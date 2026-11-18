@@ -1617,10 +1617,7 @@
       "nude": "events_monsters/bea_nude_big"
     },
     "unit": "bea_player",
-    "voice": [
-      "Disable/vo_collect_legendary_bear/vo_collect_legendary_bear.m4a",
-      "Disable/vo_collect_epic_bear/vo_collect_epic_bear.m4a"
-    ],
+    "voice": [],
     "power": 1072,
     "artWeb": {
       "base": "assets/heroes/bea/base.webp",

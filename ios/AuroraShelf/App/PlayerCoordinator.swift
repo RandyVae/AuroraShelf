@@ -1,10 +1,10 @@
-import SwiftUI
 import Observation
+import SwiftUI
 
 public enum AppImmersiveRoute: Hashable {
     case video(VideoItem)
     case live(stream: LiveStreamItem, relatedStreams: [LiveStreamItem])
-    case comic(ComicItem)
+    case comic(ComicItem, initialChapterIndex: Int, restoreProgress: Bool = true)
     case forumPost(ForumPostItem)
     case game
 }
@@ -14,8 +14,8 @@ public enum AppImmersiveRoute: Hashable {
 @MainActor
 public final class PlayerCoordinator {
     public static let shared = PlayerCoordinator()
-    
-    public var activeRoute: AppImmersiveRoute? = nil
+
+    public var activeRoute: AppImmersiveRoute?
 
     public var activeVideo: VideoItem? {
         get {
@@ -28,9 +28,9 @@ public final class PlayerCoordinator {
             activeRoute = newValue.map { .video($0) }
         }
     }
-    
+
     public init() {}
-    
+
     public func play(_ video: VideoItem) {
         activeRoute = .video(video)
     }
@@ -39,8 +39,8 @@ public final class PlayerCoordinator {
         activeRoute = .live(stream: stream, relatedStreams: relatedStreams)
     }
 
-    public func openComic(_ comic: ComicItem) {
-        activeRoute = .comic(comic)
+    public func openComic(_ comic: ComicItem, initialChapterIndex: Int = 0, restoreProgress: Bool = true) {
+        activeRoute = .comic(comic, initialChapterIndex: max(0, initialChapterIndex), restoreProgress: restoreProgress)
     }
 
     public func openForumPost(_ post: ForumPostItem) {
@@ -50,7 +50,7 @@ public final class PlayerCoordinator {
     public func openGame() {
         activeRoute = .game
     }
-    
+
     public func dismiss() {
         activeRoute = nil
     }

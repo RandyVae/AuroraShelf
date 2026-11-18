@@ -10,9 +10,8 @@
 -dontwarn com.grack.nanojson.**
 
 -keep class com.aurorashelf.app.model.** { *; }
--keep class com.aurorashelf.app.data.** { *; }
--keep class com.aurorashelf.app.game.** { *; }
--keep class com.aurorashelf.app.cast.** { *; }
+-keep class com.aurorashelf.app.game.GameSaveBridge { *; }
+-keep class com.aurorashelf.app.game.GameNativeBridge { *; }
 -keep class com.aurorashelf.app.ui.LiveOrientationBridge { *; }
 -keep class com.google.protobuf.** { *; }
 -dontwarn com.google.protobuf.**

@@ -188,15 +188,16 @@
     const hero = resolveSymbol(symbol, data);
     const heroKey = (hero && hero.key) || (id === 'florence' ? 'esther' : (id === 'zoe_enemy' ? 'zoechloe' : (id === 'hilda_enemy' ? 'hilda' : (id === 'kitty' ? 'kitty' : (id === 'dominica' ? 'dominica' : (id === 'regina' ? 'regina' : null))))));
 
+    const adultOn = !!(typeof window !== 'undefined' && window.APP && APP.state && APP.state.settings && APP.state.settings.adult);
     let artSrc = '';
     if (hero && hero.artWeb) {
-      artSrc = hero.artWeb.nude || hero.artWeb.lega || hero.artWeb.base || '';
+      artSrc = (adultOn && hero.artWeb.nude) || hero.artWeb.lega || hero.artWeb.base || '';
     }
     if (!artSrc && heroKey && typeof heroKey === 'string' && heroKey !== 'undefined') {
-      if (heroKey === 'kitty') {
-        artSrc = 'assets/heroes/kitty/lega.webp';
+      if (heroKey === 'aphrodite' || heroKey === 'ariana') {
+        artSrc = `assets/heroes/${heroKey}/base.webp`;
       } else {
-        artSrc = `assets/heroes/${heroKey}/nude.webp`;
+        artSrc = `assets/heroes/${heroKey}/lega.webp`;
       }
     }
     if (!artSrc) {
@@ -208,7 +209,7 @@
 
     let quote = '“战术连线达成，高额战利品已直接入库控制台！”';
     if (isHero && hero && hero.name) {
-      quote = `“特勤英雄【${hero.name}】已直接入库特勤名册！战备奖励已就位。”`;
+      quote = `“特勤英雄【${hero.name}】火力连线达成！满五连更可直接招募入列或获赠突破碎片！”`;
     } else if (id === 'wild') {
       quote = '“皇冠百搭狂飙！全轴替代连线，战利品倍率极限翻腾！”';
     } else if (id === 'scatter') {
@@ -252,155 +253,138 @@
         const AC = window.AudioContext || window.webkitAudioContext;
         this.ctx = new AC();
       }
-      if (this.ctx && this.ctx.state === 'suspended') {
+      if (this.ctx && (this.ctx.state === 'suspended' || this.ctx.state === 'interrupted')) {
         this.ctx.resume().catch(() => {});
       }
       return this.ctx;
     },
-    isMuted() {
-      if (window.LGAudio && (LGAudio.isMuted || LGAudio.appMuted)) return true;
+    getVolume() {
+      if (window.LGAudio && (LGAudio.isMuted || LGAudio.appMuted)) return 0;
       if (window.APP && APP.state && APP.state.settings) {
-        if (APP.state.settings.sfx === false || APP.state.settings.sfxVol === 0) return true;
+        const sfx = APP.state.settings.sfx;
+        if (sfx === false) return 0;
+        if (typeof sfx === 'number') return Math.max(0, Math.min(1, sfx));
+        if (typeof APP.state.settings.sfxVol === 'number') return Math.max(0, Math.min(1, APP.state.settings.sfxVol));
       }
-      return false;
+      if (window.LGAudio && typeof LGAudio.sfxVolume === 'number') {
+        return Math.max(0, Math.min(1, LGAudio.sfxVolume));
+      }
+      return 0.8;
+    },
+    isMuted() {
+      return this.getVolume() <= 0;
+    },
+    _playOsc(ctx, type, startTime, stopTime, setupFn) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = type;
+      setupFn(osc, gain);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.onended = () => {
+        try { osc.disconnect(); } catch (e) {}
+        try { gain.disconnect(); } catch (e) {}
+      };
+      osc.start(startTime);
+      osc.stop(stopTime);
     },
     lever() {
-      if (this.isMuted()) return;
+      const vol = this.getVolume();
+      if (vol <= 0) return;
       const ctx = this.getCtx();
       if (!ctx) return;
       const now = ctx.currentTime;
-      // Mechanical ratchet clack
       for (let i = 0; i < 3; i++) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(320 + i * 80, now + i * 0.05);
-        gain.gain.setValueAtTime(0.18, now + i * 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.04);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now + i * 0.05);
-        osc.stop(now + i * 0.05 + 0.05);
+        this._playOsc(ctx, 'triangle', now + i * 0.05, now + i * 0.05 + 0.05, (osc, gain) => {
+          osc.frequency.setValueAtTime(320 + i * 80, now + i * 0.05);
+          gain.gain.setValueAtTime(Math.max(0.001, 0.18 * vol), now + i * 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.05 + 0.04);
+        });
       }
-      // Damped spring release thump
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(140, now + 0.18);
-      osc2.frequency.exponentialRampToValueAtTime(45, now + 0.35);
-      gain2.gain.setValueAtTime(0.28, now + 0.18);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.18);
-      osc2.stop(now + 0.4);
+      this._playOsc(ctx, 'sine', now + 0.18, now + 0.4, (osc2, gain2) => {
+        osc2.frequency.setValueAtTime(140, now + 0.18);
+        osc2.frequency.exponentialRampToValueAtTime(45, now + 0.35);
+        gain2.gain.setValueAtTime(Math.max(0.001, 0.28 * vol), now + 0.18);
+        gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+      });
     },
     reelStop(col) {
-      if (this.isMuted()) return;
+      const vol = this.getVolume();
+      if (vol <= 0) return;
       const ctx = this.getCtx();
       if (!ctx) return;
       const now = ctx.currentTime;
       const baseFreq = 180 + (col || 0) * 35;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(baseFreq, now);
-      osc.frequency.exponentialRampToValueAtTime(60, now + 0.08);
-      gain.gain.setValueAtTime(0.25, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.1);
+      this._playOsc(ctx, 'triangle', now, now + 0.1, (osc, gain) => {
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(60, now + 0.08);
+        gain.gain.setValueAtTime(Math.max(0.001, 0.25 * vol), now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+      });
     },
     coin() {
-      if (this.isMuted()) return;
+      const vol = this.getVolume();
+      if (vol <= 0) return;
       const ctx = this.getCtx();
       if (!ctx) return;
       const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
       const f = 1900 + Math.random() * 400;
-      osc.frequency.setValueAtTime(f, now);
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.2);
+      this._playOsc(ctx, 'sine', now, now + 0.2, (osc, gain) => {
+        osc.frequency.setValueAtTime(f, now);
+        gain.gain.setValueAtTime(Math.max(0.001, 0.12 * vol), now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+      });
     },
     winChime(count) {
-      if (this.isMuted()) return;
+      const vol = this.getVolume();
+      if (vol <= 0) return;
       const ctx = this.getCtx();
       if (!ctx) return;
       const now = ctx.currentTime;
       const chords = [523.25, 659.25, 783.99, 1046.50, 1318.51];
       const notes = count >= 4 ? chords : chords.slice(0, Math.min(chords.length, count + 1));
       notes.forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, now + i * 0.07);
-        gain.gain.setValueAtTime(0.18, now + i * 0.07);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.35);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now + i * 0.07);
-        osc.stop(now + i * 0.07 + 0.4);
+        this._playOsc(ctx, 'sine', now + i * 0.07, now + i * 0.07 + 0.4, (osc, gain) => {
+          osc.frequency.setValueAtTime(freq, now + i * 0.07);
+          gain.gain.setValueAtTime(Math.max(0.001, 0.18 * vol), now + i * 0.07);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.07 + 0.35);
+        });
       });
     },
     bigWin() {
-      if (this.isMuted()) return;
+      const vol = this.getVolume();
+      if (vol <= 0) return;
       const ctx = this.getCtx();
       if (!ctx) return;
       const now = ctx.currentTime;
       const fanfare = [523.25, 659.25, 783.99, 1046.50, 1174.66, 1318.51, 1567.98];
       fanfare.forEach((freq, idx) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
-        gain.gain.setValueAtTime(0.22, now + idx * 0.08);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.5);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now + idx * 0.08);
-        osc.stop(now + idx * 0.08 + 0.55);
+        this._playOsc(ctx, 'triangle', now + idx * 0.08, now + idx * 0.08 + 0.55, (osc, gain) => {
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+          gain.gain.setValueAtTime(Math.max(0.001, 0.22 * vol), now + idx * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.08 + 0.5);
+        });
       });
     },
-
     heroCutin() {
-      if (this.isMuted()) return;
+      const vol = this.getVolume();
+      if (vol <= 0) return;
       const ctx = this.getCtx();
       if (!ctx) return;
       const now = ctx.currentTime;
-      // 科技感跃迁与超载能量斩击音效
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(260, now);
-      osc.frequency.exponentialRampToValueAtTime(960, now + 0.16);
-      osc.frequency.exponentialRampToValueAtTime(140, now + 0.42);
-      gain.gain.setValueAtTime(0.32, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.46);
-
-      // 低音冲击轰鸣
-      const sub = ctx.createOscillator();
-      const subGain = ctx.createGain();
-      sub.type = 'sine';
-      sub.frequency.setValueAtTime(160, now);
-      sub.frequency.exponentialRampToValueAtTime(45, now + 0.35);
-      subGain.gain.setValueAtTime(0.42, now);
-      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
-      sub.connect(subGain);
-      subGain.connect(ctx.destination);
-      sub.start(now);
-      sub.stop(now + 0.4);
+      this._playOsc(ctx, 'sawtooth', now, now + 0.46, (osc, gain) => {
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.exponentialRampToValueAtTime(960, now + 0.16);
+        osc.frequency.exponentialRampToValueAtTime(140, now + 0.42);
+        gain.gain.setValueAtTime(Math.max(0.001, 0.32 * vol), now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+      });
+      this._playOsc(ctx, 'sine', now, now + 0.4, (sub, subGain) => {
+        sub.frequency.setValueAtTime(160, now);
+        sub.frequency.exponentialRampToValueAtTime(45, now + 0.35);
+        subGain.gain.setValueAtTime(Math.max(0.001, 0.42 * vol), now);
+        subGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+      });
     }
   };
 
@@ -408,6 +392,7 @@
     {
       id: 'charlotte',
       unit: 'charlotte_maze_nude_enemy',
+      safeUnit: 'charlotte_skin_player',
       name: 'Charlotte 18+',
       title: '魅惑特勤',
       mult: '+18% 爆率',
@@ -424,7 +409,7 @@
     },
     {
       id: 'kart',
-      unit: 'cartilla_agent_nude_enemy',
+      unit: 'casey_player',
       name: 'Cartilla 18+',
       title: '突击先锋',
       mult: '+22% 爆率',
@@ -441,7 +426,7 @@
     },
     {
       id: 'misa',
-      unit: 'misaki_agent_nude_enemy',
+      unit: 'orin_player',
       name: 'Misaki 18+',
       title: '王牌狙击',
       mult: '+25% 爆率',
@@ -458,7 +443,7 @@
     },
     {
       id: 'ines',
-      unit: 'ines_agent_nude_enemy',
+      unit: 'morana_player',
       name: 'Ines 18+',
       title: '灵能护盾',
       mult: '+20% 爆率',
@@ -475,7 +460,7 @@
     },
     {
       id: 'luf',
-      unit: 'luf_agent_nude_enemy',
+      unit: 'bea_player',
       name: 'Luf 18+',
       title: '圣光圣灵',
       mult: '+24% 爆率',
@@ -492,7 +477,7 @@
     },
     {
       id: 'astara',
-      unit: 'astara_18_unit',
+      unit: 'victoria_player',
       name: 'Astara 18+',
       title: '深渊魔女',
       mult: '+26% 爆率',
@@ -509,13 +494,13 @@
     },
     {
       id: 'aphrodite',
-      unit: 'aphrodite_18_unit',
+      unit: 'lilith_player',
       name: 'Aphrodite 18+',
       title: '爱欲女神',
       mult: '+28% 爆率',
       favor: 'Lv.10 · 沉沦',
-      scaleMult: 0.68,
-      yRatio: 0.0,
+      scaleMult: 1.18,
+      yRatio: -0.04,
       dialogue: {
         idle: '长官的视线……比最热烈的黄金还要诱人呢～',
         spin: '爱神轻抚转轮～奇迹就要绽放了哦～',
@@ -527,6 +512,7 @@
     {
       id: 'skye',
       unit: 'skye_skin_nude_enemy',
+      safeUnit: 'skye_enemy',
       name: 'Skye 18+',
       title: '机动先锋',
       mult: '+15% 爆率',
@@ -544,6 +530,7 @@
     {
       id: 'ivy',
       unit: 'ivy_skin_nude_enemy',
+      safeUnit: 'ivy_enemy',
       name: 'Ivy 18+',
       title: '剧毒潜行',
       mult: '+16% 爆率',
@@ -696,14 +683,21 @@
   const SlotsGame = { spin, resolveSymbol, resolveSymbolVisual, SYMBOL_ASSETS, SLOTS_MASCOTS, CUTIN_HEROES };
   window.SlotsGame = SlotsGame;
 
+  const BET_STEPS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 150, 200];
+
   const SlotsUI = {
     config: null,
     bet: 20,
     freeSpins: 0,
+    freeSpinBet: null,
     turbo: false,
     autoSpin: false,
     autoSpinsLeft: 0,
     spinning: false,
+
+    isAdultEnabled() {
+      return !!(typeof window !== 'undefined' && window.APP && APP.state && APP.state.settings && APP.state.settings.adult);
+    },
 
     isReduceMotion() {
       const sys = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -731,12 +725,72 @@
         (APP.state.slots && APP.state.slots.freeSpins) ||
         (APP.state.slotsSession && APP.state.slotsSession.freeSpins)
       )) || 0;
+      this.freeSpinBet = (window.APP && APP.state && (
+        (APP.state.slots && APP.state.slots.freeSpinBet) ||
+        (APP.state.slotsSession && APP.state.slotsSession.freeSpinBet)
+      )) || (this.freeSpins > 0 ? this.bet : null);
       this.bind();
       this.bindModals();
       this.render();
       this.renderPlaceholder();
       this.initMarqueeLights();
-      this.initMascot();
+      this.syncMascotLabels(false);
+      // Do NOT start mascotStage WebGL loop during boot() on title/hub; only initialize if already on slots screen
+      const slotsScreen = document.getElementById('screen-slots');
+      if (slotsScreen && slotsScreen.classList.contains('active')) {
+        this.initMascot();
+      }
+    },
+
+    syncFromState(state) {
+      this.stopAutoSpin();
+      this.spinning = false;
+      const st = state || (window.APP && APP.state) || null;
+      const minBet = (this.config && this.config.minBet) || 10;
+      const maxBet = (this.config && this.config.maxBet) || 200;
+      const defaultBet = (this.config && this.config.defaultBet) || 20;
+      if (st) {
+        if (st.slotsSession && typeof st.slotsSession.freeSpins === 'number') {
+          this.freeSpins = Math.max(0, Math.round(st.slotsSession.freeSpins));
+        } else if (st.slots && typeof st.slots.freeSpins === 'number') {
+          this.freeSpins = Math.max(0, Math.round(st.slots.freeSpins));
+        } else {
+          this.freeSpins = 0;
+        }
+        this.freeSpinBet = this.freeSpins > 0
+          ? ((st.slotsSession && st.slotsSession.freeSpinBet) || (st.slots && st.slots.freeSpinBet) || defaultBet)
+          : null;
+        const gold = st.gold || 0;
+        const rawBet = gold >= minBet ? Math.min(this.bet || defaultBet, gold) : defaultBet;
+        this.bet = Math.max(minBet, Math.min(maxBet, Math.floor(rawBet / 10) * 10 || minBet));
+      } else {
+        this.freeSpins = 0;
+        this.freeSpinBet = null;
+        this.bet = defaultBet;
+      }
+      const spinBtn = document.getElementById('btn-slots-spin');
+      if (spinBtn) spinBtn.disabled = false;
+      this.syncMascotLabels(false);
+      this.render();
+    },
+
+    highestAffordableBet(gold) {
+      const minBet = (this.config && this.config.minBet) || 10;
+      const maxBet = (this.config && this.config.maxBet) || 200;
+      let best = minBet;
+      for (let i = 0; i < BET_STEPS.length; i++) {
+        if (BET_STEPS[i] <= gold && BET_STEPS[i] <= maxBet) best = BET_STEPS[i];
+      }
+      const stepTen = Math.min(maxBet, Math.max(minBet, Math.floor(gold / 10) * 10));
+      return Math.max(best, stepTen);
+    },
+
+    canModifyBet() {
+      if (this.spinning || this.freeSpins > 0) {
+        if (window.UI && UI.toast) UI.toast('免费旋转或转动中无法更改押注');
+        return false;
+      }
+      return true;
     },
 
     openSheet(el) {
@@ -766,6 +820,7 @@
           LGSave.persist(state);
           this.closeSheet(bailoutModal);
           this.render();
+          if (window.UI && UI.renderHud) UI.renderHud(state);
           SlotsAudio.coin();
           if (window.NativeBridge) NativeBridge.haptic('success');
           UI.toast('🎉 伴游空投已到账！获得 300 金币与天命好运，快拉动拉杆！');
@@ -779,7 +834,7 @@
         });
       }
 
-      // 充值特权金库
+      // 充值特权金库（单存档限领一次 50k，耗尽后仅在破产时提供 +500 应急金）
       const rechargeModal = document.getElementById('modal-slots-recharge');
       const rechargeBtn = document.getElementById('btn-slots-recharge-pay');
       const rechargeClose = document.getElementById('btn-slots-recharge-close');
@@ -796,23 +851,48 @@
       if (rechargeBtn) {
         rechargeBtn.onclick = () => {
           const state = APP.state;
+          const minBet = (this.config && this.config.minBet) || 10;
+          if (state.slotsVaultClaimed) {
+            if ((state.gold || 0) < minBet) {
+              state.gold = (state.gold || 0) + 500;
+              LGSave.recordTransaction(state, 'gold', 500, 'slots_emergency_relief');
+              LGSave.persist(state);
+              this.closeSheet(rechargeModal);
+              this.render();
+              if (window.UI && UI.renderHud) UI.renderHud(state);
+              SlotsAudio.coin();
+              UI.toast('🪙 首充金库已领过，特批发放 +500 紧急救援金币！');
+            } else {
+              this.closeSheet(rechargeModal);
+              UI.toast('首充超值金库每个存档仅限领取 1 次');
+            }
+            return;
+          }
+          state.slotsVaultClaimed = true;
+          state.isVip = true;
           state.gold = (state.gold || 0) + 50000;
           state.slotsSession = state.slotsSession || {};
           state.slotsSession.isVip = true;
+          if (!this.freeSpinBet) this.freeSpinBet = this.bet;
           this.freeSpins += 10;
           state.slotsSession.freeSpins = this.freeSpins;
+          state.slotsSession.freeSpinBet = this.freeSpinBet;
           state.slotsSession.isFreeSpin = true;
-          if (state.slots) state.slots.freeSpins = this.freeSpins;
+          if (state.slots) {
+            state.slots.freeSpins = this.freeSpins;
+            state.slots.freeSpinBet = this.freeSpinBet;
+          }
           LGSave.recordTransaction(state, 'gold', 50000, 'first_recharge_vip');
           LGSave.persist(state);
           this.closeSheet(rechargeModal);
           this.render();
+          if (window.UI && UI.renderHud) UI.renderHud(state);
           SlotsAudio.bigWin();
           this.dropCoins(24);
           if (window.NativeBridge) NativeBridge.haptic('bigWin');
           UI.toast('👑 恭喜指挥官！首充超值金库已激活！50,000 金币与 VIP 1 极速到账！');
           const m = SLOTS_MASCOTS[this.mascotIndex || 0];
-          if (m) this.setMascotSpeech('哇！太霸气了指挥官！全员 18+ 装扮已随侍就绪～');
+          if (m) this.setMascotSpeech('哇！太霸气了指挥官！特权补给已随侍就绪～');
         };
       }
     },
@@ -828,22 +908,48 @@
         if (window.NativeBridge) NativeBridge.haptic('warning');
       } else {
         const modal = document.getElementById('modal-slots-recharge');
+        const payLabel = typeof document.querySelector === 'function'
+          ? document.querySelector('#btn-slots-recharge-pay .rc-label')
+          : null;
+        if (payLabel) {
+          payLabel.textContent = state.slotsVaultClaimed ? '领取 +500 紧急救援金币' : '立即领取特勤金币';
+        }
         this.openSheet(modal);
         if (window.NativeBridge) NativeBridge.haptic('selection');
       }
     },
 
-    initMascot() {
-      const canvas = document.getElementById('slots-mascot-canvas');
-      if (!canvas || !window.SpineStage) return;
-      if (!this.mascotStage) {
-        this.mascotStage = new SpineStage(canvas, {
-          heightRatio: 1.0,
-          scaleMultiplier: 0.68,
-          yRatio: 0.0,
-          xRatio: 0.5
-        });
+    resolveMascotUnit(m) {
+      if (!m) return 'kitty_player';
+      if (!this.isAdultEnabled() && m.safeUnit) return m.safeUnit;
+      return m.unit;
+    },
+
+    formatMascotName(m) {
+      if (!m) return '';
+      return this.isAdultEnabled() ? m.name : m.name.replace(/\s*18\+$/, ' 战术');
+    },
+
+    syncMascotLabels(showDialogue = false) {
+      const m = SLOTS_MASCOTS[this.mascotIndex || 0];
+      if (!m) return;
+      const nameEl = document.getElementById('slots-mascot-name');
+      const multEl = document.getElementById('mascot-lucky-mult');
+      const favorEl = document.getElementById('mascot-favor-level');
+      const tagEl = document.querySelector('#slots-mascot-deck .mascot-tag');
+      if (nameEl) nameEl.textContent = this.formatMascotName(m);
+      if (multEl) multEl.textContent = m.mult;
+      if (favorEl) favorEl.textContent = m.favor;
+      if (tagEl) tagEl.textContent = this.isAdultEnabled() ? '✦ 18+ 伴游 ✦' : '✦ 战术伴游 ✦';
+      if (showDialogue) {
+        this.setMascotSpeech(m.dialogue.idle, 3200);
+      } else {
+        const bubble = document.getElementById('mascot-speech');
+        if (bubble) bubble.hidden = true;
       }
+    },
+
+    initMascot() {
       const switchBtn = document.getElementById('btn-slots-mascot-switch');
       if (switchBtn) switchBtn.onclick = () => this.switchMascot();
 
@@ -858,21 +964,18 @@
         };
       }
 
-      this.loadCurrentMascot(false);
-      this.initCutin();
-    },
-
-    initCutin() {
-      const canvas = document.getElementById('slots-cutin-canvas');
+      const canvas = document.getElementById('slots-mascot-canvas');
       if (!canvas || !window.SpineStage) return;
-      if (!this.cutinStage) {
-        this.cutinStage = new SpineStage(canvas, {
-          heightRatio: 1.15,
-          scaleMultiplier: 1.25,
-          yRatio: -0.15,
-          xRatio: 0.52
+      if (!this.mascotStage) {
+        this.mascotStage = new SpineStage(canvas, {
+          heightRatio: 1.0,
+          scaleMultiplier: 0.68,
+          yRatio: 0.0,
+          xRatio: 0.5
         });
       }
+
+      this.loadCurrentMascot(false);
     },
 
     async triggerInSpinHeroEntrance(result) {
@@ -880,15 +983,20 @@
       const artImg = document.getElementById('slots-cutin-art');
       const nameEl = document.getElementById('cutin-hero-name');
       const quoteEl = document.getElementById('cutin-quote');
+      const callsignEl = cutinEl ? cutinEl.querySelector('.cutin-callsign') : null;
       const slashFx = document.getElementById('cutin-slash-fx');
       const reelWindow = document.getElementById('slots-reel-window');
       if (!cutinEl || !artImg) return;
 
+      const adultOn = this.isAdultEnabled();
       const hero = CUTIN_HEROES[Math.floor(Math.random() * CUTIN_HEROES.length)];
-      artImg.src = hero.art;
-      artImg.alt = `${hero.name} 18+ 原画突入`;
+      const safeArt = adultOn ? hero.art : hero.art.replace('/nude.webp', '/lega.webp');
+      const cleanName = adultOn ? hero.name : hero.name.replace(/\s*18\+$/, '');
+      artImg.src = safeArt;
+      artImg.alt = `${cleanName} 原画突入`;
 
-      if (nameEl) nameEl.textContent = `${hero.name} 魅惑突入`;
+      if (callsignEl) callsignEl.textContent = adultOn ? '✦ 18+ EROS IMPACT ✦' : '✦ TACTICAL IMPACT ✦';
+      if (nameEl) nameEl.textContent = adultOn ? `${cleanName} 魅惑突入` : `${cleanName} 战术突入`;
       if (quoteEl) quoteEl.textContent = hero.quote;
       cutinEl.style.setProperty('--cutin-accent', hero.color || '#ff3a9d');
 
@@ -926,23 +1034,13 @@
     loadCurrentMascot(showDialogue = false) {
       const m = SLOTS_MASCOTS[this.mascotIndex || 0];
       if (!m) return;
-      const nameEl = document.getElementById('slots-mascot-name');
-      const multEl = document.getElementById('mascot-lucky-mult');
-      const favorEl = document.getElementById('mascot-favor-level');
-      if (nameEl) nameEl.textContent = m.name;
-      if (multEl) multEl.textContent = m.mult;
-      if (favorEl) favorEl.textContent = m.favor;
-      if (showDialogue) {
-        this.setMascotSpeech(m.dialogue.idle, 3200);
-      } else {
-        const bubble = document.getElementById('mascot-speech');
-        if (bubble) bubble.hidden = true;
-      }
+      this.syncMascotLabels(showDialogue);
 
       if (this.mascotStage) {
+        const unitToLoad = this.resolveMascotUnit(m);
         this.mascotStage.opts.scaleMultiplier = m.scaleMult || 1.28;
         this.mascotStage.opts.yRatio = m.yRatio !== undefined ? m.yRatio : -0.06;
-        this.mascotStage.show(m.unit, { anim: 'idle' });
+        this.mascotStage.show(unitToLoad, { anim: 'idle' });
       }
     },
 
@@ -961,9 +1059,10 @@
     switchMascot() {
       this.mascotIndex = (this.mascotIndex + 1) % SLOTS_MASCOTS.length;
       SlotsAudio.coin();
-      this.loadCurrentMascot(true);
+      if (!this.mascotStage) this.initMascot();
+      else this.loadCurrentMascot(true);
       const m = SLOTS_MASCOTS[this.mascotIndex];
-      UI.toast(`✦ 幸运伴游已切换为：${m.name}`);
+      UI.toast(`✦ 幸运伴游已切换为：${this.formatMascotName(m)}`);
     },
 
     onMascotSpin() {
@@ -1012,14 +1111,18 @@
     },
 
     resumeMascot() {
-      if (this.mascotStage) {
-        this.mascotStage.start();
-        const m = SLOTS_MASCOTS[this.mascotIndex || 0];
-        if (m) {
-          this.mascotStage.opts.scaleMultiplier = m.scaleMult || 1.28;
-          this.mascotStage.opts.yRatio = m.yRatio !== undefined ? m.yRatio : -0.06;
-          this.mascotStage.show(m.unit, { anim: 'idle' });
-        }
+      if (!this.mascotStage) {
+        this.initMascot();
+        return;
+      }
+      this.mascotStage.start();
+      const m = SLOTS_MASCOTS[this.mascotIndex || 0];
+      if (m) {
+        this.syncMascotLabels(false);
+        const unitToLoad = this.resolveMascotUnit(m);
+        this.mascotStage.opts.scaleMultiplier = m.scaleMult || 1.28;
+        this.mascotStage.opts.yRatio = m.yRatio !== undefined ? m.yRatio : -0.06;
+        this.mascotStage.show(unitToLoad, { anim: 'idle' });
       }
     },
 
@@ -1027,6 +1130,27 @@
       if (this.mascotStage) {
         this.mascotStage.stop();
       }
+    },
+
+    betDown() {
+      if (!this.canModifyBet()) return;
+      this.bet = Math.max(this.config.minBet, this.bet - 10);
+      this.render();
+      SlotsAudio.coin();
+    },
+
+    betUp() {
+      if (!this.canModifyBet()) return;
+      this.bet = Math.min(this.config.maxBet, this.bet + 10);
+      this.render();
+      SlotsAudio.coin();
+    },
+
+    maxBet() {
+      if (!this.canModifyBet()) return;
+      this.bet = this.config.maxBet;
+      this.render();
+      SlotsAudio.coin();
     },
 
     bind() {
@@ -1038,11 +1162,11 @@
 
       const betDown = document.getElementById('btn-slots-bet-down');
       const betUp = document.getElementById('btn-slots-bet-up');
-      if (betDown) betDown.onclick = () => { this.bet = Math.max(this.config.minBet, this.bet - 10); this.render(); SlotsAudio.coin(); };
-      if (betUp) betUp.onclick = () => { this.bet = Math.min(this.config.maxBet, this.bet + 10); this.render(); SlotsAudio.coin(); };
+      if (betDown) betDown.onclick = () => this.betDown();
+      if (betUp) betUp.onclick = () => this.betUp();
 
       const maxBet = document.getElementById('btn-slots-max-bet');
-      if (maxBet) maxBet.onclick = () => { this.bet = this.config.maxBet; this.render(); SlotsAudio.coin(); };
+      if (maxBet) maxBet.onclick = () => this.maxBet();
 
       const paytable = document.getElementById('btn-slots-paytable');
       const paytableClose = document.getElementById('btn-slots-paytable-close');
@@ -1149,8 +1273,10 @@
         window.removeEventListener('keydown', this._keydownHandler);
         this._keydownHandler = null;
       }
-      if (this.mascotStage && typeof this.mascotStage.stop === 'function') {
-        this.mascotStage.stop();
+      if (this.mascotStage) {
+        if (typeof this.mascotStage.destroy === 'function') this.mascotStage.destroy();
+        else if (typeof this.mascotStage.stop === 'function') this.mascotStage.stop();
+        this.mascotStage = null;
       }
       if (window.APP && APP.stages && APP.stages.slotsFeature && typeof APP.stages.slotsFeature.stop === 'function') {
         try { APP.stages.slotsFeature.stop(); } catch (e) {}
@@ -1179,16 +1305,17 @@
       const spinBtnSub = document.querySelector('.slots-master-spin-btn .spin-sub-title');
       const spinBtnMain = document.querySelector('.slots-master-spin-btn .spin-main-title');
 
+      const hasFree = this.freeSpins > 0;
+      const shownBet = hasFree ? (this.freeSpinBet || this.bet) : this.bet;
       if (gold) gold.textContent = (state.gold || 0).toLocaleString();
-      if (bet) bet.textContent = this.bet.toLocaleString();
+      if (bet) bet.textContent = shownBet.toLocaleString();
       if (free) free.textContent = this.freeSpins;
 
-      const hasFree = this.freeSpins > 0;
       if (statusBar) statusBar.classList.toggle('has-free-spins', hasFree);
 
       if (hint) {
         hint.textContent = hasFree
-          ? `免费大旋转进行中 · 本次旋转免扣金币 · 狂暴倍率生效`
+          ? `免费大旋转进行中 · 锁定押注 ${shownBet} · 本次旋转免扣金币 · 狂暴倍率生效`
           : `单次旋转消耗 ${this.bet} 金币 · 命中 3 个 Scatter 激活免费大旋转`;
       }
       if (winTier && hasFree && winTier.textContent === 'BASE GAME') {
@@ -1267,13 +1394,15 @@
       const list = document.getElementById('slots-paytable-list');
       if (!list || !this.config) return;
       list.innerHTML = '';
+      const freeSpinCount = (this.config.scatter && this.config.scatter.freeSpins) || 8;
+      const scatterThreshold = (this.config.scatter && this.config.scatter.threshold) || 3;
       this.config.symbols.forEach((symbol) => {
         const iconSrc = symbol.icon || SYMBOL_ASSETS[symbol.id] || '';
         const row = document.createElement('div');
         row.className = 'paytable-row ' + symbol.kind;
         const payouts = symbol.payouts || {};
-        const payoutDesc = symbol.kind === 'scatter' 
-          ? '3个及以上: 奖励5次免费旋转'
+        const payoutDesc = symbol.kind === 'scatter'
+          ? `${scatterThreshold}个及以上: 奖励${freeSpinCount}次免费旋转`
           : `2连 ${payouts['2'] || 0}x · 3连 ${payouts['3'] || 0}x · 5连 ${payouts['5'] || 0}x`;
         row.innerHTML = `
           <div class="pay-icon" style="background-image:url(${iconSrc})"></div>
@@ -1314,7 +1443,15 @@
       if (this.spinning || !this.config || !state) return;
       state.slotsSession = state.slotsSession || {};
       const useFree = this.freeSpins > 0;
+      const minBet = this.config.minBet || 10;
       if (!useFree && (state.gold || 0) < this.bet) {
+        if ((state.gold || 0) >= minBet) {
+          this.bet = this.highestAffordableBet(state.gold || 0);
+          this.stopAutoSpin();
+          this.render();
+          if (window.UI && UI.toast) UI.toast('金币不足当前押注，已自动调整押注额');
+          return;
+        }
         this.stopAutoSpin();
         this.handleOutOfGold();
         return;
@@ -1325,13 +1462,15 @@
       const button = document.getElementById('btn-slots-spin');
       if (button) button.disabled = true;
 
+      const spinBet = useFree ? (this.freeSpinBet || this.bet) : this.bet;
+
       // 保证引擎与 UI 使用单一、统一的免费旋转状态源
       state.slotsSession.freeSpins = this.freeSpins;
       state.slotsSession.isFreeSpin = useFree;
 
       // 结合心流状态的确定性 PRNG 轮盘计算
       const seed = (Date.now() ^ ((state.stats && state.stats.slotsSpins) || 0)) >>> 0;
-      const result = SlotsGame.spin(this.config, this.bet, seed, state.slotsSession);
+      const result = SlotsGame.spin(this.config, spinBet, seed, state.slotsSession);
       state.slotsSession.totalSpins = (state.slotsSession.totalSpins || 0) + 1;
       if (state.slotsSession.luckyBailout) {
         state.slotsSession.luckyBailout = false;
@@ -1339,8 +1478,8 @@
 
       // 扣除押注或消耗免费旋转（严格只递减 1 次，严禁双重递减）
       if (!useFree) {
-        state.gold -= this.bet;
-        LGSave.recordTransaction(state, 'gold', -this.bet, 'slots_spin');
+        state.gold -= spinBet;
+        LGSave.recordTransaction(state, 'gold', -spinBet, 'slots_spin');
       } else {
         this.freeSpins -= 1;
       }
@@ -1399,7 +1538,13 @@
       const win = result.totalWin;
       state.gold += win;
       if (win > 0) LGSave.recordTransaction(state, 'gold', win, 'slots_win');
-      if (result.freeSpinsAwarded) this.freeSpins += result.freeSpinsAwarded;
+      if (result.freeSpinsAwarded) {
+        if (!this.freeSpinBet) this.freeSpinBet = spinBet;
+        this.freeSpins += result.freeSpinsAwarded;
+      }
+      if (this.freeSpins <= 0) {
+        this.freeSpinBet = null;
+      }
 
       // 奖池命中动效与提示
       if (result.isJackpot && result.jackpot) {
@@ -1415,38 +1560,44 @@
         if (window.NativeBridge) NativeBridge.haptic('bigWin');
       }
 
-      // Check for hero symbol wins to directly unlock into inventory/roster
+      // Only award full hero / shard bonus on 5-of-a-kind hero paylines; duplicate converts to 10 shards
       const heroWins = (result.wins || []).filter((w) => {
+        if (w.count < 5) return false;
         const s = (this.config.symbols || []).find((item) => item.id === w.symbol);
         return s && (s.kind === 'hero' || ['kitty', 'dominica', 'regina', 'florence', 'esther'].includes(s.id));
       });
       if (heroWins.length > 0) {
+        const rewardedKeys = new Set();
         heroWins.forEach((hw) => {
           const sym = (this.config.symbols || []).find((item) => item.id === hw.symbol);
           const resolved = SlotsGame.resolveSymbol(sym, APP.data);
           const heroKey = (resolved && resolved.key) || hw.symbol;
           const heroName = (resolved && resolved.name) || (sym && sym.label) || heroKey;
-          if (heroKey) {
+          if (heroKey && !rewardedKeys.has(heroKey)) {
+            rewardedKeys.add(heroKey);
             state.owned = state.owned || [];
             state.roster = state.roster || {};
             if (!state.owned.includes(heroKey)) {
               state.owned.push(heroKey);
-              state.roster[heroKey] = LGSave.createHeroInstance(heroKey, { level: 30, stars: 5, skillLevel: 10 });
-              UI.toast(`🎉 抽中特勤英雄【${heroName}】！已直接加入特勤仓库！`);
+              state.roster[heroKey] = LGSave.createHeroInstance(heroKey);
+              UI.toast(`🎉 五连大奖解锁特勤英雄【${heroName}】！已加入特勤名册！`);
             } else {
-              state.wallet.shards = (state.wallet.shards || 0) + 50;
-              state.shards = state.wallet.shards;
-              UI.toast(`🎉 抽中已有英雄【${heroName}】，已转化为 50 突破碎片直接入库！`);
+              state.shards = (state.shards || 0) + 10;
+              if (state.wallet) state.wallet.shards = state.shards;
+              LGSave.recordTransaction(state, 'shards', 10, 'slots_hero_5x:' + heroKey);
+              UI.toast(`🎉 五连命中已有英雄【${heroName}】，已转化为 10 突破碎片入库！`);
             }
           }
         });
       }
 
       state.slotsSession.freeSpins = this.freeSpins;
+      state.slotsSession.freeSpinBet = this.freeSpinBet;
       state.slotsSession.isFreeSpin = this.freeSpins > 0;
-      state.slots = state.slots || { version: 2, lastSeed: null, freeSpins: 0 };
+      state.slots = state.slots || { version: 2, lastSeed: null, freeSpins: 0, freeSpinBet: null };
       state.slots.lastSeed = seed;
       state.slots.freeSpins = this.freeSpins;
+      state.slots.freeSpinBet = this.freeSpinBet;
       state.stats.slotsSpins = (state.stats.slotsSpins || 0) + 1;
       if (win > 0) state.stats.slotsWins = (state.stats.slotsWins || 0) + 1;
       if (window.Missions) Missions.track(state, APP.data.missions, 'slots_spin', 1);
@@ -1513,7 +1664,7 @@
         this.autoSpinsLeft -= 1;
         const autoBtn = document.getElementById('btn-slots-auto');
         if (autoBtn) autoBtn.textContent = `AUTO (${this.autoSpinsLeft})`;
-        if (this.autoSpinsLeft <= 0 || (state.gold || 0) < this.bet) {
+        if (this.autoSpinsLeft <= 0 || (this.freeSpins <= 0 && (state.gold || 0) < minBet)) {
           this.stopAutoSpin();
         } else {
           if (this._autoSpinTimer) clearTimeout(this._autoSpinTimer);
@@ -1577,14 +1728,19 @@
       if (typeof symbol === 'string') symbol = this.config.symbols.find((item) => item.id === symbol);
       if (!symbol) return;
 
+      const adultOn = this.isAdultEnabled();
       const visual = SlotsGame.resolveSymbolVisual(symbol, APP.data);
       layer.hidden = false;
 
       if (badge) {
-        badge.textContent = visual.isHero ? '✦ 18+ AWAKEN MEGA HIT ✦' : (playCg ? 'MEGA HIT 3-COMBO' : 'LINE HIT COMBO');
+        badge.textContent = visual.isHero
+          ? (adultOn ? '✦ 18+ AWAKEN MEGA HIT ✦' : '✦ TACTICAL AWAKEN MEGA HIT ✦')
+          : (playCg ? 'MEGA HIT 3-COMBO' : 'LINE HIT COMBO');
       }
       if (name) {
-        name.textContent = visual.isHero ? `【${visual.displayName}】18+ 觉醒登场` : `${visual.displayName} · 连线达成`;
+        name.textContent = visual.isHero
+          ? (adultOn ? `【${visual.displayName}】18+ 觉醒登场` : `【${visual.displayName}】战术觉醒登场`)
+          : `${visual.displayName} · 连线达成`;
       }
       if (quote) {
         quote.textContent = visual.quote;
@@ -1692,9 +1848,6 @@
         'assets/videos/cg_ch3.mp4',
         'assets/videos/cg_ch4.mp4',
         'assets/videos/v_comics_maze_2_48.mp4',
-        'assets/videos/cg_ch2.mp4',
-        'assets/videos/cg_ch3.mp4',
-        'assets/videos/cg_ch4.mp4',
         'assets/videos/cg_rea_general.mp4',
         'assets/videos/cg_rea_event049.mp4'
       ];

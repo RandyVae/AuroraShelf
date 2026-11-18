@@ -32,6 +32,8 @@ data class LiveUiState(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val selectedItem: LiveItem? = null,
+    val isSearchOpen: Boolean = false,
+    val searchQuery: String = "",
 )
 
 internal data class LivePageUpdate(
@@ -127,6 +129,10 @@ class LiveViewModel(
 
     fun open(item: LiveItem) = mutableUiState.update { it.copy(selectedItem = item) }
     fun close() = mutableUiState.update { it.copy(selectedItem = null) }
+    fun setSearchOpen(open: Boolean) = mutableUiState.update {
+        it.copy(isSearchOpen = open, searchQuery = if (open) it.searchQuery else "")
+    }
+    fun updateSearchQuery(query: String) = mutableUiState.update { it.copy(searchQuery = query) }
 
     private fun load(page: Int, replace: Boolean) {
         loadJob?.cancel()

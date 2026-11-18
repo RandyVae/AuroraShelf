@@ -17,19 +17,22 @@ public struct LiveInlineCommentsView: View {
     public let stream: LiveStreamItem
     public var externalComments: [LiveComment] = []
     public var isLivePlaying: Bool = false
+    public var isCommentBridgeActive: Bool = false
     @Binding public var isExpanded: Bool
-    public var maxBodyHeight: CGFloat? = nil
+    public var maxBodyHeight: CGFloat?
 
     public init(
         stream: LiveStreamItem,
         externalComments: [LiveComment] = [],
         isLivePlaying: Bool = false,
+        isCommentBridgeActive: Bool = false,
         isExpanded: Binding<Bool> = .constant(true),
         maxBodyHeight: CGFloat? = nil
     ) {
         self.stream = stream
         self.externalComments = externalComments
         self.isLivePlaying = isLivePlaying
+        self.isCommentBridgeActive = isCommentBridgeActive
         self._isExpanded = isExpanded
         self.maxBodyHeight = maxBodyHeight
     }
@@ -38,8 +41,15 @@ public struct LiveInlineCommentsView: View {
         externalComments
     }
 
+    private var isBridgeConnected: Bool {
+        isCommentBridgeActive || !externalComments.isEmpty
+    }
+
     private var status: String {
-        isLivePlaying || !externalComments.isEmpty ? "已连接" : "等待新评论…"
+        if isBridgeConnected {
+            return "已连接"
+        }
+        return isLivePlaying ? "点击「聊天室」互动" : "等待连接…"
     }
 
     public var body: some View {
@@ -62,8 +72,12 @@ public struct LiveInlineCommentsView: View {
                             .background(AuroraColor.surfaceCard, in: Capsule())
                     }
                     Spacer()
-                    Circle().fill(status == "已连接" ? .green : .secondary).frame(width: 7, height: 7)
-                    Text(status).font(.caption).foregroundStyle(AuroraColor.textSecondary)
+                    Circle()
+                        .fill(isBridgeConnected ? .green : .secondary)
+                        .frame(width: 7, height: 7)
+                    Text(status)
+                        .font(.caption)
+                        .foregroundStyle(AuroraColor.textSecondary)
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AuroraColor.textSecondary)
@@ -75,10 +89,12 @@ public struct LiveInlineCommentsView: View {
 
             if isExpanded {
                 if comments.isEmpty {
-                    Text("暂无新评论…")
+                    Text(isBridgeConnected ? "暂无新评论…" : "原生直连低延迟播放中，轻点上方「聊天室」可进入官方实时聊天室")
                         .font(.subheadline)
                         .foregroundStyle(AuroraColor.textSecondary)
+                        .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity, minHeight: 72)
+                        .padding(.horizontal, 8)
                 } else if let maxBodyHeight {
                     ScrollView(.vertical, showsIndicators: true) {
                         commentsList

@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "搜索影视、动漫、漫画或番号";
-"search.concurrent_hint" = "在 20 个视频源并发搜索";
+"search.concurrent_hint" = "在 %d 个视频源并发搜索";
 "search.no_results" = "无搜索结果";
 "search.searching" = "正在搜索…";
 "search.history" = "搜索历史";
@@ -91,6 +91,7 @@
 "settings.language" = "语言";
 "settings.language_title" = "选择语言";
 "settings.follow_system" = "跟随系统";
+"settings.appearance" = "外观模式";
 "settings.game" = "娱乐 · 游戏";
 "settings.game_title" = "欲望女神 · 战术 RPG";
 "settings.game_desc" = "策略战棋 · 原生硬件加速与沉浸视口";
@@ -98,7 +99,8 @@
 "settings.video_source" = "当前视频源";
 "settings.comic_source" = "当前漫画源";
 "settings.live_source" = "当前直播源";
-"settings.offline_download" = "视频离线下载";
+"settings.offline_download" = "离线下载管理";
+"settings.open_source" = "开源软件许可";
 "settings.not_available" = "当前版本未提供";
 "settings.version" = "版本信息";
 "settings.airplay_title" = "AirPlay 投屏";

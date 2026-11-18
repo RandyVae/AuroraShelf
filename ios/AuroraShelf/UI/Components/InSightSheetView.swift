@@ -1,5 +1,5 @@
-import SwiftUI
 import AVKit
+import SwiftUI
 
 /// Apple TV 风格的 InSight 实时音画感知与控制面板
 public struct InSightSheetView: View {
@@ -36,6 +36,7 @@ public struct InSightSheetView: View {
     }
 
     public var body: some View {
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
         NavigationStack {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: AuroraMetrics.spacingXL) {
@@ -123,22 +124,24 @@ public struct InSightSheetView: View {
                             }
                             .buttonStyle(.plain)
 
-                            // 屏幕旋转
-                            Button(action: onToggleOrientation) {
-                                HStack {
-                                    Label(
-                                        isLandscape ? "显示方向：横屏沉浸" : "显示方向：竖屏便携",
-                                        systemImage: isLandscape ? "iphone.portrait" : "iphone.landscape"
-                                    )
-                                    Spacer()
-                                    Text(isLandscape ? "90° 旋转" : "默认")
-                                        .font(.subheadline)
-                                        .foregroundStyle(AuroraColor.textSecondary)
+                            // 屏幕旋转（仅 iPhone 呈现；iPad 跟随物理重力全向自然旋转）
+                            if !isPad {
+                                Button(action: onToggleOrientation) {
+                                    HStack {
+                                        Label(
+                                            isLandscape ? "显示方向：横屏沉浸" : "显示方向：竖屏便携",
+                                            systemImage: isLandscape ? "iphone" : "iphone.landscape"
+                                        )
+                                        Spacer()
+                                        Text(isLandscape ? "横屏锁定" : "默认")
+                                            .font(.subheadline)
+                                            .foregroundStyle(AuroraColor.textSecondary)
+                                    }
+                                    .padding()
+                                    .background(AuroraColor.surfaceCard)
                                 }
-                                .padding()
-                                .background(AuroraColor.surfaceCard)
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
 
                             // 投屏
                             HStack {
@@ -169,7 +172,7 @@ public struct InSightSheetView: View {
                                 try? watchlistStore.setBookmarked(!isBookmarked, for: video)
                             } label: {
                                 Label(
-                                    isBookmarked ? "移出片单" : "加入片单",
+                                    isBookmarked ? "watchlist.in_list".localized : "watchlist.add".localized,
                                     systemImage: isBookmarked ? "bookmark.fill" : "bookmark"
                                 )
                                 .font(.subheadline.bold())
@@ -206,7 +209,10 @@ public struct InSightSheetView: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.headline)
                             .foregroundStyle(AuroraColor.textTertiary)
+                            .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
+                            .contentShape(Rectangle())
                     }
+                    .accessibilityLabel("common.close".localized)
                 }
             }
         }

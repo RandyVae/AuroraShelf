@@ -12,7 +12,7 @@
     gacha: A + 'gochi/bgm_gochi_main/bgm_gochi_main.m4a',
   };
   const SFX = {
-    attack: [A + 'tutorial/kitty_attack/kitty_attack.m4a', A + 'tutorial/regina_attack/regina_attack.m4a', A + 'main/bonita_attack/bonita_attack.m4a'],
+    attack: [A + 'tutorial/kitty_attack/kitty_attack.m4a', A + 'main/regina_attack/regina_attack.m4a', A + 'main/bonita_attack/bonita_attack.m4a'],
     hit: [A + 'tutorial/vo_fight_hit_new/vo_fight_hit_new.m4a'],
     skill: [A + 'tutorial_next/skill_damage/skill_damage.m4a', A + 'main/skill_shock/skill_shock.m4a'],
     buff: [A + 'tutorial_next/skill_buff/skill_buff.m4a'],
@@ -21,7 +21,7 @@
     heal: [A + 'tutorial_next/fight_health_up/fight_health_up.m4a'],
     win: [A + 'tutorial/fight_win/fight_win.m4a'],
     lose: [A + 'main/fight_lose/fight_lose.m4a'],
-    collect: [A + 'Disable/vo_collect_epic_suc/vo_collect_epic_suc.m4a', A + 'Disable/vo_collect_legendary_suc/vo_collect_legendary_suc.m4a'],
+    collect: [A + 'tutorial/fight_card_get/fight_card_get.m4a', A + 'tutorial/fight_win/fight_win.m4a'],
     card: [A + 'tutorial/fight_card_get/fight_card_get.m4a'],
     click: [A + 'tutorial/fight_flash/fight_flash.m4a'],
   };
@@ -57,8 +57,26 @@
     if (this.bgmEl) this.bgmEl.volume = this.appMuted ? 0 : this.bgmVolume;
   };
 
+  AudioManager.prototype.pauseBgm = function () {
+    this._bgmPaused = true;
+    if (this.bgmEl) {
+      try { this.bgmEl.pause(); } catch (e) {}
+    }
+  };
+
+  AudioManager.prototype.resumeBgm = function () {
+    this._bgmPaused = false;
+    if (this.appMuted || this.isMuted || !this.bgmVolume) return;
+    if (this.bgmEl && this.bgmEl.src && this.bgmEl.dataset && this.bgmEl.dataset.src) {
+      this.bgmEl.volume = this.bgmVolume;
+      const p = this.bgmEl.play();
+      if (p && p.catch) p.catch(() => {});
+    } else if (this.current) {
+      this.playBgm(this.current, true);
+    }
+  };
+
   AudioManager.prototype.stopBgm = function () {
-    this.isMuted = true;
     if (this.bgmEl) {
       try { this.bgmEl.pause(); } catch (e) {}
     }
@@ -68,6 +86,7 @@
     const src = BGM[name];
     if (!src) return;
     this.current = name;
+    this._bgmPaused = false;
     if (this.appMuted) return;
     this.isMuted = (this.bgmVolume === 0 && this.sfxVolume === 0);
     if (!this.bgmEl || !this.bgmVolume) return;
@@ -89,8 +108,12 @@
       const oldest = this.activeChannels.shift();
       if (oldest) {
         try { oldest.pause(); oldest.currentTime = 0; } catch (e) {}
+        for (const [k, v] of this.pool.entries()) {
+          if (v === oldest) this.pool.delete(k);
+        }
         el = oldest;
         el.src = src;
+        this.pool.set(src, el);
         this.activeChannels.push(el);
         return el;
       }

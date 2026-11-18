@@ -1,10 +1,15 @@
-import Foundation
-import UIKit
-import ImageIO
 import CommonCrypto
+import Foundation
+import ImageIO
+import UIKit
 
 actor ComicPageImageLoader {
     static let shared = ComicPageImageLoader()
+
+    /// 漫画单页最大目标像素宽度阈值：仅当图片像素宽度 > 1800 时按宽度比例等比降采样，
+    /// 彻底修复 800×12000 Webtoon 条漫因高度超限被误压至 160px 宽导致的糊图问题。
+    nonisolated static let maxTargetPixelWidth: Int = 1800
+    nonisolated static let maxGPUTextureDimension: Int = 16384
 
     private struct InFlightEntry {
         let id: UUID
@@ -23,14 +28,15 @@ actor ComicPageImageLoader {
         session = URLSession.permissive(configuration: configuration)
         cache.countLimit = 32
         cache.totalCostLimit = 80 * 1024 * 1024 // 80 MB 内存上限
-        
-        let memCache = self.cache
+
         NotificationCenter.default.addObserver(
             forName: UIApplication.didReceiveMemoryWarningNotification,
             object: nil,
             queue: .main
         ) { _ in
-            memCache.removeAllObjects()
+            Task {
+                await ComicPageImageLoader.shared.clearCache()
+            }
         }
     }
 
@@ -115,7 +121,6 @@ actor ComicPageImageLoader {
         var targetURL = imageURL
         var targetHost = host
         var targetReferer = imageReferer
-        // 主动熔断绕过：若该图床 CDN 已被标记为离线/超慢，直接切换至健康度榜首镜像，避免每张图重复等超时
         if let cdnPoolKey, SourceHealthRegistry.shared.isCircuitOpen(urlOrHost: host),
            var comps = URLComponents(url: imageURL, resolvingAgainstBaseURL: true),
            let bestHost = SourceHealthRegistry.shared.resolveOrigins(sourceKey: cdnPoolKey)
@@ -143,7 +148,6 @@ actor ComicPageImageLoader {
             if let cdnPoolKey {
                 SourceHealthRegistry.shared.recordFailure(sourceKey: cdnPoolKey, urlOrHost: targetHost, isHardBlock: true)
             }
-            // 1. Baozi / JM CDN 容灾自动回退：按健康度排序轮询候选镜像节点
             if let cdnPoolKey,
                var fallbackComponents = URLComponents(url: imageURL, resolvingAgainstBaseURL: true) {
                 let defaults = cdnPoolKey == "baozi-cdn"
@@ -177,20 +181,48 @@ actor ComicPageImageLoader {
                 throw error
             }
         }
-        let image = decodeImage(from: data, allowDownsample: page.verticalSegments <= 1) ?? decryptEncryptedPage(data, url: imageURL)
+        let isGif = imageURL.pathExtension.lowercased() == "gif"
+        let effectiveSegments = isGif ? 0 : page.verticalSegments
+        let image = Self.decodeImageData(from: data, allowDownsample: effectiveSegments <= 1 && !isGif)
+            ?? decryptEncryptedPage(data, url: imageURL)
         guard let image else { throw ComicImageError.decodeFailed }
-        return page.verticalSegments > 1 ? unscramble(image, segments: page.verticalSegments) : image
+        return effectiveSegments > 1 ? unscramble(image, segments: effectiveSegments) : image
     }
 
-    private func decodeImage(from data: Data, allowDownsample: Bool) -> UIImage? {
+    nonisolated static func decodeImageData(from data: Data, allowDownsample: Bool) -> UIImage? {
         guard allowDownsample,
               let source = CGImageSourceCreateWithData(data as CFData, nil),
               CGImageSourceGetCount(source) == 1 else {
             return UIImage(data: data)
         }
+
+        let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let pixelWidth = (props?[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue ?? 0
+        let pixelHeight = (props?[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue ?? 0
+
+        // Downsample ONLY when pixelWidth > 1800 (unless height exceeds GPU texture limit 16384),
+        // keeping 800x12000 Webtoon vertical strips at crisp 800px native width.
+        guard pixelWidth > maxTargetPixelWidth || pixelHeight > maxGPUTextureDimension else {
+            let decodeOpts: [CFString: Any] = [kCGImageSourceShouldCacheImmediately: true]
+            if let cgImage = CGImageSourceCreateImageAtIndex(source, 0, decodeOpts as CFDictionary) {
+                return UIImage(cgImage: cgImage)
+            }
+            return UIImage(data: data)
+        }
+
+        let scaleByWidth = pixelWidth > maxTargetPixelWidth
+            ? Double(maxTargetPixelWidth) / Double(pixelWidth)
+            : 1.0
+        let scaleByHeight = pixelHeight > maxGPUTextureDimension
+            ? Double(maxGPUTextureDimension) / Double(pixelHeight)
+            : 1.0
+        let scale = min(scaleByWidth, scaleByHeight)
+        let maxDimension = max(pixelWidth, pixelHeight)
+        let targetMaxPixelSize = max(1, min(maxGPUTextureDimension, Int((Double(maxDimension) * scale).rounded())))
+
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: 2400,
+            kCGImageSourceThumbnailMaxPixelSize: targetMaxPixelSize,
             kCGImageSourceCreateThumbnailWithTransform: true,
             kCGImageSourceShouldCacheImmediately: true
         ]
@@ -237,8 +269,7 @@ actor ComicPageImageLoader {
     }
 
     private func decryptEncryptedPage(_ data: Data, url: URL) -> UIImage? {
-        let host = url.host?.lowercased() ?? ""
-        guard host.contains("91dongman") || host == "drleao.cn" || host.hasSuffix(".drleao.cn") else { return nil }
+        guard data.count >= 16, data.count % kCCBlockSizeAES128 == 0 else { return nil }
         let key = Data("f5d965df75336270".utf8)
         let iv = Data("97b60394abc2fbe1".utf8)
         let options = [CCOptions(0), CCOptions(kCCOptionPKCS7Padding)]
@@ -260,7 +291,7 @@ actor ComicPageImageLoader {
             }
             guard status == kCCSuccess else { continue }
             output.count = written
-            if let image = UIImage(data: output) { return image }
+            if let image = Self.decodeImageData(from: output, allowDownsample: true) { return image }
         }
         return nil
     }

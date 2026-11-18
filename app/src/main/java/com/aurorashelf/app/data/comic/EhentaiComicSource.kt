@@ -35,7 +35,11 @@ internal class EhentaiComicSource : ComicSource {
         ),
     )
 
-    private val cursors = ConcurrentHashMap<String, MutableMap<Int, String>>()
+    private val cursorsLock = Any()
+    private val cursors = object : LinkedHashMap<String, MutableMap<Int, String>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, MutableMap<Int, String>>?): Boolean =
+            size > 32
+    }
 
     override suspend fun browse(categoryId: String, page: Int): List<ComicSummary> =
         load(categoryId, query = "", page = page)
@@ -45,12 +49,20 @@ internal class EhentaiComicSource : ComicSource {
 
     private suspend fun load(categoryId: String, query: String, page: Int): List<ComicSummary> = withContext(Dispatchers.IO) {
         val key = "$categoryId\u0000$query"
-        val pageCursors = cursors.getOrPut(key) { ConcurrentHashMap<Int, String>() }
-        if (page == 1) pageCursors.clear()
-        val url = if (page == 1) listUrl(categoryId, query) else pageCursors[page] ?: return@withContext emptyList()
+        val url = synchronized(cursorsLock) {
+            val pageCursors = cursors.getOrPut(key) {
+                object : LinkedHashMap<Int, String>(16, 0.75f, true) {
+                    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Int, String>?): Boolean = size > 64
+                }
+            }
+            if (page == 1) pageCursors.clear()
+            if (page == 1) listUrl(categoryId, query) else pageCursors[page]
+        } ?: return@withContext emptyList()
         val document = document(url)
-        document.selectFirst("#dnext[href]")?.absUrl("href")?.takeIf(String::isNotBlank)?.let {
-            pageCursors[page + 1] = it
+        document.selectFirst("#dnext[href]")?.absUrl("href")?.takeIf(String::isNotBlank)?.let { nextHref ->
+            synchronized(cursorsLock) {
+                cursors[key]?.put(page + 1, nextHref)
+            }
         }
         document.select(".itg tr").mapNotNull { row ->
             val link = row.selectFirst(".glname a[href*=/g/]") ?: return@mapNotNull null

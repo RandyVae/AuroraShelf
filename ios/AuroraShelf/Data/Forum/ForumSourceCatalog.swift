@@ -92,7 +92,6 @@ enum ForumSourceAdapter {
             return URL(string: "https://t66y.com/thread0806.php?fid=16&page=\(page)")
         }
         let origin = baseOrigin?.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            ?? SourceHealthRegistry.shared.resolveOrigins(sourceKey: "t906").first
             ?? "https://t924.sol140.com"
         return URL(string: "\(origin)/forumdisplay.php?fid=\(fid)&page=\(page)")
     }
@@ -400,17 +399,67 @@ enum ForumPostParser {
         return String(value[range])
     }
 
-    private static func cleanText(_ html: String) -> String {
-        html
+    static func cleanText(_ html: String) -> String {
+        let withLineBreaks = html
             .replacingOccurrences(of: #"(?is)<script\b[^>]*>.*?</script>|<style\b[^>]*>.*?</style>"#, with: " ", options: .regularExpression)
-            .replacingOccurrences(of: #"(?i)<br\s*/?>|</p>|</div>"#, with: "\n", options: .regularExpression)
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: #"(?i)<br\s*/?>|</p>|</div>|</li>|</tr>|</h[1-6]>|</blockquote>"#, with: "\n", options: .regularExpression)
             .replacingOccurrences(of: #"(?is)<[^>]+>"#, with: " ", options: .regularExpression)
+
+        let decoded = decodeHTMLEntities(withLineBreaks)
+        let lines = decoded.components(separatedBy: "\n").map { rawLine -> String in
+            rawLine
+                .replacingOccurrences(of: #"[ \t\u{00A0}]+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let nonEmptyParagraphs = lines.filter { !$0.isEmpty }
+        return nonEmptyParagraphs.joined(separator: "\n\n")
+    }
+
+    private static func decodeHTMLEntities(_ text: String) -> String {
+        var working = text
             .replacingOccurrences(of: "&nbsp;", with: " ")
             .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&apos;", with: "'")
             .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .split(whereSeparator: { $0.isWhitespace })
-            .joined(separator: " ")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&mdash;", with: "—")
+            .replacingOccurrences(of: "&ndash;", with: "–")
+            .replacingOccurrences(of: "&hellip;", with: "…")
+            .replacingOccurrences(of: "&ldquo;", with: "“")
+            .replacingOccurrences(of: "&rdquo;", with: "”")
+            .replacingOccurrences(of: "&lsquo;", with: "‘")
+            .replacingOccurrences(of: "&rsquo;", with: "’")
+
+        if let hexRegex = try? NSRegularExpression(pattern: #"&#[xX]([0-9a-fA-F]{1,6});"#) {
+            let ns = working as NSString
+            let matches = hexRegex.matches(in: working, range: NSRange(location: 0, length: ns.length))
+            for match in matches.reversed() {
+                let hexStr = ns.substring(with: match.range(at: 1))
+                if let code = UInt32(hexStr, radix: 16),
+                   let scalar = UnicodeScalar(code),
+                   let swiftRange = Range(match.range, in: working) {
+                    working.replaceSubrange(swiftRange, with: String(Character(scalar)))
+                }
+            }
+        }
+
+        if let decRegex = try? NSRegularExpression(pattern: #"&#(\d{1,7});"#) {
+            let ns = working as NSString
+            let matches = decRegex.matches(in: working, range: NSRange(location: 0, length: ns.length))
+            for match in matches.reversed() {
+                let decStr = ns.substring(with: match.range(at: 1))
+                if let code = UInt32(decStr, radix: 10),
+                   let scalar = UnicodeScalar(code),
+                   let swiftRange = Range(match.range, in: working) {
+                    working.replaceSubrange(swiftRange, with: String(Character(scalar)))
+                }
+            }
+        }
+
+        return working.replacingOccurrences(of: "&amp;", with: "&")
     }
 
     private static func htmlAttribute(_ name: String, in attributes: String) -> String? {
@@ -436,6 +485,7 @@ public final class ForumRepository: ObservableObject {
     private let postFetcher: ForumPostFetcher?
     private var currentLoadTask: Task<Void, Never>?
     private var activeRequestID = UUID()
+    private var hasTriggeredInitialLoad = false
     private var currentPage = 1
     private var hasMorePages = true
     private var detailCache: [String: ForumPostItem] = [:]
@@ -454,7 +504,11 @@ public final class ForumRepository: ObservableObject {
         ]
         self.session = URLSession.permissive(configuration: config)
         self.postFetcher = nil
-        self.loadPosts()
+        if let snapshot = SourceSnapshotStore.shared.getForumFeed(boardKey: "all"),
+           !snapshot.items.isEmpty {
+            self.posts = snapshot.items
+            print("[AuroraPerf] forum_swr_init count=\(snapshot.items.count) fresh=\(snapshot.isFresh)")
+        }
     }
 
     init(fetcher: @escaping ForumPostFetcher) {
@@ -462,7 +516,15 @@ public final class ForumRepository: ObservableObject {
         self.postFetcher = fetcher
     }
 
+    /// 首次进入社区标签页时按需触发拉取，杜绝冷启动同时并发请求 7 个板块
+    public func loadPostsIfNeeded() {
+        guard !hasTriggeredInitialLoad else { return }
+        hasTriggeredInitialLoad = true
+        loadPosts()
+    }
+
     public func loadPosts() {
+        hasTriggeredInitialLoad = true
         _ = startLoad(for: selectedBoardFid)
     }
 

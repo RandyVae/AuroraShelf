@@ -1002,7 +1002,12 @@ class VideoRepository {
     }
 
     companion object {
-        private val huangguoFeedCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<VideoItem>>>()
+        private val huangguoFeedCache = java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<String, Pair<Long, List<VideoItem>>>(16, 0.75f, true) {
+                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Pair<Long, List<VideoItem>>>?): Boolean =
+                    size > 64
+            },
+        )
         @Volatile private var huavodHeroCache: Pair<Long, List<HuavodHeroSlide>>? = null
         private const val HUAVOD_HERO_CACHE_TTL_MS = 10 * 60 * 1000L
         private val HUAVOD_VOD_ID_REGEX = Regex("""/voddetail/(\d+)\.html""")

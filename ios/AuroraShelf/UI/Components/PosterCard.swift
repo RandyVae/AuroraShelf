@@ -91,7 +91,7 @@ public struct PosterCard: View {
                 }
             }
             .lineLimit(1)
-            .frame(height: 18)
+            .frame(minHeight: 18)
         }
         .contextMenu {
             if let onDetail = onDetail {

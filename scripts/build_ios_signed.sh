@@ -30,6 +30,9 @@ echo "=========================================="
 mkdir -p "${BUILD_DIR}"
 mkdir -p "${OUTPUT_DIR}"
 
+# 导出前清理旧 IPA 产物，防止导出失败时误上传陈旧缓存包
+rm -f "${OUTPUT_DIR}/AuroraShelf.ipa" "${OUTPUT_DIR}/Netgrey.ipa"
+
 # 生成动态 ExportOptions.plist
 cat <<EOF > "${EXPORT_OPTIONS}"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -72,15 +75,19 @@ xcodebuild -exportArchive \
   -exportOptionsPlist "${EXPORT_OPTIONS}" \
   -allowProvisioningUpdates
 
-# 重命名统一为 Netgrey.ipa
-if [ -f "${OUTPUT_DIR}/AuroraShelf.ipa" ]; then
-  cp "${OUTPUT_DIR}/AuroraShelf.ipa" "${OUTPUT_DIR}/Netgrey.ipa"
-  echo "=========================================="
-  echo "打包与签名成功！"
-  echo "产物路径: ${OUTPUT_DIR}/Netgrey.ipa"
-  echo "签名信息:"
-  codesign -dv --verbose=4 "${OUTPUT_DIR}/AuroraShelf.app" 2>&1 || true
-  echo "=========================================="
-else
-  echo "打包完成，输出目录: ${OUTPUT_DIR}"
+if [ ! -f "${OUTPUT_DIR}/AuroraShelf.ipa" ]; then
+  echo "错误: IPA 导出失败，未在 ${OUTPUT_DIR} 找到 AuroraShelf.ipa！" >&2
+  exit 1
 fi
+
+cp -f "${OUTPUT_DIR}/AuroraShelf.ipa" "${OUTPUT_DIR}/Netgrey.ipa"
+
+ARCHIVE_APP="${ARCHIVE_PATH}/Products/Applications/AuroraShelf.app"
+echo "=========================================="
+echo "打包与签名成功！"
+echo "产物路径: ${OUTPUT_DIR}/Netgrey.ipa"
+if [ -d "${ARCHIVE_APP}" ]; then
+  echo "归档包签名信息:"
+  codesign -dv --verbose=4 "${ARCHIVE_APP}" 2>&1 || true
+fi
+echo "=========================================="

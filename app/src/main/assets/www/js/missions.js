@@ -5,17 +5,39 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  function checkDailyReset(state) {
+  function checkDailyReset(state, catalog) {
+    if (!state) return false;
     if (!state.missions) state.missions = { daily: {}, achievements: {}, lastDailyReset: 0 };
+    if (!state.missions.daily) state.missions.daily = {};
+    if (!state.missions.achievements) state.missions.achievements = {};
+
+    const resolvedCatalog = catalog || (typeof window !== 'undefined' && window.APP && window.APP.data && window.APP.data.missions) || null;
     const now = new Date();
     const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const lastReset = Number(state.missions.lastDailyReset) || 0;
 
-    if (state.missions.lastDailyReset < todayMidnight) {
+    let changed = false;
+    if (lastReset < todayMidnight || lastReset > todayMidnight + 86400000) {
       state.missions.daily = {};
       state.missions.lastDailyReset = todayMidnight;
-      // Trigger daily login mission automatically
-      track(state, null, 'login', 1);
+      changed = true;
     }
+
+    if (resolvedCatalog && resolvedCatalog.daily) {
+      const loginDef = resolvedCatalog.daily.find((m) => m.type === 'login');
+      if (loginDef) {
+        const cur = state.missions.daily[loginDef.id];
+        if (!cur || ((cur.progress || 0) < 1 && !cur.claimed)) {
+          track(state, resolvedCatalog, 'login', 1);
+          changed = true;
+        }
+      }
+    }
+
+    if (changed && typeof window !== 'undefined' && window.LGSave && typeof window.LGSave.persist === 'function') {
+      try { window.LGSave.persist(state); } catch (e) {}
+    }
+    return changed;
   }
 
   function track(state, missionsCatalog, type, amount, meta) {
@@ -72,7 +94,7 @@
   }
 
   function getList(state, catalog, category) {
-    checkDailyReset(state);
+    checkDailyReset(state, catalog);
     const defs = (catalog && catalog[category]) || [];
     const store = (category === 'daily' ? state.missions.daily : state.missions.achievements) || {};
 
@@ -134,7 +156,7 @@
           if (state.wallet) state.wallet.keys = state.keys;
           granted.push(v + ' 契约钥匙');
         } else if (k === 'energy') {
-          state.energy = Math.min(100, (state.energy || 0) + v);
+          state.energy = (state.energy || 0) + v;
           if (state.wallet) state.wallet.energy = state.energy;
           granted.push(v + ' 点行动力');
         } else if (k === 'shards') {
@@ -154,7 +176,7 @@
 
   function hasUnclaimed(state, catalog) {
     if (!state || !catalog) return false;
-    checkDailyReset(state);
+    checkDailyReset(state, catalog);
     const daily = getList(state, catalog, 'daily');
     const ach = getList(state, catalog, 'achievements');
     return daily.some((x) => x.done && !x.claimed) || ach.some((x) => x.done && !x.claimed);

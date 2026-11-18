@@ -1,7 +1,7 @@
-import Foundation
-import UIKit
 import Combine
 import CryptoKit
+import Foundation
+import UIKit
 
 /// 漫画离线下载状态枚举
 public enum ComicDownloadStatus: Codable, Sendable, Equatable {
@@ -58,7 +58,7 @@ public struct DownloadedComicChapter: Identifiable, Codable, Sendable, Equatable
     }
 }
 
-/// 漫画离线下载中枢（Apple HIG 规范：沙盒落盘解密存储、离线阅读优先拦截与磁盘管理）
+/// 漫画离线下载中枢（Apple HIG 规范：沙盒落盘解密存储、FIFO 挂起队列、跨源隔离与 iCloud 备份排除）
 @MainActor
 public final class ComicDownloadManager: ObservableObject {
     public static let shared = ComicDownloadManager()
@@ -66,25 +66,41 @@ public final class ComicDownloadManager: ObservableObject {
     @Published public private(set) var chapters: [DownloadedComicChapter] = []
 
     private let fileManager = FileManager.default
-    private let baseDir: URL
+    let baseDir: URL
     private let metaFileURL: URL
     private var inFlightTasks: [String: (id: UUID, task: Task<Void, Never>)] = [:]
     private var activeDownloadCount = 0
     private let maximumConcurrentDownloads = 2
+    private var slotWaiters: [(id: UUID, continuation: CheckedContinuation<Void, Error>)] = []
 
-    private init() {
-        let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        self.baseDir = docs.appendingPathComponent("OfflineComics", isDirectory: true)
+    private convenience init() {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        self.init(baseDirectory: docs.appendingPathComponent("OfflineComics", isDirectory: true))
+    }
+
+    init(baseDirectory: URL) {
+        self.baseDir = baseDirectory
         self.metaFileURL = baseDir.appendingPathComponent("comic_metadata.json")
-
-        if !fileManager.fileExists(atPath: baseDir.path) {
-            try? fileManager.createDirectory(at: baseDir, withIntermediateDirectories: true)
-        }
-
+        Self.prepareExcludedDirectory(baseDir, fileManager: fileManager)
         loadFromDisk()
     }
 
-    /// 统计已下载漫画总磁盘占用
+    private static func prepareExcludedDirectory(_ directory: URL, fileManager: FileManager) {
+        if !fileManager.fileExists(atPath: directory.path) {
+            try? fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        var dirURL = directory
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? dirURL.setResourceValues(values)
+    }
+
+    /// 统计已下载漫画总磁盘占用（字节数）
+    public var totalDownloadedBytes: Int64 {
+        chapters.filter { $0.status.isCompleted }.reduce(Int64(0)) { $0 + $1.totalBytes }
+    }
+
+    /// 统计已下载漫画总磁盘占用（本地化格式字符串）
     public func formattedTotalSpace() -> String {
         let total = chapters.reduce(Int64(0)) { $0 + $1.totalBytes }
         return ByteCountFormatter.string(fromByteCount: total, countStyle: .file)
@@ -114,50 +130,86 @@ public final class ComicDownloadManager: ObservableObject {
         return completedChapters.isEmpty ? 0.0 : 1.0
     }
 
-    /// 查询某章节当前下载状态
-    public func status(for comicId: String, chapterId: String) -> ComicDownloadStatus? {
-        let id = generateID(comicId: comicId, chapterId: chapterId)
-        return chapters.first(where: { $0.id == id })?.status
+    private func findChapter(sourceId: String, comicId: String, chapterId: String) -> DownloadedComicChapter? {
+        if !sourceId.isEmpty {
+            let scopedID = generateID(sourceId: sourceId, comicId: comicId, chapterId: chapterId)
+            if let hit = chapters.first(where: { $0.id == scopedID }) {
+                return hit
+            }
+            if let hit = chapters.first(where: { $0.sourceId == sourceId && $0.comicId == comicId && $0.chapterId == chapterId }) {
+                return hit
+            }
+        }
+        let legacyID = legacyGenerateID(comicId: comicId, chapterId: chapterId)
+        if let hit = chapters.first(where: { $0.id == legacyID }) {
+            if sourceId.isEmpty || hit.sourceId.isEmpty || hit.sourceId == sourceId {
+                return hit
+            }
+        }
+        if sourceId.isEmpty {
+            return chapters.first(where: { $0.comicId == comicId && $0.chapterId == chapterId })
+        }
+        return nil
+    }
+
+    /// 查询某章节当前下载状态（支持传入 sourceId，兼容旧版无 sourceId 索引）
+    public func status(for comicId: String, chapterId: String, sourceId: String = "") -> ComicDownloadStatus? {
+        findChapter(sourceId: sourceId, comicId: comicId, chapterId: chapterId)?.status
     }
 
     /// 判断某章节是否已完成离线下载
-    public func isDownloaded(comicId: String, chapterId: String) -> Bool {
-        status(for: comicId, chapterId: chapterId)?.isCompleted ?? false
+    public func isDownloaded(comicId: String, chapterId: String, sourceId: String = "") -> Bool {
+        status(for: comicId, chapterId: chapterId, sourceId: sourceId)?.isCompleted ?? false
     }
 
-    /// 获取离线页面本地缓存文件 URL
-    public func localPageURL(comicId: String, chapterId: String, pageIndex: Int) -> URL? {
-        let primaryURL = baseDir
+    /// 获取离线页面本地缓存文件 URL（优先读取包含 sourceId 的隔离路径，回退旧版路径）
+    public func localPageURL(comicId: String, chapterId: String, pageIndex: Int, sourceId: String = "") -> URL? {
+        let resolvedSourceId = !sourceId.isEmpty
+            ? sourceId
+            : (findChapter(sourceId: "", comicId: comicId, chapterId: chapterId)?.sourceId ?? "")
+
+        if !resolvedSourceId.isEmpty {
+            let scopedURL = baseDir
+                .appendingPathComponent(sanitize(resolvedSourceId))
+                .appendingPathComponent(sanitize(comicId))
+                .appendingPathComponent(sanitize(chapterId))
+                .appendingPathComponent("page_\(pageIndex).jpg")
+            if fileManager.fileExists(atPath: scopedURL.path) {
+                return scopedURL
+            }
+        }
+
+        let legacyPrimaryURL = baseDir
             .appendingPathComponent(sanitize(comicId))
             .appendingPathComponent(sanitize(chapterId))
             .appendingPathComponent("page_\(pageIndex).jpg")
-        if fileManager.fileExists(atPath: primaryURL.path) {
-            return primaryURL
+        if fileManager.fileExists(atPath: legacyPrimaryURL.path) {
+            return legacyPrimaryURL
         }
-        let legacyURL = baseDir
+
+        let legacyEncodedURL = baseDir
             .appendingPathComponent(legacySanitize(comicId))
             .appendingPathComponent(legacySanitize(chapterId))
             .appendingPathComponent("page_\(pageIndex).jpg")
-        return fileManager.fileExists(atPath: legacyURL.path) ? legacyURL : nil
+        return fileManager.fileExists(atPath: legacyEncodedURL.path) ? legacyEncodedURL : nil
     }
 
     /// 从本地磁盘直接加载已解密的离线页面图片
-    public func localImage(comicId: String, chapterId: String, pageIndex: Int) async -> UIImage? {
-        guard let url = localPageURL(comicId: comicId, chapterId: chapterId, pageIndex: pageIndex),
-              let data = await Task.detached(priority: .utility, operation: {
-                  try? Data(contentsOf: url)
-              }).value,
-              let image = UIImage(data: data) else {
+    public func localImage(comicId: String, chapterId: String, pageIndex: Int, sourceId: String = "") async -> UIImage? {
+        guard let url = localPageURL(comicId: comicId, chapterId: chapterId, pageIndex: pageIndex, sourceId: sourceId) else {
             return nil
         }
-        return image
+        return await Task.detached(priority: .utility) {
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return UIImage(data: data)
+        }.value
     }
 
     /// 启动单章节下载
     public func startDownload(comic: ComicItem, chapter: ComicChapter) {
-        let itemId = generateID(comicId: comic.id, chapterId: chapter.id)
+        let itemId = generateID(sourceId: comic.sourceId, comicId: comic.id, chapterId: chapter.id)
 
-        if let existing = chapters.first(where: { $0.id == itemId }),
+        if let existing = findChapter(sourceId: comic.sourceId, comicId: comic.id, chapterId: chapter.id),
            existing.status.isCompleted || existing.status.isDownloading {
             return
         }
@@ -220,25 +272,36 @@ public final class ComicDownloadManager: ObservableObject {
         startDownload(comic: comic, chapter: chapter)
     }
 
-    /// 删除指定章节下载
+    /// 删除指定章节下载（同时兼容新版含 sourceId 的 ID 与旧版 comicId_chapterId）
     public func removeDownload(id: String) {
-        inFlightTasks[id]?.task.cancel()
-        inFlightTasks[id] = nil
-
-        if let item = chapters.first(where: { $0.id == id }) {
-            let chapterDir = baseDir
-                .appendingPathComponent(sanitize(item.comicId))
-                .appendingPathComponent(sanitize(item.chapterId))
-            try? fileManager.removeItem(at: chapterDir)
-            let legacyDir = baseDir
-                .appendingPathComponent(legacySanitize(item.comicId))
-                .appendingPathComponent(legacySanitize(item.chapterId))
-            if legacyDir != chapterDir {
-                try? fileManager.removeItem(at: legacyDir)
-            }
+        let matched = chapters.first { item in
+            item.id == id || legacyGenerateID(comicId: item.comicId, chapterId: item.chapterId) == id
         }
+        let targetId = matched?.id ?? id
+        inFlightTasks[targetId]?.task.cancel()
+        inFlightTasks[targetId] = nil
 
-        chapters.removeAll(where: { $0.id == id })
+        if let item = matched {
+            var candidateDirs: [URL] = [
+                baseDir.appendingPathComponent(sanitize(item.comicId)).appendingPathComponent(sanitize(item.chapterId)),
+                baseDir.appendingPathComponent(legacySanitize(item.comicId)).appendingPathComponent(legacySanitize(item.chapterId))
+            ]
+            if !item.sourceId.isEmpty {
+                candidateDirs.insert(
+                    baseDir
+                        .appendingPathComponent(sanitize(item.sourceId))
+                        .appendingPathComponent(sanitize(item.comicId))
+                        .appendingPathComponent(sanitize(item.chapterId)),
+                    at: 0
+                )
+            }
+            for dir in candidateDirs {
+                try? fileManager.removeItem(at: dir)
+            }
+            chapters.removeAll(where: { $0.id == item.id })
+        } else {
+            chapters.removeAll(where: { $0.id == id })
+        }
         saveToDisk()
     }
 
@@ -246,27 +309,71 @@ public final class ComicDownloadManager: ObservableObject {
     public func removeAll() {
         for entry in inFlightTasks.values { entry.task.cancel() }
         inFlightTasks.removeAll()
+        let pendingWaiters = slotWaiters
+        slotWaiters.removeAll()
+        for waiter in pendingWaiters {
+            waiter.continuation.resume(throwing: CancellationError())
+        }
 
         try? fileManager.removeItem(at: baseDir)
-        try? fileManager.createDirectory(at: baseDir, withIntermediateDirectories: true)
+        Self.prepareExcludedDirectory(baseDir, fileManager: fileManager)
         chapters.removeAll()
         saveToDisk()
     }
 
-    // MARK: - 核心下载任务调度
+    // MARK: - 核心下载任务调度（FIFO Continuation 队列，零轮询休眠）
+
+    private func acquireDownloadSlot() async throws {
+        try Task.checkCancellation()
+        if activeDownloadCount < maximumConcurrentDownloads {
+            activeDownloadCount += 1
+            return
+        }
+        let waiterID = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                if Task.isCancelled {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                if activeDownloadCount < maximumConcurrentDownloads {
+                    activeDownloadCount += 1
+                    continuation.resume()
+                    return
+                }
+                slotWaiters.append((id: waiterID, continuation: continuation))
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if let idx = self.slotWaiters.firstIndex(where: { $0.id == waiterID }) {
+                    let removed = self.slotWaiters.remove(at: idx)
+                    removed.continuation.resume(throwing: CancellationError())
+                }
+            }
+        }
+    }
+
+    private func releaseDownloadSlot() {
+        while !slotWaiters.isEmpty {
+            let next = slotWaiters.removeFirst()
+            next.continuation.resume()
+            return
+        }
+        activeDownloadCount = max(0, activeDownloadCount - 1)
+    }
 
     private func executeDownload(itemId: String, taskToken: UUID, comic: ComicItem, chapter: ComicChapter) async {
         do {
-            try await waitForDownloadSlot()
+            try await acquireDownloadSlot()
         } catch {
             if inFlightTasks[itemId]?.id == taskToken {
                 inFlightTasks[itemId] = nil
             }
             return
         }
-        activeDownloadCount += 1
         defer {
-            activeDownloadCount = max(0, activeDownloadCount - 1)
+            releaseDownloadSlot()
             if inFlightTasks[itemId]?.id == taskToken {
                 inFlightTasks[itemId] = nil
             }
@@ -284,9 +391,17 @@ public final class ComicDownloadManager: ObservableObject {
                 throw NSError(domain: "ComicDownloadManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "章节页面解析为空"])
             }
 
-            let chapterDir = baseDir
-                .appendingPathComponent(sanitize(comic.id))
-                .appendingPathComponent(sanitize(chapter.id))
+            let chapterDir: URL
+            if !comic.sourceId.isEmpty {
+                chapterDir = baseDir
+                    .appendingPathComponent(sanitize(comic.sourceId), isDirectory: true)
+                    .appendingPathComponent(sanitize(comic.id), isDirectory: true)
+                    .appendingPathComponent(sanitize(chapter.id), isDirectory: true)
+            } else {
+                chapterDir = baseDir
+                    .appendingPathComponent(sanitize(comic.id), isDirectory: true)
+                    .appendingPathComponent(sanitize(chapter.id), isDirectory: true)
+            }
             try? fileManager.createDirectory(at: chapterDir, withIntermediateDirectories: true)
 
             updateItem(id: itemId) {
@@ -300,13 +415,16 @@ public final class ComicDownloadManager: ObservableObject {
 
                 let pageFileURL = chapterDir.appendingPathComponent("page_\(idx).jpg")
                 if !fileManager.fileExists(atPath: pageFileURL.path) {
-                    // 使用 ComicPageImageLoader 下载并解密图片（处理 JM 混淆、EHentai 鉴权等）
                     let image = try await ComicPageImageLoader.shared.load(page)
-                    guard let jpegData = image.jpegData(compressionQuality: 0.88) else {
-                        throw NSError(domain: "ComicDownloadManager", code: -2, userInfo: [NSLocalizedDescriptionKey: "图片转码 JPEG 失败"])
-                    }
-                    try jpegData.write(to: pageFileURL, options: .atomic)
-                    totalBytes += Int64(jpegData.count)
+                    let writtenBytes = try await Task.detached(priority: .utility) { () -> Int64 in
+                        try Task.checkCancellation()
+                        guard let jpegData = image.jpegData(compressionQuality: 0.88) else {
+                            throw NSError(domain: "ComicDownloadManager", code: -2, userInfo: [NSLocalizedDescriptionKey: "图片转码 JPEG 失败"])
+                        }
+                        try jpegData.write(to: pageFileURL, options: .atomic)
+                        return Int64(jpegData.count)
+                    }.value
+                    totalBytes += writtenBytes
                 } else {
                     let attrs = try? fileManager.attributesOfItem(atPath: pageFileURL.path)
                     totalBytes += (attrs?[.size] as? Int64) ?? 0
@@ -336,14 +454,6 @@ public final class ComicDownloadManager: ObservableObject {
         }
     }
 
-    private func waitForDownloadSlot() async throws {
-        while activeDownloadCount >= maximumConcurrentDownloads {
-            try Task.checkCancellation()
-            try await Task.sleep(for: .milliseconds(50))
-        }
-        try Task.checkCancellation()
-    }
-
     private func updateItem(id: String, mutate: (inout DownloadedComicChapter) -> Void) {
         if let idx = chapters.firstIndex(where: { $0.id == id }) {
             var item = chapters[idx]
@@ -352,7 +462,14 @@ public final class ComicDownloadManager: ObservableObject {
         }
     }
 
-    private func generateID(comicId: String, chapterId: String) -> String {
+    func generateID(sourceId: String, comicId: String, chapterId: String) -> String {
+        if sourceId.isEmpty {
+            return legacyGenerateID(comicId: comicId, chapterId: chapterId)
+        }
+        return "\(sourceId)_\(comicId)_\(chapterId)"
+    }
+
+    private func legacyGenerateID(comicId: String, chapterId: String) -> String {
         "\(comicId)_\(chapterId)"
     }
 

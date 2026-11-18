@@ -84,7 +84,29 @@
     }
   };
 
+  VFXManager.prototype.pause = function () {
+    this.paused = true;
+    if (this.animId) {
+      cancelAnimationFrame(this.animId);
+      this.animId = null;
+    }
+  };
+
+  VFXManager.prototype.resume = function () {
+    if (!this.paused) return;
+    this.paused = false;
+    if (this.container && this.canvas && !this.animId) {
+      this.lastTime = performance.now();
+      this.animId = requestAnimationFrame(this.loop);
+    }
+  };
+
   VFXManager.prototype.loop = function (now) {
+    if (this.paused || (typeof window !== 'undefined' && window.APP && window.APP.gamePaused)) {
+      this.animId = null;
+      this.paused = true;
+      return;
+    }
     const dt = Math.min(0.1, (now - this.lastTime) / 1000);
     this.lastTime = now;
 

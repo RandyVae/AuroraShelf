@@ -26,7 +26,12 @@ object HuangguoEdgeGateway {
     const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
-    private val detailMetadataCache = ConcurrentHashMap<String, VideoDetailMetadata>()
+    private val detailMetadataCache = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, VideoDetailMetadata>(32, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, VideoDetailMetadata>?): Boolean =
+                size > 128
+        },
+    )
 
     fun cachedDetailMetadata(dramaId: String): VideoDetailMetadata? = detailMetadataCache[dramaId]
 

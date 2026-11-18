@@ -35,11 +35,11 @@ struct LiveChatSheet: View {
                     ContentUnavailableView("聊天室地址无效", systemImage: "bubble.left.and.bubble.right")
                 }
             }
-            .navigationTitle("\(stream.username) · 实时聊天室")
+            .navigationTitle("\(stream.username) · \("live.chat".localized)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("关闭", systemImage: "xmark") { dismiss() }
+                    Button("common.close".localized, systemImage: "xmark") { dismiss() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("重新加载", systemImage: "arrow.clockwise") { reloadID = UUID() }
@@ -53,16 +53,16 @@ struct LiveChatSheet: View {
 private struct LiveRoomWebView: UIViewRepresentable {
     let roomURL: URL
     let reloadID: UUID
-    let onStatus: (String) -> Void
+    let onStatus: @MainActor (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onStatus: onStatus) }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.allowsInlineMediaPlayback = true
+        configuration.allowsPictureInPictureMediaPlayback = false
         configuration.mediaTypesRequiringUserActionForPlayback = .all
 
-        // 注入年龄免责与访客条款同意 Cookie，穿透年龄门禁
         let cookieStore = configuration.websiteDataStore.httpCookieStore
         let cookies: [(String, String, String)] = [
             ("isAdult", "1", ".stripchat.com"),
@@ -89,9 +89,15 @@ private struct LiveRoomWebView: UIViewRepresentable {
             }
         }
 
-        // 注入自动移除年龄确认覆盖层与模拟点击同意的轻量脚本
-        let autoAcceptSource = """
+        // 移除年龄门禁并强制静音页面内视频/音频节点，避免与主直播播放器重音
+        let autoAcceptAndMuteSource = """
         (() => {
+            const muteMedia = () => {
+                document.querySelectorAll('video, audio').forEach(el => {
+                    try { el.muted = true; el.volume = 0; el.pause(); } catch (e) {}
+                });
+            };
+            muteMedia();
             const overlay = document.getElementById('entrance_terms_overlay') || document.getElementById('entrance_terms');
             if (overlay) { try { overlay.remove(); } catch(e) { overlay.style.display = 'none'; } }
             const acceptButtons = Array.from(document.querySelectorAll('.btn-visitors-agreement-accept, [class*=visitors-agreement-accept], button, a, [role=button]')).filter(b => {
@@ -104,7 +110,7 @@ private struct LiveRoomWebView: UIViewRepresentable {
             }
         })();
         """
-        let userScript = WKUserScript(source: autoAcceptSource, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
+        let userScript = WKUserScript(source: autoAcceptAndMuteSource, injectionTime: .atDocumentEnd, forMainFrameOnly: false)
         configuration.userContentController.addUserScript(userScript)
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
@@ -122,16 +128,21 @@ private struct LiveRoomWebView: UIViewRepresentable {
 
     static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
         coordinator.cleanup()
+        uiView.evaluateJavaScript("document.querySelectorAll('video, audio').forEach(el => { try { el.muted = true; el.pause(); el.srcObject = null; el.removeAttribute('src'); } catch(e) {} });", completionHandler: nil)
+        uiView.pauseAllMediaPlayback()
+        uiView.closeAllMediaPresentations(completionHandler: {})
         uiView.stopLoading()
         uiView.navigationDelegate = nil
+        uiView.loadHTMLString("", baseURL: nil)
     }
 
+    @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate {
         var reloadID = UUID()
-        private let onStatus: (String) -> Void
+        private let onStatus: @MainActor (String) -> Void
         nonisolated(unsafe) private var pollTimer: Timer?
 
-        init(onStatus: @escaping (String) -> Void) {
+        init(onStatus: @escaping @MainActor (String) -> Void) {
             self.onStatus = onStatus
         }
 
@@ -146,12 +157,16 @@ private struct LiveRoomWebView: UIViewRepresentable {
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             onStatus("已连接 · 正在监听消息")
+            webView.pauseAllMediaPlayback()
             pollTimer?.invalidate()
             pollTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self, weak webView] _ in
                 Task { @MainActor [weak self, weak webView] in
                     guard let self, let webView else { return }
                     let script = """
                     (() => {
+                      document.querySelectorAll('video, audio').forEach(el => {
+                        try { el.muted = true; el.volume = 0; el.pause(); } catch (e) {}
+                      });
                       const overlay = document.getElementById('entrance_terms_overlay') || document.getElementById('entrance_terms');
                       if (overlay) { try { overlay.remove(); } catch(e) {} }
                       const accept = document.querySelector('.btn-visitors-agreement-accept, [class*=visitors-agreement-accept]');
@@ -164,9 +179,10 @@ private struct LiveRoomWebView: UIViewRepresentable {
                     })()
                     """
                     webView.evaluateJavaScript(script) { [weak self] result, _ in
+                        let jsonStr = result as? String
                         Task { @MainActor [weak self] in
                             guard let self,
-                                  let json = result as? String,
+                                  let json = jsonStr,
                                   let data = json.data(using: .utf8),
                                   let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                                   let nodes = payload["nodes"] as? Int,
@@ -184,21 +200,23 @@ private struct LiveRoomWebView: UIViewRepresentable {
 
         func webView(
             _ webView: WKWebView,
-            decidePolicyFor navigationAction: WKNavigationAction
-        ) async -> WKNavigationActionPolicy {
-            guard let url = navigationAction.request.url, url.scheme == "https" else { return .cancel }
-            guard let host = url.host?.lowercased(),
+            decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
+        ) {
+            guard let url = navigationAction.request.url, url.scheme == "https",
+                  let host = url.host?.lowercased(),
                   ["stripchat.com", "chaturbate.com", "hornystudents.com", "mmcdn.com", "highwebmedia.com", "cb-wl.com"]
                     .contains(where: { host == $0 || host.hasSuffix(".\($0)") }) else {
-                return .cancel
+                decisionHandler(.cancel)
+                return
             }
-            // Keep the room and its known chat/CDN frames, but prevent unrelated top-level browsing.
             if navigationAction.targetFrame?.isMainFrame == true,
                !["stripchat.com", "chaturbate.com", "hornystudents.com"]
                 .contains(where: { host == $0 || host.hasSuffix(".\($0)") }) {
-                return .cancel
+                decisionHandler(.cancel)
+                return
             }
-            return .allow
+            decisionHandler(.allow)
         }
     }
 }

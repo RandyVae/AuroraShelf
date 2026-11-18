@@ -10,10 +10,11 @@ import androidx.core.content.edit
  */
 class GameSaveBridge(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private val writeLock = Any()
 
     private fun resolvePrefKey(rawKey: String?): String {
         val clean = rawKey?.trim().orEmpty()
-        if (clean.isEmpty() || clean == PRIMARY_WEB_KEY) return KEY
+        if (clean.isEmpty() || clean == PRIMARY_WEB_KEY || clean == LEGACY_WEB_KEY) return KEY
         return "key_${clean.take(64)}"
     }
 
@@ -29,27 +30,58 @@ class GameSaveBridge(context: Context) {
 
     @JavascriptInterface
     fun set(value: String?) {
-        prefs.edit { putString(KEY, value ?: "") }
+        val safeValue = value ?: ""
+        if (safeValue.length > MAX_VALUE_CHARS) return
+        synchronized(writeLock) {
+            prefs.edit { putString(KEY, safeValue) }
+        }
     }
 
     @JavascriptInterface
     fun setKey(key: String?, value: String?) {
-        prefs.edit { putString(resolvePrefKey(key), value ?: "") }
+        val safeValue = value ?: ""
+        if (safeValue.length > MAX_VALUE_CHARS) return
+        val resolved = resolvePrefKey(key)
+        synchronized(writeLock) {
+            if (!prefs.contains(resolved) && prefs.all.size >= MAX_KEYS) {
+                return
+            }
+            prefs.edit { putString(resolved, safeValue) }
+        }
     }
 
     @JavascriptInterface
     fun clear() {
-        prefs.edit { remove(KEY) }
+        synchronized(writeLock) {
+            prefs.edit { remove(KEY) }
+        }
     }
 
     @JavascriptInterface
     fun clearKey(key: String?) {
-        prefs.edit { remove(resolvePrefKey(key)) }
+        val resolved = resolvePrefKey(key)
+        synchronized(writeLock) {
+            prefs.edit { remove(resolved) }
+        }
+    }
+
+    @JavascriptInterface
+    fun flush() {
+        flushSync()
+    }
+
+    fun flushSync() {
+        synchronized(writeLock) {
+            prefs.edit().commit()
+        }
     }
 
     companion object {
         private const val PREFS = "lg_local_save"
         private const val KEY = "state"
-        private const val PRIMARY_WEB_KEY = "lg_save_v4"
+        internal const val PRIMARY_WEB_KEY = "lg-local-edition-v2"
+        private const val LEGACY_WEB_KEY = "lg_save_v4"
+        internal const val MAX_VALUE_CHARS = 2 * 1024 * 1024
+        internal const val MAX_KEYS = 32
     }
 }

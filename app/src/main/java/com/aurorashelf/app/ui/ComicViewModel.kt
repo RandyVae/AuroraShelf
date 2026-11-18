@@ -88,11 +88,17 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     private var readerJob: Job? = null
     private var detailsRequestToken: Long = 0L
     private var readerRequestToken: Long = 0L
+    private var hasRefreshedThisSession: Boolean = false
 
-    /** Loads the comic feed once the comics tab is actually shown; safe to call repeatedly. */
+    /** Loads the comic feed once the comics tab is actually shown; refreshes cached snapshots silently once per session. */
     fun ensureLoaded() {
         val state = mutableUiState.value
-        if (state.page == 0 && !state.isLoading) refresh()
+        if (!hasRefreshedThisSession && !state.isLoading) {
+            hasRefreshedThisSession = true
+            refresh()
+        } else if (state.page == 0 && !state.isLoading) {
+            refresh()
+        }
     }
 
     fun selectSource(sourceId: String) {
@@ -166,7 +172,8 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectCategory(categoryId: String) {
-        if (categoryId == mutableUiState.value.selectedCategoryId) return
+        val current = mutableUiState.value
+        if (categoryId == current.selectedCategoryId && current.activeQuery.isBlank() && current.query.isBlank()) return
         detailsJob?.cancel()
         readerJob?.cancel()
         detailsRequestToken++
@@ -447,6 +454,49 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearAllComicDownloads() {
         downloadManager.removeAll()
+    }
+
+    /** Opens a downloaded offline comic chapter directly in the reader (e.g. from Personal offline downloads). */
+    fun openDownloadedChapter(downloaded: com.aurorashelf.app.data.comic.DownloadedComicChapter) {
+        val comic = ComicSummary(
+            sourceId = downloaded.sourceId,
+            id = downloaded.comicId,
+            title = downloaded.comicTitle,
+            coverUrl = downloaded.coverUrl.takeIf(String::isNotBlank),
+        )
+        val chapter = com.aurorashelf.app.model.ComicChapter(
+            id = downloaded.chapterId,
+            title = downloaded.chapterTitle,
+        )
+        val localPages = downloadManager.getLocalPages(comic, chapter)
+        if (localPages.isEmpty()) return
+
+        // Build chapter list from all completed downloads of the same comic so prev/next chapter works offline too.
+        val siblingChapters = downloadedChapters.value
+            .filter {
+                it.comicId == downloaded.comicId &&
+                    it.sourceId == downloaded.sourceId &&
+                    it.status == com.aurorashelf.app.data.comic.ComicDownloadStatus.COMPLETED
+            }
+            .map { com.aurorashelf.app.model.ComicChapter(id = it.chapterId, title = it.chapterTitle) }
+            .distinctBy { it.id }
+            .ifEmpty { listOf(chapter) }
+        val chapterIdx = siblingChapters.indexOfFirst { it.id == chapter.id }.coerceAtLeast(0)
+        val syntheticDetails = ComicDetails(
+            comic = comic,
+            description = "",
+            chapters = siblingChapters,
+        )
+        readerJob?.cancel()
+        readerRequestToken++
+        mutableUiState.update {
+            it.copy(
+                details = syntheticDetails,
+                reader = ComicReaderSession(syntheticDetails, chapterIdx, localPages),
+                isReaderLoading = false,
+                readerError = null,
+            )
+        }
     }
 
     private fun loadChapter(details: ComicDetails, index: Int) {

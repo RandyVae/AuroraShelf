@@ -892,7 +892,7 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   transition: opacity 180ms ease, transform 220ms ease;
 }
 .story-art.left { right: auto; left: -10%; }
-.story-top { display: flex; gap: 8px; justify-content: flex-end; padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 14px) 0; z-index: 4; }
+.story-top { display: flex; align-items: center; gap: 8px; justify-content: flex-end; padding: calc(var(--safe-t) + 10px) calc(var(--safe-r) + 108px) 0 calc(var(--safe-l) + 14px); z-index: 4; }
 .story-dialog {
   margin-top: auto;
   margin-inline: calc(var(--safe-l) + 14px) calc(var(--safe-r) + 14px);
@@ -1064,8 +1064,8 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
 .battle-field {
   position: relative;
   width: 100%;
-  height: clamp(380px, 64vh, 720px);
-  margin-top: calc(var(--safe-t) + 4px);
+  height: clamp(380px, 62vh, 720px);
+  margin-top: calc(var(--safe-t) + 28px);
   overflow: hidden;
   background: var(--surface);
   border-block: 1px solid var(--border);
@@ -1096,7 +1096,10 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
     repeating-linear-gradient(180deg, transparent 0 12%, color-mix(in srgb, var(--surface-3) 16%, transparent) 12.1% 12.3%);
 }
 .battle-hud {
-  position: absolute; inset-inline: 10px; top: 8px;
+  position: absolute;
+  top: calc(var(--safe-t) + 10px);
+  left: calc(var(--safe-l) + 14px);
+  right: calc(var(--safe-r) + 108px);
   display: flex; align-items: center; gap: 8px; z-index: 3;
   pointer-events: none;
 }
@@ -1326,7 +1329,7 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   display: none;
   flex-direction: column;
   padding: calc(var(--safe-t) + 4px) 10px calc(var(--safe-b) + 6px) 10px;
-  touch-action: none;
+  touch-action: manipulation;
   overscroll-behavior: none;
   box-sizing: border-box;
 }
@@ -2684,7 +2687,27 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   box-shadow: var(--shadow-2);
 }
 .modal-card h3 { margin: 0 0 6px; font-size: var(--type-headline); }
-.modal-card p { margin: 0 0 14px; color: var(--text-secondary); font-size: var(--type-callout); }
+.modal-card p, .modal-card .modal-body { margin: 0 0 14px; color: var(--text-secondary); font-size: var(--type-callout); }
+.modal-textarea {
+  width: 100%;
+  min-height: 120px;
+  max-height: 40vh;
+  padding: 10px 12px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  resize: vertical;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.modal-textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
 .modal-actions { display: flex; gap: 8px; }
 .modal-actions .btn { flex: 1; }
 
@@ -3112,12 +3135,13 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
 
 .cg-cinema-controls {
   position: absolute;
-  top: max(24px, calc(env(safe-area-inset-top, 24px) + 12px));
-  left: max(16px, calc(env(safe-area-inset-left, 16px) + 8px));
-  right: max(16px, calc(env(safe-area-inset-right, 16px) + 8px));
+  top: calc(var(--safe-t) + 10px);
+  left: calc(var(--safe-l) + 14px);
+  right: calc(var(--safe-r) + 108px);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   pointer-events: auto;
   z-index: 101;
 }
@@ -3789,5 +3813,127 @@ button:focus-visible, [tabindex]:focus-visible, a:focus-visible {
   padding: 8px 12px;
   border-radius: 12px;
   background: rgba(20, 24, 38, 0.85);
+}
+
+/* ==========================================================================
+   Compact Landscape Adaptation (Phone & Split-View Landscape <= 560px tall)
+   Ensures Slots SPIN button and Battle Commander Skills stay 100% reachable.
+   ========================================================================== */
+@media (max-height: 560px) and (orientation: landscape) {
+  .stage {
+    width: 100vw;
+  }
+
+  /* Battle landscape compact layout */
+  #screen-battle {
+    overflow-y: auto;
+  }
+  #screen-battle .battle-hud {
+    top: calc(var(--safe-t) + 6px);
+  }
+  #screen-battle .battle-field {
+    height: clamp(152px, 44vh, 220px);
+    margin-top: calc(var(--safe-t) + 22px);
+    flex-shrink: 0;
+  }
+  #screen-battle .battle-squads {
+    padding-top: 4px;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  #screen-battle .squad-chip {
+    padding: 4px 6px;
+  }
+  #screen-battle .squad-chip img {
+    width: 22px;
+    height: 22px;
+  }
+  #screen-battle .commander-deck {
+    margin-top: 4px;
+    padding: 4px 8px;
+    flex-shrink: 0;
+  }
+  #screen-battle .commander-energy-row {
+    margin-bottom: 4px;
+  }
+  #screen-battle .btn-commander-skill {
+    min-height: 36px;
+    padding: 4px 6px;
+  }
+  #screen-battle .battle-logbox {
+    display: none;
+  }
+  #screen-battle .battle-bar {
+    padding: 4px calc(var(--safe-r) + 14px) calc(var(--safe-b) + 4px) calc(var(--safe-l) + 14px);
+    flex-shrink: 0;
+  }
+  #screen-battle .battle-bar .btn.sm {
+    min-height: 34px;
+  }
+
+  /* Slots two-column + scrollable safety layout */
+  #screen-slots {
+    height: 100%;
+    max-height: 100%;
+    overflow-y: auto !important;
+    touch-action: pan-y manipulation;
+    padding: calc(var(--safe-t) + 2px) calc(var(--safe-r) + 10px) calc(var(--safe-b) + 4px) calc(var(--safe-l) + 10px);
+  }
+  #screen-slots .slots-topbar {
+    min-height: 32px;
+    padding: 2px calc(var(--safe-r, 0px) + 108px) 2px 8px;
+  }
+  #screen-slots .slots-jackpot-rail {
+    margin: 2px auto;
+    gap: 4px;
+  }
+  #screen-slots .jackpot-tier {
+    padding: 2px 4px;
+  }
+  #screen-slots .slots-cabinet {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(220px, 1fr);
+    grid-template-rows: auto auto 1fr;
+    gap: 4px 10px;
+    align-items: stretch;
+    padding: 6px 8px;
+  }
+  #screen-slots .slots-marquee {
+    display: none;
+  }
+  #screen-slots .slots-display {
+    grid-column: 1;
+    grid-row: 1;
+    margin-bottom: 0;
+  }
+  #screen-slots .slots-reel-window {
+    grid-column: 1;
+    grid-row: 2 / span 2;
+    height: clamp(150px, 52vh, 220px);
+    max-height: none;
+    padding: 12px 14px 4px;
+  }
+  #screen-slots .slots-win-meter {
+    grid-column: 2;
+    grid-row: 1;
+    margin-top: 0;
+    height: 28px;
+  }
+  #screen-slots .slots-status {
+    grid-column: 2;
+    grid-row: 2;
+    margin-top: 0;
+  }
+  #screen-slots .slots-controls-aux {
+    grid-column: 1;
+    margin-top: 2px;
+  }
+  #screen-slots .slots-console-deck {
+    grid-column: 2;
+    grid-row: 3;
+    height: clamp(110px, 38vh, 155px);
+    min-height: 108px;
+    margin-top: 0;
+  }
 }
 

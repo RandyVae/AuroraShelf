@@ -15,10 +15,12 @@
             --card-bg: rgba(255, 255, 255, 0.05);
             --card-border: rgba(255, 255, 255, 0.12);
             --text-primary: #FFFFFF;
-            --text-secondary: rgba(255, 255, 255, 0.70);
-            --text-muted: rgba(255, 255, 255, 0.45);
+            --text-secondary: rgba(255, 255, 255, 0.72);
+            --text-muted: rgba(255, 255, 255, 0.50);
             --success: #30D158;
-            --success-glow: rgba(48, 209, 88, 0.3);
+            --success-glow: rgba(48, 209, 88, 0.30);
+            --warning: #FFD60A;
+            --warning-glow: rgba(255, 214, 10, 0.22);
         }
         * {
             margin: 0;
@@ -27,7 +29,7 @@
             -webkit-tap-highlight-color: transparent;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang SC", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "PingFang HK", "PingFang SC", sans-serif;
             background-color: var(--bg-base);
             color: var(--text-primary);
             min-height: 100vh;
@@ -97,7 +99,7 @@
             color: var(--text-secondary);
             margin-bottom: 18px;
         }
-        
+
         /* 平台切换胶囊 (Apple HIG Segmented Control) */
         .segmented-control {
             width: 100%;
@@ -154,6 +156,8 @@
             color: var(--text-secondary);
             margin-bottom: 16px;
             display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
             align-items: center;
             gap: 6px;
         }
@@ -185,14 +189,24 @@
             color: var(--success);
             box-shadow: 0 0 16px var(--success-glow);
         }
+        .status-pill.pending {
+            background: rgba(255, 214, 10, 0.14);
+            border-color: rgba(255, 214, 10, 0.36);
+            color: var(--warning);
+            box-shadow: 0 0 16px var(--warning-glow);
+        }
         .status-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
             background: var(--text-muted);
+            flex-shrink: 0;
         }
         .status-pill.success .status-dot {
             background: var(--success);
+        }
+        .status-pill.pending .status-dot {
+            background: var(--warning);
         }
         .flow-card {
             width: 100%;
@@ -233,6 +247,10 @@
             background: var(--success);
             color: #000;
         }
+        .step-badge.pending {
+            background: var(--warning);
+            color: #000;
+        }
         .step-name {
             font-size: 15px;
             font-weight: 600;
@@ -242,7 +260,7 @@
             font-size: 12px;
             color: var(--text-muted);
             margin-left: 34px;
-            line-height: 1.4;
+            line-height: 1.45;
         }
         .action-btn {
             width: 100%;
@@ -264,13 +282,21 @@
             color: #FFFFFF;
             box-shadow: 0 8px 24px var(--brand-glow);
         }
+        .action-btn.secondary {
+            height: 42px;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--text-secondary);
+            box-shadow: none;
+        }
         .action-btn.android {
             background: linear-gradient(135deg, #3DDC84 0%, #1FA85D 100%);
             color: #0B0B0E;
             font-weight: 700;
             box-shadow: 0 8px 24px var(--android-glow);
         }
-        .action-btn.primary:active, .action-btn.android:active {
+        .action-btn.primary:active, .action-btn.android:active, .action-btn.secondary:active {
             transform: scale(0.97);
             opacity: 0.9;
         }
@@ -298,7 +324,7 @@
             transition: border-color 0.2s ease, background 0.2s ease;
         }
         .tf-input::placeholder {
-            color: rgba(255, 255, 255, 0.38);
+            color: rgba(255, 255, 255, 0.40);
         }
         .tf-input:focus {
             border-color: var(--brand-color);
@@ -311,8 +337,9 @@
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid rgba(255, 255, 255, 0.10);
             font-size: 13px;
-            line-height: 1.5;
+            line-height: 1.55;
             color: var(--text-primary);
+            text-align: left;
         }
         .tf-status-box.visible {
             display: block;
@@ -321,6 +348,11 @@
             background: rgba(48, 209, 88, 0.12);
             border-color: rgba(48, 209, 88, 0.30);
             color: #9BF3B0;
+        }
+        .tf-status-box.warn {
+            background: rgba(255, 214, 10, 0.12);
+            border-color: rgba(255, 214, 10, 0.34);
+            color: #FFE885;
         }
         .tf-status-box.err {
             background: rgba(255, 69, 58, 0.12);
@@ -366,10 +398,31 @@
             color: var(--text-secondary);
         }
         .footer {
-            margin-top: 22px;
-            font-size: 12px;
+            width: 100%;
+            max-width: 430px;
+            margin-top: 20px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            font-size: 11.5px;
+            line-height: 1.6;
             color: var(--text-muted);
-            letter-spacing: 0.2px;
+            text-align: center;
+            z-index: 1;
+        }
+        .footer-title {
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .footer a {
+            color: rgba(255, 255, 255, 0.78);
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .footer a:hover {
+            color: #FFFFFF;
         }
     </style>
 </head>
@@ -377,7 +430,7 @@
     <div class="container">
         <!-- 应用图标与标头 -->
         <div class="app-icon">
-            <svg viewBox="0 0 50 66" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg viewBox="0 0 50 66" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <rect x="0" y="0" width="13" height="66" rx="2" fill="#B20A14"/>
                 <rect x="37" y="0" width="13" height="66" rx="2" fill="#B20A14"/>
                 <path d="M0 0 H13 L50 66 H37 Z" fill="#FF4F7B"/>
@@ -388,20 +441,21 @@
         <div class="app-subtitle">多平台官方无线安装与发布中心</div>
 
         <!-- 平台选择 Segmented Control -->
-        <div class="segmented-control" role="tablist">
-            <button id="tabIos" class="segment-btn active" onclick="switchPlatform('ios')" role="tab">
-                <span>🍎</span> iOS / iPadOS
+        <div class="segmented-control" role="tablist" aria-label="选择目标平台">
+            <button id="tabIos" class="segment-btn active" onclick="switchPlatform('ios')" role="tab" aria-selected="true">
+                <span>iOS / iPadOS</span>
             </button>
-            <button id="tabAndroid" class="segment-btn" onclick="switchPlatform('android')" role="tab">
-                <span>🤖</span> Android
+            <button id="tabAndroid" class="segment-btn" onclick="switchPlatform('android')" role="tab" aria-selected="false">
+                <span>Android</span>
             </button>
         </div>
 
         <!-- ==================== iOS / iPadOS 面板 ==================== -->
         <div id="panelIos" class="tab-panel active" role="tabpanel">
             <div class="app-meta">
-                <span>v2.16.40 (Build 266)</span>
+                <span>v2.17.0 (Build 267)</span>
                 <span class="badge">Universal 通用</span>
+                <span class="badge">iOS 26.0+</span>
                 <span class="badge">Apple HIG</span>
             </div>
 
@@ -411,34 +465,40 @@
             </div>
 
             <div class="flow-card">
-                <!-- 步骤 1: 获取授权 -->
+                <!-- 步骤 1: 获取授权（口令门禁保护 Apple 100 台设备配额） -->
                 <div class="step-item">
                     <div class="step-header">
                         <div id="step1Badge" class="step-badge">1</div>
-                        <div class="step-name">获取设备授权</div>
+                        <div class="step-name">获取设备授权 (UDID)</div>
                     </div>
                     <div class="step-desc" id="step1Desc">
-                        点击下方安装官方设备描述文件，系统将自动登记此 iPhone / iPad 标识（UDID）。
+                        输入邀请口令（与下方 TestFlight 通用，自动记忆免重复输入）并安装描述文件，系统将登记此 iPhone / iPad 设备标识。
                     </div>
-                    <a id="btnStep1" class="action-btn primary" href="/enroll.mobileconfig">
-                        第一步：安装授权描述文件
-                    </a>
+                    <input id="udidInviteCode" class="tf-input" type="text" autocomplete="off" placeholder="请输入邀请口令" oninput="syncInviteCodeInput('udid')">
+                    <button id="btnStep1" class="action-btn primary" type="button" onclick="submitUdidEnroll()">
+                        第一步：验证口令并安装描述文件
+                    </button>
+                    <div id="udidEnrollStatus" class="tf-status-box" role="status" aria-live="polite"></div>
                 </div>
 
                 <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 6px 0;">
 
-                <!-- 步骤 2: 安装 App -->
+                <!-- 步骤 2: 安装 App（仅在当前 IPA 已内置该 UDID 时解锁） -->
                 <div class="step-item">
                     <div class="step-header">
                         <div id="step2Badge" class="step-badge">2</div>
                         <div class="step-name">直接安装 Netgrey</div>
                     </div>
-                    <div class="step-desc">
-                        完成授权后，点击直接触发系统级 OTA 安装弹窗，应用将自动部署至主屏幕。
+                    <div id="step2Desc" class="step-desc">
+                        设备 UDID 已包含于当前签名安装包时，点击直接触发系统级 OTA 安装弹窗。
                     </div>
-                    <a id="btnStep2" class="action-btn disabled" href="itms-services://?action=download-manifest&url=https://bananarey.us/manifest.plist">
+                    <div id="udidPendingNotice" class="tf-status-box warn" role="status" aria-live="polite"></div>
+                    <a id="btnStep2" class="action-btn disabled" aria-disabled="true" data-manifest-href="itms-services://?action=download-manifest&url=https://bananarey.us/manifest.plist">
                         第二步：安装 Netgrey
                     </a>
+                    <button id="btnCheckProvisioned" class="action-btn secondary" type="button" style="display:none;" onclick="checkUdidProvisionedStatus(true)">
+                        刷新当前安装包重签生效状态
+                    </button>
                 </div>
             </div>
 
@@ -446,21 +506,21 @@
                 <div class="step-item">
                     <div class="step-header">
                         <div class="step-badge" style="background: #0A84FF;">TF</div>
-                        <div class="step-name">TestFlight 内部测试（邀请制）</div>
+                        <div class="step-name">TestFlight 内部测试（推荐 · 免等待）</div>
                     </div>
                     <div class="step-desc" style="margin-left: 0;">
-                        无需开开发者模式，90 天稳定不掉签。建议优先填 iCloud / Gmail / Outlook 邮箱；若使用 163 / QQ 邮箱未收到，请检查「垃圾邮件/广告箱」（发件人 no_reply@email.apple.com）。
+                        无需开启开发者模式、无需等待重签打包，90 天稳定不掉签。建议优先填 iCloud / Gmail / Outlook 邮箱；若使用 163 / QQ 邮箱未收到，请检查「垃圾邮件/广告箱」（发件人 no_reply@email.apple.com）。
                     </div>
-                    <input id="tfInviteCode" class="tf-input" type="text" autocomplete="off" placeholder="请输入邀请口令">
+                    <input id="tfInviteCode" class="tf-input" type="text" autocomplete="off" placeholder="请输入邀请口令" oninput="syncInviteCodeInput('tf')">
                     <input id="tfEmail" class="tf-input" type="email" autocomplete="email" inputmode="email" placeholder="请输入 Apple ID 邮箱（如 name@icloud.com）">
                     <button id="btnTfInvite" class="action-btn primary" type="button" onclick="submitTestFlightInvite(false)">
                         申请 TestFlight 内部测试
                     </button>
                     <div id="tfStatusBox" class="tf-status-box" role="status" aria-live="polite"></div>
-                    <button id="btnTfRefresh" class="action-btn" type="button" style="display:none; height:42px; font-size:14px; background:rgba(255,255,255,0.08); color:var(--text-primary);" onclick="pollTestFlightStatus(true)">
+                    <button id="btnTfRefresh" class="action-btn secondary" type="button" style="display:none;" onclick="pollTestFlightStatus(true)">
                         我已点完邮件确认，立即同步状态
                     </button>
-                    <button id="btnTfResend" class="action-btn" type="button" style="display:none; height:42px; font-size:14px; background:rgba(255,255,255,0.06); color:var(--text-muted); border:1px solid rgba(255,255,255,0.12);" onclick="submitTestFlightInvite(true)">
+                    <button id="btnTfResend" class="action-btn secondary" type="button" style="display:none; color:var(--text-muted);" onclick="submitTestFlightInvite(true)">
                         没收到邮件？重发团队邀请邮件
                     </button>
                 </div>
@@ -469,7 +529,7 @@
             <div class="guide-box">
                 <strong>iOS / iPadOS 使用说明：</strong><br>
                 • 点击第一步后，请前往 <strong>系统设置 &gt; 顶部「已下载描述文件」</strong> 点击右上角安装。<br>
-                • iOS 16+ 首次运行 App 需进入 <strong>设置 &gt; 隐私与安全性 &gt; 开发者模式</strong> 开启。<br>
+                • <strong>iOS 26.0+</strong> 系统要求：首次运行通过 UDID 无线安装的 App 需进入 <strong>设置 &gt; 隐私与安全性 &gt; 开发者模式</strong> 开启（TestFlight 通道无需开启）。<br>
                 • 针对 iPad：自动适配原生侧边栏、4~6 列自适应海报流与宽屏影院画幅。
             </div>
         </div>
@@ -477,8 +537,8 @@
         <!-- ==================== Android 面板 ==================== -->
         <div id="panelAndroid" class="tab-panel" role="tabpanel">
             <div class="app-meta">
-                <span>v2.16.40 (Build 266)</span>
-                <span class="badge">137 MB</span>
+                <span>v2.17.0 (Build 267)</span>
+                <span class="badge">Android 8.0+</span>
                 <span class="badge">Material You 3</span>
             </div>
 
@@ -494,7 +554,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polygon points="5 3 19 12 5 21 5 3"/>
                     </svg>
-                    <span>ExoPlayer 硬解</span>
+                    <span>Media3 硬解引擎</span>
                 </div>
                 <div class="feature-item">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -518,33 +578,42 @@
                         <div class="step-name">官方纯净正式版安装包</div>
                     </div>
                     <div class="step-desc">
-                        单架构通用包（arm64-v8a / armeabi-v7a / x86_64），已内置完整音视频硬解引擎与本地离线游戏。
+                        多架构通用包（arm64-v8a / armeabi-v7a / x86_64），已内置完整音视频硬解引擎与本地离线游戏。
                     </div>
-                    <a class="action-btn android" href="/Netgrey.apk?v=2.16.40" download="Netgrey-v2.16.40.apk">
+                    <a class="action-btn android" href="/Netgrey.apk?v=2.17.0" download="Netgrey-v2.17.0.apk">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
                             <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
-                        立即下载 Android APK (137 MB)
+                        立即下载 Android APK (v2.17.0)
                     </a>
                 </div>
             </div>
 
             <div class="guide-box">
                 <strong>Android 安装提示：</strong><br>
-                • 点击上方按钮直接开始高速下载安装包（<code>Netgrey-v2.16.40.apk</code>）。<br>
+                • 点击上方按钮直接开始高速下载安装包（<code>Netgrey-v2.17.0.apk</code>）。<br>
                 • 若浏览器提示「此类型的文件可能对您的设备有害」或「未受信任的应用」，请点击 <strong>「仍然下载 / 继续安装」</strong>。<br>
                 • 安装时若提示权限限制，在系统设置中开启 <strong>「允许来自此来源的应用」</strong> 即可。
             </div>
         </div>
     </div>
 
-    <div class="footer">
-        Netgrey · Dedicated Over-The-Air Distribution
-    </div>
+    <footer class="footer">
+        <div class="footer-title">Netgrey v2.17.0 · Dedicated Over-The-Air Distribution</div>
+        <div>
+            开源合规声明：Android 视频解析组件基于 <strong>PipePipeExtractor (GPLv3)</strong> 构建；内置游戏骨骼渲染集成 <strong>Spine Runtimes License</strong>；其余网络、图像与液态玻璃组件遵循 <strong>Apache-2.0 / MIT</strong> 许可。完整源代码与第三方许可证见
+            <a href="https://github.com/RandyVae/AuroraShelf" target="_blank" rel="noopener noreferrer">GitHub 源码仓库</a>
+            及
+            <a href="https://github.com/RandyVae/AuroraShelf/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noopener noreferrer">THIRD_PARTY_NOTICES.md</a>。
+        </div>
+    </footer>
 
     <script>
+        const INVITE_CODE_STORAGE_KEY = 'netgrey_invite_code';
+        const PENDING_PROVISION_COPY = '设备 UDID 已成功写入 Apple 开发者名录（排队等待下一次重签打包生效）。如需立即免等待安装，请直接使用下方 TestFlight 内部测试通道！';
+
         function switchPlatform(platform) {
             const tabIos = document.getElementById('tabIos');
             const tabAndroid = document.getElementById('tabAndroid');
@@ -553,19 +622,206 @@
 
             if (platform === 'android') {
                 tabIos.classList.remove('active');
+                tabIos.setAttribute('aria-selected', 'false');
                 tabAndroid.classList.add('active');
+                tabAndroid.setAttribute('aria-selected', 'true');
                 panelIos.classList.remove('active');
                 panelAndroid.classList.add('active');
             } else {
                 tabAndroid.classList.remove('active');
+                tabAndroid.setAttribute('aria-selected', 'false');
                 tabIos.classList.add('active');
+                tabIos.setAttribute('aria-selected', 'true');
                 panelAndroid.classList.remove('active');
                 panelIos.classList.add('active');
             }
         }
 
+        function syncInviteCodeInput(source) {
+            const udidEl = document.getElementById('udidInviteCode');
+            const tfEl = document.getElementById('tfInviteCode');
+            const val = source === 'udid'
+                ? (udidEl ? udidEl.value : '')
+                : (tfEl ? tfEl.value : '');
+            if (source === 'udid' && tfEl && tfEl.value !== val) {
+                tfEl.value = val;
+            } else if (source === 'tf' && udidEl && udidEl.value !== val) {
+                udidEl.value = val;
+            }
+            const trimmed = val.trim();
+            if (trimmed) {
+                try { localStorage.setItem(INVITE_CODE_STORAGE_KEY, trimmed); } catch (_) {}
+            }
+        }
+
+        function restoreSavedInviteCode() {
+            try {
+                const saved = (localStorage.getItem(INVITE_CODE_STORAGE_KEY) || '').trim();
+                if (!saved) return;
+                const udidEl = document.getElementById('udidInviteCode');
+                const tfEl = document.getElementById('tfInviteCode');
+                if (udidEl && !udidEl.value) udidEl.value = saved;
+                if (tfEl && !tfEl.value) tfEl.value = saved;
+            } catch (_) {}
+        }
+
+        function setUdidEnrollStatus(kind, text) {
+            const box = document.getElementById('udidEnrollStatus');
+            if (!box) return;
+            if (!text) {
+                box.className = 'tf-status-box';
+                box.innerText = '';
+                return;
+            }
+            box.className = 'tf-status-box visible' + (kind ? ' ' + kind : '');
+            box.innerText = text;
+        }
+
+        function renderDeviceProvisionState(udid, displayLabel, isProvisioned) {
+            const statusPill = document.getElementById('statusPill');
+            const statusText = document.getElementById('statusText');
+            const step1Badge = document.getElementById('step1Badge');
+            const step1Desc = document.getElementById('step1Desc');
+            const btnStep1 = document.getElementById('btnStep1');
+            const step2Badge = document.getElementById('step2Badge');
+            const btnStep2 = document.getElementById('btnStep2');
+            const pendingNotice = document.getElementById('udidPendingNotice');
+            const btnCheckProvisioned = document.getElementById('btnCheckProvisioned');
+
+            if (!udid || !statusPill || !statusText || !btnStep2) return;
+
+            const shortUdid = udid.length > 12
+                ? (udid.substring(0, 8) + '...' + udid.substring(udid.length - 4))
+                : udid;
+
+            step1Badge.classList.add('done');
+            step1Badge.innerText = '✓';
+            step1Desc.innerText = '此设备已完成 UDID 登记。如需更换或重新登记设备，可再次点击下方按钮。';
+            btnStep1.innerText = '重新获取授权描述文件';
+            btnStep1.classList.remove('primary');
+            btnStep1.classList.add('secondary');
+
+            if (isProvisioned === true) {
+                statusPill.classList.remove('pending');
+                statusPill.classList.add('success');
+                statusText.innerText = '已就绪可安装: ' + displayLabel + ' (' + shortUdid + ')';
+
+                step2Badge.classList.remove('pending');
+                step2Badge.classList.add('done');
+                step2Badge.innerText = '2';
+
+                if (pendingNotice) {
+                    pendingNotice.className = 'tf-status-box';
+                    pendingNotice.innerText = '';
+                }
+                if (btnCheckProvisioned) {
+                    btnCheckProvisioned.style.display = 'none';
+                }
+
+                const manifestHref = btnStep2.getAttribute('data-manifest-href');
+                if (manifestHref) btnStep2.setAttribute('href', manifestHref);
+                btnStep2.setAttribute('aria-disabled', 'false');
+                btnStep2.classList.remove('disabled');
+                btnStep2.classList.add('success');
+                btnStep2.innerText = '第二步：直接安装 Netgrey';
+            } else {
+                statusPill.classList.remove('success');
+                statusPill.classList.add('pending');
+                statusText.innerText = '已登记待重签: ' + displayLabel + ' (' + shortUdid + ')';
+
+                step2Badge.classList.remove('done');
+                step2Badge.classList.add('pending');
+                step2Badge.innerText = '…';
+
+                btnStep2.removeAttribute('href');
+                btnStep2.setAttribute('aria-disabled', 'true');
+                btnStep2.classList.remove('success');
+                btnStep2.classList.add('disabled');
+                btnStep2.innerText = '等待下一次重签打包后开放直接安装';
+
+                if (pendingNotice) {
+                    pendingNotice.className = 'tf-status-box visible warn';
+                    pendingNotice.innerText = PENDING_PROVISION_COPY;
+                }
+                if (btnCheckProvisioned) {
+                    btnCheckProvisioned.style.display = 'flex';
+                }
+            }
+        }
+
+        async function checkUdidProvisionedStatus(manual) {
+            const savedUdid = (localStorage.getItem('netgrey_udid') || '').trim();
+            if (!savedUdid) return;
+            const savedModel = localStorage.getItem('netgrey_model') || 'iPhone';
+            const savedName = localStorage.getItem('netgrey_name') || '';
+            const label = savedName || savedModel;
+            const btnCheck = document.getElementById('btnCheckProvisioned');
+            if (manual && btnCheck) {
+                btnCheck.disabled = true;
+                btnCheck.innerText = '正在查询安装包签名名录…';
+            }
+            try {
+                const resp = await fetch('/api/udid/status?udid=' + encodeURIComponent(savedUdid), { cache: 'no-store' });
+                const data = await resp.json();
+                if (resp.ok && data && data.ok) {
+                    const provisioned = data.provisioned === true;
+                    localStorage.setItem('netgrey_provisioned', provisioned ? '1' : '0');
+                    renderDeviceProvisionState(savedUdid, label, provisioned);
+                }
+            } catch (_) {
+                // 网络离线时保留当前已知状态
+            } finally {
+                if (manual && btnCheck) {
+                    btnCheck.disabled = false;
+                    btnCheck.innerText = '刷新当前安装包重签生效状态';
+                }
+            }
+        }
+
+        async function submitUdidEnroll() {
+            const codeEl = document.getElementById('udidInviteCode');
+            const tfCodeEl = document.getElementById('tfInviteCode');
+            const btn = document.getElementById('btnStep1');
+            const inviteCode = ((codeEl && codeEl.value) || (tfCodeEl && tfCodeEl.value) || '').trim();
+
+            if (!inviteCode) {
+                setUdidEnrollStatus('err', '请输入管理员提供的邀请口令后再获取设备描述文件。');
+                if (codeEl) codeEl.focus();
+                return;
+            }
+
+            try { localStorage.setItem(INVITE_CODE_STORAGE_KEY, inviteCode); } catch (_) {}
+            if (tfCodeEl && tfCodeEl.value !== inviteCode) tfCodeEl.value = inviteCode;
+
+            btn.disabled = true;
+            const prevText = btn.innerText;
+            btn.innerText = '正在校验口令并生成描述文件…';
+            setUdidEnrollStatus('', '');
+
+            try {
+                const resp = await fetch('/api/udid/enroll', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ invite_code: inviteCode })
+                });
+                const data = await resp.json();
+                if (!resp.ok || !data.ok || !data.mobileconfig_url) {
+                    setUdidEnrollStatus('err', (data && data.error) || '口令校验未通过，请确认邀请口令是否正确。');
+                    return;
+                }
+                setUdidEnrollStatus('ok', '验证通过，正在拉起系统描述文件下载，随后请前往「系统设置 > 已下载描述文件」完成安装。');
+                window.location.href = data.mobileconfig_url;
+            } catch (e) {
+                setUdidEnrollStatus('err', '网络请求失败，请检查网络连接后重试。');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = prevText;
+            }
+        }
+
         (function() {
-            // 自动侦测访问设备
+            restoreSavedInviteCode();
+
             const ua = navigator.userAgent || '';
             const urlParams = new URLSearchParams(window.location.search);
             const queryPlatform = urlParams.get('platform');
@@ -576,52 +832,37 @@
                 switchPlatform('ios');
             }
 
-            // 处理 iOS 授权回传逻辑
-            const udidParam = urlParams.get('udid');
-            const modelParam = urlParams.get('model') || 'iPhone';
-            const nameParam = urlParams.get('name') || '';
+            const udidParam = (urlParams.get('udid') || '').trim();
+            const modelParam = (urlParams.get('model') || 'iPhone').trim();
+            const nameParam = (urlParams.get('name') || '').trim();
             const regParam = urlParams.get('registered');
+            const provParam = urlParams.get('provisioned');
 
-            if (udidParam && regParam !== 'false') {
+            if (udidParam && regParam === 'true') {
                 localStorage.setItem('netgrey_udid', udidParam);
                 localStorage.setItem('netgrey_model', modelParam);
                 localStorage.setItem('netgrey_name', nameParam);
+                if (provParam === '1' || provParam === 'true') {
+                    localStorage.setItem('netgrey_provisioned', '1');
+                } else {
+                    localStorage.setItem('netgrey_provisioned', '0');
+                }
             }
 
-            const savedUdid = localStorage.getItem('netgrey_udid');
+            const savedUdid = (localStorage.getItem('netgrey_udid') || '').trim();
             const savedModel = localStorage.getItem('netgrey_model') || 'iPhone';
-            const savedName = localStorage.getItem('netgrey_name');
-
-            const statusPill = document.getElementById('statusPill');
+            const savedName = localStorage.getItem('netgrey_name') || '';
+            const savedProvisioned = localStorage.getItem('netgrey_provisioned') === '1';
             const statusText = document.getElementById('statusText');
-            const step1Badge = document.getElementById('step1Badge');
-            const step1Desc = document.getElementById('step1Desc');
-            const btnStep1 = document.getElementById('btnStep1');
-            const step2Badge = document.getElementById('step2Badge');
-            const btnStep2 = document.getElementById('btnStep2');
 
             if (regParam === 'false' && statusText) {
-                statusText.innerText = '设备注册未完成，请重新授权或联系管理员';
-            } else if (savedUdid && statusPill) {
-                statusPill.classList.add('success');
-                const shortUdid = savedUdid.substring(0, 8) + '...' + savedUdid.substring(savedUdid.length - 4);
-                statusText.innerText = '已认证: ' + (savedName ? savedName : savedModel) + ' (' + shortUdid + ')';
-
-                step1Badge.classList.add('done');
-                step1Badge.innerHTML = '✓';
-                step1Desc.innerText = '此设备已成功完成授权绑定。如需重新绑定可再次点击下方按钮。';
-                btnStep1.innerText = '重新获取授权';
-                btnStep1.classList.remove('primary');
-                btnStep1.style.background = 'rgba(255,255,255,0.08)';
-                btnStep1.style.color = 'rgba(255,255,255,0.7)';
-
-                step2Badge.style.background = '#30D158';
-                step2Badge.style.color = '#000';
-                btnStep2.classList.remove('disabled');
-                btnStep2.classList.add('action-btn', 'success');
-                btnStep2.innerText = '第二步：直接安装 Netgrey';
+                statusText.innerText = '设备注册未完成，请重新输入邀请口令授权或使用下方 TestFlight 通道';
+            } else if (savedUdid) {
+                const label = savedName || savedModel;
+                renderDeviceProvisionState(savedUdid, label, savedProvisioned);
+                checkUdidProvisionedStatus(false);
             } else if (statusText) {
-                statusText.innerText = '等待设备授权绑定';
+                statusText.innerText = '等待设备授权绑定（或直接使用下方 TestFlight）';
             }
         })();
 
@@ -655,10 +896,11 @@
 
         async function submitTestFlightInvite(resend) {
             const codeEl = document.getElementById('tfInviteCode');
+            const udidCodeEl = document.getElementById('udidInviteCode');
             const emailEl = document.getElementById('tfEmail');
             const btn = document.getElementById('btnTfInvite');
             const resendBtn = document.getElementById('btnTfResend');
-            const inviteCode = (codeEl ? codeEl.value : '').trim();
+            const inviteCode = ((codeEl && codeEl.value) || (udidCodeEl && udidCodeEl.value) || '').trim();
             const email = (emailEl ? emailEl.value : '').trim().toLowerCase();
 
             if (!inviteCode) {
@@ -669,6 +911,10 @@
                 setTfStatus('err', '请输入有效的 Apple ID 邮箱地址。', false, false);
                 return;
             }
+
+            try { localStorage.setItem(INVITE_CODE_STORAGE_KEY, inviteCode); } catch (_) {}
+            if (codeEl && codeEl.value !== inviteCode) codeEl.value = inviteCode;
+            if (udidCodeEl && udidCodeEl.value !== inviteCode) udidCodeEl.value = inviteCode;
 
             stopTfPolling();
             btn.disabled = true;
@@ -684,7 +930,12 @@
                 });
                 const data = await resp.json();
                 if (!resp.ok || !data.ok) {
-                    setTfStatus('err', data.error || '发送邀请失败，请稍后重试。', false, false);
+                    const rec = data && data.record;
+                    if (rec && rec.status === 'retry_invite') {
+                        setTfStatus('warn', rec.message || data.error || '重发暂未完成，系统将自动重试。', true, true);
+                    } else {
+                        setTfStatus('err', (data && data.error) || '发送邀请失败，请稍后重试。', false, !!resend);
+                    }
                     return;
                 }
                 const rec = data.record || {};
@@ -724,7 +975,7 @@
                 const resp = await fetch(url, { cache: 'no-store' });
                 const data = await resp.json();
                 if (!resp.ok || !data.ok || !data.record) {
-                    if (manual) setTfStatus('err', data.error || '状态查询失败', true, false);
+                    if (manual) setTfStatus('err', (data && data.error) || '状态查询失败', true, false);
                     return;
                 }
                 const rec = data.record;
@@ -734,6 +985,8 @@
                 } else if (rec.status === 'error') {
                     stopTfPolling();
                     setTfStatus('err', rec.message || '加入群组失败', true, true);
+                } else if (rec.status === 'retry_invite') {
+                    setTfStatus('warn', rec.message || '正在后台自动重试发送邀请…', true, true);
                 } else {
                     setTfStatus('', rec.message || '等待邮箱点击确认…', true, true);
                 }

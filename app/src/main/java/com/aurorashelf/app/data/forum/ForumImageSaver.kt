@@ -82,8 +82,8 @@ internal fun deduplicateForumImageUrls(urls: List<String>): List<String> {
 internal class ForumImageSaver(
     context: Context,
     private val client: OkHttpClient = OkHttpClient.Builder()
-        .followRedirects(true)
-        .followSslRedirects(true)
+        .followRedirects(false)
+        .followSslRedirects(false)
         .build(),
 ) {
     private val applicationContext = context.applicationContext
@@ -119,17 +119,41 @@ internal class ForumImageSaver(
     }
 
     private fun saveRemoteImage(request: ForumImageRequest): Uri {
-        val safeCookies = request.cookies?.takeIf { it.isNotBlank() && shouldForwardCookies(request.imageUrl, request.pageUrl) }
-        val networkRequest = Request.Builder()
-            .url(request.imageUrl)
-            .header("User-Agent", request.userAgent)
-            .header("Referer", request.pageUrl)
-            .apply { safeCookies?.let { header("Cookie", it) } }
+        val noRedirectClient = client.newBuilder()
+            .followRedirects(false)
+            .followSslRedirects(false)
             .build()
+        var currentUrl = request.imageUrl
+        var redirects = 0
+        while (true) {
+            if (!currentUrl.startsWith("https://", ignoreCase = true)) {
+                throw IOException("已拒绝非 HTTPS 图片重定向")
+            }
+            val safeCookies = request.cookies?.takeIf {
+                it.isNotBlank() && shouldForwardCookies(request.pageUrl, currentUrl)
+            }
+            val networkRequest = Request.Builder()
+                .url(currentUrl)
+                .header("User-Agent", request.userAgent)
+                .header("Referer", request.pageUrl)
+                .apply { safeCookies?.let { header("Cookie", it) } }
+                .build()
 
-        return client.newCall(networkRequest).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("图片服务器返回 ${response.code}")
-            saveResponse(response, request.imageUrl)
+            noRedirectClient.newCall(networkRequest).execute().use { response ->
+                if (response.code in listOf(301, 302, 303, 307, 308)) {
+                    if (redirects >= MAX_IMAGE_REDIRECTS) {
+                        throw IOException("图片重定向次数过多")
+                    }
+                    val location = response.header("Location")?.takeIf { it.isNotBlank() }
+                        ?: throw IOException("图片重定向缺少目标地址")
+                    currentUrl = runCatching { URI(currentUrl).resolve(location).toString() }
+                        .getOrElse { throw IOException("无效的图片重定向地址", it) }
+                    redirects += 1
+                    return@use
+                }
+                if (!response.isSuccessful) throw IOException("图片服务器返回 ${response.code}")
+                return saveResponse(response, currentUrl)
+            }
         }
     }
 
@@ -219,6 +243,7 @@ internal class ForumImageSaver(
     }
 
     internal companion object {
+        private const val MAX_IMAGE_REDIRECTS = 5
         private const val MAX_IMAGE_BYTES = 40L * 1024L * 1024L
         private const val MAX_BASE64_CHARACTERS = MAX_IMAGE_BYTES * 4L / 3L + 8L
 

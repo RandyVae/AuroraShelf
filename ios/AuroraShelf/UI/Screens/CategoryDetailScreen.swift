@@ -110,18 +110,18 @@ public struct CategoryDetailScreen: View {
                             ForEach(0..<6, id: \.self) { _ in
                                 VStack(alignment: .leading, spacing: AuroraMetrics.spacingS) {
                                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(Color.white.opacity(0.08))
+                                        .fill(AuroraColor.surfaceCard)
                                         .aspectRatio(AuroraMetrics.posterAspect, contentMode: .fit)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+                                                .stroke(AuroraColor.hairline, lineWidth: 1)
                                         )
                                     RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.white.opacity(0.12))
+                                        .fill(AuroraColor.surfaceHigh)
                                         .frame(height: 14)
                                         .frame(maxWidth: .infinity)
                                     RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color.white.opacity(0.08))
+                                        .fill(AuroraColor.surfaceCard)
                                         .frame(width: 80, height: 10)
                                 }
                             }
@@ -155,7 +155,7 @@ public struct CategoryDetailScreen: View {
                                         }
                                     )
                                     .onAppear {
-                                        if video.id == videos.last?.id {
+                                        if video.id == sortedVideos.last?.id {
                                             loadNextPage()
                                         }
                                     }

@@ -514,13 +514,28 @@ internal fun MediaImage(
 ) {
     val context = LocalContext.current
     var attempt by remember(video.thumbnailUrl, video.pageUrl) { mutableIntStateOf(0) }
-    var isLoading by remember(video.thumbnailUrl, video.pageUrl, attempt) { mutableStateOf(true) }
+    val memoryCachedBytes = remember(video.thumbnailUrl, video.pageUrl, video.title, attempt) {
+        if (attempt == 0) {
+            video.thumbnailUrl?.let { url ->
+                CoverImageLoader.peekMemory(url, video.pageUrl, title = video.title)
+            }
+        } else {
+            null
+        }
+    }
+    var isLoading by remember(video.thumbnailUrl, video.pageUrl, attempt) {
+        mutableStateOf(memoryCachedBytes == null && video.thumbnailUrl != null)
+    }
     val imageBytes by produceState<ByteArray?>(
-        initialValue = null,
+        initialValue = memoryCachedBytes,
         key1 = video.thumbnailUrl,
         key2 = video.pageUrl,
         key3 = attempt,
     ) {
+        if (memoryCachedBytes != null) {
+            isLoading = false
+            return@produceState
+        }
         value = video.thumbnailUrl?.let { url ->
             withContext(Dispatchers.IO) {
                 CoverImageLoader.load(url, video.pageUrl, title = video.title)
@@ -623,7 +638,7 @@ internal fun MediaImage(
  */
 @Composable
 internal fun BoxScope.DarkModeArtworkScrim() {
-    if (isSystemInDarkTheme()) {
+    if (MaterialTheme.colorScheme.background.luminance() <= 0.5f) {
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -994,7 +1009,7 @@ internal fun NetflixSectionHeader(
             ) {
                 if (badgeText != null) {
                     Surface(
-                        color = AuroraCoral,
+                        color = AuroraBrandAccentDeep,
                         shape = RoundedCornerShape(3.dp),
                     ) {
                         Text(
@@ -1029,10 +1044,11 @@ internal fun NetflixSectionHeader(
             Text(
                 text = actionText,
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = AuroraCoral,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
+                    .minimumInteractiveComponentSize()
                     .clickable(role = Role.Button, onClick = onAction)
-                    .padding(4.dp),
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
             )
         }
     }
@@ -1042,7 +1058,7 @@ internal fun NetflixSectionHeader(
 internal fun NetflixBadge(
     text: String,
     modifier: Modifier = Modifier,
-    backgroundColor: Color = AuroraCoral,
+    backgroundColor: Color = AuroraBrandAccentDeep,
     textColor: Color = Color.White,
 ) {
     Surface(
@@ -1158,12 +1174,12 @@ internal fun NetflixTopBar(
 
         IconButton(
             onClick = { actualOnCast() },
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.minimumInteractiveComponentSize(),
         ) {
             Icon(
                 imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
-                contentDescription = if (isCasting) "正在投屏至電視" else "投屏",
-                tint = if (isCasting) AuroraCoral else if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
+                contentDescription = if (isCasting) "正在投屏至电视" else "投屏",
+                tint = if (isCasting) MaterialTheme.colorScheme.primary else if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(22.dp),
             )
         }
@@ -1207,6 +1223,7 @@ internal fun NetflixSearchCapsule(
                 if (isDark) Color(0xFF454545) else MaterialTheme.colorScheme.outlineVariant,
             ),
             modifier = modifier
+                .minimumInteractiveComponentSize()
                 .height(36.dp)
                 .clickable(
                     role = Role.Button,
@@ -1454,7 +1471,7 @@ internal fun Modifier.auroraSwipeBack(
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
     val triggerDistancePx = with(density) { 96.dp.toPx() }
-    val edgeThresholdPx = with(density) { 48.dp.toPx() }
+    val edgeThresholdPx = with(density) { 20.dp.toPx() }
 
     this
         .onSizeChanged { containerWidthPx = it.width.toFloat().coerceAtLeast(1f) }

@@ -1,5 +1,6 @@
-import Foundation
 import Combine
+import Foundation
+import UIKit
 
 /// 播放进度记录模型（对齐 Apple TV 待播清单 Up Next 状态机）
 public struct PlaybackRecord: Codable, Identifiable, Equatable {
@@ -48,7 +49,6 @@ public struct PlaybackRecord: Codable, Identifiable, Equatable {
         guard !isManuallyDismissed && !isManuallyCompleted && !isAutoCompleted else {
             return false
         }
-        // 至少有效播放 5 秒以上
         return positionMs >= 5_000
     }
 }
@@ -77,26 +77,64 @@ public final class PlaybackProgressStore: ObservableObject {
         }
     }
 
-    @Published public private(set) var records: [PlaybackRecord] = []
+    @Published public private(set) var records: [PlaybackRecord] = [] {
+        didSet {
+            upNextRecords = Self.computeUpNext(from: records)
+        }
+    }
+
+    /// 缓存化 Up Next 活跃待播清单（避免 SwiftUI 每次重绘对 200 条记录重复过滤排序）
+    @Published public private(set) var upNextRecords: [PlaybackRecord] = []
 
     private let defaults: UserDefaults
     private var lastDiskPersistTime: Date = .distantPast
     private var pendingPersistTask: Task<Void, Never>?
+    nonisolated(unsafe) private var lifecycleObservers: [NSObjectProtocol] = []
 
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         if let data = defaults.data(forKey: Self.storageKey) {
             if let decoded = try? JSONDecoder().decode(LossyPlaybackRecordArray.self, from: data) {
-                self.records = Self.cappedRecords(decoded.items)
+                let initial = Self.cappedRecords(decoded.items)
+                self.records = initial
+                self.upNextRecords = Self.computeUpNext(from: initial)
             } else {
                 self.records = []
+                self.upNextRecords = []
             }
+        }
+
+        let center = NotificationCenter.default
+        let resignToken = center.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.pendingPersistTask != nil else { return }
+                self.flushPendingPersist()
+            }
+        }
+        let terminateToken = center.addObserver(
+            forName: UIApplication.willTerminateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.flushPendingPersist()
+            }
+        }
+        self.lifecycleObservers = [resignToken, terminateToken]
+    }
+
+    deinit {
+        for observer in lifecycleObservers {
+            NotificationCenter.default.removeObserver(observer)
         }
     }
 
-    /// Up Next 活跃待播清单（按最后更新时间降序）
-    public var upNextRecords: [PlaybackRecord] {
-        records
+    private static func computeUpNext(from items: [PlaybackRecord]) -> [PlaybackRecord] {
+        items
             .filter { $0.shouldAppearInUpNext }
             .sorted { $0.lastUpdated > $1.lastUpdated }
     }
@@ -106,7 +144,7 @@ public final class PlaybackProgressStore: ObservableObject {
         records.first { $0.videoId == video.id && $0.sourceName == video.sourceName }
     }
 
-    /// 实时更新播放进度（节流落盘，杜绝播放器高频 I/O 阻塞主线程）
+    /// 实时更新播放进度（节流落盘，切后台/终止时即刻冲刷）
     public func updateProgress(video: VideoItem, positionMs: Int64, durationMs: Int64) {
         guard durationMs > 0 else { return }
 
@@ -186,9 +224,9 @@ public final class PlaybackProgressStore: ObservableObject {
             pendingPersistTask = nil
             persistToDisk(records)
         } else if pendingPersistTask == nil {
-            pendingPersistTask = Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 5_000_000_000) // 5 秒防抖窗口
-                guard !Task.isCancelled else { return }
+            pendingPersistTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled, let self else { return }
                 self.persistToDisk(self.records)
                 self.pendingPersistTask = nil
             }

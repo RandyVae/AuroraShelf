@@ -327,7 +327,7 @@ public struct ComicFeaturedCard: View {
                         .background(AuroraColor.brand.opacity(0.12), in: Capsule())
                         .lineLimit(1)
                 }
-                .frame(height: 18)
+                .frame(minHeight: 18)
             }
             .frame(width: cardWidth)
             .contentShape(Rectangle())
@@ -346,6 +346,8 @@ public struct ComicHeroBanner: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.auroraContainerSize) private var containerSize
 
     public init(
         comic: ComicItem,
@@ -360,11 +362,12 @@ public struct ComicHeroBanner: View {
     }
 
     private var formFactor: DeviceFormFactor {
-        DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
+        DeviceLayout.resolveCurrent(containerSize: containerSize, horizontalSizeClass: horizontalSizeClass)
     }
 
     private var heroHeight: CGFloat {
-        DeviceLayout.heroHeight(for: formFactor, screenHeight: DeviceLayout.currentWindowSize.height)
+        let effectiveHeight = containerSize.height > 0 ? containerSize.height : DeviceLayout.currentWindowSize.height
+        return DeviceLayout.heroHeight(for: formFactor, screenHeight: effectiveHeight)
     }
 
     private var isWideAspect: Bool {
@@ -420,11 +423,11 @@ public struct ComicHeroBanner: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .shadow(color: .black.opacity(0.95), radius: 8, x: 0, y: 3)
+                    .shadow(color: colorScheme == .dark ? .black.opacity(0.95) : .white.opacity(0.75), radius: 8, x: 0, y: 2)
                     .padding(.horizontal, AuroraMetrics.contentInset)
 
                 metadataView
-                    .shadow(color: .black.opacity(0.9), radius: 6, x: 0, y: 2)
+                    .shadow(color: colorScheme == .dark ? .black.opacity(0.9) : .clear, radius: 6, x: 0, y: 2)
 
                 HStack(spacing: AuroraMetrics.spacingM) {
                     readButton
@@ -440,20 +443,24 @@ public struct ComicHeroBanner: View {
 
     @ViewBuilder
     private var metadataView: some View {
+        let primaryMetaColor: Color = colorScheme == .dark ? .white : AuroraColor.textPrimary
+        let secondaryMetaColor: Color = colorScheme == .dark ? .white.opacity(0.85) : AuroraColor.textSecondary
+        let dotColor: Color = colorScheme == .dark ? .white.opacity(0.6) : AuroraColor.textTertiary
+
         HStack(spacing: AuroraMetrics.spacingS) {
             Text("精品漫画")
                 .font(.caption2.bold())
                 .foregroundStyle(.white)
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)
-                .background(.purple.opacity(0.4), in: Capsule())
+                .background(.purple.opacity(colorScheme == .dark ? 0.55 : 0.85), in: Capsule())
 
             if !comic.author.isEmpty {
                 Text(comic.author)
                     .font(.caption.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(primaryMetaColor)
                 Text("•")
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(dotColor)
             }
 
             Text(sourceName)
@@ -462,10 +469,10 @@ public struct ComicHeroBanner: View {
 
             if !comic.latestChapterTitle.isEmpty {
                 Text("•")
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(dotColor)
                 Text(comic.latestChapterTitle)
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(secondaryMetaColor)
                     .lineLimit(1)
             }
         }
@@ -482,8 +489,8 @@ public struct ComicHeroBanner: View {
                     .font(.headline.weight(.bold))
             }
             .frame(maxWidth: .infinity, minHeight: 46)
-            .background(Color.white, in: Capsule())
-            .foregroundStyle(Color.black)
+            .background(colorScheme == .dark ? Color.white : AuroraColor.brand, in: Capsule())
+            .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
         }
         .buttonStyle(AppleSpringCardButtonStyle())
     }
@@ -499,12 +506,15 @@ public struct ComicHeroBanner: View {
             .frame(minHeight: 46)
             .padding(.horizontal, 16)
             .background(.ultraThinMaterial, in: Capsule())
-            .background(Color.black.opacity(0.35), in: Capsule())
+            .background(
+                (colorScheme == .dark ? Color.black.opacity(0.35) : AuroraColor.surfaceHigh.opacity(0.88)),
+                in: Capsule()
+            )
             .overlay(
                 Capsule()
-                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.25) : AuroraColor.hairline, lineWidth: 1)
             )
-            .foregroundStyle(.white)
+            .foregroundStyle(colorScheme == .dark ? Color.white : AuroraColor.textPrimary)
         }
         .buttonStyle(AppleSpringCardButtonStyle())
         .accessibilityHint("切换另一部推荐漫画")
@@ -515,6 +525,7 @@ public struct ComicsScreen: View {
     @ObservedObject public var repo = ComicRepository.shared
     @ObservedObject private var comicDownloadManager = ComicDownloadManager.shared
     public let onOpenSearch: () -> Void
+    public let onPlayVideo: (VideoItem) -> Void
     @State private var detailTask: Task<Void, Never>?
     @State private var detailLoadingState = ComicDetailLoadingState()
     @State private var detailError: String?
@@ -530,9 +541,15 @@ public struct ComicsScreen: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.auroraContainerSize) private var containerSize
     
-    public init(onOpenSearch: @escaping () -> Void = {}) {
+    public init(
+        onOpenSearch: @escaping () -> Void = {},
+        onPlayVideo: @escaping (VideoItem) -> Void = { _ in }
+    ) {
         self.onOpenSearch = onOpenSearch
+        self.onPlayVideo = onPlayVideo
     }
 
     private var spotlightComic: ComicItem? {
@@ -639,9 +656,6 @@ public struct ComicsScreen: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: AuroraMetrics.spacingM) {
-                    AirPlayRoutePicker()
-                        .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-
                     Button {
                         showDownloadCenter = true
                     } label: {
@@ -734,10 +748,19 @@ public struct ComicsScreen: View {
         }
         .sheet(isPresented: $showDownloadCenter) {
             NavigationStack {
-                OfflineDownloadsScreen(initialTab: .comic, showCloseButton: true, onPlayVideo: { _ in })
+                OfflineDownloadsScreen(
+                    initialTab: .comic,
+                    showCloseButton: true,
+                    onPlayVideo: { video in
+                        showDownloadCenter = false
+                        onPlayVideo(video)
+                    }
+                )
             }
         }
         .onAppear {
+            repo.loadComicsIfNeeded()
+            #if DEBUG
             let args = CommandLine.arguments
             if let idx = args.firstIndex(of: "--comic-source"), idx + 1 < args.count {
                 let srcId = args[idx + 1]
@@ -758,6 +781,7 @@ public struct ComicsScreen: View {
                     }
                 }
             }
+            #endif
         }
         .onDisappear {
             cancelComicDetailsLoad()
@@ -996,7 +1020,9 @@ public struct ComicsScreen: View {
     }
 
     private var comicGridColumns: [GridItem] {
-        let minimumWidth: CGFloat = dynamicTypeSize.isAccessibilitySize ? 300 : 152
+        let form = DeviceLayout.resolveCurrent(containerSize: containerSize, horizontalSizeClass: horizontalSizeClass)
+        let baseMin = max(152, DeviceLayout.gridMinimumWidth(for: form))
+        let minimumWidth: CGFloat = dynamicTypeSize.isAccessibilitySize ? 300 : baseMin
         return [GridItem(.adaptive(minimum: minimumWidth, maximum: 340), spacing: AuroraMetrics.spacingM)]
     }
 

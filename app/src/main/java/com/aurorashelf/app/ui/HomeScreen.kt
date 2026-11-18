@@ -88,11 +88,17 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
+import android.animation.ValueAnimator
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aurorashelf.app.data.AccountRepository
+import com.aurorashelf.app.data.AccountState
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -133,6 +139,8 @@ internal fun HomeScreen(
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val accountState by remember(context) { AccountRepository.get(context).state }.collectAsStateWithLifecycle()
     val fontScale = LocalDensity.current.fontScale
     val density = LocalDensity.current
     var headerHeightPx by remember { mutableIntStateOf(0) }
@@ -238,8 +246,10 @@ internal fun HomeScreen(
                         )
                     }
 
-                    item(key = "account-onboarding") {
-                        AccountOnboardingCard(onOpenAccount = onOpenAccount)
+                    if (accountState !is AccountState.SignedIn) {
+                        item(key = "account-onboarding") {
+                            AccountOnboardingCard(onOpenAccount = onOpenAccount)
+                        }
                     }
 
                     state.message?.let { message ->
@@ -568,9 +578,10 @@ private fun NetflixHeroBillboard(
     val video = videos.getOrNull(currentIndex) ?: videos.first()
     val isFavorite = video.id in favoriteIds
 
-    // 6.5s 自动轮播聚光灯画廊
-    LaunchedEffect(videos.size) {
-        if (videos.size > 1) {
+    // 6.5s 自动轮播聚光灯画廊（尊重系统「减少动画」无障碍设置）
+    val reduceMotion = remember { !ValueAnimator.areAnimatorsEnabled() }
+    LaunchedEffect(videos.size, reduceMotion) {
+        if (videos.size > 1 && !reduceMotion) {
             while (true) {
                 delay(6500)
                 currentIndex = (currentIndex + 1) % videos.size
@@ -578,9 +589,10 @@ private fun NetflixHeroBillboard(
         }
     }
 
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp
-    val heroHeight = (screenHeightDp * 0.72f).coerceIn(300f, 460f).dp
     val density = LocalDensity.current
+    val containerHeightPx = LocalWindowInfo.current.containerSize.height
+    val screenHeightDp = if (containerHeightPx > 0) with(density) { containerHeightPx.toDp().value } else 720f
+    val heroHeight = (screenHeightDp * 0.72f).coerceIn(300f, 460f).dp
     var containerSizePx by remember { mutableStateOf(IntSize.Zero) }
     val heroVideo = remember(video) {
         val heroUrl = video.heroThumbnailUrl
@@ -1067,6 +1079,7 @@ private fun VideoGridCard(
                     onFavorite()
                 },
                 modifier = Modifier
+                    .minimumInteractiveComponentSize()
                     .size(36.dp)
                     .offset(x = 6.dp, y = (-4).dp),
             ) {

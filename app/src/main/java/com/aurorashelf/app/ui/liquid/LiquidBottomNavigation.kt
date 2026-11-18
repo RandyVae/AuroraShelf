@@ -41,6 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
@@ -92,8 +93,18 @@ internal fun LiquidBottomNavigation(
 ) {
     require(tabSlots.isNotEmpty())
     require(tabSlots.all { it in 0 until visualItemCount })
-    val accentColor = AuroraCoral
-    val containerColor = AuroraGlassContainerDark.copy(alpha = 0.85f)
+    val isDark = MaterialTheme.colorScheme.background.luminance() <= 0.5f
+    val accentColor = MaterialTheme.colorScheme.primary
+    val containerColor = if (isDark) {
+        AuroraGlassContainerDark.copy(alpha = 0.85f)
+    } else {
+        AuroraGlassContainerLight.copy(alpha = 0.90f)
+    }
+    val activePillTint = if (isDark) {
+        Color.White.copy(alpha = 0.12f)
+    } else {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+    }
     val tabsBackdrop = rememberLayerBackdrop()
 
     BoxWithConstraints(modifier = modifier, contentAlignment = Alignment.CenterStart) {
@@ -280,7 +291,7 @@ internal fun LiquidBottomNavigation(
                     onDrawSurface = {
                         val progress = dragAnimation.pressProgress
                         drawRect(
-                            color = Color.White.copy(alpha = 0.1f),
+                            color = activePillTint,
                             alpha = 1f - progress,
                         )
                         drawRect(Color.Black.copy(alpha = 0.03f * progress))

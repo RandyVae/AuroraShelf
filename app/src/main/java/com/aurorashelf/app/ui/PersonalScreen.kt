@@ -165,7 +165,11 @@ import com.aurorashelf.app.model.FeedCategory
 import com.aurorashelf.app.model.LiveSourceCatalog
 import com.aurorashelf.app.model.LiveSourceInfo
 import com.aurorashelf.app.model.VideoItem
+import com.aurorashelf.app.BuildConfig
+import com.aurorashelf.app.data.AccountRepository
+import com.aurorashelf.app.data.AccountState
 import com.aurorashelf.app.data.AppPreferences
+import com.aurorashelf.app.data.ThemeMode
 import com.aurorashelf.app.data.SourceAddress
 import com.aurorashelf.app.data.PlaybackEpisode
 import com.aurorashelf.app.data.PlaybackResolver
@@ -228,6 +232,7 @@ internal fun PersonalScreen(
     onComicSource: (String) -> Unit,
     onLiveSource: (String) -> Unit = {},
     onOpenCached: (VideoItem) -> Unit,
+    onOpenComicDownload: (DownloadedComicChapter) -> Unit = {},
     onRemoveComicDownload: (String) -> Unit = {},
     onRetryComicDownload: (String) -> Unit = {},
     onClearComicDownloads: () -> Unit = {},
@@ -291,6 +296,7 @@ internal fun PersonalScreen(
                     onComicSource = onComicSource,
                     onLiveSource = onLiveSource,
                     onOpenCached = onOpenCached,
+                    onOpenComicDownload = onOpenComicDownload,
                     onRemoveComicDownload = onRemoveComicDownload,
                     onRetryComicDownload = onRetryComicDownload,
                     onClearComicDownloads = onClearComicDownloads,
@@ -445,12 +451,19 @@ private fun PersonalOverview(
         }
         item { SettingsSectionLabel("应用") }
         item {
+            val context = LocalContext.current
+            val accountState by remember(context) { AccountRepository.get(context) }.state.collectAsStateWithLifecycle()
+            val signedInProfile = (accountState as? AccountState.SignedIn)?.profile
             SettingsNavigationCard {
                 SettingsNavigationRow(
-                    icon = { Icon(Icons.Default.Person, contentDescription = null, tint = AuroraCoral) },
-                    title = "账号",
-                    supporting = "注册登录并为未来会员服务保留权益接口",
-                    value = "免费注册",
+                    icon = { Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                    title = signedInProfile?.displayName?.ifBlank { "账号" } ?: "账号",
+                    supporting = signedInProfile?.email ?: "注册登录并为未来会员服务保留权益接口",
+                    value = when {
+                        signedInProfile == null -> "免费注册"
+                        signedInProfile.isVerified -> "已验证"
+                        else -> "待验证"
+                    },
                     onClick = onAccount,
                     modifier = Modifier.testTag("personal-account-entry"),
                 )
@@ -530,6 +543,7 @@ private fun SettingsScreen(
     onComicSource: (String) -> Unit,
     onLiveSource: (String) -> Unit,
     onOpenCached: (VideoItem) -> Unit,
+    onOpenComicDownload: (DownloadedComicChapter) -> Unit,
     onRemoveComicDownload: (String) -> Unit,
     onRetryComicDownload: (String) -> Unit,
     onClearComicDownloads: () -> Unit,
@@ -539,7 +553,8 @@ private fun SettingsScreen(
     val context = LocalContext.current
     val cacheManager = remember(context) { OfflineCacheManager.get(context) }
     val cachedVideos by cacheManager.entries.collectAsStateWithLifecycle()
-    val preferences = remember(context) { AppPreferences(context) }
+    val preferences = remember(context) { AppPreferences.get(context) }
+    val themeMode by preferences.themeModeFlow.collectAsStateWithLifecycle()
     var videoPreloadEnabled by remember { mutableStateOf(preferences.videoPreloadEnabled) }
     var introAnimationEnabled by remember { mutableStateOf(preferences.introAnimationEnabled) }
     var introSoundEnabled by remember { mutableStateOf(preferences.introSoundEnabled) }
@@ -621,6 +636,8 @@ private fun SettingsScreen(
                     comicDownloadedBytes = comicDownloadedBytes,
                     totalActiveCount = totalActiveCount,
                     combinedActiveProgress = combinedActiveProgress,
+                    themeMode = themeMode,
+                    onThemeModeChange = { nextMode -> preferences.themeMode = nextMode },
                     videoPreloadEnabled = videoPreloadEnabled,
                     onVideoPreloadChange = { enabled ->
                         videoPreloadEnabled = enabled
@@ -673,6 +690,7 @@ private fun SettingsScreen(
                     combinedActiveProgress = combinedActiveProgress,
                     onBack = { route = SettingsRoute.OVERVIEW },
                     onOpenCached = onOpenCached,
+                    onOpenComic = onOpenComicDownload,
                     onBrowseHome = onBrowseHome,
                     onClear = { isComic ->
                         clearTargetIsComic = isComic
@@ -699,6 +717,8 @@ private fun SettingsOverview(
     comicDownloadedBytes: Long,
     totalActiveCount: Int,
     combinedActiveProgress: Float,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
     videoPreloadEnabled: Boolean,
     onVideoPreloadChange: (Boolean) -> Unit,
     introAnimationEnabled: Boolean,
@@ -772,10 +792,9 @@ private fun SettingsOverview(
         }
         item { SettingsSectionLabel("体验") }
         item {
-            SettingsInfoCard(
-                icon = { Icon(Icons.Outlined.Info, contentDescription = null) },
-                title = "跟随系统外观",
-                supporting = "自动使用 Material You 动态色、日间或夜间主题",
+            ThemeModeSelectorCard(
+                selectedMode = themeMode,
+                onSelectMode = onThemeModeChange,
             )
         }
         item {
@@ -808,6 +827,131 @@ private fun SettingsOverview(
                 testTag = "settings-intro-sound",
             )
         }
+        item { SettingsSectionLabel("关于") }
+        item {
+            AboutAndOpenSourceCard()
+        }
+    }
+}
+
+@Composable
+private fun ThemeModeSelectorCard(
+    selectedMode: ThemeMode,
+    onSelectMode: (ThemeMode) -> Unit,
+) {
+    SettingsCard {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+                .testTag("settings-theme-mode"),
+        ) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("外观模式", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "即时切换浅色、深色或跟随系统外观",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                ThemeMode.entries.forEach { mode ->
+                    val isSelected = mode == selectedMode
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onSelectMode(mode) },
+                        label = {
+                            Text(
+                                text = mode.label,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                maxLines = 1,
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .testTag("theme-mode-${mode.storageKey}"),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AboutAndOpenSourceCard() {
+    var showLicensesDialog by rememberSaveable { mutableStateOf(false) }
+    val versionSummary = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
+
+    if (showLicensesDialog) {
+        AlertDialog(
+            onDismissRequest = { showLicensesDialog = false },
+            title = { Text("开源组件与许可声明") },
+            text = {
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.heightIn(max = 360.dp),
+                ) {
+                    item {
+                        Text(
+                            "Netgrey $versionSummary 使用以下开源软件组件，谨向各上游社区致谢：",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    val notices = listOf(
+                        "AndroidX & Jetpack Compose / Material 3" to "Apache License 2.0",
+                        "AndroidX Media3 / ExoPlayer" to "Apache License 2.0",
+                        "Square OkHttp" to "Apache License 2.0",
+                        "Coil Image Loader" to "Apache License 2.0",
+                        "Jsoup HTML Parser" to "MIT License",
+                        "Chris Banes Haze" to "Apache License 2.0",
+                        "Kyant0 AndroidLiquidGlass / Backdrop & Shapes" to "Apache License 2.0",
+                        "TeamNewPipe / PipePipe Extractor & nanojson" to "GNU GPL v3.0 / MIT License",
+                    )
+                    items(notices) { (name, license) ->
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(name, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface)
+                            Text(license, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLicensesDialog = false }) {
+                    Text("关闭")
+                }
+            },
+        )
+    }
+
+    SettingsNavigationCard {
+        SettingsNavigationRow(
+            icon = { Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+            title = "关于与开源许可",
+            supporting = "查看当前构建版本与第三方开源组件许可声明",
+            value = versionSummary,
+            onClick = { showLicensesDialog = true },
+            modifier = Modifier.testTag("settings-about-licenses"),
+        )
     }
 }
 
@@ -1206,6 +1350,7 @@ private fun OfflineCachePage(
     combinedActiveProgress: Float,
     onBack: () -> Unit,
     onOpenCached: (VideoItem) -> Unit,
+    onOpenComic: (DownloadedComicChapter) -> Unit,
     onBrowseHome: () -> Unit,
     onClear: (Boolean) -> Unit,
     onRetry: (OfflineVideo) -> Unit,
@@ -1444,7 +1589,10 @@ private fun OfflineCachePage(
                             )
                             Button(
                                 onClick = onBrowseHome,
-                                colors = ButtonDefaults.buttonColors(containerColor = AuroraCoral, contentColor = Color.White),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ),
                             ) { Text("去首页缓存视频") }
                         }
                     }
@@ -1552,6 +1700,11 @@ private fun OfflineCachePage(
                 items(filteredComics, key = DownloadedComicChapter::id) { chapter ->
                     OfflineComicChapterRow(
                         chapter = chapter,
+                        onOpen = {
+                            if (chapter.status == ComicDownloadStatus.COMPLETED) {
+                                onOpenComic(chapter)
+                            }
+                        },
                         onRetry = { onRetryComic(chapter.id) },
                         onRemove = { onRemoveComic(chapter.id) },
                     )
@@ -1564,6 +1717,7 @@ private fun OfflineCachePage(
 @Composable
 private fun OfflineComicChapterRow(
     chapter: DownloadedComicChapter,
+    onOpen: () -> Unit,
     onRetry: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -1573,11 +1727,13 @@ private fun OfflineComicChapterRow(
         ComicDownloadStatus.QUEUED -> "排队等待 · $maxPages 页"
         ComicDownloadStatus.RESOLVING -> "正在解析章节图片…"
         ComicDownloadStatus.DOWNLOADING -> "下载中 ${chapter.downloadedPages}/$maxPages 页 ($pct%)"
-        ComicDownloadStatus.COMPLETED -> "已完成 · $maxPages 页 · ${formatBytes(chapter.totalBytes)}"
+        ComicDownloadStatus.COMPLETED -> "已完成 · $maxPages 页 · ${formatBytes(chapter.totalBytes)} · 点击离线阅读"
         ComicDownloadStatus.PAUSED -> "已暂停 · ${chapter.downloadedPages}/$maxPages 页"
         ComicDownloadStatus.FAILED -> chapter.errorMessage?.takeIf { it.isNotBlank() }?.let { "失败: $it" } ?: "下载失败"
     }
     Surface(
+        onClick = onOpen,
+        enabled = chapter.status == ComicDownloadStatus.COMPLETED,
         color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),

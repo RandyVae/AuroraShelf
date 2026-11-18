@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -77,6 +78,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -131,6 +133,8 @@ internal fun ForumScreen(
     onClosePost: () -> Unit,
     onSelectSource: (String?) -> Unit = {},
     onSearch: () -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
+    onCloseSearch: () -> Unit = {},
     onSettings: () -> Unit = {},
 ) {
     // Keep the list state in composition while the reader is open.
@@ -151,9 +155,16 @@ internal fun ForumScreen(
         return
     }
 
-    val visiblePosts = remember(state.posts, state.selectedSourceId) {
-        if (state.selectedSourceId == null) state.posts
-        else state.posts.filter { it.sourceId == state.selectedSourceId }
+    BackHandler(enabled = state.isSearchOpen) {
+        onCloseSearch()
+    }
+
+    val visiblePosts = remember(state.posts, state.selectedSourceId, state.searchQuery) {
+        filterForumPosts(
+            posts = state.posts,
+            selectedSourceId = state.selectedSourceId,
+            searchQuery = state.searchQuery,
+        )
     }
 
     LaunchedEffect(Unit) { onEnsureLoaded() }
@@ -262,7 +273,11 @@ internal fun ForumScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
-                        text = "该板块暂未抓取到更多帖子，请下拉刷新或浏览【全部】",
+                        text = if (state.searchQuery.isNotBlank()) {
+                            "未找到与「${state.searchQuery}」匹配的帖子"
+                        } else {
+                            "该板块暂未抓取到更多帖子，请下拉刷新或浏览【全部】"
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -325,37 +340,52 @@ internal fun ForumScreen(
             }
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
-        NetflixTopBar {
-            NetflixSearchCapsule(
-                label = "搜索社区",
-                onClick = onSearch,
+        if (state.isSearchOpen) {
+            CenteredSearchBar(
+                query = state.searchQuery,
+                onQueryChange = onSearchQueryChange,
+                placeholder = "搜索社区帖子、作者或板块",
+                onSearch = {},
+                onBack = onCloseSearch,
+                onClear = { onSearchQueryChange("") },
+                isSearching = state.isLoading,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                testTag = "forum-search-field",
+                forceDark = false,
             )
-        }
-        CategoryStrip(
-            testTag = "forum-category-bar",
-            isScrolled = isScrolled,
-            applyBackground = false,
-        ) {
-            NetflixCategoryChip(
-                selected = state.selectedSourceId == null,
-                onClick = { onSelectSource(null) },
-                label = "全部",
-            )
-            NetflixCategoryChip(
-                selected = state.selectedSourceId == "t66y",
-                onClick = { onSelectSource("t66y") },
-                label = "草榴社区",
-            )
-            NetflixCategoryChip(
-                selected = state.selectedSourceId == "t66y_16",
-                onClick = { onSelectSource("t66y_16") },
-                label = "达盖尔的旗帜",
-            )
-            NetflixCategoryChip(
-                selected = state.selectedSourceId == "t906",
-                onClick = { onSelectSource("t906") },
-                label = "91自拍论坛",
-            )
+        } else {
+            NetflixTopBar {
+                NetflixSearchCapsule(
+                    label = if (state.searchQuery.isNotBlank()) state.searchQuery else "搜索社区",
+                    onClick = onSearch,
+                )
+            }
+            CategoryStrip(
+                testTag = "forum-category-bar",
+                isScrolled = isScrolled,
+                applyBackground = false,
+            ) {
+                NetflixCategoryChip(
+                    selected = state.selectedSourceId == null,
+                    onClick = { onSelectSource(null) },
+                    label = "全部",
+                )
+                NetflixCategoryChip(
+                    selected = state.selectedSourceId == "t66y",
+                    onClick = { onSelectSource("t66y") },
+                    label = "草榴社区",
+                )
+                NetflixCategoryChip(
+                    selected = state.selectedSourceId == "t66y_16",
+                    onClick = { onSelectSource("t66y_16") },
+                    label = "达盖尔的旗帜",
+                )
+                NetflixCategoryChip(
+                    selected = state.selectedSourceId == "t906",
+                    onClick = { onSelectSource("t906") },
+                    label = "91自拍论坛",
+                )
+            }
         }
         if (state.isLoading) {
             LinearProgressIndicator(
@@ -466,7 +496,8 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val imageSaver = remember(context) { ForumImageSaver(context) }
-    val isDarkTheme = true
+    val isDarkTheme = MaterialTheme.colorScheme.background.luminance() <= 0.5f
+    val latestIsDarkTheme by rememberUpdatedState(isDarkTheme)
     val cachedHtml = remember(post.url) { ForumPostCache.get(post.url) }
     val startedAt = remember(post.url) { System.currentTimeMillis() }
     var isLoading by remember(post.url) { mutableStateOf(true) }
@@ -480,6 +511,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     var isSavingImage by remember(post.url) { mutableStateOf(false) }
     var batchSaveProgress by remember(post.url) { mutableStateOf<Pair<Int, Int>?>(null) }
     var detectedImageUrls by remember(post.url) { mutableStateOf<List<String>>(emptyList()) }
+    val latestDetectedImages by rememberUpdatedState(detectedImageUrls)
     var readerUserAgent by remember(post.url) { mutableStateOf("Mozilla/5.0") }
 
     val buildImageRequest: (String, String) -> ForumImageRequest = { imageUrl, currentPageUrl ->
@@ -608,7 +640,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     }
                     earlyStyledGeneration = currentGen
                     view?.applyMobileForumLayout(
-                        isDarkTheme = isDarkTheme,
+                        isDarkTheme = latestIsDarkTheme,
                         onHtml = null,
                         onImages = { imgs -> if (imgs.isNotEmpty()) detectedImageUrls = imgs },
                     ) { wasApplied ->
@@ -635,7 +667,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     if (earlyStyledGeneration == visibleGen) return
                     earlyStyledGeneration = visibleGen
                     view?.applyMobileForumLayout(
-                        isDarkTheme = isDarkTheme,
+                        isDarkTheme = latestIsDarkTheme,
                         onHtml = null,
                         onImages = { imgs -> if (imgs.isNotEmpty()) detectedImageUrls = imgs },
                     ) {
@@ -651,8 +683,8 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     Log.i(TAG, "pageFinished totalMs=${System.currentTimeMillis() - startedAt} cacheHit=${cachedHtml != null}")
                     val finishedGeneration = loadGeneration
                     view?.applyMobileForumLayout(
-                        isDarkTheme = isDarkTheme,
-                        onHtml = { html -> ForumPostCache.put(post.url, html) },
+                        isDarkTheme = latestIsDarkTheme,
+                        onHtml = { html -> ForumPostCache.put(post.url, stripForumThemeClass(html)) },
                         onImages = { imgs -> detectedImageUrls = imgs },
                     ) { wasApplied ->
                         if (finishedGeneration != loadGeneration) return@applyMobileForumLayout
@@ -676,7 +708,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     val targetUri = request?.url ?: return true
                     if (targetUri.scheme == "aurorashelf" && targetUri.host == "save-image") {
                         val imageUrl = targetUri.getQueryParameter("url").orEmpty()
-                        if (imageUrl.isNotBlank()) {
+                        if (isAllowedForumSaveImageUrl(imageUrl, latestDetectedImages)) {
                             val currentPageUrl = view?.url ?: post.url
                             triggerSaveWithPermission(buildImageRequest(imageUrl, currentPageUrl))
                         }
@@ -708,6 +740,13 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
             } else {
                 loadForumPost(post.url)
             }
+        }
+    }
+    LaunchedEffect(webView, isDarkTheme) {
+        if (!isLoading) {
+            webView.evaluateForumScript(
+                "(() => { if (document.body) { document.body.classList.toggle('aurora-dark', $isDarkTheme); return true; } return false; })()",
+            ) {}
         }
     }
     LaunchedEffect(loadGeneration) {
@@ -742,7 +781,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
         enabled = !(canGoBack && webView.canGoBack()),
         onBack = onClose,
     ) {
-        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().testTag("forum-reader")) {
+        Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding().testTag("forum-reader")) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(horizontal = 8.dp),
@@ -923,6 +962,31 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
     }
 }
 
+private val activeForumJsCalls = java.util.WeakHashMap<WebView, java.util.concurrent.atomic.AtomicInteger>()
+
+@SuppressLint("SetJavaScriptEnabled")
+private fun WebView.evaluateForumScript(
+    script: String,
+    onResult: (String?) -> Unit,
+) {
+    val counter = synchronized(activeForumJsCalls) {
+        activeForumJsCalls.getOrPut(this) { java.util.concurrent.atomic.AtomicInteger(0) }.also {
+            it.incrementAndGet()
+        }
+    }
+    settings.javaScriptEnabled = true
+    evaluateJavascript(script) { raw ->
+        try {
+            onResult(raw)
+        } finally {
+            if (counter.decrementAndGet() <= 0) {
+                counter.set(0)
+                settings.javaScriptEnabled = false
+            }
+        }
+    }
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebView.applyMobileForumLayout(
     isDarkTheme: Boolean,
@@ -930,26 +994,23 @@ private fun WebView.applyMobileForumLayout(
     onImages: ((List<String>) -> Unit)? = null,
     onComplete: (Boolean) -> Unit,
 ) {
-    settings.javaScriptEnabled = true
-    evaluateJavascript(mobileForumScript(isDarkTheme)) { result ->
+    evaluateForumScript(mobileForumScript(isDarkTheme)) { result ->
         val applied = result == "true"
         val finishWithHtml: () -> Unit = {
             if (applied && onHtml != null) {
-                evaluateJavascript("document.documentElement.outerHTML") { raw ->
+                evaluateForumScript("document.documentElement.outerHTML") { raw ->
                     if (raw != null && raw != "null") {
                         runCatching { JSONArray("[$raw]").getString(0) }.getOrNull()?.let(onHtml)
                     }
-                    settings.javaScriptEnabled = false
                     onComplete(true)
                 }
             } else {
-                settings.javaScriptEnabled = false
                 onComplete(applied)
             }
         }
 
         if (applied && onImages != null) {
-            evaluateJavascript("JSON.stringify(window.__auroraPostImages || [])") { rawImages ->
+            evaluateForumScript("JSON.stringify(window.__auroraPostImages || [])") { rawImages ->
                 val list = runCatching {
                     val jsonString = rawImages?.takeIf { it != "null" }?.let { JSONArray("[$it]").getString(0) } ?: "[]"
                     val arr = JSONArray(jsonString)
@@ -967,6 +1028,39 @@ private fun WebView.applyMobileForumLayout(
         }
     }
 }
+
+internal fun filterForumPosts(
+    posts: List<ForumPost>,
+    selectedSourceId: String?,
+    searchQuery: String,
+): List<ForumPost> {
+    val sourceFiltered = if (selectedSourceId == null) {
+        posts
+    } else {
+        posts.filter { it.sourceId == selectedSourceId }
+    }
+    val needle = searchQuery.trim()
+    if (needle.isEmpty()) return sourceFiltered
+    return sourceFiltered.filter { post ->
+        post.title.contains(needle, ignoreCase = true) ||
+            post.author.contains(needle, ignoreCase = true) ||
+            post.sourceName.contains(needle, ignoreCase = true)
+    }
+}
+
+internal fun isAllowedForumSaveImageUrl(
+    imageUrl: String,
+    detectedImageUrls: List<String>,
+): Boolean {
+    val trimmed = imageUrl.trim()
+    if (trimmed.isEmpty()) return false
+    val validScheme = trimmed.startsWith("https://", ignoreCase = true) ||
+        trimmed.startsWith("data:image/", ignoreCase = true)
+    return validScheme && trimmed in detectedImageUrls
+}
+
+internal fun stripForumThemeClass(html: String): String =
+    html.replace("aurora-dark", "").replace("  ", " ")
 
 private fun WebView.loadForumPost(url: String) {
     if (!url.contains("t66y.com", ignoreCase = true)) {

@@ -123,7 +123,7 @@
         ],
         vfx: { tacticalLink: true },
         tacticalPrompt: '【双角色协同】Kitty（先锋）与 Dominica（指挥）战术频道接通，阵线协同完毕。',
-        audio: { sfx: 'tutorial/regina_attack/regina_attack.m4a' },
+        audio: { sfx: 'main/regina_attack/regina_attack.m4a' },
         dialogue: {
           speaker: 'Dominica',
           role: '战术指挥',
@@ -226,39 +226,57 @@
       const scr = document.getElementById('screen-story');
       if (!scr) return;
 
+      const chip = document.getElementById('story-event-chip');
+      if (chip) chip.hidden = false;
+      const track = scr.querySelector('.story-timeline-track');
+      if (track) track.hidden = false;
+      const promptEl = document.getElementById('story-tactical-prompt');
+      if (promptEl) promptEl.hidden = false;
+
       const autoBtn = document.getElementById('btn-story-auto');
       if (autoBtn) {
         autoBtn.textContent = this.autoPlay ? '自动播放 (开)' : '自动播放 (关)';
         autoBtn.setAttribute('aria-pressed', this.autoPlay ? 'true' : 'false');
-        autoBtn.onclick = (e) => {
-          e.stopPropagation();
-          this.autoPlay = !this.autoPlay;
-          autoBtn.textContent = this.autoPlay ? '自动播放 (开)' : '自动播放 (关)';
-          autoBtn.setAttribute('aria-pressed', this.autoPlay ? 'true' : 'false');
-          if (this.autoPlay) this.scheduleNext();
-        };
       }
+    },
 
-      const skipBtn = document.getElementById('btn-story-skip');
-      if (skipBtn) {
-        skipBtn.onclick = (e) => {
-          e.stopPropagation();
-          this.skip();
-        };
-      }
-
-      scr.onclick = () => {
-        if (!this.active) return;
-        const textNode = document.getElementById('story-text');
-        const curEvent = this.currentSeq.events[this.eventIndex];
-        const full = (curEvent && curEvent.dialogue && curEvent.dialogue.text) || '';
-        if (textNode && textNode.textContent.length < full.length) {
-          clearTimeout(this.typingTimer);
-          textNode.textContent = full;
-          return;
+    scheduleNext() {
+      clearTimeout(this.eventTimer);
+      if (!this.active || !this.autoPlay || !this.currentSeq) return;
+      const ev = this.currentSeq.events[this.eventIndex];
+      const logEntry = window.PrologueLog && window.PrologueLog[window.PrologueLog.length - 1];
+      this.eventTimer = setTimeout(() => {
+        if (logEntry && logEntry.status === 'active') {
+          logEntry.status = 'completed';
+          logEntry.elapsedMs = performance.now() - logEntry.startTimeMs;
         }
         this.nextEvent();
-      };
+      }, (ev && ev.durationMs) || 1500);
+    },
+
+    toggleAuto(btn) {
+      if (!this.active) return;
+      this.autoPlay = !this.autoPlay;
+      const autoBtn = btn || document.getElementById('btn-story-auto');
+      if (autoBtn) {
+        autoBtn.textContent = this.autoPlay ? '自动播放 (开)' : '自动播放 (关)';
+        autoBtn.setAttribute('aria-pressed', this.autoPlay ? 'true' : 'false');
+      }
+      if (this.autoPlay) this.scheduleNext();
+      else clearTimeout(this.eventTimer);
+    },
+
+    handleTap() {
+      if (!this.active || !this.currentSeq) return;
+      const textNode = document.getElementById('story-text');
+      const curEvent = this.currentSeq.events[this.eventIndex];
+      const full = (curEvent && curEvent.dialogue && curEvent.dialogue.text) || '';
+      if (textNode && textNode.textContent.length < full.length) {
+        clearTimeout(this.typingTimer);
+        textNode.textContent = full;
+        return;
+      }
+      this.nextEvent();
     },
 
     startEvent(idx) {
@@ -344,10 +362,10 @@
       if (ev.audio) {
         if (ev.audio.bgm && window.LGAudio) window.LGAudio.playBgm(ev.audio.bgm);
         if (ev.audio.sfx && window.LGAudio) {
-          if (ev.audio.sfx.includes('breath')) {
+          if (ev.audio.sfx.endsWith('.m4a') || ev.audio.sfx.includes('/')) {
             window.LGAudio.playVoice(ev.audio.sfx);
           } else {
-            window.LGAudio.playSfx('attack');
+            window.LGAudio.playSfx(ev.audio.sfx);
           }
         }
       }
@@ -527,7 +545,7 @@
       this.finish();
     },
 
-    finish() {
+    _cleanupOverlayDom() {
       this.active = false;
       clearTimeout(this.eventTimer);
       clearTimeout(this.typingTimer);
@@ -544,10 +562,36 @@
       }
 
       const scr = document.getElementById('screen-story');
-      if (scr) scr.classList.remove('prologue-mode');
+      if (scr) {
+        scr.classList.remove('prologue-mode');
+        const track = scr.querySelector('.story-timeline-track');
+        if (track) track.hidden = true;
+      }
+      const chip = document.getElementById('story-event-chip');
+      if (chip) chip.hidden = true;
+      const promptEl = document.getElementById('story-tactical-prompt');
+      if (promptEl) promptEl.hidden = true;
+      const suppActor = document.getElementById('story-supp-actor');
+      if (suppActor) suppActor.hidden = true;
+      const enemyActor = document.getElementById('story-enemy-actor');
+      if (enemyActor) enemyActor.hidden = true;
+      const spineCanvas = document.getElementById('story-spine-canvas');
+      if (spineCanvas) spineCanvas.hidden = true;
+      const dialogBox = document.querySelector('.story-dialog');
+      if (dialogBox) dialogBox.style.opacity = '1';
+    },
 
-      if (typeof this.onComplete === 'function') {
-        this.onComplete();
+    abort() {
+      this.onComplete = null;
+      this._cleanupOverlayDom();
+    },
+
+    finish() {
+      const done = this.onComplete;
+      this.onComplete = null;
+      this._cleanupOverlayDom();
+      if (typeof done === 'function') {
+        done();
       }
     }
   };

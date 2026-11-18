@@ -16,6 +16,7 @@ import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.VideoDetailMetadata
 import com.aurorashelf.app.model.VideoItem
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -146,17 +147,6 @@ class PlaybackResolver {
             return@withContext it.rememberFor(pageUrl, startedAtMs)
         }
 
-        // 黄果详情页将播放按钮指向 /video/...，媒体地址只在该播放页的数据节点中发布。
-        page.select("a.hg-web-detail__play[href], a[href*=/video/]")
-            .asSequence()
-            .mapNotNull { SourceAddress.resolve(page.baseUri(), it.attr("href")) }
-            .distinct()
-            .firstNotNullOfOrNull { playbackUrl -> parse(fetch(playbackUrl))?.let { it to playbackUrl } }
-            ?.let { (source, playbackUrl) ->
-                Log.i(TAG, "resolve linked source host=${runCatching { java.net.URI(source.url).host }.getOrNull()} type=${mediaType(source.url)}")
-                return@withContext source.copy(referer = playbackUrl).rememberFor(pageUrl, startedAtMs)
-            }
-
         throw IOException("页面未提供可识别的视频地址，请重试或检查站点是否要求登录")
     }
 
@@ -215,7 +205,7 @@ class PlaybackResolver {
         Log.i(TAG, "timing resolve ms=${System.currentTimeMillis() - startedAtMs} cache=miss")
     }
 
-    internal fun resolve91Dongman(pageUrl: String, startedAtMs: Long): PlaybackSource {
+    internal suspend fun resolve91Dongman(pageUrl: String, startedAtMs: Long): PlaybackSource {
         val document = fetch(pageUrl)
         val html = document.html()
         val videoUrlAttr = document.selectFirst("div[data-video-url]")?.attr("data-video-url")?.takeIf(String::isNotBlank)
@@ -246,7 +236,7 @@ class PlaybackResolver {
         return source.rememberFor(pageUrl, startedAtMs)
     }
 
-    internal fun resolveHuangguoEpisodes(detailUrl: String): List<PlaybackEpisode> {
+    internal suspend fun resolveHuangguoEpisodes(detailUrl: String): List<PlaybackEpisode> {
         val dramaId = Regex("""/(?:video|detail|play)/(\d+)""").find(detailUrl)?.groupValues?.get(1)
         val origin = runCatching {
             val uri = URI(detailUrl)
@@ -275,12 +265,12 @@ class PlaybackResolver {
         return parseEpisodes(fetch(detailUrl), detailUrl)
     }
 
-    internal fun resolveHuangguo(pageUrl: String, startedAtMs: Long): PlaybackSource {
+    internal suspend fun resolveHuangguo(pageUrl: String, startedAtMs: Long): PlaybackSource {
         val pageUri = runCatching { URI(pageUrl) }.getOrNull()
         val origin = if (pageUri?.scheme != null && pageUri.host != null) {
             "${pageUri.scheme}://${pageUri.host}"
         } else {
-            "https://huangguoai.com"
+            HuangguoEdgeGateway.DEFAULT_ORIGIN
         }
         val dramaId = Regex("""/(?:video|detail|play)/(\d+)""").find(pageUrl)?.groupValues?.get(1)
         val episodeNum = Regex("""/ep-(\d+)""").find(pageUrl)?.groupValues?.get(1)?.toIntOrNull()
@@ -288,36 +278,7 @@ class PlaybackResolver {
             ?: 1
 
         if (dramaId != null) {
-            // 1. 核心优先：直接请求 POST /api/videos/{id}/episodes/{ep}/playback（150ms 极速直签直出，与官方 cyber-video 保持一致）
-            val ep = episodeNum.coerceAtLeast(1)
-            val apiEndpoint = "${origin}/api/videos/$dramaId/episodes/$ep/playback"
-            val apiResult = runCatching {
-                val conn = Jsoup.connect(apiEndpoint)
-                    .method(org.jsoup.Connection.Method.POST)
-                    .requestBody("{}")
-                    .header("Content-Type", "application/json")
-                    .header("Referer", pageUrl)
-                    .header("Origin", origin)
-                    .userAgent(VideoRepository.USER_AGENT)
-                    .ignoreContentType(true)
-                    .timeout(5_000)
-                    .execute()
-                val body = conn.body()
-                val m3u8Url = Regex(""""main"\s*:\s*"([^"]+)"""").find(body)?.groupValues?.get(1)
-                    ?: Regex(""""preview"\s*:\s*"([^"]+)"""").find(body)?.groupValues?.get(1)
-                    ?: Regex(""""hevc"\s*:\s*"([^"]+)"""").find(body)?.groupValues?.get(1)
-                if (!m3u8Url.isNullOrBlank()) {
-                    val cleanUrl = cleanHlsUrl(decodeJson(m3u8Url))
-                    PlaybackSource(url = cleanUrl, referer = "$origin/")
-                } else null
-            }.getOrNull()
-
-            if (apiResult != null) {
-                Log.i(TAG, "resolve huangguo api host=${runCatching { URI(apiResult.url).host }.getOrNull()} type=${mediaType(apiResult.url)}")
-                return apiResult.rememberFor(pageUrl, startedAtMs)
-            }
-
-            // 2. 备用降级：Edge 网关
+            // Delegate to HuangguoEdgeGateway (pooled OkHttp POST /playback -> Edge envelope fallback, zero double POST)
             val edgePlayUrl = HuangguoEdgeGateway.fetchEpisodePlayUrl(origin, dramaId, episodeNum)
             if (!edgePlayUrl.isNullOrBlank()) {
                 val cleanUrl = cleanHlsUrl(edgePlayUrl)
@@ -331,14 +292,13 @@ class PlaybackResolver {
         parse(page)?.let {
             return it.rememberFor(pageUrl, startedAtMs)
         }
-        page.select("a.hg-web-detail__play[href], a[href*=/video/]")
-            .asSequence()
-            .mapNotNull { SourceAddress.resolve(page.baseUri(), it.attr("href")) }
-            .distinct()
-            .firstNotNullOfOrNull { playbackUrl -> parse(fetch(playbackUrl))?.let { it to playbackUrl } }
-            ?.let { (source, playbackUrl) ->
-                return source.copy(referer = playbackUrl).rememberFor(pageUrl, startedAtMs)
+        for (element in page.select("a.hg-web-detail__play[href], a[href*=/video/]")) {
+            val playbackUrl = SourceAddress.resolve(page.baseUri(), element.attr("href")) ?: continue
+            val parsed = parse(fetch(playbackUrl))
+            if (parsed != null) {
+                return parsed.copy(referer = playbackUrl).rememberFor(pageUrl, startedAtMs)
             }
+        }
 
         throw IOException("无法获取黄果短剧播放流")
     }
@@ -441,11 +401,6 @@ class PlaybackResolver {
                 return PlaybackSource(it, pageLocation)
             }
 
-        if (ContentSourceCatalog.isMissAv(pageLocation)) {
-            extractMissAvHls(page.html())?.let {
-                return PlaybackSource(it, pageLocation)
-            }
-        }
         return null
     }
 
@@ -980,7 +935,8 @@ class PlaybackResolver {
         episodeParam: String,
         startedAtMs: Long,
     ): PlaybackSource {
-        val cachedToken = huavodTokenCache.get(episodeParam)
+        // Atomically check out any prewarmed token (`mt` is single-use and must not remain in cache while waiting).
+        val cachedToken = huavodTokenCache.removeAndGet(episodeParam)
         val (token, adDurationMs, issuedAtMs, channelKey) = cachedToken ?: run {
             val nextUrl = "https://huavod.com/Player/next?episode=$episodeParam"
             val responseText = Jsoup.connect(nextUrl)
@@ -995,9 +951,7 @@ class PlaybackResolver {
                 ?: throw IOException("未能获取播放令牌")
             val adMs = Regex(""""ad_duration_ms"\s*:\s*(\d+)""").find(responseText)?.groupValues?.get(1)?.toLongOrNull() ?: 0L
             val ck = Regex(""""channel_key"\s*:\s*"([^"]+)"""").find(responseText)?.groupValues?.get(1)?.replace("\\/", "/")
-            val entry = HuavodTokenEntry(mt, adMs, System.currentTimeMillis(), ck)
-            huavodTokenCache.put(episodeParam, entry)
-            entry
+            HuavodTokenEntry(mt, adMs, System.currentTimeMillis(), ck)
         }
 
         // Direct fast path: if channelKey is not BunnyCDN, play immediately without waiting!
@@ -1073,7 +1027,7 @@ class PlaybackResolver {
         }
     }
 
-    private fun fetch(url: String): Document {
+    private suspend fun fetch(url: String): Document {
         val startedAtMs = System.currentTimeMillis()
         var fetched = false
         val headers = buildMap {
@@ -1083,14 +1037,16 @@ class PlaybackResolver {
                 put("Accept-Language", "zh-CN,zh;q=0.9")
             }
         }
-        val document = pageCache.get(url) {
+        val document = pageCache.getAsync(url) {
             fetched = true
-            AuroraHttpClient.fetchDocument(
-                url = url,
-                sourceKey = SourceHealthRegistry.sourceKeyForUrl(url),
-                headers = headers,
-                timeoutMs = 15_000L,
-            )
+            withContext(Dispatchers.IO) {
+                AuroraHttpClient.fetchDocument(
+                    url = url,
+                    sourceKey = SourceHealthRegistry.sourceKeyForUrl(url),
+                    headers = headers,
+                    timeoutMs = 15_000L,
+                )
+            }
         }
         Log.i(
             TAG,
@@ -1121,7 +1077,7 @@ class PlaybackResolver {
         private val huavodScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         private val ENCODED_SOURCE = Regex("""strencode2\(\s*["']([^"']+)["']\s*\)""")
         private val ESCAPE = Regex("%u([0-9a-fA-F]{4})|%([0-9a-fA-F]{2})")
-        private val JSON_STRING = Regex("""\"([^\"]+)\"\s*:\s*\"((?:\\\\.|[^\"\\\\])*)\"""")
+        internal val JSON_STRING = Regex(""""([^"\\]+)"\s*:\s*"([^"\\]*+(?:\\.[^"\\]*+)*+)"""")
         private val JSON_EPISODES = Regex("""\"epPlaySrcs\"\s*:\s*\{(.*?)\}""", setOf(RegexOption.DOT_MATCHES_ALL))
         private val MEDIA_EXTENSIONS = setOf(".m3u8", ".mp4", ".m4v", ".webm", ".mov", ".mkv", ".ts")
         private val BLOCKED_AD_HOSTS = setOf(
@@ -1185,6 +1141,12 @@ internal class CachedValue<V>(
         synchronized(lock) { entries.remove(key) }
     }
 
+    /** Atomically removes and returns [key] if present and non-expired (single-use checkout). */
+    fun removeAndGet(key: String): V? = synchronized(lock) {
+        val entry = entries.remove(key) ?: return@synchronized null
+        if (entry.expiresAtMs <= clock()) null else entry.value
+    }
+
     fun clear() = synchronized(lock) {
         entries.clear()
     }
@@ -1210,6 +1172,47 @@ internal class PageFetchCache(
     private val lock = Any()
     private val entries = LinkedHashMap<String, Entry>(16, 0.75f, true)
     private val inFlight = HashMap<String, FutureTask<Document>>()
+    private val asyncInFlight = HashMap<String, CompletableDeferred<Document>>()
+
+    /**
+     * Coroutine single-flight fetch: suspends joining callers without blocking carrier threads.
+     */
+    suspend fun getAsync(url: String, load: suspend () -> Document): Document {
+        var ownsLoad = false
+        val deferred: CompletableDeferred<Document>
+        synchronized(lock) {
+            val entry = entries[url]
+            if (entry != null) {
+                if (entry.expiresAtMs > clock()) return entry.document
+                entries.remove(url)
+            }
+            val pending = asyncInFlight[url]
+            if (pending != null) {
+                deferred = pending
+            } else {
+                val created = CompletableDeferred<Document>()
+                asyncInFlight[url] = created
+                deferred = created
+                ownsLoad = true
+            }
+        }
+        if (!ownsLoad) {
+            return deferred.await()
+        }
+        return try {
+            val document = load()
+            store(url, document)
+            deferred.complete(document)
+            document
+        } catch (failure: Throwable) {
+            deferred.completeExceptionally(failure)
+            throw failure
+        } finally {
+            synchronized(lock) {
+                asyncInFlight.remove(url, deferred)
+            }
+        }
+    }
 
     fun get(url: String, load: () -> Document): Document {
         var ownsLoad = false

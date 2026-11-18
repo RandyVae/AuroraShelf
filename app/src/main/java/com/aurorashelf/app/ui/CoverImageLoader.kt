@@ -58,7 +58,12 @@ internal object CoverImageLoader {
         "霜花店" to "https://img9.doubanio.com/view/photo/l_ratio_poster/public/p453856276.jpg",
     )
     private const val DOUBAN_NEGATIVE_SENTINEL = "__NO_DOUBAN_POSTER__"
-    private val doubanUrlCache = ConcurrentHashMap<String, String>()
+    private val doubanUrlCache = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, String>(64, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean =
+                size > 256
+        },
+    )
     private val doubanClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(4, TimeUnit.SECONDS)
@@ -193,13 +198,34 @@ internal object CoverImageLoader {
         return resolved
     }
 
+    /**
+     * Synchronous, zero-I/O memory-cache lookup so Compose lists can render cached covers on frame 1
+     * without flashing a placeholder/spinner during scroll recycling.
+     */
+    fun peekMemory(address: String, referer: String = "", title: String? = null): ByteArray? {
+        val activeLoader = sharedLoader ?: return null
+        val normalized = normalizeThumbnailUrl(address)
+        val upgraded = upgradeCoverUrl(normalized)
+        val primaryUrl = upgraded ?: normalized
+        if (primaryUrl.isNotBlank()) {
+            activeLoader.peekMemory(primaryUrl)?.let { return it }
+        }
+        if (!title.isNullOrBlank() && referer.contains("huavod.com", ignoreCase = true)) {
+            quickDoubanLookup(title)?.let { doubanUrl ->
+                activeLoader.peekMemory(doubanUrl)?.let { return it }
+            }
+        }
+        return null
+    }
+
     @JvmOverloads
     fun load(address: String, referer: String, title: String? = null): ByteArray? {
         val normalized = normalizeThumbnailUrl(address)
         val upgraded = upgradeCoverUrl(normalized)
         val isDeadOrPlaceholder = upgraded == null || isDeadCoverHost(normalized)
+        val isHuavodContext = referer.contains("huavod.com", ignoreCase = true)
 
-        if (isDeadOrPlaceholder && !title.isNullOrBlank()) {
+        if (isDeadOrPlaceholder && isHuavodContext && !title.isNullOrBlank()) {
             resolveDoubanPosterUrl(title)?.let { doubanUrl ->
                 loader().load(doubanUrl, "https://movie.douban.com/")?.let { return it }
             }
@@ -210,9 +236,7 @@ internal object CoverImageLoader {
             loader().load(primaryUrl, referer)?.let { return it }
         }
 
-        if (!title.isNullOrBlank() &&
-            (referer.contains("huavod.com", ignoreCase = true) || isDeadOrPlaceholder)
-        ) {
+        if (!title.isNullOrBlank() && isHuavodContext) {
             resolveDoubanPosterUrl(title)?.let { doubanUrl ->
                 if (doubanUrl != primaryUrl) {
                     loader().load(doubanUrl, "https://movie.douban.com/")?.let { return it }
@@ -505,6 +529,8 @@ internal class CoverLoader(
 ) {
     private val flights = ConcurrentHashMap<String, Flight>()
     private val negativeUntil = ConcurrentHashMap<String, Long>()
+
+    fun peekMemory(address: String): ByteArray? = cache.memoryGet(address)
 
     fun load(address: String, referer: String): ByteArray? {
         cache.memoryGet(address)?.let { return it }

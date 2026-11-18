@@ -262,16 +262,17 @@ public struct ForumFeaturedCard: View {
                     .stroke(AuroraColor.hairline, lineWidth: 1)
             )
 
-            // 2. 标题固定高度插槽（38pt），无论单行双行均顶部对齐
+            // 2. 标题最小高度插槽（38pt），适应大字号且无论单行双行均顶部对齐
             Text(post.title)
                 .font(.subheadline)
                 .fontWeight(.semibold)
                 .foregroundStyle(AuroraColor.textPrimary)
-                .lineLimit(2)
+                .lineLimit(2, reservesSpace: true)
                 .multilineTextAlignment(.leading)
-                .frame(width: cardWidth, height: 38, alignment: .topLeading)
+                .frame(width: cardWidth, alignment: .topLeading)
+                .frame(minHeight: 38, alignment: .topLeading)
 
-            // 3. 元数据固定高度插槽（16pt）
+            // 3. 元数据最小高度插槽（16pt）
             HStack(spacing: 6) {
                 if let author = post.author, !author.isEmpty {
                     Text(author)
@@ -293,7 +294,8 @@ public struct ForumFeaturedCard: View {
                         .foregroundStyle(AuroraColor.textSecondary)
                 }
             }
-            .frame(width: cardWidth, height: 16)
+            .frame(width: cardWidth)
+            .frame(minHeight: 16)
         }
         .frame(width: cardWidth, alignment: .topLeading)
     }
@@ -307,6 +309,8 @@ public struct ForumHeroBillboard: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.auroraContainerSize) private var containerSize
 
     public init(
         post: ForumPostItem,
@@ -319,11 +323,12 @@ public struct ForumHeroBillboard: View {
     }
 
     private var formFactor: DeviceFormFactor {
-        DeviceLayout.resolveCurrent(horizontalSizeClass: horizontalSizeClass)
+        DeviceLayout.resolveCurrent(containerSize: containerSize, horizontalSizeClass: horizontalSizeClass)
     }
 
     private var heroHeight: CGFloat {
-        DeviceLayout.heroHeight(for: formFactor, screenHeight: DeviceLayout.currentWindowSize.height)
+        let effectiveHeight = containerSize.height > 0 ? containerSize.height : DeviceLayout.currentWindowSize.height
+        return DeviceLayout.heroHeight(for: formFactor, screenHeight: effectiveHeight)
     }
 
     private var isWideAspect: Bool {
@@ -396,11 +401,11 @@ public struct ForumHeroBillboard: View {
                     .multilineTextAlignment(.center)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                     .fixedSize(horizontal: false, vertical: true)
-                    .shadow(color: .black.opacity(0.95), radius: 8, x: 0, y: 3)
+                    .shadow(color: colorScheme == .dark ? .black.opacity(0.95) : .white.opacity(0.75), radius: 8, x: 0, y: 2)
                     .padding(.horizontal, AuroraMetrics.contentInset)
 
                 metadataView
-                    .shadow(color: .black.opacity(0.9), radius: 6, x: 0, y: 2)
+                    .shadow(color: colorScheme == .dark ? .black.opacity(0.9) : .clear, radius: 6, x: 0, y: 2)
 
                 HStack(spacing: AuroraMetrics.spacingM) {
                     enterButton
@@ -416,6 +421,10 @@ public struct ForumHeroBillboard: View {
 
     @ViewBuilder
     private var metadataView: some View {
+        let primaryMetaColor: Color = colorScheme == .dark ? .white : AuroraColor.textPrimary
+        let secondaryMetaColor: Color = colorScheme == .dark ? .white.opacity(0.85) : AuroraColor.textSecondary
+        let dotColor: Color = colorScheme == .dark ? .white.opacity(0.6) : AuroraColor.textTertiary
+
         HStack(spacing: AuroraMetrics.spacingS) {
             Text("热帖聚焦")
                 .font(.caption2.bold())
@@ -434,18 +443,18 @@ public struct ForumHeroBillboard: View {
 
             if let author = post.author {
                 Text("•")
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(dotColor)
                 Text(author)
                     .font(.caption.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(primaryMetaColor)
             }
 
             if let replies = post.replies {
                 Text("•")
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(dotColor)
                 Text("\(replies) 回复")
                     .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.85))
+                    .foregroundStyle(secondaryMetaColor)
             }
         }
         .lineLimit(1)
@@ -461,8 +470,8 @@ public struct ForumHeroBillboard: View {
                     .font(.headline.weight(.bold))
             }
             .frame(maxWidth: .infinity, minHeight: 46)
-            .background(Color.white, in: Capsule())
-            .foregroundStyle(Color.black)
+            .background(colorScheme == .dark ? Color.white : AuroraColor.brand, in: Capsule())
+            .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
         }
         .buttonStyle(AppleSpringCardButtonStyle())
     }
@@ -478,12 +487,15 @@ public struct ForumHeroBillboard: View {
             .frame(minHeight: 46)
             .padding(.horizontal, 16)
             .background(.ultraThinMaterial, in: Capsule())
-            .background(Color.black.opacity(0.35), in: Capsule())
+            .background(
+                (colorScheme == .dark ? Color.black.opacity(0.35) : AuroraColor.surfaceHigh.opacity(0.88)),
+                in: Capsule()
+            )
             .overlay(
                 Capsule()
-                    .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                    .stroke(colorScheme == .dark ? Color.white.opacity(0.25) : AuroraColor.hairline, lineWidth: 1)
             )
-            .foregroundStyle(.white)
+            .foregroundStyle(colorScheme == .dark ? Color.white : AuroraColor.textPrimary)
         }
         .buttonStyle(AppleSpringCardButtonStyle())
         .accessibilityHint("切换另一篇推荐热帖")
@@ -629,9 +641,6 @@ public struct ForumScreen: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: AuroraMetrics.spacingM) {
-                    AirPlayRoutePicker()
-                        .frame(width: AuroraMetrics.minTouchTarget, height: AuroraMetrics.minTouchTarget)
-
                     Button(action: onOpenSearch) {
                         Image(systemName: "magnifyingglass")
                             .font(.body)
@@ -643,6 +652,9 @@ public struct ForumScreen: View {
                     .accessibilityLabel("搜索社区")
                 }
             }
+        }
+        .onAppear {
+            repo.loadPostsIfNeeded()
         }
     }
 

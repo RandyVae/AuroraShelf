@@ -147,7 +147,7 @@ public struct Top10Card: View {
                 }
             }
             .lineLimit(1)
-            .frame(height: 18)
+            .frame(minHeight: 18)
         }
         .frame(width: cardWidth + (rank >= 10 ? rankWidthDouble : rankWidthSingle) + 6)
         .contextMenu {

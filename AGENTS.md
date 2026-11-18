@@ -1,6 +1,6 @@
 # Project
 
-Netgrey · Android & iOS 2.16.40
+Netgrey · Android & iOS 2.17.0
 
 # Objective
 
@@ -70,11 +70,11 @@ Check `git status` before editing. Update `.ai` after each meaningful stage. Rec
 ## 缺陷修复后全源连通性与 UI 防错位全量核验规范（核心强制）
 
 - **全源连通性全量核验（核心强制）**：
-  任何缺陷修复（Bug Fix）、数据源网络策略调整或数据模型重构后，**严禁仅测试当前改动的单个源即草率交付**。必须对工程内支持的全部源进行一次全量连通性与解析可用性检查（涵盖 19 个视频流媒体源、黄果短剧源、漫画源、直播源、社区论坛源、图床 CDN 等）：
+  任何缺陷修复（Bug Fix）、数据源网络策略调整或数据模型重构后，**严禁仅测试当前改动的单个源即草率交付**。必须对工程内支持的全部源进行一次全量连通性与解析可用性检查（涵盖 18 个视频流媒体源、黄果短剧源、漫画源、直播源、社区论坛源、图床 CDN 等）：
   1. 验证 Feed 列表数据解析返回有效项目；
   2. 验证封面与切片图片通过防盗链/代理加载正常解码；
   3. 验证播放直链或切片解析成功且协议有效（无 SSL/TLS 证书握手阻断、无 403 跨域拦截、无协程/Task 自身死锁）；
-  4. 可直接执行全源探针自动化测试：`RUN_IOS_LIVE_SOURCE_AUDIT=1 xcodebuild test -project ios/AuroraShelf.xcodeproj -scheme AuroraShelf -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -only-testing:AuroraShelfTests/LiveVideoSourceAuditTests`。
+  4. 可直接执行全源探针自动化测试：`TEST_RUNNER_RUN_IOS_LIVE_SOURCE_AUDIT=1 xcodebuild test -project ios/AuroraShelf.xcodeproj -scheme AuroraShelf -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -only-testing:AuroraShelfTests/LiveVideoSourceAuditTests`。
 - **UI 多形态防错位与防截断核验（核心强制）**：
   任何缺陷修复或界面调整后，**必须对全链路 UI 进行系统性防错位与防溢出核验**：
   1. 严禁出现布局错位、元素腰斩、文字省略截断（如“...”）、图文重叠、边距塌陷或超出视口等视觉回归问题；

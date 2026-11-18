@@ -40,7 +40,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
         configuration.allowsAirPlayForMediaPlayback = true
-        configuration.allowsPictureInPictureMediaPlayback = true
+        configuration.allowsPictureInPictureMediaPlayback = false
 
         // 注入关键年满 18 岁及协议确认 Cookie（覆盖 Stripchat 与 Chaturbate/HornyStudents）
         let cookieStore = configuration.websiteDataStore.httpCookieStore
@@ -510,22 +510,57 @@ public struct StripchatLiveWebView: UIViewRepresentable {
     }
 
     public static func dismantleUIView(_ webView: WKWebView, coordinator: Coordinator) {
+        coordinator.isDismantled = true
         coordinator.playTimeoutTask?.cancel()
         coordinator.playTimeoutTask = nil
-        webView.evaluateJavaScript("if (window.__auroraHookInterval) clearInterval(window.__auroraHookInterval);", completionHandler: nil)
+        let teardownJS = """
+        if (window.__auroraHookInterval) { clearInterval(window.__auroraHookInterval); window.__auroraHookInterval = null; }
+        document.querySelectorAll('video, audio').forEach(function(el) {
+            try { el.pause(); el.muted = true; el.srcObject = null; el.removeAttribute('src'); el.load(); } catch(e) {}
+        });
+        """
+        webView.evaluateJavaScript(teardownJS, completionHandler: nil)
+        webView.pauseAllMediaPlayback()
+        webView.closeAllMediaPresentations(completionHandler: {})
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.configuration.userContentController.removeAllUserScripts()
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "liveBridge")
+        webView.loadHTMLString("", baseURL: nil)
     }
 
     public final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
+        private static let allowedLiveCertDomains: [String] = [
+            "stripchat.com",
+            "chaturbate.com",
+            "hornystudents.com",
+            "mmcdn.com",
+            "doppiocdn.com",
+            "doppiocdn.media",
+            "doppiocdn.live",
+            "doppiocdn.net",
+            "doppiocdn.org",
+            "highwebmedia.com",
+            "cb-wl.com"
+        ]
+
+        static func isAllowedLiveHost(_ rawHost: String?) -> Bool {
+            guard let host = rawHost?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                  !host.isEmpty else {
+                return false
+            }
+            return allowedLiveCertDomains.contains { domain in
+                host == domain || host.hasSuffix(".\(domain)")
+            }
+        }
+
         var parent: StripchatLiveWebView
         weak var webView: WKWebView?
         var requestedURL: URL?
         var currentFillMode: Bool = false
         var lastReportedDimension: CGSize?
         var playTimeoutTask: DispatchWorkItem?
+        var isDismantled: Bool = false
 
         init(_ parent: StripchatLiveWebView) {
             self.parent = parent
@@ -536,7 +571,7 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         private func startPlayTimeoutWatchdog() {
             playTimeoutTask?.cancel()
             let task = DispatchWorkItem { [weak self] in
-                guard let self = self else { return }
+                guard let self = self, !self.isDismantled else { return }
                 if self.parent.isLoading && self.parent.errorMessage == nil {
                     self.parent.isLoading = false
                     self.parent.errorMessage = "主播当前离线或暂未开播"
@@ -547,14 +582,15 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         }
 
         public func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard message.name == "liveBridge",
+            guard !isDismantled,
+                  message.name == "liveBridge",
                   let body = message.body as? [String: Any],
                   let type = body["type"] as? String else {
                 return
             }
 
             DispatchQueue.main.async { [weak self] in
-                guard let self = self else { return }
+                guard let self = self, !self.isDismantled else { return }
                 switch type {
                 case "playing":
                     self.playTimeoutTask?.cancel()
@@ -611,19 +647,21 @@ public struct StripchatLiveWebView: UIViewRepresentable {
         }
 
         public func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            guard !isDismantled else { return }
             let nsErr = error as NSError
             if nsErr.code == NSURLErrorCancelled { return }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isDismantled else { return }
                 self.parent.isLoading = false
                 self.parent.errorMessage = "网络连接中断，请重试"
             }
         }
 
         public func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            guard !isDismantled else { return }
             let nsErr = error as NSError
             if nsErr.code == NSURLErrorCancelled { return }
 
-            // 失败时自动平滑切入备用线路
             if let currentUrl = self.requestedURL {
                 let currentHost = currentUrl.host ?? ""
                 var fallbackUrl: URL? = nil
@@ -643,18 +681,28 @@ public struct StripchatLiveWebView: UIViewRepresentable {
                 }
             }
 
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isDismantled else { return }
                 self.parent.isLoading = false
                 self.parent.errorMessage = "网络连接超时，请检查网络后点击重试"
             }
         }
 
-        nonisolated public func webView(
+        @MainActor
+        public func webView(
             _ webView: WKWebView,
             didReceive challenge: URLAuthenticationChallenge,
-            completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+            completionHandler: @escaping @MainActor (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
         ) {
-            PermissiveURLSessionDelegate.handleChallenge(challenge, completionHandler: completionHandler)
+            guard Self.isAllowedLiveHost(challenge.protectionSpace.host) else {
+                completionHandler(.performDefaultHandling, nil)
+                return
+            }
+            PermissiveURLSessionDelegate.handleChallenge(challenge) { disposition, credential in
+                Task { @MainActor in
+                    completionHandler(disposition, credential)
+                }
+            }
         }
     }
 }

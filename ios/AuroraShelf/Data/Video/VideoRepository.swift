@@ -25,18 +25,6 @@ public struct PlaybackSourceResult: Sendable {
     }
 }
 
-private actor StreamCache {
-    private var streamMap: [String: URL] = [:]
-
-    func get(key: String) -> URL? {
-        streamMap[key]
-    }
-
-    func set(key: String, url: URL) {
-        streamMap[key] = url
-    }
-}
-
 /// Apple TV 风格分类货架实体
 public struct CategoryShelf: Identifiable, Sendable, Equatable {
     public var id: String { category }
@@ -73,12 +61,13 @@ public final class VideoRepository: ObservableObject {
     @Published public var isLoadingNextPage: Bool = false
 
     private let session: URLSession
-    private let cache = StreamCache()
     private var huangguoFeedCache: [String: (date: Date, items: [VideoItem])] = [:]
-    private var huangguoPlaybackCache: [String: PlaybackSourceResult] = [:]
     private var huavodHeroSlidesCache: (date: Date, slides: [HuavodHeroSlide])?
     private var detailMetadataCache: [String: VideoDetailMetadata] = [:]
     private var currentLoadTask: Task<Void, Never>?
+    private var paginationTask: Task<Void, Never>?
+    private var feedGeneration = UUID()
+    private var activeSearchTask: Task<Void, Never>?
     private var currentSearchToken = UUID()
 
     private init() {
@@ -95,6 +84,9 @@ public final class VideoRepository: ObservableObject {
     }
 
     public func switchCategory(to category: String) {
+        paginationTask?.cancel()
+        paginationTask = nil
+        feedGeneration = UUID()
         self.currentCategory = category
         self.feedError = nil
         self.currentPage = 1
@@ -116,6 +108,9 @@ public final class VideoRepository: ObservableObject {
     }
 
     public func switchSource(to source: VideoSourceDefinition) {
+        paginationTask?.cancel()
+        paginationTask = nil
+        feedGeneration = UUID()
         self.currentSource = source
         let initialCategory = source.categories.first ?? "全部"
         self.currentCategory = initialCategory
@@ -189,6 +184,10 @@ public final class VideoRepository: ObservableObject {
 
     public func loadFeed(for source: VideoSourceDefinition, category: String = "全部") {
         currentLoadTask?.cancel()
+        paginationTask?.cancel()
+        paginationTask = nil
+        feedGeneration = UUID()
+        let generation = feedGeneration
         if self.feedVideos.isEmpty,
            let snapshot = SourceSnapshotStore.shared.getVideoFeed(sourceId: source.id, category: category),
            !snapshot.items.isEmpty {
@@ -205,7 +204,7 @@ public final class VideoRepository: ObservableObject {
         currentLoadTask = Task {
             do {
                 let videos = try await fetchVideosForSource(targetSource, category: category, page: 1)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, self.feedGeneration == generation else { return }
                 guard self.currentSource.id == targetSource.id && self.currentCategory == category else { return }
                 self.applyFeedItems(videos, source: targetSource)
                 if !self.feedVideos.isEmpty {
@@ -216,18 +215,16 @@ public final class VideoRepository: ObservableObject {
                 self.isLoading = false
                 self.feedError = nil
 
-                // 重点源（如华视影院 22s 广告倒计时锁）前置异步静默预热前 3 部视频播放流
                 if targetSource.id == VideoSourceCatalog.huavod.id {
-                    for video in self.feedVideos.prefix(3) {
+                    for video in self.feedVideos.prefix(2) {
                         VideoPreloadManager.shared.prewarm(video: video)
                     }
                 }
             } catch is CancellationError {
                 return
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, self.feedGeneration == generation else { return }
                 guard self.currentSource.id == targetSource.id && self.currentCategory == category else { return }
-                // Stale-If-Error：若已有本地缓存快照展示，不销毁当前画架，维持无缝可读
                 if self.feedVideos.isEmpty {
                     self.feedError = error.localizedDescription
                     self.categoryShelves = []
@@ -270,30 +267,51 @@ public final class VideoRepository: ObservableObject {
 
     public func loadNextPage() async {
         guard canLoadMore, !isLoading, !isLoadingNextPage else { return }
-        self.isLoadingNextPage = true
-        defer { self.isLoadingNextPage = false }
-
+        let generation = self.feedGeneration
         let targetSource = currentSource
         let targetCategory = currentCategory
         let nextPage = currentPage + 1
+        self.isLoadingNextPage = true
 
-        do {
-            let newVideos = try await fetchVideosForSource(targetSource, category: targetCategory, page: nextPage)
-            guard !Task.isCancelled, self.currentSource.id == targetSource.id, self.currentCategory == targetCategory else { return }
-            let existingIDs = Set(self.feedVideos.map(\.id))
-            let uniqueNewVideos = newVideos.filter { !existingIDs.contains($0.id) }
-
-            if uniqueNewVideos.isEmpty {
-                self.canLoadMore = false
-            } else {
-                self.feedVideos.append(contentsOf: uniqueNewVideos)
-                self.currentPage = nextPage
-                self.canLoadMore = !newVideos.isEmpty
+        paginationTask?.cancel()
+        let task = Task<Void, Never> { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if self.feedGeneration == generation {
+                    self.isLoadingNextPage = false
+                }
             }
-        } catch {
-            guard !Task.isCancelled, self.currentSource.id == targetSource.id, self.currentCategory == targetCategory else { return }
-            // 网络抖动或临时异常不应永久禁用滚动分页，保留 canLoadMore 允许重试
-            self.feedError = error.localizedDescription
+            do {
+                let newVideos = try await self.fetchVideosForSource(targetSource, category: targetCategory, page: nextPage)
+                guard !Task.isCancelled,
+                      self.feedGeneration == generation,
+                      self.currentSource.id == targetSource.id,
+                      self.currentCategory == targetCategory else { return }
+                let existingIDs = Set(self.feedVideos.map(\.id))
+                let uniqueNewVideos = newVideos.filter { !existingIDs.contains($0.id) }
+
+                if uniqueNewVideos.isEmpty {
+                    self.canLoadMore = false
+                } else {
+                    self.feedVideos.append(contentsOf: uniqueNewVideos)
+                    self.currentPage = nextPage
+                    self.canLoadMore = !newVideos.isEmpty
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                guard !Task.isCancelled,
+                      self.feedGeneration == generation,
+                      self.currentSource.id == targetSource.id,
+                      self.currentCategory == targetCategory else { return }
+                self.feedError = error.localizedDescription
+            }
+        }
+        self.paginationTask = task
+        await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
         }
     }
 
@@ -642,9 +660,9 @@ public final class VideoRepository: ObservableObject {
     }
 
     public func resolveBeegStream(fileId: String) async throws -> URL {
-        let cacheKey = "beeg-\(fileId)"
-        if let cached = await cache.get(key: cacheKey) {
-            return cached
+        let cacheKey = "beeg://\(fileId)"
+        if let cached = VideoPreloadManager.shared.cachedResult(for: cacheKey) {
+            return cached.url
         }
 
         guard let url = URL(string: "https://store.externulls.com/video/play_url/\(fileId)") else {
@@ -706,13 +724,25 @@ public final class VideoRepository: ObservableObject {
                     variantURLStr = "https://video.beeg.com" + (variant.starts(with: "/") ? variant : "/\(variant)")
                 }
                 if let variantURL = URL(string: variantURLStr) {
-                    await cache.set(key: cacheKey, url: variantURL)
+                    let cached = PlaybackSourceResult(
+                        url: variantURL,
+                        headers: ["Referer": "https://beeg.com/", "Origin": "https://beeg.com"],
+                        referer: "https://beeg.com/",
+                        title: fileId
+                    )
+                    VideoPreloadManager.shared.cache(result: cached, for: cacheKey, ttl: 1800)
                     return variantURL
                 }
             }
         }
 
-        await cache.set(key: cacheKey, url: fullPlayUrl)
+        let fallbackCached = PlaybackSourceResult(
+            url: fullPlayUrl,
+            headers: ["Referer": "https://beeg.com/", "Origin": "https://beeg.com"],
+            referer: "https://beeg.com/",
+            title: fileId
+        )
+        VideoPreloadManager.shared.cache(result: fallbackCached, for: cacheKey, ttl: 1800)
         return fullPlayUrl
     }
 
@@ -939,7 +969,7 @@ public final class VideoRepository: ObservableObject {
     }
 
     public func resolveHuangguoStream(pageUrl: String, title: String) async throws -> PlaybackSourceResult {
-        if let cached = huangguoPlaybackCache[pageUrl] {
+        if let cached = VideoPreloadManager.shared.cachedResult(for: pageUrl) {
             return cached
         }
         guard let url = URL(string: pageUrl) else {
@@ -1019,7 +1049,7 @@ public final class VideoRepository: ObservableObject {
                                 }
                             }
                             let result = PlaybackSourceResult(url: streamUrl, headers: headers, referer: "\(origin)/", title: title)
-                            huangguoPlaybackCache[pageUrl] = result
+                            VideoPreloadManager.shared.cache(result: result, for: pageUrl, ttl: 1800)
                             return result
                         }
                     }
@@ -1042,7 +1072,7 @@ public final class VideoRepository: ObservableObject {
                         "User-Agent": Self.USER_AGENT
                     ]
                     let result = PlaybackSourceResult(url: streamUrl, headers: headers, referer: "\(origin)/", title: title)
-                    huangguoPlaybackCache[pageUrl] = result
+                    VideoPreloadManager.shared.cache(result: result, for: pageUrl, ttl: 1800)
                     return result
                 }
             }
@@ -2210,67 +2240,91 @@ public final class VideoRepository: ObservableObject {
         throw NSError(domain: "VideoRepository", code: 404, userInfo: [NSLocalizedDescriptionKey: "未找到 XVideos 播放流"])
     }
 
+    @MainActor
+    public func cancelAndClearSearch() {
+        activeSearchTask?.cancel()
+        activeSearchTask = nil
+        currentSearchToken = UUID()
+        isSearching = false
+        searchResults = []
+        searchError = nil
+    }
+
     // 全网搜索
     @MainActor
     public func searchAllSources(query: String) async {
+        activeSearchTask?.cancel()
+        activeSearchTask = nil
         let token = UUID()
         currentSearchToken = token
-        isSearching = true
-        searchResults = []
-        searchError = nil
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             isSearching = false
+            searchResults = []
+            searchError = nil
             return
         }
+
+        isSearching = true
+        searchResults = []
+        searchError = nil
 
         let preferredSourceName = currentSource.name
         let searchableSources = VideoSourceCatalog.searchableSources
-        let results = await withTaskGroup(of: [VideoItem]?.self, returning: [[VideoItem]?].self) { group in
-            for source in searchableSources {
-                group.addTask {
-                    do {
-                        return try await self.searchVideos(for: source, query: trimmed)
-                    } catch {
-                        return nil
+        let searchTask = Task<Void, Never> { @MainActor [weak self] in
+            guard let self else { return }
+            let results = await withTaskGroup(of: [VideoItem]?.self, returning: [[VideoItem]?].self) { group in
+                for source in searchableSources {
+                    group.addTask {
+                        do {
+                            return try await self.searchVideos(for: source, query: trimmed)
+                        } catch {
+                            return nil
+                        }
                     }
                 }
-            }
-            var collected: [[VideoItem]?] = []
-            for await result in group {
-                guard self.currentSearchToken == token, !Task.isCancelled else {
-                    group.cancelAll()
-                    return collected
+                var collected: [[VideoItem]?] = []
+                for await result in group {
+                    guard self.currentSearchToken == token, !Task.isCancelled else {
+                        group.cancelAll()
+                        return collected
+                    }
+                    collected.append(result)
+                    let visible = Self.sortSearchResults(
+                        collected.compactMap { $0 }.flatMap { $0 },
+                        query: trimmed,
+                        preferredSourceName: preferredSourceName
+                    )
+                    self.searchResults = visible
                 }
-                collected.append(result)
-                let visible = Self.sortSearchResults(
-                    collected.compactMap { $0 }.flatMap { $0 },
-                    query: trimmed,
-                    preferredSourceName: preferredSourceName
-                )
-                self.searchResults = visible
+                return collected
             }
-            return collected
-        }
-        guard currentSearchToken == token else { return }
-        guard !Task.isCancelled else {
-            isSearching = false
-            return
-        }
+            guard self.currentSearchToken == token else { return }
+            guard !Task.isCancelled else {
+                self.isSearching = false
+                return
+            }
 
-        let allVideos = Self.sortSearchResults(
-            results.compactMap { $0 }.flatMap { $0 },
-            query: trimmed,
-            preferredSourceName: preferredSourceName
-        )
-        searchResults = allVideos
-        let failedFeedCount = results.filter { $0 == nil }.count
-        if failedFeedCount == results.count {
-            searchError = "搜索暂时失败，请检查网络后重试。"
-        } else if failedFeedCount > 0 {
-            searchError = "部分来源暂时无法访问，已显示其余搜索结果。"
+            let allVideos = Self.sortSearchResults(
+                results.compactMap { $0 }.flatMap { $0 },
+                query: trimmed,
+                preferredSourceName: preferredSourceName
+            )
+            self.searchResults = allVideos
+            let failedFeedCount = results.filter { $0 == nil }.count
+            if failedFeedCount == results.count {
+                self.searchError = "搜索暂时失败，请检查网络后重试。"
+            } else if failedFeedCount > 0 {
+                self.searchError = "部分来源暂时无法访问，已显示其余搜索结果。"
+            }
+            self.isSearching = false
         }
-        isSearching = false
+        activeSearchTask = searchTask
+        await withTaskCancellationHandler {
+            await searchTask.value
+        } onCancel: {
+            searchTask.cancel()
+        }
     }
 
     nonisolated static func sortSearchResults(
@@ -2984,10 +3038,6 @@ public final class VideoRepository: ObservableObject {
             return [PlaybackEpisode(number: 1, label: "第 1 集", pageUrl: pageUrl)]
         }
 
-        if let dmMeta = Self.parse91DongmanDetailMetadata(from: html), dmMeta.hasContent {
-            detailMetadataCache[pageUrl] = dmMeta
-        }
-
         var results: [PlaybackEpisode] = []
         var seen = Set<Int>()
 
@@ -3084,14 +3134,13 @@ public final class VideoRepository: ObservableObject {
 
     nonisolated private func parseHuavodEpisodeAndMeta(
         data: Data
-    ) async -> (episodes: [PlaybackEpisode], huavodMeta: VideoDetailMetadata?, dmMeta: VideoDetailMetadata?) {
+    ) async -> (episodes: [PlaybackEpisode], huavodMeta: VideoDetailMetadata?) {
         guard let html = String(data: data, encoding: .utf8) else {
-            return ([], nil, nil)
+            return ([], nil)
         }
         return (
             parseHuavodEpisodesFromHtml(html),
-            Self.parseHuavodDetailMetadata(from: html),
-            Self.parse91DongmanDetailMetadata(from: html)
+            Self.parseHuavodDetailMetadata(from: html)
         )
     }
 
@@ -3110,10 +3159,6 @@ public final class VideoRepository: ObservableObject {
         }
 
         let initialParsed = await parseHuavodEpisodeAndMeta(data: data)
-        if let dmMeta = initialParsed.dmMeta, dmMeta.hasContent {
-            detailMetadataCache[pageUrl] = dmMeta
-        }
-
         var results = initialParsed.episodes
         var capturedDetailMeta = initialParsed.huavodMeta
 
@@ -3140,9 +3185,6 @@ public final class VideoRepository: ObservableObject {
         }
         if let capturedDetailMeta, capturedDetailMeta.hasContent {
             detailMetadataCache[pageUrl] = capturedDetailMeta
-            if let canonicalKey = Self.canonicalDetailCacheKey(for: pageUrl) {
-                detailMetadataCache[canonicalKey] = capturedDetailMeta
-            }
             if let canonicalKey = Self.canonicalDetailCacheKey(for: pageUrl) {
                 detailMetadataCache[canonicalKey] = capturedDetailMeta
             }

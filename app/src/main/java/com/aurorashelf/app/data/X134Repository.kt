@@ -34,6 +34,7 @@ internal object X134Repository {
     private const val META_CACHE_TTL_MS = 15 * 60 * 1000L
     private const val META_CACHE_MAX = 512
     private const val CURSOR_CACHE_MAX = 128
+    internal const val MAX_DECODE_DEPTH = 64
 
     internal data class ServerFnHashes(
         val latest: String,
@@ -531,10 +532,13 @@ internal object X134Repository {
     internal fun decodeSeroval(jsonText: String): Any? {
         val rootObj = JSONObject(jsonText)
         val refs = HashMap<Int, Any?>()
-        return decodeNode(rootObj, refs)
+        return decodeNode(rootObj, refs, depth = 0)
     }
 
-    private fun decodeNode(node: Any?, refs: MutableMap<Int, Any?>): Any? {
+    private fun decodeNode(node: Any?, refs: MutableMap<Int, Any?>, depth: Int): Any? {
+        if (depth > MAX_DECODE_DEPTH) {
+            throw IOException("134X 数据嵌套深度超出安全上限 ($MAX_DECODE_DEPTH)")
+        }
         if (node == null || node === JSONObject.NULL) return null
         if (node !is JSONObject) return node
         val type = node.optInt("t", -1)
@@ -559,7 +563,7 @@ internal object X134Repository {
                 val arr = node.optJSONArray("a")
                 if (arr != null) {
                     for (idx in 0 until arr.length()) {
-                        list.add(decodeNode(arr.opt(idx), refs))
+                        list.add(decodeNode(arr.opt(idx), refs, depth + 1))
                     }
                 }
                 list
@@ -576,7 +580,7 @@ internal object X134Repository {
                     val count = minOf(keys.length(), values.length())
                     for (idx in 0 until count) {
                         val key = unescapeSerovalString(keys.optString(idx))
-                        map[key] = decodeNode(values.opt(idx), refs)
+                        map[key] = decodeNode(values.opt(idx), refs, depth + 1)
                     }
                 }
                 map

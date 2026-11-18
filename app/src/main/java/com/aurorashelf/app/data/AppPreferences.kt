@@ -1,23 +1,54 @@
 package com.aurorashelf.app.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.aurorashelf.app.model.ComicSummary
 import com.aurorashelf.app.model.ContentSourceCatalog
 import com.aurorashelf.app.model.ForumPost
 import com.aurorashelf.app.model.LiveItem
 import com.aurorashelf.app.model.VideoItem
+import java.net.URI
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
 
-class AppPreferences(context: Context) {
-    private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+enum class ThemeMode(val storageKey: String, val label: String) {
+    SYSTEM("system", "跟随系统"),
+    LIGHT("light", "浅色模式"),
+    DARK("dark", "深色模式");
+
+    companion object {
+        fun fromStorage(raw: String?): ThemeMode =
+            entries.firstOrNull { it.storageKey.equals(raw?.trim(), ignoreCase = true) } ?: SYSTEM
+    }
+}
+
+class AppPreferences internal constructor(
+    private val preferences: SharedPreferences,
+    private val sharedThemeFlow: MutableStateFlow<ThemeMode>? = null,
+) {
+    constructor(context: Context) : this(
+        preferences = context.applicationContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE),
+        sharedThemeFlow = globalThemeModeFlow(context.applicationContext),
+    )
+
+    private val localThemeFlow = MutableStateFlow(
+        ThemeMode.fromStorage(preferences.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.storageKey)),
+    )
+
+    val themeModeFlow: StateFlow<ThemeMode>
+        get() = (sharedThemeFlow ?: localThemeFlow).asStateFlow()
 
     @Volatile
     private var lastSavedVideosJson: String? = null
 
     @Volatile
     private var lastSavedVideosList: List<VideoItem> = emptyList()
+
+    private val progressLock = Any()
 
     fun cachedFeed(): CachedFeed? = runCatching {
         decodeFeedCache(preferences.getString(KEY_FEED_CACHE, "").orEmpty())
@@ -100,9 +131,14 @@ class AppPreferences(context: Context) {
 
     fun saveVideo(video: VideoItem) {
         if (video.id.startsWith("demo-")) return
-        val retainedIds = favoriteIds() + historyIds() + video.id
-        val records = (listOf(video) + savedVideos()).distinctBy(VideoItem::id)
-            .filter { it.id in retainedIds }
+        val retainedIds = favoriteIds() + historyIds()
+        val records = (listOf(video) + savedVideos())
+            .distinctBy { compositeVideoKey(it) }
+            .filter { matchesVideoKey(retainedIds, it) }
+        persistSavedVideoList(records)
+    }
+
+    private fun persistSavedVideoList(records: List<VideoItem>) {
         val array = JSONArray()
         records.forEach { item ->
             array.put(JSONObject().apply {
@@ -149,23 +185,63 @@ class AppPreferences(context: Context) {
         get() = preferences.getBoolean(KEY_VIDEO_PRELOAD_ENABLED, true)
         set(value) = preferences.edit { putBoolean(KEY_VIDEO_PRELOAD_ENABLED, value) }
 
-    /** Whether the cinematic launch intro plays on a cold start (release builds only). */
+    /** Whether the cinematic launch intro plays on a cold start. */
     var introAnimationEnabled: Boolean
         get() = preferences.getBoolean(KEY_INTRO_ANIMATION_ENABLED, true)
-        set(value) = preferences.edit { putBoolean(KEY_INTRO_ANIMATION_ENABLED, value) }
+        set(value) = preferences.edit {
+            putBoolean(KEY_INTRO_ANIMATION_ENABLED, value)
+            putBoolean(KEY_INTRO_USER_CONFIGURED, true)
+        }
+
+    val isIntroExplicitlyConfigured: Boolean
+        get() = preferences.getBoolean(KEY_INTRO_USER_CONFIGURED, false)
+
+    var introHasPlayedOnce: Boolean
+        get() = preferences.getBoolean(KEY_INTRO_PLAYED_ONCE, false)
+        set(value) = preferences.edit { putBoolean(KEY_INTRO_PLAYED_ONCE, value) }
 
     /** Whether the launch intro plays its original synthesized sound design. */
     var introSoundEnabled: Boolean
         get() = preferences.getBoolean(KEY_INTRO_SOUND_ENABLED, true)
         set(value) = preferences.edit { putBoolean(KEY_INTRO_SOUND_ENABLED, value) }
 
+    var themeMode: ThemeMode
+        get() = ThemeMode.fromStorage(preferences.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.storageKey))
+        set(value) {
+            preferences.edit { putString(KEY_THEME_MODE, value.storageKey) }
+            localThemeFlow.value = value
+            sharedThemeFlow?.value = value
+        }
+
     fun favoriteIds(): Set<String> =
         preferences.getStringSet(KEY_FAVORITES, emptySet()).orEmpty().filterNot { it.startsWith("demo-") }.toSet()
 
     fun toggleFavorite(id: String) {
         val updated = favoriteIds().toMutableSet()
-        if (!updated.add(id)) updated.remove(id)
+        val added = updated.add(id)
+        if (!added) updated.remove(id)
         preferences.edit { putStringSet(KEY_FAVORITES, updated) }
+        if (!added) {
+            val retained = updated + historyIds()
+            val existing = savedVideos()
+            val pruned = existing.filter { matchesVideoKey(retained, it) }
+            if (pruned.size != existing.size) {
+                persistSavedVideoList(pruned)
+            }
+        }
+    }
+
+    fun removeFavorite(id: String) {
+        val updated = favoriteIds().toMutableSet()
+        if (updated.remove(id)) {
+            preferences.edit { putStringSet(KEY_FAVORITES, updated) }
+            val retained = updated + historyIds()
+            val existing = savedVideos()
+            val pruned = existing.filter { matchesVideoKey(retained, it) }
+            if (pruned.size != existing.size) {
+                persistSavedVideoList(pruned)
+            }
+        }
     }
 
     fun historyIds(): List<String> =
@@ -182,6 +258,37 @@ class AppPreferences(context: Context) {
             addAll(historyIds().filterNot { it == id })
         }.take(MAX_HISTORY)
         preferences.edit { putString(KEY_HISTORY, updated.joinToString("\n")) }
+    }
+
+    fun savePlaybackProgress(videoKey: String, positionMs: Long, durationMs: Long = 0L) {
+        val key = videoKey.trim()
+        if (key.isEmpty()) return
+        synchronized(progressLock) {
+            val map = decodePlaybackProgress(preferences.getString(KEY_PLAYBACK_PROGRESS, "").orEmpty())
+            val completed = durationMs > 0L && positionMs >= (durationMs * 95L / 100L)
+            if (positionMs < 2_000L || completed) {
+                if (map.remove(key) != null) {
+                    preferences.edit { putString(KEY_PLAYBACK_PROGRESS, encodePlaybackProgress(map)) }
+                }
+                return
+            }
+            map.remove(key)
+            map[key] = positionMs
+            while (map.size > MAX_PLAYBACK_PROGRESS_ITEMS) {
+                val eldest = map.keys.firstOrNull() ?: break
+                map.remove(eldest)
+            }
+            preferences.edit { putString(KEY_PLAYBACK_PROGRESS, encodePlaybackProgress(map)) }
+        }
+    }
+
+    fun getPlaybackProgress(videoKey: String): Long {
+        val key = videoKey.trim()
+        if (key.isEmpty()) return 0L
+        return synchronized(progressLock) {
+            val map = decodePlaybackProgress(preferences.getString(KEY_PLAYBACK_PROGRESS, "").orEmpty())
+            map[key]?.coerceAtLeast(0L) ?: 0L
+        }
     }
 
     companion object {
@@ -201,8 +308,13 @@ class AppPreferences(context: Context) {
         private const val KEY_LIVE_CACHE = "live_cache"
         private const val KEY_VIDEO_PRELOAD_ENABLED = "video_preload_enabled"
         private const val KEY_INTRO_ANIMATION_ENABLED = "intro_animation_enabled"
+        private const val KEY_INTRO_USER_CONFIGURED = "intro_user_configured"
+        private const val KEY_INTRO_PLAYED_ONCE = "intro_has_played_once"
         private const val KEY_INTRO_SOUND_ENABLED = "intro_sound_enabled"
+        private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_PLAYBACK_PROGRESS = "playback_progress_ms"
         private const val MAX_HISTORY = 50
+        internal const val MAX_PLAYBACK_PROGRESS_ITEMS = 200
         internal const val MAX_FEED_CACHE_ITEMS = 30
         internal const val MAX_FORUM_CACHE_ITEMS = 120
         internal const val MAX_COMIC_CACHE_ITEMS = 30
@@ -211,8 +323,69 @@ class AppPreferences(context: Context) {
         internal const val COMIC_CACHE_TTL_MS = 12 * 60 * 60 * 1000L
         internal const val LIVE_CACHE_TTL_MS = 12 * 60 * 60 * 1000L
 
+        @Volatile private var instance: AppPreferences? = null
+        @Volatile private var processThemeFlow: MutableStateFlow<ThemeMode>? = null
+
+        private fun globalThemeModeFlow(appContext: Context): MutableStateFlow<ThemeMode> =
+            processThemeFlow ?: synchronized(this) {
+                processThemeFlow ?: run {
+                    val prefs = appContext.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+                    val initial = ThemeMode.fromStorage(prefs.getString(KEY_THEME_MODE, ThemeMode.SYSTEM.storageKey))
+                    MutableStateFlow(initial).also { processThemeFlow = it }
+                }
+            }
+
+        fun get(context: Context): AppPreferences = instance ?: synchronized(this) {
+            instance ?: AppPreferences(context.applicationContext).also { instance = it }
+        }
+
         fun normalizeBaseUrl(value: String): String = value.trim().trimEnd('/')
+
+        fun compositeVideoKey(video: VideoItem): String {
+            val host = runCatching { URI(video.pageUrl).host?.lowercase()?.removePrefix("www.") }
+                .getOrNull()
+                ?.takeIf { it.isNotBlank() }
+            return if (host != null) "$host::${video.id}" else video.id
+        }
+
+        fun playbackProgressKey(video: VideoItem, episodeUrl: String? = null): String {
+            val ep = episodeUrl?.trim()?.takeIf { it.isNotBlank() }
+            return ep ?: video.pageUrl.trim().ifBlank { compositeVideoKey(video) }
+        }
+
+        fun matchesVideoKey(storedIds: Collection<String>, video: VideoItem): Boolean {
+            if (video.id in storedIds) return true
+            return compositeVideoKey(video) in storedIds
+        }
     }
+}
+
+internal fun encodePlaybackProgress(entries: Map<String, Long>): String = JSONArray().apply {
+    entries.forEach { (key, posMs) ->
+        if (key.isNotBlank() && posMs > 0L) {
+            put(JSONObject().put("k", key).put("p", posMs))
+        }
+    }
+}.toString()
+
+internal fun decodePlaybackProgress(json: String): LinkedHashMap<String, Long> {
+    val out = LinkedHashMap<String, Long>()
+    if (json.isBlank()) return out
+    val arr = runCatching { JSONArray(json) }.getOrNull() ?: return out
+    for (i in 0 until arr.length()) {
+        val obj = arr.optJSONObject(i) ?: continue
+        val key = obj.optString("k").trim()
+        val pos = obj.optLong("p", 0L)
+        if (key.isNotBlank() && pos > 0L) {
+            out.remove(key)
+            out[key] = pos
+        }
+    }
+    while (out.size > AppPreferences.MAX_PLAYBACK_PROGRESS_ITEMS) {
+        val eldest = out.keys.firstOrNull() ?: break
+        out.remove(eldest)
+    }
+    return out
 }
 
 /**

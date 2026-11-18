@@ -9,6 +9,7 @@ public struct PersonalScreen: View {
     @ObservedObject private var downloadManager = OfflineDownloadManager.shared
     @ObservedObject private var comicDownloadManager = ComicDownloadManager.shared
     @ObservedObject private var account = AccountService.shared
+    @AppStorage("aurora_theme_mode") private var themeModeRaw: String = AuroraThemeMode.system.rawValue
     public let onPlayVideo: (VideoItem) -> Void
 
     @State private var showVideoSourcePicker: Bool = false
@@ -16,10 +17,36 @@ public struct PersonalScreen: View {
     @State private var showLiveSourceDialog: Bool = false
     @State private var showAirPlayPicker: Bool = false
     @State private var showLanguagePicker: Bool = false
+    @State private var showThemeDialog: Bool = false
     @State private var showAccount: Bool = false
+    @State private var showOpenSourceNotices: Bool = false
     
     public init(onPlayVideo: @escaping (VideoItem) -> Void) {
         self.onPlayVideo = onPlayVideo
+    }
+
+    private var activeThemeMode: AuroraThemeMode {
+        AuroraThemeMode(rawValue: themeModeRaw) ?? .system
+    }
+
+    private var profileDisplayName: String {
+        if let profile = account.profile {
+            let trimmed = profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
+            return profile.email.components(separatedBy: "@").first ?? profile.email
+        }
+        return "访客用户"
+    }
+
+    private var profileInitial: String {
+        let name = profileDisplayName
+        guard let first = name.first else { return "G" }
+        return String(first).uppercased()
+    }
+
+    private var isProActive: Bool {
+        guard let status = account.profile?.subscriptionStatus.lowercased() else { return false }
+        return status == "pro" || status == "active" || status == "vip"
     }
     
     public var body: some View {
@@ -28,51 +55,68 @@ public struct PersonalScreen: View {
             
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: AuroraMetrics.spacingXL) {
-                    // 1. 用户头像与会员卡
-                    HStack(spacing: AuroraMetrics.spacingL) {
-                        ZStack {
-                            Circle()
-                                .fill(AuroraColor.brand)
-                                .frame(width: 56, height: 56)
-                            // 头像单字母（§3.2 白名单允许 .black）
-                            Text("R")
-                                .font(.system(size: 24, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                        }
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            HStack(spacing: 6) {
-                                Text("Randy")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                    .foregroundStyle(AuroraColor.textPrimary)
-                                
-                                // PRO 徽章（§3.2 白名单允许 .black）
-                                Text("PRO")
-                                    .font(.caption2)
-                                    .fontWeight(.black)
-                                    .foregroundStyle(.black)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.yellow))
+                    // 1. 用户头像与会员卡（动态绑定 AccountService，点击打开账号管理）
+                    Button {
+                        showAccount = true
+                    } label: {
+                        HStack(spacing: AuroraMetrics.spacingL) {
+                            ZStack {
+                                Circle()
+                                    .fill(AuroraColor.brand)
+                                    .frame(width: 56, height: 56)
+                                Text(profileInitial)
+                                    .font(.system(size: 24, weight: .black, design: .rounded))
+                                    .foregroundStyle(.white)
                             }
                             
-                            Text("iOS 视频适配 \(VideoSourceCatalog.supportedSources.count)/\(VideoSourceCatalog.allSources.count) · 漫画适配 \(ComicSourceCatalog.supportedSources.count)/\(ComicSourceCatalog.allSources.count)")
-                                .font(.footnote)
-                                .foregroundStyle(AuroraColor.textSecondary)
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 6) {
+                                    Text(profileDisplayName)
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundStyle(AuroraColor.textPrimary)
+                                    
+                                    if isProActive {
+                                        Text("PRO")
+                                            .font(.caption2)
+                                            .fontWeight(.black)
+                                            .foregroundStyle(.black)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Capsule().fill(Color.yellow))
+                                    } else {
+                                        Text(account.profile != nil ? "免费版" : "未登录")
+                                            .font(.caption2)
+                                            .fontWeight(.bold)
+                                            .foregroundStyle(AuroraColor.textSecondary)
+                                            .padding(.horizontal, 6)
+                                            .padding(.vertical, 2)
+                                            .background(Capsule().fill(AuroraColor.surfaceHigh))
+                                    }
+                                }
+                                
+                                Text("iOS 视频适配 \(VideoSourceCatalog.supportedSources.count)/\(VideoSourceCatalog.allSources.count) · 漫画适配 \(ComicSourceCatalog.supportedSources.count)/\(ComicSourceCatalog.allSources.count)")
+                                    .font(.footnote)
+                                    .foregroundStyle(AuroraColor.textSecondary)
+                            }
+                            
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(AuroraColor.textTertiary)
                         }
-                        
-                        Spacer()
+                        .padding(AuroraMetrics.spacingL)
+                        .background(
+                            RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                                .fill(AuroraColor.surface)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
+                                        .stroke(AuroraColor.hairline, lineWidth: 1)
+                                )
+                        )
                     }
-                    .padding(AuroraMetrics.spacingL)
-                    .background(
-                        RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
-                            .fill(AuroraColor.surface)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: AuroraMetrics.cardRadius, style: .continuous)
-                                    .stroke(AuroraColor.hairline, lineWidth: 1)
-                            )
-                    )
+                    .buttonStyle(.plain)
                     .padding(.horizontal, AuroraMetrics.contentInset)
                     .padding(.top, AuroraMetrics.spacingS)
                     
@@ -141,14 +185,14 @@ public struct PersonalScreen: View {
                     .padding(.horizontal, AuroraMetrics.contentInset)
                     
                     // 3. 源管理与设置列表
-                    VStack(spacing: 1) {
+                    VStack(spacing: 0) {
                         Button {
                             showAccount = true
                         } label: {
                             settingRow(
                                 icon: "person.crop.circle",
                                 title: "账号",
-                                value: account.profile?.email ?? "免费注册",
+                                value: account.profile?.email ?? "登录 / 免费注册",
                                 isNavigable: true
                             )
                         }
@@ -162,10 +206,13 @@ public struct PersonalScreen: View {
                             settingRow(
                                 icon: "server.rack",
                                 title: "settings.video_source".localized,
-                                value: "\(videoRepo.currentSource.name) · \(VideoSourceCatalog.supportedSources.count)/\(VideoSourceCatalog.allSources.count)"
+                                value: "\(videoRepo.currentSource.name) · \(VideoSourceCatalog.supportedSources.count)/\(VideoSourceCatalog.allSources.count)",
+                                isNavigable: true
                             )
                         }
                         .buttonStyle(.plain)
+
+                        Divider().overlay(AuroraColor.hairline)
                         
                         Button {
                             showComicSourcePicker = true
@@ -173,10 +220,13 @@ public struct PersonalScreen: View {
                             settingRow(
                                 icon: "books.vertical",
                                 title: "settings.comic_source".localized,
-                                value: "\(comicRepo.currentSource.name) · \(ComicSourceCatalog.supportedSources.count)/\(ComicSourceCatalog.allSources.count)"
+                                value: "\(comicRepo.currentSource.name) · \(ComicSourceCatalog.supportedSources.count)/\(ComicSourceCatalog.allSources.count)",
+                                isNavigable: true
                             )
                         }
                         .buttonStyle(.plain)
+
+                        Divider().overlay(AuroraColor.hairline)
                         
                         NavigationLink {
                             WatchlistScreen(onPlayVideo: onPlayVideo)
@@ -190,12 +240,16 @@ public struct PersonalScreen: View {
                         }
                         .buttonStyle(.plain)
 
+                        Divider().overlay(AuroraColor.hairline)
+
                         Button {
                             showAirPlayPicker = true
                         } label: {
                             settingRow(icon: "tv", title: "settings.airplay_title".localized, value: "settings.airplay_select".localized, isNavigable: true)
                         }
                         .buttonStyle(.plain)
+
+                        Divider().overlay(AuroraColor.hairline)
 
                         Button {
                             showLiveSourceDialog = true
@@ -209,6 +263,22 @@ public struct PersonalScreen: View {
                         }
                         .buttonStyle(.plain)
 
+                        Divider().overlay(AuroraColor.hairline)
+
+                        Button {
+                            showThemeDialog = true
+                        } label: {
+                            settingRow(
+                                icon: "circle.lefthalf.filled",
+                                title: "settings.appearance".localized,
+                                value: activeThemeMode.displayName,
+                                isNavigable: true
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider().overlay(AuroraColor.hairline)
+
                         Button {
                             showLanguagePicker = true
                         } label: {
@@ -221,6 +291,8 @@ public struct PersonalScreen: View {
                         }
                         .buttonStyle(.plain)
 
+                        Divider().overlay(AuroraColor.hairline)
+
                         NavigationLink {
                             OfflineDownloadsScreen(onPlayVideo: onPlayVideo)
                         } label: {
@@ -232,6 +304,23 @@ public struct PersonalScreen: View {
                             )
                         }
                         .buttonStyle(.plain)
+
+                        Divider().overlay(AuroraColor.hairline)
+
+                        Button {
+                            showOpenSourceNotices = true
+                        } label: {
+                            settingRow(
+                                icon: "doc.text",
+                                title: "settings.open_source".localized,
+                                value: "GPLv3 / Apache-2.0 / MIT",
+                                isNavigable: true
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Divider().overlay(AuroraColor.hairline)
+
                         settingRow(icon: "info.circle", title: "settings.version".localized, value: appVersion)
                     }
                     .background(
@@ -281,6 +370,9 @@ public struct PersonalScreen: View {
         .sheet(isPresented: $showAccount) {
             AccountView()
         }
+        .sheet(isPresented: $showOpenSourceNotices) {
+            OpenSourceNoticesSheet()
+        }
         .sheet(isPresented: $showVideoSourcePicker) {
             VideoSourcePickerSheet(selectedSource: videoRepo.currentSource) { src in
                 videoRepo.switchSource(to: src)
@@ -306,19 +398,28 @@ public struct PersonalScreen: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("完成") { showAirPlayPicker = false }
+                            .frame(minWidth: 44, minHeight: 44)
                     }
                 }
             }
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
-        .confirmationDialog("选择直播来源", isPresented: $showLiveSourceDialog, titleVisibility: .visible) {
+        .confirmationDialog("settings.select_live_source".localized, isPresented: $showLiveSourceDialog, titleVisibility: .visible) {
             ForEach(LiveSourceCatalog.allSources) { source in
                 Button(source.name) {
                     liveRepo.selectSource(source.id)
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button("common.cancel".localized, role: .cancel) {}
+        }
+        .confirmationDialog("settings.appearance".localized, isPresented: $showThemeDialog, titleVisibility: .visible) {
+            ForEach(AuroraThemeMode.allCases) { mode in
+                Button(mode.displayName) {
+                    themeModeRaw = mode.rawValue
+                }
+            }
+            Button("common.cancel".localized, role: .cancel) {}
         }
     }
 
@@ -385,6 +486,58 @@ public struct PersonalScreen: View {
         .padding(.horizontal, AuroraMetrics.spacingL)
         .padding(.vertical, AuroraMetrics.spacingM)
         .frame(minHeight: AuroraMetrics.minTouchTarget)
+        .contentShape(Rectangle())
+    }
+}
+
+struct OpenSourceNoticesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    private let items: [(name: String, license: String, summary: String)] = [
+        ("PipePipeExtractor", "GNU GPLv3", "第三方流媒体站点解析组件（见仓库 THIRD_PARTY_NOTICES.md 与源码树）"),
+        ("Spine WebGL Runtime", "Spine Runtimes License", "2D 骨骼动画渲染运行时（Esoteric Software）"),
+        ("Comic Protocol Reference", "Apache-2.0", "漫画接口协议与分片重排算法参考实现（JHenTai / Mihon 生态）"),
+        ("Apple Native Frameworks", "Apple SDK", "SwiftUI、AVKit、AVFoundation、WebKit、Network、CryptoKit")
+    ]
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("开源组件与致谢") {
+                    ForEach(items, id: \.name) { item in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(item.name)
+                                    .font(.headline)
+                                    .foregroundStyle(AuroraColor.textPrimary)
+                                Spacer()
+                                Text(item.license)
+                                    .font(.caption.bold())
+                                    .foregroundStyle(AuroraColor.brandLabel)
+                            }
+                            Text(item.summary)
+                                .font(.caption)
+                                .foregroundStyle(AuroraColor.textSecondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                Section {
+                    if let url = URL(string: "https://github.com/RandyVae/AuroraShelf/blob/main/THIRD_PARTY_NOTICES.md") {
+                        Link("查看完整 THIRD_PARTY_NOTICES.md", destination: url)
+                            .foregroundStyle(AuroraColor.brand)
+                    }
+                }
+            }
+            .navigationTitle("settings.open_source".localized)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("common.done".localized) { dismiss() }
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+            }
+        }
     }
 }
 
@@ -409,7 +562,10 @@ struct ComicSourcePickerSheet: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title3)
                             .foregroundStyle(AuroraColor.textSecondary)
+                            .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+                            .contentShape(Rectangle())
                     }
+                    .accessibilityLabel("common.close".localized)
                 }
                 .padding(.horizontal, AuroraMetrics.contentInset)
                 .padding(.top, AuroraMetrics.spacingL)
@@ -510,7 +666,6 @@ struct LanguagePickerSheet: View {
                     } label: {
                         let meta = iconData(for: lang)
                         HStack(spacing: 12) {
-                            // 原生液态玻璃语言图标（Apple HIG 设计规范）
                             ZStack {
                                 Circle()
                                     .fill(LinearGradient(colors: meta.gradient, startPoint: .topLeading, endPoint: .bottomTrailing))
@@ -568,6 +723,7 @@ struct LanguagePickerSheet: View {
                         dismiss()
                     }
                     .foregroundStyle(AuroraColor.brand)
+                    .frame(minWidth: 44, minHeight: 44)
                 }
             }
         }

@@ -1,4 +1,20 @@
-## 最新交接：2026-11-18 — 全端五层端侧自治容灾与极速加载引擎（`AuroraResilience`）研发论证、三端 Release 实测全绿、香港繁体报告与全通道上线 · v2.16.40 (Build 266)
+## 最新交接：2026-11-18 — 全栈 86 项优化审计问题全面整改、服务端安全部署、三端 Release 模拟器全规模验收与双通道同步上线 · v2.17.0 (Build 267)
+
+### 本次完成
+1. **后端、OTA 与 PocketBase 全面加固并实部署上线（`SEC-01`、`SEC-02`、`SEC-11`、`OPS-01..10`）**：
+   - [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py)：将 `devices.json` 与 `testflight_invites.json` 迁至 `/var/lib/netgrey-ota/`（`0700`/`0600` 权限，启动时自动迁移并删除 `/var/www/netgrey/` 旧文件）；新增邀请口令门禁 `/api/udid/enroll`（签发 10 分钟单次 HMAC-SHA256 `enrollment_token`）、动态 `/api/udid/enroll.mobileconfig`、校验 token 的 `/api/receive-udid`（CMS 剥离 + 单次 nonce 防重放 + `provisioned=1|0` 重定向）及 `/api/udid/status`；升级 `BoundedThreadingTCPServer(max_workers=16)`、LRU 限流与跨 IP 口令防爆。
+   - [publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) & [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html)：新增 `--check-versions` 四端版本一致性预检、从 IPA 提取 `provisioned_udids.json`、上传前 `>=5GB` 磁盘门禁与单次 SSH 事务原子切换；网页端仅在设备已签入当前 IPA 时解锁绿色直装按钮，未签入设备诚实提示排队状态并引导至即时可用的 TestFlight 通道；页脚新增开源许可致谢。
+   - [netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf) & [deploy_auth_backend.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/deploy_auth_backend.sh)：部署 Nginx `/auth-api` 白名单、屏蔽 `/auth-api/_/` 与静态 `.json/.py/.sh` 访问，同步 PocketBase `1731900000_lock_users_rules.js` 规则迁移与 systemd 沙盒加固；线上实测 `/devices.json`、`/invites.json`、`/provisioned_udids.json`、`/auth-api/_/` 均返回 `HTTP 404`，`verify_auth_api.sh` 全绿。
+2. **Android、iOS/iPadOS 与 Web 游戏全栈修复（`SEC-03..14`、`PLY-01..19`、`DAT-01..16`、`UIX-01..13`、`GAM-01..14`）**：
+   - **Web 游戏 (`Lust Goddess v2.17.0`)**：[save.js](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/assets/www/js/save.js) 对接 `window.AuroraSaveBridge || window.AndroidSave`、修复写前 `BACKUP_KEY` 备份与原型污染防护；[app.js](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/assets/www/js/app.js) 根治 `handleAppBack()` 抽屉关闭后不可再打开的软锁及战斗复活取消死锁；[slots.js](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/assets/www/js/slots.js) 补齐全部 11 位看板娘有效 Spine 目录映射与免费旋转锁注；清理 `Disable/` 死音频。
+   - **Android**：修复 `network_security_config.xml`、`LocalMediaProxy`、`CastManager`、`NativeSitePlayer`（原生 PiP 与 `ON_STOP` 生命周期）、`AccountScreen`（重发验证邮件）、`LiveScreen`/`ForumScreen`（页内真实搜索）、`JmUnscrambleTransformation`（超长条漫分块防 OOM）、浅色/深色对比度及 `strings.xml` 繁体/英文资源。
+   - **iOS / iPadOS**：删除无引用 `intro_film.mp4` 与 `NativePlayerView.swift`，新增 [GameSaveStore.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Game/GameSaveStore.swift)、[ComicReadingProgressStore.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Comic/ComicReadingProgressStore.swift) 与 [PlayerMediaTrackMenu.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Player/PlayerMediaTrackMenu.swift)，升级 [SearchSheetView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Search/SearchSheetView.swift) 支持四域搜索、[PersonalScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/PersonalScreen.swift) 支持外观三态切换/动态账号卡/开源许可弹窗、[StorageUsageBarView.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/StorageUsageBarView.swift) 真实磁盘占比，以及 [ComicPageImageLoader.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/ComicPageImageLoader.swift) 动态 CDN AES 解密与 Webtoon 保真。
+3. **全量验证与双通道发布（`v2.17.0 Build 267`）**：
+   - 自动化测试：Web `verify-game-logic.js` / `verify-fixes.js` / `verify_curated_assets.py` 全通；Node `probe_all_sources.mjs` 32 源 0 失败；Android 离线 43 套件 276 项（268 通/8 跳/0 失败）+ 在线 `com.aurorashelf.app.data.*` 全通 + `lintDebug` 0 error；iOS 离线与在线全源探针（18 视频 + 9 免登漫画 + 7 论坛 + 2 直播）全通。
+   - 三端 Release 模拟器实测：`emulator-5554` R8 APK、`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 走查全部通过。
+   - 双通道上线：`https://bananarey.us`（`Netgrey.apk` `143,321,062` B、`Netgrey.ipa` `140,055,738` B、`manifest.plist` `2.17.0`、`source-manifest.json` `2.17.0` 均 `HTTP 200`，`/` 剩 `11G`）与 TestFlight `v2.17.0 (Build 267)` 同步上线。
+
+## 历史交接：2026-11-18 — 全端五层端侧自治容灾与极速加载引擎（`AuroraResilience`）研发论证、三端 Release 实测全绿、香港繁体报告与全通道上线 · v2.16.40 (Build 266)
 
 ### 本次完成
 1. **五层端侧自治容灾与极速加载引擎落地（Android + iOS + iPadOS + 零单点清单）**：

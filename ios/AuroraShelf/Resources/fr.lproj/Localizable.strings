@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "Rechercher vidéos, animes, mangas ou codes";
-"search.concurrent_hint" = "Recherche simultanée sur 20 sources vidéo";
+"search.concurrent_hint" = "Recherche simultanée sur %d sources vidéo";
 "search.no_results" = "Aucun résultat trouvé";
 "search.searching" = "Recherche en cours…";
 "search.history" = "Historique de recherche";
@@ -110,3 +110,6 @@
 "common.cancel" = "Annuler";
 "common.close" = "Fermer";
 "common.ok" = "OK";
+
+"settings.appearance" = "Apparence";
+"settings.open_source" = "Licences Open Source";

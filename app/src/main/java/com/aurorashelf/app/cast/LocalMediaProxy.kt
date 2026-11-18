@@ -2,20 +2,28 @@ package com.aurorashelf.app.cast
 
 import android.util.Log
 import com.aurorashelf.app.data.VideoRepository
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileInputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URI
 import java.net.URLDecoder
 import java.net.URLEncoder
+import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
-import java.util.UUID
-import java.util.concurrent.Executors
+import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -31,29 +39,85 @@ internal fun interface OfflineCacheStreamOpener {
         cacheKey: String,
         sourceUrl: String,
         referer: String?,
+        extraHeaders: Map<String, String>,
         start: Long,
         endInclusive: Long?,
     ): CachedStreamSlice?
 }
 
+internal data class RegisteredProxyStream(
+    val referer: String?,
+    val extraHeaders: Map<String, String>,
+)
+
 /**
  * Lightweight local HTTP media streaming proxy.
- * Enables Smart TVs to play video streams that require custom headers (e.g. Referer),
+ * Enables Smart TVs to play video streams that require custom headers (e.g. Referer, Origin),
  * HLS (.m3u8) streams with relative/protected segments, or Media3 SimpleCache / local offline videos
  * without hotlink 403 rejections.
  */
 internal class LocalMediaProxy(
-    private val okHttpClient: OkHttpClient = OkHttpClient.Builder().build(),
+    okHttpClient: OkHttpClient = OkHttpClient.Builder().build(),
     private val allowedDirs: List<File> = emptyList(),
     private val cacheStreamOpener: OfflineCacheStreamOpener? = null,
-    internal val sessionToken: String = UUID.randomUUID().toString().replace("-", ""),
+    sessionToken: String = generateRandomToken(),
 ) {
+    private val upstreamHttpClient: OkHttpClient = okHttpClient.newBuilder()
+        .dns(PublicMediaDns)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .build()
+
+    @Volatile
+    internal var sessionToken: String = sessionToken
+        private set
+
     private var serverSocket: ServerSocket? = null
-    private val executor = Executors.newCachedThreadPool()
+    private val acceptExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+        Thread(r, "local-media-proxy-accept").apply { isDaemon = true }
+    }
+    private val workerPool = ThreadPoolExecutor(
+        2,
+        16,
+        30L,
+        TimeUnit.SECONDS,
+        LinkedBlockingQueue(64),
+        { r -> Thread(r, "local-media-proxy-worker").apply { isDaemon = true } },
+        ThreadPoolExecutor.DiscardOldestPolicy(),
+    ).apply {
+        allowCoreThreadTimeOut(true)
+    }
+
     @Volatile private var isRunning = false
+    @Volatile private var lastBoundHostOverride: String? = null
+
+    private val registryLock = Any()
+    private val registeredStreams = object : LinkedHashMap<String, RegisteredProxyStream>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, RegisteredProxyStream>?): Boolean =
+            size > MAX_REGISTERED_STREAMS
+    }
+    private val registeredStreamPrefixes = object : LinkedHashMap<String, RegisteredProxyStream>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, RegisteredProxyStream>?): Boolean =
+            size > MAX_REGISTERED_PREFIXES
+    }
+    private val registeredLocalFiles = object : LinkedHashMap<String, Boolean>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>?): Boolean =
+            size > MAX_REGISTERED_FILES
+    }
 
     val port: Int
         get() = serverSocket?.localPort ?: 0
+
+    fun rotateSession(): String {
+        val next = generateRandomToken()
+        synchronized(registryLock) {
+            sessionToken = next
+            registeredStreams.clear()
+            registeredStreamPrefixes.clear()
+            registeredLocalFiles.clear()
+        }
+        return next
+    }
 
     fun start(): Boolean {
         if (isRunning && serverSocket?.isClosed == false) return true
@@ -63,7 +127,7 @@ internal class LocalMediaProxy(
                 val socket = ServerSocket(0)
                 serverSocket = socket
                 isRunning = true
-                executor.execute { acceptLoop(socket) }
+                acceptExecutor.execute { acceptLoop(socket) }
                 Log.i(TAG, "LocalMediaProxy started on port ${socket.localPort}")
                 true
             } catch (e: Exception) {
@@ -75,6 +139,7 @@ internal class LocalMediaProxy(
 
     fun stop() {
         isRunning = false
+        rotateSession()
         try {
             serverSocket?.close()
         } catch (_: Exception) {}
@@ -104,12 +169,16 @@ internal class LocalMediaProxy(
         referer: String? = null,
         cacheKey: String? = null,
         localIpOverride: String? = null,
+        extraHeaders: Map<String, String> = emptyMap(),
     ): String? {
         val ip = localIpOverride ?: getLocalIpAddress() ?: return null
+        lastBoundHostOverride = localIpOverride
         if (!start()) return null
+        val activeToken = sessionToken
+        registerStreamInternal(videoUrl, referer, extraHeaders)
         return buildProxyUrlWithBase(
             proxyBaseUrl = "http://$ip:$port",
-            token = sessionToken,
+            token = activeToken,
             videoUrl = videoUrl,
             referer = referer,
             cacheKey = cacheKey,
@@ -121,6 +190,7 @@ internal class LocalMediaProxy(
         referer: String? = null,
         cacheKey: String? = null,
         localIpOverride: String? = null,
+        extraHeaders: Map<String, String> = emptyMap(),
     ): String? {
         val trimmed = filePath.trim()
         // Guard against passing an HTTP/HTTPS URL (such as OfflineVideo.mediaUrl) as a local file path.
@@ -132,21 +202,70 @@ internal class LocalMediaProxy(
                 referer = referer,
                 cacheKey = cacheKey,
                 localIpOverride = localIpOverride,
+                extraHeaders = extraHeaders,
             )
         }
         val cleanPath = trimmed.removePrefix("file://")
+        val targetFile = File(cleanPath)
+        if (!isAllowedLocalFile(targetFile, allowedDirs)) {
+            Log.w(TAG, "Refused to register disallowed local file path for casting")
+            return null
+        }
+        val canonicalPath = runCatching { targetFile.canonicalPath }.getOrNull() ?: return null
         val ip = localIpOverride ?: getLocalIpAddress() ?: return null
+        lastBoundHostOverride = localIpOverride
         if (!start()) return null
-        val encodedPath = URLEncoder.encode(cleanPath, StandardCharsets.UTF_8.name())
-        return "http://$ip:$port/file?token=$sessionToken&path=$encodedPath"
+        val activeToken = sessionToken
+        synchronized(registryLock) {
+            registeredLocalFiles[canonicalPath] = true
+        }
+        val encodedPath = URLEncoder.encode(canonicalPath, StandardCharsets.UTF_8.name())
+        return "http://$ip:$port/file?token=$activeToken&path=$encodedPath"
+    }
+
+    private fun registerStreamInternal(
+        url: String,
+        referer: String?,
+        extraHeaders: Map<String, String>,
+    ) {
+        val cleanHeaders = sanitizeForwardedHeaders(extraHeaders)
+        val entry = RegisteredProxyStream(referer = referer, extraHeaders = cleanHeaders)
+        val prefix = streamDirectoryPrefix(url)
+        synchronized(registryLock) {
+            registeredStreams[url] = entry
+            if (prefix != null) {
+                registeredStreamPrefixes[prefix] = entry
+            }
+        }
+    }
+
+    private fun lookupRegisteredStream(targetUrl: String): RegisteredProxyStream? {
+        val prefix = streamDirectoryPrefix(targetUrl)
+        synchronized(registryLock) {
+            registeredStreams[targetUrl]?.let { return it }
+            if (prefix != null) {
+                registeredStreamPrefixes[prefix]?.let { return it }
+                val inherited = registeredStreamPrefixes.entries.firstOrNull { (registeredPrefix, _) ->
+                    targetUrl.startsWith("$registeredPrefix/")
+                }?.value
+                if (inherited != null) return inherited
+            }
+        }
+        return null
+    }
+
+    private fun isRegisteredLocalFile(canonicalPath: String): Boolean {
+        synchronized(registryLock) {
+            return registeredLocalFiles.containsKey(canonicalPath)
+        }
     }
 
     private fun acceptLoop(server: ServerSocket) {
         while (isRunning && !server.isClosed) {
             try {
                 val client = server.accept()
-                executor.execute { handleClient(client) }
-            } catch (e: Exception) {
+                workerPool.execute { handleClient(client) }
+            } catch (_: Exception) {
                 if (!isRunning) break
             }
         }
@@ -155,6 +274,7 @@ internal class LocalMediaProxy(
     private fun handleClient(client: Socket) {
         client.use { socket ->
             try {
+                socket.soTimeout = CLIENT_SOCKET_TIMEOUT_MS
                 val input = socket.getInputStream()
                 val output = socket.getOutputStream()
                 val requestLine = readLine(input) ?: return
@@ -164,29 +284,30 @@ internal class LocalMediaProxy(
                 val isHead = parts[0] == "HEAD"
                 val rawUri = parts[1]
                 var rangeHeader: String? = null
-                var hostHeader: String? = null
-                while (true) {
+                var headerCount = 0
+                while (headerCount < 64) {
                     val line = readLine(input) ?: break
                     if (line.isEmpty()) break
+                    headerCount++
                     if (line.startsWith("Range:", ignoreCase = true)) {
                         rangeHeader = line.substring(6).trim()
-                    } else if (line.startsWith("Host:", ignoreCase = true)) {
-                        hostHeader = line.substring(5).trim()
                     }
                 }
 
                 val params = parseQueryParams(rawUri)
-                if (params["token"] != sessionToken) {
+                val providedToken = params["token"].orEmpty()
+                if (!constantTimeEquals(providedToken, sessionToken)) {
                     send403(output)
                     return
                 }
 
-                val effectiveHost = hostHeader?.takeIf { it.isNotBlank() }
-                    ?: "${getLocalIpAddress() ?: "127.0.0.1"}:$port"
+                // Always derive proxy authority from the server's own bound IP + port (never trust client Host header).
+                val boundHost = lastBoundHostOverride ?: getLocalIpAddress() ?: "127.0.0.1"
+                val serverAuthority = "$boundHost:$port"
 
                 when {
                     rawUri.startsWith("/stream?") ->
-                        handleStreamProxy(params, rangeHeader, effectiveHost, isHead, output)
+                        handleStreamProxy(params, rangeHeader, serverAuthority, isHead, output)
                     rawUri.startsWith("/file?") ->
                         handleFileProxy(params, rangeHeader, isHead, output)
                     else -> send404(output)
@@ -200,14 +321,17 @@ internal class LocalMediaProxy(
     private fun handleStreamProxy(
         params: Map<String, String>,
         rangeHeader: String?,
-        hostHeader: String,
+        serverAuthority: String,
         isHead: Boolean,
         output: OutputStream,
     ) {
         val targetUrl = params["url"]?.takeIf {
             it.startsWith("http://", ignoreCase = true) || it.startsWith("https://", ignoreCase = true)
         } ?: return send404(output)
-        val referer = params["ref"]
+
+        val registered = lookupRegisteredStream(targetUrl) ?: return send403(output)
+        val referer = params["ref"]?.takeIf { it.isNotBlank() } ?: registered.referer
+        val extraHeaders = registered.extraHeaders
         val cacheKey = params["key"]
 
         // 1. Try Media3 SimpleCache / OfflineCacheStreamOpener first when a cacheKey is present
@@ -216,7 +340,7 @@ internal class LocalMediaProxy(
             val isSuffixRange = rangeHeader?.trim()?.startsWith("bytes=-") == true
             val (reqStart, reqEnd) = if (isSuffixRange) 0L to null else parseByteRange(rangeHeader)
             val slice = runCatching {
-                opener.open(cacheKey, targetUrl, referer, reqStart, reqEnd)
+                opener.open(cacheKey, targetUrl, referer, extraHeaders, reqStart, reqEnd)
             }.getOrNull()
             if (slice != null) {
                 try {
@@ -227,7 +351,7 @@ internal class LocalMediaProxy(
                         if (suffixLen != null) {
                             val suffixStart = (totalLength - suffixLen).coerceAtLeast(0L)
                             val suffixSlice = runCatching {
-                                opener.open(cacheKey, targetUrl, referer, suffixStart, totalLength - 1)
+                                opener.open(cacheKey, targetUrl, referer, extraHeaders, suffixStart, totalLength - 1)
                             }.getOrNull()
                             if (suffixSlice != null) {
                                 try {
@@ -239,9 +363,8 @@ internal class LocalMediaProxy(
                             }
                         }
                     } else if (!rangeHeader.isNullOrBlank() && totalLength <= 0 && reqStart > 0) {
-                        // Length unknown: fall back to streaming from offset 0 with 200 OK instead of mismatched offset
                         slice.close()
-                        val fullSlice = runCatching { opener.open(cacheKey, targetUrl, referer, 0L, null) }.getOrNull()
+                        val fullSlice = runCatching { opener.open(cacheKey, targetUrl, referer, extraHeaders, 0L, null) }.getOrNull()
                         if (fullSlice != null) {
                             try {
                                 writeCachedSlice(fullSlice, isRange = false, reqStart = 0L, isHead = isHead, output = output)
@@ -261,12 +384,20 @@ internal class LocalMediaProxy(
             }
         }
 
+        // Block literal loopback/private/link-local hosts before dialing upstream
+        val targetHost = runCatching { URI(targetUrl).host }.getOrNull()
+        if (targetHost.isNullOrBlank() || isBlockedLiteralHost(targetHost)) {
+            send403(output)
+            return
+        }
+
         // 2. Network stream proxy (with HLS M3U8 manifest rewriting support)
         val reqBuilder = Request.Builder()
             .url(targetUrl)
             .header("User-Agent", VideoRepository.USER_AGENT)
             .header("Accept", "*/*")
-        if (!referer.isNullOrBlank()) {
+        extraHeaders.forEach { (k, v) -> reqBuilder.header(k, v) }
+        if (!referer.isNullOrBlank() && extraHeaders.keys.none { it.equals("Referer", ignoreCase = true) }) {
             reqBuilder.header("Referer", referer)
         }
         val isHlsRequest = DlnaSoap.isHlsUrl(targetUrl)
@@ -274,7 +405,7 @@ internal class LocalMediaProxy(
             reqBuilder.header("Range", rangeHeader)
         }
 
-        val response = okHttpClient.newCall(reqBuilder.build()).execute()
+        val response = upstreamHttpClient.newCall(reqBuilder.build()).execute()
         response.use { resp ->
             val contentType = resp.header("Content-Type").orEmpty()
             val isM3u8 = isHlsRequest ||
@@ -282,13 +413,22 @@ internal class LocalMediaProxy(
                 contentType.contains("x-mpegURL", ignoreCase = true)
 
             if (isM3u8 && resp.isSuccessful) {
-                val rawManifest = resp.body?.string().orEmpty()
+                val declaredLen = resp.body?.contentLength() ?: -1L
+                if (declaredLen > MAX_MANIFEST_BYTES) {
+                    send403(output)
+                    return
+                }
+                val rawManifest = readTextCapped(resp.body?.byteStream(), MAX_MANIFEST_BYTES)
+                val activeToken = sessionToken
                 val rewritten = rewriteHlsManifest(
                     manifest = rawManifest,
                     baseUri = targetUrl,
-                    proxyBaseUrl = "http://$hostHeader",
-                    token = sessionToken,
+                    proxyBaseUrl = "http://$serverAuthority",
+                    token = activeToken,
                     referer = referer,
+                    onResolvedResource = { resolvedUri ->
+                        registerStreamInternal(resolvedUri, referer, extraHeaders)
+                    },
                 )
                 val payload = rewritten.toByteArray(StandardCharsets.UTF_8)
                 val headers = buildString {
@@ -340,7 +480,8 @@ internal class LocalMediaProxy(
     ) {
         val path = params["path"] ?: return send404(output)
         val file = File(path)
-        if (!isAllowedLocalFile(file, allowedDirs)) {
+        val canonicalPath = runCatching { file.canonicalPath }.getOrNull() ?: return send403(output)
+        if (!isRegisteredLocalFile(canonicalPath) || !isAllowedLocalFile(file, allowedDirs)) {
             send403(output)
             return
         }
@@ -497,16 +638,140 @@ internal class LocalMediaProxy(
             val b = input.read()
             if (b == -1) return if (sb.isEmpty()) null else sb.toString()
             if (b == '\n'.code) return sb.toString().trimEnd('\r')
-            if (sb.length >= 8192) throw java.io.IOException("HTTP header line too long")
+            if (sb.length >= 8192) throw IOException("HTTP header line too long")
             sb.append(b.toChar())
         }
     }
 
     companion object {
         private const val TAG = "LocalMediaProxy"
+        private const val CLIENT_SOCKET_TIMEOUT_MS = 10_000
+        internal const val MAX_MANIFEST_BYTES = 8 * 1024 * 1024
+        private const val MAX_REGISTERED_STREAMS = 2048
+        private const val MAX_REGISTERED_PREFIXES = 256
+        private const val MAX_REGISTERED_FILES = 64
         private val HLS_URI_ATTR_REGEX = Regex("""URI="([^"]+)"""")
         private val FORBIDDEN_PATH_SEGMENTS = listOf("shared_prefs", "databases", "code_cache", "no_backup")
         private val FORBIDDEN_EXTENSIONS = setOf("xml", "db", "sqlite", "journal", "properties", "json")
+        private val ALLOWED_EXTRA_HEADER_NAMES = setOf(
+            "origin",
+            "referer",
+            "user-agent",
+            "accept",
+            "accept-language",
+            "cookie",
+            "authorization",
+        )
+        private val secureRandom = SecureRandom()
+
+        internal object PublicMediaDns : Dns {
+            override fun lookup(hostname: String): List<InetAddress> {
+                if (isBlockedLiteralHost(hostname)) {
+                    throw UnknownHostException("Blocked non-public upstream host: $hostname")
+                }
+                val resolved = Dns.SYSTEM.lookup(hostname)
+                val publicAddresses = resolved.filterNot { isPrivateOrLoopbackAddress(it) }
+                if (publicAddresses.isEmpty()) {
+                    throw UnknownHostException("Blocked private/loopback upstream target for $hostname")
+                }
+                return publicAddresses
+            }
+        }
+
+        internal fun generateRandomToken(): String {
+            val bytes = ByteArray(16)
+            secureRandom.nextBytes(bytes)
+            return bytes.joinToString("") { "%02x".format(it) }
+        }
+
+        internal fun constantTimeEquals(provided: String, expected: String): Boolean {
+            if (provided.isEmpty() || expected.isEmpty()) return false
+            return MessageDigest.isEqual(
+                provided.toByteArray(StandardCharsets.UTF_8),
+                expected.toByteArray(StandardCharsets.UTF_8),
+            )
+        }
+
+        internal fun isPrivateOrLoopbackAddress(address: InetAddress): Boolean {
+            if (address.isLoopbackAddress ||
+                address.isAnyLocalAddress ||
+                address.isLinkLocalAddress ||
+                address.isSiteLocalAddress ||
+                address.isMulticastAddress
+            ) {
+                return true
+            }
+            val bytes = address.address
+            // IPv6 Unique Local Addresses (fc00::/7)
+            if (bytes.size == 16 && (bytes[0].toInt() and 0xfe) == 0xfc) {
+                return true
+            }
+            // IPv4 Carrier-Grade NAT (100.64.0.0/10)
+            if (bytes.size == 4 && (bytes[0].toInt() and 0xff) == 100 && ((bytes[1].toInt() and 0xc0) == 64)) {
+                return true
+            }
+            return false
+        }
+
+        internal fun isBlockedLiteralHost(host: String): Boolean {
+            val clean = host.trim().removeSurrounding("[", "]").lowercase()
+            if (clean.isEmpty() || clean == "localhost" || clean.endsWith(".local") || clean.endsWith(".localhost")) {
+                return true
+            }
+            if (clean == "127.0.0.1" || clean == "0.0.0.0" || clean == "::1" || clean == "::") {
+                return true
+            }
+            val ipv4Parts = clean.split('.')
+            if (ipv4Parts.size == 4 && ipv4Parts.all { it.toIntOrNull() in 0..255 }) {
+                val addr = runCatching { InetAddress.getByName(clean) }.getOrNull() ?: return true
+                return isPrivateOrLoopbackAddress(addr)
+            }
+            if (clean.contains(':')) {
+                val addr = runCatching { InetAddress.getByName(clean) }.getOrNull() ?: return true
+                return isPrivateOrLoopbackAddress(addr)
+            }
+            return false
+        }
+
+        internal fun streamDirectoryPrefix(url: String): String? {
+            val withoutQuery = url.substringBefore('?').substringBefore('#')
+            val slashIdx = withoutQuery.lastIndexOf('/')
+            if (slashIdx <= "https://".length) return null
+            return withoutQuery.substring(0, slashIdx)
+        }
+
+        internal fun sanitizeForwardedHeaders(headers: Map<String, String>): Map<String, String> {
+            if (headers.isEmpty()) return emptyMap()
+            val out = LinkedHashMap<String, String>()
+            for ((rawKey, rawValue) in headers) {
+                val key = rawKey.trim()
+                val value = rawValue.replace("\r", "").replace("\n", "").trim()
+                if (key.isEmpty() || value.isEmpty()) continue
+                if (key.lowercase() in ALLOWED_EXTRA_HEADER_NAMES) {
+                    out[key] = value
+                }
+            }
+            return out
+        }
+
+        internal fun readTextCapped(stream: InputStream?, maxBytes: Int): String {
+            if (stream == null) return ""
+            stream.use { input ->
+                val out = ByteArrayOutputStream(4096)
+                val buf = ByteArray(8192)
+                var total = 0
+                while (true) {
+                    val read = input.read(buf)
+                    if (read < 0) break
+                    total += read
+                    if (total > maxBytes) {
+                        throw IOException("HLS manifest exceeds ${maxBytes} bytes")
+                    }
+                    out.write(buf, 0, read)
+                }
+                return out.toByteArray().toString(StandardCharsets.UTF_8)
+            }
+        }
 
         internal fun parseQueryParams(rawUri: String): Map<String, String> {
             val query = rawUri.substringAfter("?", "")
@@ -534,7 +799,7 @@ internal class LocalMediaProxy(
                         canonical.startsWith(dirCanonical)
                     }
                 } else {
-                    true
+                    false
                 }
             } catch (_: Exception) {
                 false
@@ -574,6 +839,7 @@ internal class LocalMediaProxy(
             proxyBaseUrl: String,
             token: String,
             referer: String?,
+            onResolvedResource: ((String) -> Unit)? = null,
         ): String {
             val lines = manifest.split("\r\n", "\n")
             return lines.joinToString("\n") { line ->
@@ -585,6 +851,7 @@ internal class LocalMediaProxy(
                             HLS_URI_ATTR_REGEX.replace(line) { matchResult ->
                                 val rawUri = matchResult.groupValues[1]
                                 val resolved = resolveRelativeUri(baseUri, rawUri)
+                                onResolvedResource?.invoke(resolved)
                                 val proxied = buildProxyUrlWithBase(proxyBaseUrl, token, resolved, referer)
                                 """URI="$proxied""""
                             }
@@ -594,6 +861,7 @@ internal class LocalMediaProxy(
                     }
                     else -> {
                         val resolved = resolveRelativeUri(baseUri, trimmed)
+                        onResolvedResource?.invoke(resolved)
                         buildProxyUrlWithBase(proxyBaseUrl, token, resolved, referer)
                     }
                 }

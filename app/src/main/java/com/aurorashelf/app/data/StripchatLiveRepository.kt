@@ -18,6 +18,8 @@ class StripchatLiveRepository {
         try {
             val response = request(buildUrl(category, page, SITE_BASE), SITE_BASE)
             parsePage(response, SITE_BASE)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             // 主线路失败时自动尝试国际主站备用线路
             val fallbackResponse = request(buildUrl(category, page, FALLBACK_SITE_BASE), FALLBACK_SITE_BASE)

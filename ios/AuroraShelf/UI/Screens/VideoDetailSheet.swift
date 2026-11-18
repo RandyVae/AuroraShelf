@@ -240,7 +240,7 @@ public struct VideoDetailSheet: View {
 
                     // 2. 核心操作按钮栏（Apple TV 原生标准：高对比纯白播放胶囊 + 磨砂质感辅助圆钮）
                     HStack(spacing: AuroraMetrics.spacingM) {
-                        // 主播放按钮（深色下纯白高光大底，提供最高视觉优先级）
+                        // 主播放按钮（自适应品牌高对比主按钮）
                         Button {
                             onDismiss()
                             if let ep = selectedEpisode {
@@ -256,13 +256,13 @@ public struct VideoDetailSheet: View {
                                     .font(.headline.weight(.semibold))
                             }
                             .frame(maxWidth: .infinity, minHeight: 48)
-                            .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                            .foregroundStyle(Color.black)
+                            .background(AuroraColor.brand, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .foregroundStyle(Color.white)
                         }
                         .buttonStyle(AppleSpringCardButtonStyle())
                         .hoverEffect(.highlight)
 
-                        // 片单收藏按钮（Apple TV 毛玻璃容器）
+                        // 片单收藏按钮（自适应表面容器）
                         let isBookmarked = watchlist.contains(video)
                         Button {
                             do {
@@ -274,17 +274,18 @@ public struct VideoDetailSheet: View {
                             Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
                                 .font(.title3)
                                 .frame(width: 48, height: 48)
-                                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                                        .stroke(AuroraColor.hairline, lineWidth: 1)
                                 )
-                                .foregroundStyle(isBookmarked ? AuroraColor.brand : .white)
+                                .foregroundStyle(isBookmarked ? AuroraColor.brand : AuroraColor.textPrimary)
                         }
                         .buttonStyle(AppleSpringCardButtonStyle())
                         .hoverEffect(.highlight)
+                        .accessibilityLabel(isBookmarked ? "watchlist.remove".localized : "watchlist.add".localized)
 
-                        // 离线缓存下载按钮（Apple TV 毛玻璃容器）
+                        // 离线缓存下载按钮（自适应表面容器）
                         let targetVideo = selectedEpisode != nil ? videoForEpisode(selectedEpisode!) : video
                         let isDownloaded = downloadManager.isDownloaded(video: targetVideo, episode: selectedEpisode)
                         let isDownloading = downloadManager.status(for: targetVideo, episode: selectedEpisode)?.isDownloading ?? false
@@ -307,32 +308,32 @@ public struct VideoDetailSheet: View {
                                 } else {
                                     Image(systemName: "arrow.down.circle")
                                         .font(.title3)
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(AuroraColor.textPrimary)
                                 }
                             }
                             .frame(width: 48, height: 48)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                                    .stroke(AuroraColor.hairline, lineWidth: 1)
                             )
                         }
                         .buttonStyle(AppleSpringCardButtonStyle())
                         .hoverEffect(.highlight)
                         .accessibilityLabel(isDownloaded ? "已离线缓存" : (isDownloading ? "正在下载" : "离线缓存"))
 
-                        // 原生分享（Apple TV 毛玻璃容器）
+                        // 原生分享（自适应表面容器）
                         if let shareURL = URL(string: video.playbackUrl), !video.playbackUrl.isEmpty {
                             ShareLink(item: shareURL) {
                                 Image(systemName: "square.and.arrow.up")
                                     .font(.title3)
                                     .frame(width: 48, height: 48)
-                                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .background(AuroraColor.surfaceCard, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .stroke(Color.white.opacity(0.15), lineWidth: 0.5)
+                                            .stroke(AuroraColor.hairline, lineWidth: 1)
                                     )
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(AuroraColor.textPrimary)
                             }
                             .buttonStyle(AppleSpringCardButtonStyle())
                             .hoverEffect(.highlight)
@@ -573,7 +574,7 @@ public struct VideoDetailSheet: View {
                         HStack(spacing: AuroraMetrics.spacingM) {
                             specItem(title: "视频编码", value: video.playbackUrl.contains(".m3u8") ? "HLS" : "MP4")
                             specItem(title: "来源站点", value: video.sourceName)
-                            specItem(title: "投屏支持", value: "AirPlay / DLNA")
+                            specItem(title: "投屏支持", value: "AirPlay")
                         }
                         .padding(.horizontal, AuroraMetrics.contentInset)
                     }
@@ -711,7 +712,10 @@ public struct VideoDetailSheet: View {
                         Image(systemName: "xmark.circle.fill")
                             .font(.headline)
                             .foregroundStyle(AuroraColor.textTertiary)
+                            .frame(minWidth: AuroraMetrics.minTouchTarget, minHeight: AuroraMetrics.minTouchTarget)
+                            .contentShape(Rectangle())
                     }
+                    .accessibilityLabel("common.close".localized)
                 }
             }
         }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -59,8 +61,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -96,6 +98,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -118,6 +121,8 @@ import coil3.network.httpHeaders
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.transformations
+import coil3.size.Precision
+import coil3.size.Size
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.aurorashelf.app.data.VideoRepository
@@ -481,7 +486,16 @@ private fun ComicLibrary(
             (state.loadMoreError ?: state.error)?.let { message ->
                 if (state.comics.isNotEmpty()) {
                     item(span = { GridItemSpan(maxLineSpan) }) {
-                        TextButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
+                        TextButton(
+                            onClick = {
+                                if (state.loadMoreError != null && state.page > 0) {
+                                    onLoadMore()
+                                } else {
+                                    onRefresh()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
                             Text("$message（点击重试）")
                         }
                     }
@@ -652,13 +666,13 @@ private fun ComicSourceAuthCard(
                 onClick = { onAuthenticate(account, password) },
                 enabled = !isLoading && account.isNotBlank() && password.isNotBlank(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AuroraCoral,
-                    contentColor = Color.White,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                 ),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = Color.White)
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                     Spacer(Modifier.width(9.dp))
                 }
                 Text(if (isLoading) "正在授权" else "登录并连接", fontWeight = FontWeight.Bold)
@@ -674,16 +688,41 @@ private fun NetflixComicHeroBillboard(
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(460.dp)
             .clickable(role = Role.Button, onClick = onRead),
     ) {
+        val isWideStage = maxWidth > 500.dp
         ComicCoverImage(
             comic = comic,
             modifier = Modifier.fillMaxSize(),
         )
+        if (isWideStage) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.56f)),
+            )
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                shadowElevation = 12.dp,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
+                color = AuroraMediaPlaceholder,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 68.dp)
+                    .height(236.dp)
+                    .aspectRatio(0.72f),
+            ) {
+                ComicCoverImage(
+                    comic = comic,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
 
         // Top dark vignette gradient
         Box(
@@ -979,6 +1018,7 @@ private fun ComicDownloadProgressSheetContent(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .padding(horizontal = 20.dp)
             .padding(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1117,7 +1157,7 @@ private fun ComicDetailsScreen(
     onOpenDownloadProgress: () -> Unit = {},
     onRetryComicDownload: ((String) -> Unit)? = null,
 ) {
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
         LazyColumn(
             contentPadding = PaddingValues(bottom = 126.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -1185,13 +1225,13 @@ private fun ComicDetailsScreen(
                                         onClick = { onChapter(0) },
                                         shape = RoundedCornerShape(4.dp),
                                         colors = ButtonDefaults.buttonColors(
-                                            containerColor = AuroraCoral,
-                                            contentColor = Color.White,
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary,
                                         ),
                                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                        modifier = if (onDownloadAll != null) Modifier.weight(1f).height(38.dp) else Modifier.height(38.dp),
+                                        modifier = if (onDownloadAll != null) Modifier.weight(1f).heightIn(min = 44.dp) else Modifier.heightIn(min = 44.dp),
                                     ) {
-                                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(4.dp))
                                         Text("开始阅读", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                                     }
@@ -1203,7 +1243,7 @@ private fun ComicDetailsScreen(
                                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
                                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                            modifier = Modifier.weight(1f).height(38.dp),
+                                            modifier = Modifier.weight(1f).heightIn(min = 44.dp),
                                         ) {
                                             Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
                                             Spacer(Modifier.width(4.dp))
@@ -1301,7 +1341,7 @@ private fun ComicDetailsScreen(
                                         onDownloadChapter?.invoke(chapter)
                                     }
                                 },
-                                modifier = Modifier.size(28.dp).padding(end = 6.dp),
+                                modifier = Modifier.minimumInteractiveComponentSize().size(28.dp).padding(end = 6.dp),
                             ) {
                                 Icon(
                                     Icons.Default.Refresh,
@@ -1313,7 +1353,7 @@ private fun ComicDetailsScreen(
                         } else if (onDownloadChapter != null) {
                             IconButton(
                                 onClick = { onDownloadChapter(chapter) },
-                                modifier = Modifier.size(28.dp).padding(end = 6.dp),
+                                modifier = Modifier.minimumInteractiveComponentSize().size(28.dp).padding(end = 6.dp),
                             ) {
                                 Icon(
                                     Icons.Default.Download,
@@ -1349,6 +1389,7 @@ private fun ComicReader(
 ) {
     val reader = requireNotNull(state.reader)
     val context = LocalContext.current
+    val targetPageWidthPx = LocalWindowInfo.current.containerSize.width.coerceIn(720, JmUnscrambleTransformation.MAX_TEXTURE_WIDTH)
     val listState = rememberLazyListState()
 
     // Reset reader scroll position to top when chapter changes
@@ -1357,7 +1398,7 @@ private fun ComicReader(
     }
 
     // Sliding window page prefetch: pre-resolves and warms ahead 3 pages off the main thread
-    LaunchedEffect(listState, reader.pages) {
+    LaunchedEffect(listState, reader.pages, targetPageWidthPx) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
             .distinctUntilChanged()
             .collect { currentIndex ->
@@ -1365,6 +1406,7 @@ private fun ComicReader(
                 withContext(Dispatchers.IO) {
                     ahead.forEach { idx ->
                         val p = reader.pages[idx]
+                        if (p.imageUrl.startsWith("file:/")) return@forEach
                         runCatching {
                             val resolved = ComicPageResolver.resolve(p)
                             val req = ImageRequest.Builder(context)
@@ -1379,8 +1421,11 @@ private fun ComicReader(
                                 .diskCacheKey(resolved.imageUrl)
                                 .apply {
                                     if (resolved.verticalSegments > 1) {
-                                        size(coil3.size.Size.ORIGINAL)
+                                        size(Size.ORIGINAL)
                                         transformations(JmUnscrambleTransformation(resolved.verticalSegments))
+                                    } else {
+                                        size(Size(targetPageWidthPx, JmUnscrambleTransformation.MAX_TEXTURE_HEIGHT))
+                                        precision(Precision.INEXACT)
                                     }
                                 }
                                 .build()
@@ -1470,7 +1515,7 @@ private fun ComicReader(
                     Row(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
+                        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 24.dp),
                     ) {
                         TextButton(
                             onClick = onPreviousChapter,
@@ -1552,6 +1597,7 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
     var retryKey by remember { mutableIntStateOf(0) }
     var loadState by remember(page, retryKey) { mutableIntStateOf(0) }
     val context = LocalContext.current
+    val targetPageWidthPx = LocalWindowInfo.current.containerSize.width.coerceIn(720, JmUnscrambleTransformation.MAX_TEXTURE_WIDTH)
     val isLocalFile = page.imageUrl.startsWith("file:/")
     val resolvedResult by produceState<Result<ComicPage>?>(
         initialValue = if (isLocalFile || page.resolutionUrl == null) Result.success(page) else null,
@@ -1563,13 +1609,15 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
         }
     }
     val resolvedPage = resolvedResult?.getOrNull()
-    val request = remember(resolvedPage, retryKey, context) {
+    val request = remember(resolvedPage, retryKey, context, targetPageWidthPx) {
         resolvedPage?.let { resolved ->
             if (isLocalFile) {
                 val file = java.io.File(java.net.URI.create(resolved.imageUrl).path)
                 ImageRequest.Builder(context)
                     .data(file)
                     .memoryCacheKey(resolved.imageUrl)
+                    .size(Size(targetPageWidthPx, JmUnscrambleTransformation.MAX_TEXTURE_HEIGHT))
+                    .precision(Precision.INEXACT)
                     .build()
             } else {
                 ImageRequest.Builder(context)
@@ -1588,8 +1636,11 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
                             diskCachePolicy(CachePolicy.WRITE_ONLY)
                         }
                         if (resolved.verticalSegments > 1) {
-                            size(coil3.size.Size.ORIGINAL)
+                            size(Size.ORIGINAL)
                             transformations(JmUnscrambleTransformation(resolved.verticalSegments))
+                        } else {
+                            size(Size(targetPageWidthPx, JmUnscrambleTransformation.MAX_TEXTURE_HEIGHT))
+                            precision(Precision.INEXACT)
                         }
                     }
                     .build()
@@ -1635,7 +1686,11 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
 }
 
 @Composable
-private fun ComicCoverImage(comic: ComicSummary, modifier: Modifier = Modifier) {
+private fun ComicCoverImage(
+    comic: ComicSummary,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+) {
     val context = LocalContext.current
     // Shared with CoverPrefetcher so warm-up and the visible list use identical data/cache keys.
     val request = remember(comic.coverUrl, comic.coverReferer, comic.sourceId, context) {
@@ -1648,7 +1703,7 @@ private fun ComicCoverImage(comic: ComicSummary, modifier: Modifier = Modifier) 
             AsyncImage(
                 model = request,
                 contentDescription = "${comic.title}封面",
-                contentScale = ContentScale.Crop,
+                contentScale = contentScale,
                 modifier = Modifier.fillMaxSize(),
             )
             DarkModeArtworkScrim()

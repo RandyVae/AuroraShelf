@@ -18,7 +18,12 @@ internal data class WindowLayout(
             // two actionable rows below the fold on tall phones.
             val heroHeight = if (isLandscape) 128f else
                 (availableHeightDp - 106f - 2f * rowHeight).coerceIn(214f, 248f)
-            return WindowLayout(contentWidth / heroHeight, thumbnailFraction, if (isLandscape) 10f else 16f, isLandscape)
+            return WindowLayout(
+                heroAspectRatio = contentWidth / heroHeight,
+                rowThumbnailFraction = thumbnailFraction,
+                sectionGap = if (isLandscape) 10f else 16f,
+                compactDock = isLandscape || widthDp >= 600f,
+            )
         }
     }
 }

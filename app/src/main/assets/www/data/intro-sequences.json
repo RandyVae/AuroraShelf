@@ -176,7 +176,7 @@
             "speedlines": false
           },
           "audio": {
-            "sfx": "tutorial/regina_attack/regina_attack.m4a"
+            "sfx": "main/regina_attack/regina_attack.m4a"
           },
           "dialogue": {
             "speaker": "Dominica",
@@ -366,7 +366,7 @@
             "heroAura": true
           },
           "audio": {
-            "sfx": "tutorial/regina_attack/regina_attack.m4a"
+            "sfx": "main/regina_attack/regina_attack.m4a"
           },
           "dialogue": {
             "speaker": "Regina",

@@ -22,7 +22,7 @@
 
 /* Search */
 "search.placeholder" = "Tìm video, anime, truyện tranh hoặc mã số";
-"search.concurrent_hint" = "Tìm kiếm đồng thời trên 20 nguồn video";
+"search.concurrent_hint" = "Tìm kiếm đồng thời trên %d nguồn video";
 "search.no_results" = "Không tìm thấy kết quả";
 "search.searching" = "Đang tìm kiếm…";
 "search.history" = "Lịch sử tìm kiếm";
@@ -110,3 +110,6 @@
 "common.cancel" = "Hủy";
 "common.close" = "Đóng";
 "common.ok" = "Đồng ý";
+
+"settings.appearance" = "Giao diện";
+"settings.open_source" = "Giấy phép nguồn mở";

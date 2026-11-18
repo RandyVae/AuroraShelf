@@ -7,9 +7,11 @@ public struct LivePlayerView: View {
     @Binding public var isLandscape: Bool
     @Binding public var isFillMode: Bool
     public var topSafeArea: CGFloat = 0
+    public var isChatPresented: Binding<Bool>? = nil
     public let onDismiss: () -> Void
     public var onToggleHUD: ((String) -> Void)?
     public var onComment: ((LiveComment) -> Void)?
+    public var onCommentBridgeStateChange: ((Bool) -> Void)?
 
     @State private var player: AVPlayer?
     @State private var isPlaying: Bool = false
@@ -34,18 +36,26 @@ public struct LivePlayerView: View {
         isLandscape: Binding<Bool> = .constant(false),
         isFillMode: Binding<Bool> = .constant(false),
         topSafeArea: CGFloat = 0,
+        isChatPresented: Binding<Bool>? = nil,
         onDismiss: @escaping () -> Void,
         onToggleHUD: ((String) -> Void)? = nil,
-        onComment: ((LiveComment) -> Void)? = nil
+        onComment: ((LiveComment) -> Void)? = nil,
+        onCommentBridgeStateChange: ((Bool) -> Void)? = nil
     ) {
         self.stream = stream
         self._isFullScreen = isFullScreen
         self._isLandscape = isLandscape
         self._isFillMode = isFillMode
         self.topSafeArea = topSafeArea
+        self.isChatPresented = isChatPresented
         self.onDismiss = onDismiss
         self.onToggleHUD = onToggleHUD
         self.onComment = onComment
+        self.onCommentBridgeStateChange = onCommentBridgeStateChange
+    }
+
+    private var effectiveChatOpen: Bool {
+        isChatPresented?.wrappedValue ?? showRoomChat
     }
 
     public var body: some View {
@@ -199,16 +209,20 @@ public struct LivePlayerView: View {
         }
         .clipped()
         .onAppear {
+            PictureInPictureManager.shared.stopAndReleasePiPIfNeeded()
             fetchAndStartLiveStream()
         }
         .onChange(of: isPlaying) { _, playing in
             UIApplication.shared.isIdleTimerDisabled = playing
         }
+        .onChange(of: isWebFallbackActive) { _, active in
+            onCommentBridgeStateChange?(active)
+        }
         .onDisappear {
             cleanupLivePlayer()
             UIApplication.shared.isIdleTimerDisabled = false
         }
-        .onChange(of: showRoomChat) { _, isShowing in
+        .onChange(of: effectiveChatOpen) { _, isShowing in
             if isShowing {
                 player?.pause()
             } else if isPlaying {
@@ -282,19 +296,21 @@ public struct LivePlayerView: View {
                     }
 
                     HStack(spacing: 4) {
-                        Text(stream.sourceID == LiveSourceCatalog.stripchatID ? "Stripchat" : "HornyStudents")
+                        Text(LiveSourceCatalog.name(for: stream.sourceID))
                             .font(.caption2.bold())
                             .foregroundStyle(AuroraColor.brandLabel)
                             .lineLimit(1)
 
-                        Text("•")
-                            .font(.caption2)
-                            .foregroundStyle(Color.white.opacity(0.5))
+                        if let viewers = stream.viewCount.value {
+                            Text("•")
+                                .font(.caption2)
+                                .foregroundStyle(Color.white.opacity(0.5))
 
-                        Text("在线 \(stream.viewCount)")
-                            .font(.caption2)
-                            .foregroundStyle(Color.white.opacity(0.8))
-                            .lineLimit(1)
+                            Text("在线 \(viewers)")
+                                .font(.caption2)
+                                .foregroundStyle(Color.white.opacity(0.8))
+                                .lineLimit(1)
+                        }
                     }
                 }
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
@@ -304,9 +320,13 @@ public struct LivePlayerView: View {
                 // 右侧功能键区（iOS 27 GlassEffectContainer 融合按键群组）
                 GlassEffectContainer(spacing: 4) {
                     HStack(spacing: 4) {
-                        // 1. 聊天室按钮
+                        // 1. 聊天室按钮（与外层 LiveDetailView 共享单一 Sheet 状态）
                         controlCircleButton(systemImage: "bubble.left.and.bubble.right", label: "打开聊天室") {
-                            showRoomChat = true
+                            if let isChatPresented {
+                                isChatPresented.wrappedValue = true
+                            } else {
+                                showRoomChat = true
+                            }
                         }
 
                         // 2. 画幅切换（Fit / Fill）
@@ -325,7 +345,7 @@ public struct LivePlayerView: View {
                         // 3. 全屏模式下的横竖屏手动微调旋转
                         if isFullScreen {
                             controlCircleButton(
-                                systemImage: isLandscape ? "iphone.portrait" : "iphone.landscape",
+                                systemImage: isLandscape ? "iphone" : "iphone.landscape",
                                 label: isLandscape ? "切换竖屏" : "切换横屏"
                             ) {
                                 let impact = UIImpactFeedbackGenerator(style: .medium)
@@ -346,7 +366,7 @@ public struct LivePlayerView: View {
                         }
 
                         // 5. AirPlay 原生投屏
-                        AirPlayRoutePicker()
+                        AirPlayRoutePicker(tint: .white)
                             .frame(width: 38, height: 38)
                             .glassEffect(.regular.interactive(), in: .circle)
                             .frame(minWidth: 44, minHeight: 44)
@@ -682,6 +702,8 @@ public struct LivePlayerView: View {
 
     private func cleanupLivePlayer(cancelRequest: Bool = true) {
         UIApplication.shared.isIdleTimerDisabled = false
+        hideControlsTask?.cancel()
+        hideControlsTask = nil
         if cancelRequest {
             streamRequestTask?.cancel()
             streamRequestTask = nil

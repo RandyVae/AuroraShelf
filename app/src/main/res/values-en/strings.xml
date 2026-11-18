@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Netgrey</string>
+    <string name="action_search">Search</string>
+    <string name="cast_sheet_title">Cast to TV</string>
+    <string name="cast_rescan">Rescan</string>
+    <string name="cast_disconnect">Disconnect</string>
+    <string name="cast_system_mirror_title">System Wireless Cast / Screen Mirroring</string>
+    <string name="cast_system_mirror_subtitle">Open system cast panel (Chromecast / Miracast)</string>
+    <string name="cast_searching_lan">Scanning local network for TVs…</string>
+    <string name="cast_empty_title">No DLNA TVs Found</string>
+    <string name="cast_empty_subtitle">Ensure your phone and TV are on the same Wi-Fi network, or use System Wireless Cast above.</string>
+    <string name="theme_mode_title">Appearance</string>
+    <string name="theme_mode_system">System</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_dark">Dark</string>
+    <string name="about_open_source_title">About &amp; Open Source Licenses</string>
+</resources>

@@ -1,123 +1,113 @@
-# 极光视界 · Android 2.15.0
+# Netgrey (`AuroraShelf`) · iOS / iPadOS & Android v2.17.0
 
-按用户选定的「方案 1」重新实现的 Android 客户端。采用 Kotlin、Jetpack Compose、Material 3、Haze 与 AndroidLiquidGlass/Backdrop；Material You 界面保留真实视频源能力，并以浮动玻璃导航、吸顶分类和弹性选中动效重构视觉层级，不是网页套壳首页。2.9.0 保留首个大幅推荐视频并将后续内容改为 YouTube 式双列信息层级；2.9.1 新增完整日间与夜间主题，默认跟随系统即时切换。
+Netgrey（工程代号 `AuroraShelf`，包名 `com.aurorashelf.app`）是一套面向 **iOS / iPadOS Universal** 与 **Android（手机 / 折叠屏 / 平板）** 的双端原生多源流媒体、漫画、直播、社区阅读与离线单机游戏客户端。当前正式版本为 **v2.17.0 (Build 267)**，交付包通过 [GitHub Releases](https://github.com/RandyVae/AuroraShelf/releases/latest)、官方无线 OTA 与 Apple TestFlight 同步分发。
 
-## S26 Ultra 默认设置适配
+- **iOS / iPadOS 原生端**：基于 **Swift 6 + SwiftUI**（最低部署目标 **iOS 26.0+**），全面遵循 Apple Human Interface Guidelines 与 Liquid Glass 视觉规范；iPhone 采用浮动玻璃胶囊导航，iPad 自动切换为原生侧边栏、4~6 列自适应海报网格与宽屏影院画幅。
+- **Android 原生端**：基于 **Kotlin + Jetpack Compose + Material 3 + Haze + AndroidLiquidGlass / Backdrop**（最低 **Android 8.0 / API 26**，目标 **API 36**，编译 SDK **37**），支持 Material You 动态取色、明暗双态即时切换、竖屏液态折射底栏与横屏/大屏自适应侧栏。
 
-当前交付包可从 [GitHub Releases](https://github.com/RandyVae/AuroraShelf/releases/latest) 下载。与上一版同包名、同测试签名，版本号递增，可直接更新安装，无需卸载「极光视界」。原版应用仍不受影响。
+---
 
-针对默认字体/屏幕缩放的大屏使用场景，首页按实际窗口高度调整推荐封面，列表从浮动导航后方延伸，末尾仍保留足够滚动空间。横屏切换为 64 dp 侧边导航并限制内容宽度，避免底栏压缩主内容；横向安全区避开挖孔和侧边系统导航。
+## 核心功能矩阵（v2.17.0）
 
-没有把某个屏幕 DPI 当成三星默认值写死：相同机型的地区、系统版本、分辨率和分屏状态可能改变应用可用空间。本次最终截图在 Android 14 模拟器以 1080 × 2340、density 440 验证，并补充约 384/411 dp 两种逻辑宽度测试；不是 S26 Ultra 真机或 One UI 仿真，未强制刷新率，也不保证 120 fps。详见 `docs/s26-adaptation.md`。
+### 1. 多源长视频与短剧（18 个视频源）
+- 内置 **18 个视频与短剧源**：`huavod`（华视影院）、`huangguo`（黄果短剧）、`91porn`（91视频）、`91dongman`（91动漫）、`beeg`、`134x`、`xvideos`、`missav`、`kissjav`、`85po`、`pornhub`、`tokyomotion`、`spankbang`、`xhamster`、`eporner`、`mrdouga`、`ohentai`、`xnxx`。
+- 双端均支持分类浏览、全站搜索、自动翻页去重、选集切换、硬件解码播放（iOS `AVPlayer` + 本地 `HLSLoopbackRelayServer` 防盗链中继；Android `Media3 / ExoPlayer`）与应用私有目录 MP4/HLS 离线缓存。
 
-## 当前范围
+### 2. 原生在线漫画与分片解扰（10 个漫画源）
+- 内置 **10 个原生漫画源**：`komiic`、`baozi`（包子漫画）、`copy`（拷贝漫画）、`ikmmh`（爱看漫画）、`picacg`（哔咔漫画）、`ehentai`、`jm`（禁漫天堂）、`8muses`、`gedecomix`、`dongman91_comic`（91动漫漫画）。
+- 支持分类、搜索、章节目录、纵向连续阅读、JM 分片图像实时解扰还原、章节离线下载，以及哔咔最小内容访问登录（令牌经系统硬件密钥库加密存储）。
 
-### 导航、直播、论坛与个人中心（2.15.0）
+### 3. 公开直播聚合（2 个直播源）
+- 原生接入 **Stripchat** 与 **HornyStudents** 两个公开直播源，支持全部来源混合流或按源筛选、五大频道分类、实时在线人数、HLS 原生拉流播放与只读公开互动展示，不介入充值打赏或权限绕过。
 
-- 底栏固定为首页、漫画、直播、论坛和我的五项；点击、连续拖动、跨栏震动及玻璃透镜动效保持一致，横屏显示对应侧栏图标。
-- “我的”集中收藏、观看历史和设置，以个人中心卡片展示本地条目数量与当前视频源；二级页面支持系统返回手势。
-- 论坛把草榴社区技术讨论区与 91 自拍论坛性趣闲谈区的公开主题合并成一个信息流，不设置来源切换；两边并发分页、统一去重排序，任一来源临时不可用时仍显示另一边内容。
-- 论坛主题在应用内阅读，阅读时隐藏底栏；当前是匿名只读浏览，不接入登录、发帖、回复或绕过站点权限。
-- “直播”使用原生 Compose 列表和详情页接入 Stripchat 公开直播：支持四类筛选、刷新、分页、封面、观看人数、暂停、静音、全屏和只读公开评论。官方房间页面只在播放器内部提供视频流，不展示站点导航、付费、私信、打赏或推荐区，也不接入登录和验证绕过。
-- 2.14.1 为两种旧式论坛页面加入移动端正文重排与延迟图片恢复，避免桌面作者栏挤压正文或图片超出屏幕。
-- 2.14.2 进一步移除帖子阅读页的桌面导航、广告和发帖控件，并修复 91 论坛不规范广告标签导致正文被整体隐藏的问题。
-- 2.14.3 保留两站帖子翻页栏和列表滚动位置，并为论坛正文可见性及返回位置增加 Android 设备回归。
-- 漫画分类继续固定在滚动区顶部，但移除整条矩形背景和投影，只保留各个圆角分类按钮；未选按钮使用独立实色容器，避免与下方内容混叠。
-- 首页设置按钮仍可快速进入设置。
+### 4. 多版块社区阅读（7 个论坛版块）
+- 聚合 **7 个公开社区版块**：91 社区（`原创自拍区`、`我爱我妻区`、`性趣闲谈`、`两性健康`、`海外专区`）与草榴社区（`草榴技术区`、`达盖尔的旗帜`）。
+- 支持多版块并发拉取、移动端正文重排、广告噪声剥离、高清组图懒加载、帖子翻页与单图保存，保持纯匿名只读浏览。
 
-### 在线漫画（2.12.1）
+### 5. 内置离线单机游戏
+- 双端离线内置基于 HTML5 Canvas + **Spine WebGL** 骨骼动画的回合战斗与确定性随机 **Slots** 单机游戏，所有脚本、纹理与音频均随包内置并运行在受限本地沙箱中，无外网远程代码加载。
 
-- 底栏“漫画”模块内置 Komiic、包子漫画、拷贝漫画、爱看漫、哔咔、E-Hentai 和禁漫天堂七个原生 Kotlin 适配器，支持独立分类、搜索、详情、章节和纵向连续阅读；默认使用禁漫天堂（`jm`），该源需要本地注入公开协议参数，未配置时界面会显示真实错误并允许切源。
-- 漫画列表接近底部自动加载下一页；阅读图片携带来源要求的 Referer，并交给 Coil 做内存与磁盘缓存，单页失败可独立重试。
-- Komiic、包子漫画、拷贝漫画、E-Hentai 公共站和禁漫天堂已在 Android 14 模拟器完成列表、分页、搜索、详情与首章线路验证；爱看漫适配已跟进当前接口，但当前网络出口仍被源站区域/WAF 拒绝，界面会显示真实错误并允许切源。
-- 哔咔只增加其内容访问必需的最小登录：密码仅用于本次授权，不会保存；访问令牌使用 Android Keystore 加密。会员、支付、评论、漫画下载和云同步仍不接入。
-- E-Hentai 仅连接匿名公共画廊，不提供 ExHentai Cookie 或权限绕过。
-- 2.12.1 修正禁漫天堂分片解扰的文件名计算，并为 E-Hentai 增加请求头、连接复用、有界并发、DNS 回退和图片页解析缓存，改善封面缺失及重复滚动加载缓慢。
-- 设置页采用 Material 3 主页面与二级页面结构，视频源可搜索，漫画源使用独立选择页；来源切换、详情与章节页面均支持日间、夜间和 Material You 动态色。
+### 6. `AuroraResilience` 五层网络自愈引擎
+双端对齐实现五层高可用网络防失联架构（Android `data/resilience/*` 与 iOS `Services/Resilience/*`）：
+1. **抗污染智能 DNS（`ResilientDns`）**：并发竞速 DoH（DNS-over-HTTPS）与系统解析，自动识别并透传 VPN / TUN Fake-IP 段（`198.18.0.0/15` 等），持久化缓存健康 IP。
+2. **源健康度与动态镜像路由（`SourceHealthRegistry`）**：按延迟与成功率实时评分，遇到 403/5xx/超时自动冷却降权并切换备用镜像，支持重定向新域名自学习。
+3. **共享连接池与阶梯对冲竞速（`AuroraHttpClient`）**：复用 HTTP/2 连接池，遇到 `StreamResetException` / `EOF` 自动降级 HTTP/1.1 重试；主镜像超过 `1.1s` 未响应时自动拉起次优镜像并发竞速（Staggered Hedged Racing）。
+4. **快照秒开与自适应 DOM 兜底（`SourceSnapshotStore` + `AdaptiveHtmlFallbackParser`）**：支持 Stale-While-Revalidate 本地快照秒开；源站改版导致主选择器失效时启用启发式 DOM 结构提取兜底。
+5. **零单点故障远端镜像热更新（`RemoteSourceManifest`）**：后台非阻塞拉取 `source-manifest.json` 动态补充最新镜像域名与选择器，远端不可达时 100% 依靠本地内置池独立运行。
 
-### 多视频源（2.6.0）
+### 7. PocketBase 独立账号服务（可选登录）
+- 后端采用独立部署的 **PocketBase** 服务（经 Nginx 显式白名单反向代理于 `/auth-api`），仅暴露健康检查与 `users` 集合的注册、登录、会话刷新、邮箱验证与密码重置接口，阻断管理后台 `/_/` 与内部管理路由。
+- 客户端会话令牌在 Android 端使用 **Android Keystore AES-GCM** 加密，在 iOS 端存储于系统 **Keychain**。账号服务与匿名内容浏览完全解耦，未登录状态下所有视频、漫画、直播、论坛与单机游戏均可正常使用。
 
-- 首页和设置页可选择默认源、黄果，以及 MISSPipe/PipePipeExtractor 注册的多个服务。
-- MISSPipe 服务使用其各自的真实 Kiosk、联网搜索和播放解析器；不再把不同站点当成同一种 HTML。
-- 2.6.1 为跨站封面请求补齐移动端 UA、Referer 和 Origin；解析失败会显示错误，不再静默变成空白列表。
-- 2.6.2 修复黄果切换剧集后播放器画面未重新绑定的问题；选集面板改为按需展开并在选择后自动收起。
-- 2.14.3 为扩展来源补齐受限的同源 HTTPS 翻页，并对幂等 GET 的瞬时 TLS/EOF 失败重试一次；上线巡检确认 16 个视频来源均能取得首屏和可播放样本，其中 11 个扩展来源的第二页包含新条目。
-- 设置页将每个视频源拆为独立惰性列表项，长列表在小屏和无障碍操作下均可完整滚动。
-- `third_party/pipepipe-extractor` 为 GPLv3 源码依赖，分发包含该解析器的构建产物时必须同时提供源码和许可证，见 `THIRD_PARTY_NOTICES.md`。
+---
 
-- 首页：五种站点分类、首个大幅推荐视频和后续双列视频网格；接近底部自动请求下一页并按 ID 去重，奇数末项不会被拉伸。
-- 搜索：MISSPipe 服务执行站点联网搜索；默认源和黄果继续搜索已加载及本地保存内容。
-- 收藏和观看历史：本地持久化；历史最多 50 条。未接入账号或云同步。
-- 站点设置：读取原 APK 设置中确认的地址作为默认值，优先 HTTPS；可改地址并重新加载真实内容。已适配 `huangguoai.com` 的详情链接、分页和 HLS 播放数据。
-- 播放页：解析站点页面公开的视频地址后使用 Media3 原生播放，提供返回、收藏、全屏承载和生命周期暂停；没有绕过登录、验证码或内容权限。
-- 离线缓存：播放页按当前剧集缓存完整 MP4/HLS；设置页可查看进度与容量、重试、播放、单项删除或清空全部。内容保存在应用私有目录，不申请外部存储权限。
-- 无障碍：原生点击控件、图标描述、缓存状态描述、弹层隐藏底层语义。动画使用 Compose 动画时钟，跟随系统动画时长设置。
-- 主题：Android 12 及以上分别使用系统 Material You 日间/夜间动态色；旧系统使用经过对比度校准的浅色与深色回退方案。状态栏、导航栏图标和液态底栏会同步切换。
+## 隐私与传输安全边界
 
-这是内部测试版：列表按站点分页并在接近底部时自动加载更多；除哔咔内容访问所需的最小授权外，不包含会员、支付、评论、关注和账号同步模块。网络、站点结构及媒体格式变化仍可能影响播放、阅读和缓存。
+- **本地数据隔离**：收藏、观看历史、阅读进度与离线缓存均保存在应用私有沙箱目录，Android 端显式关闭系统云备份迁移（`allowBackup="false"`）。
+- **严格的按域名限定 TLS 降级边界（Domain-Scoped TLS Fallback）**：
+  - 账号认证接口（`/auth-api`）、OTA 与 TestFlight 接口及常规站点全程强制执行**系统标准 CA 证书链与主机名校验**，严禁全局忽略证书错误。
+  - 针对部分历史源站或镜像 CDN 存在的自签/过期证书问题，宽松 TLS 回退**严格限制在已登记的特定内容源/镜像域名白名单内按需触发**，绝不作用于认证、账户或控制面流量。
+- **WebView 安全收口**：内置游戏与必要的网页回退层严格禁用文件协议越权访问、混合内容与非 HTTP(S) 外部 Scheme 跳转。
 
-## 与原项目的关系
+---
 
-用户提供的源码目录、归档和所检索到的仓库只有说明与截图，没有可编译 Android 工程。本目录是独立重建工程。为核对视觉实现，本轮只检查参考 APK 的公开资源尺寸、布局名称与 DEX 字符串；没有解出、复制或复用其受保护的业务源码和品牌资源。
+## 构建与验证指南
 
-**原 APK 能加载真实列表。**已在模拟器中打开原 APK，并从其地址设置确认站点；此前将“没有编译源码”误当作“没有有效站点”的判断不准确。新解析器依据实际 HTML 的 `.video-title`、`.duration` 和视频链接结构适配。
+### 1. 环境要求
+- **Android**：JDK 21、Android SDK Platform 37 / Build-Tools 37.0.0、Gradle Wrapper 9.6.0。
+- **iOS / iPadOS**：macOS + Xcode（支持 iOS 26.0 SDK 与 Swift 6.0）、XcodeGen（可选，用于从 `ios/project.yml` 同步工程）。
+- **本地协议密钥注入（可选）**：复制 `source-secrets.properties.example` 为 Git 忽略的 `source-secrets.properties` 并填入协议参数（iOS 构建前由预构建脚本 `scripts/generate_ios_source_secrets.py` 自动生成未追踪的本地常量文件），严禁提交真实密钥。
 
-新版包名 `com.aurorashelf.app`，原版包名不同，两者可以共存。不会覆盖原安装，也不会自动迁移原版的收藏或账号。Android 最低版本为 8.0/API 26（原 APK 的最低版本更低）。
-
-## 构建
-
-需要 JDK 21、Android SDK platform 37/build-tools 37.0.0。目标 API 为 36，Gradle Wrapper 为 9.6.0；工具版本固定以便复现，不自动追随更新。
-
-1. 设置 `JAVA_HOME` 与 `ANDROID_HOME`，或在未提交的 `local.properties` 中配置 `sdk.dir`。
-2. 如需构建哔咔和禁漫天堂线路，将 `source-secrets.properties.example` 复制为被 Git 忽略的 `source-secrets.properties`，填入兼容客户端的协议参数；也可使用同名环境变量。不要提交该文件。
-3. 运行：
+### 2. 本地测试与构建命令
 
 ```sh
-./gradlew testDebugUnitTest lintDebug assembleDebug
-./gradlew connectedDebugAndroidTest
+# 跨平台版本号一致性检查 + 内置游戏逻辑回归
+bash scripts/publish_ota.sh --check-versions
+node scripts/verify-game-logic.js
+node scripts/verify-fixes.js
+
+# Android 单元测试、Lint 静态检查与 R8 Release 构建
+./gradlew testDebugUnitTest lintDebug
 ./gradlew assembleRelease
+
+# iOS 模拟器构建与测试（示例：iPhone 17 Pro）
+xcodebuild test \
+  -project ios/AuroraShelf.xcodeproj \
+  -scheme AuroraShelf \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+
+# 全源连通性探测（自动区分 PASS / WARN 受限挑战 / FAIL）
+node scripts/probe_all_sources.mjs
 ```
 
-`assembleRelease` 输出经过 R8 和资源裁剪的 APK。为避免 macOS 文稿目录同步程序复制临时 class 文件，构建产物位于 `build.nosync/app/`。交付包使用本机 Android 开发测试证书签名，仅供安装验收，不是官方发行签名。
-
-可选真实网络检查（不输出远端内容）：
+### 3. 双通道持续交付（OTA + TestFlight）
+在双端模拟器 Release 包全规模检查通过后，通过项目脚本完成自动化构建与发布（服务器地址与凭据从本地未追踪的 `.server_credentials` / `.appstore_credentials` 或环境变量读取）：
 
 ```sh
-./gradlew connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=com.aurorashelf.app.LiveFeedTest \
-  -Pandroid.testInstrumentationRunnerArguments.live=true
+# 双端 Release 构建并单事务原子发布至 OTA 服务器（含 >=5GB 磁盘水位门禁与 UDID 签名清单同步）
+./scripts/publish_ota.sh Release
+
+# iOS 归档合规预检并上传至 App Store Connect / TestFlight Internal
+./scripts/publish_testflight.sh --check
+./scripts/publish_testflight.sh
 ```
 
-默认 UI 测试不捆绑样例媒体；实时列表用例需要网络，避免把网络波动当成离线回归失败。
+---
 
-## 模块
+## 仓库目录结构
 
-| 路径 | 职责 |
+| 路径 | 职责说明 |
 | --- | --- |
-| `app/src/main/java/com/aurorashelf/app/data` | 视频、漫画与论坛源适配、地址校验、本地收藏与历史 |
-| `app/src/main/java/com/aurorashelf/app/model` | 视频、漫画、论坛、分类与目的页面模型 |
-| `app/src/main/java/com/aurorashelf/app/ui` | 视频、漫画、论坛页面、阅读器、状态管理和 Material 3 控件 |
-| `app/src/main/java/com/aurorashelf/app/ui/theme` | Material 3 颜色与字体 |
-| `app/src/test`、`app/src/androidTest` | 解析/校验单元测试及模拟器流程测试 |
+| `app/` | Android 客户端工程（Kotlin、Jetpack Compose、Media3、`AuroraResilience`、单元与仪器测试） |
+| `ios/` | iOS / iPadOS Universal 客户端工程（Swift 6、SwiftUI、AVKit、HLS 防盗链中继、XCTest） |
+| `third_party/pipepipe-extractor/` | Android 视频多源解析依赖（GPLv3 源码子模块） |
+| `server/pocketbase/` | PocketBase 独立账号服务 systemd 沙箱配置、Nginx 白名单配置与集合权限迁移脚本 |
+| `scripts/` | 双端签名构建、OTA 原子发布、TestFlight 上传、全源探针与游戏回归校验脚本 |
+| `scripts/ota_web/` | OTA 无线分发前端页面（`index.html`）、iOS 安装清单（`manifest.plist`）与远端自愈清单（`source-manifest.json`） |
+| `docs/` | Apple HIG / Material 3 视觉规范（`docs/ui/design-system.md`）与视觉验收流程（`docs/ui/visual-qa.md`） |
 
-## 设计与性能取舍
+---
 
-UI 采用 Material 3 Expressive 的公开设计语言，并参考用户提供的 CoolApk 16.6.1 APK 的可观察视觉机制。APK 中保留的依赖地址指向 Apache-2.0 的 AndroidLiquidGlass，因此竖屏底栏采用同一 Backdrop 光学引擎：底层内容被实时采样，选中透镜提供折射、色散、亮边、阴影和速度形变。五个栏目保持统一的可点击与可拖动样式，透镜可以在五个位置间连续跟手；跨栏提供轻触反馈，松手后弹簧落位。分类栏在头部滚出后保持吸顶，完整卡片可从导航后方穿过并最终越过遮挡。横屏继续使用自适应侧边导航。
+## 开源许可与第三方声明
 
-视觉参考、差距分析和实现映射见 `docs/design-audit/coolapk-16.6.1/audit.md`。本项目没有复制参考 APK 的代码、资源或品牌资产。
-
-启动图标是无文字的单色圆角播放几何符号，使用 Android adaptive icon 前景、安全区和单色遮罩能力；不再使用复杂装饰或系统占位图标。
-
-首页使用 LazyColumn、稳定行键和每行两个视频卡片；首个视频保持独立大卡，后续卡片以 16:10 封面、两行标题及单行来源信息组成。图片使用 Coil 缓存，HTML 读取在 IO 协程中执行，切分类取消旧请求，避免结果倒序覆盖。已实现代码层面的优化，但尚无帧率、电量、内存或原版对照性能基准；不宣称性能提升百分比。
-
-## 隐私与安全
-
-收藏与历史仅保存在应用私有目录，关闭系统备份/设备迁移。不索取相册与通讯录权限；仅在 Android 9 及以下保存论坛图片时申请存储权限。站点仍会收到网络请求及 WebView Cookie；“本地保存”不等于匿名访问。网页脚本为站点播放所需而启用；禁用文件与内容 URI 访问、HTTPS 混合内容以及非 HTTP(S) 外部跳转，不忽略证书错误。
-
-为兼容用户主动设置的旧站点，应用允许 HTTP；HTTP 无传输加密，建议始终使用 HTTPS。源站地址和 HTML 结构可能变化；空列表或连接失败会显示错误，不会静默伪装成真实内容。
-
-## 贡献与验收
-
-修改保持聚焦，新增行为补充测试，提交使用 Conventional Commits，代码合并通过 PR。公开仓库与版本安装包统一发布在 [RandyVae/AuroraShelf](https://github.com/RandyVae/AuroraShelf)；提交前查看 `CHANGELOG.md`、`docs/verification.md` 与 UI 设计基线 `docs/ui/design-system.md`、验收流程 `docs/ui/visual-qa.md`（`design-qa.md` 为 2026-09-06 的 2.3.0 阶段历史记录，仅作参考，不再作为当前 UI 门禁），不要把构建成功等同于真机播放验收通过。
-
-本工程没有复制原项目业务代码，也没有假定原项目授予代码再发布许可。AndroidLiquidGlass/Backdrop 的 Apache-2.0 归属说明见 `THIRD_PARTY_NOTICES.md`，其他第三方依赖及生成图标资产说明见 `docs/implementation-notes.md`；公开发布前仍需完成许可证与分发要求审查。
+Android 客户端集成了 GPLv3 许可的 `PipePipeExtractor` 源码组件；内置单机游戏集成了 `Spine Runtimes License` 许可的 Spine WebGL 运行时；其余网络、媒体与 UI 组件遵循 `Apache-2.0` 或 `MIT` 许可。完整归属说明与许可证路径请查阅 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
