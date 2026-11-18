@@ -1,6 +1,17 @@
 # Project State
 
-## 最新工作状态（2026年11月18日 · 18 视频源与漫画官方分类 1:1 对齐＋全源多页分页死锁根治＋91动漫新播放器 API 升级＋三端 Release 模拟器全绿验收与双通道同步上线 · v2.17.1 Build 268）
+## 最新工作状态（2026年11月18日 · Android 全面切换正式 Release 签名（RSA-4096 PKCS12 · V2/V3 强验签）＋三端 Release 模拟器验收与双通道同步上线 · v2.17.2 Build 269）
+
+- **版本号全链路同步至 `v2.17.2 (Build 269)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`。
+- **Android 正式 Release 签名切换与发布门禁（`app/build.gradle.kts` + `scripts/publish_ota.sh`）**：
+  - 生成正式生产级 `PKCS12` 证书库（`RSA 4096-bit`、`SHA256withRSA`、有效期 10,000 天至 2054 年，主体 `CN=Netgrey Release, OU=Mobile Engineering, O=Netgrey, L=Hong Kong, ST=Hong Kong, C=HK`，证书 SHA-256 指纹 `B9:44:D3:55:47:34:B4:14:BC:8E:6F:A7:ED:1B:03:EF:50:EA:32:34:CC:6E:B6:A9:49:55:1F:8E:3A:83:13:47`），凭据仅存于已加入 `.gitignore` 的本地私有配置文件（`0600` 权限），并在本机用户目录保留 `0600` 灾备副本。
+  - 重构 [build.gradle.kts](file:///Users/itou/Documents/ChatGPT/91pron/app/build.gradle.kts) 将 `releaseOptional` 升级为正式 `release` 签名配置：启用 `APK Signature Scheme v2 + v3`，并在请求任何 `*Release*` 构建任务但缺失正式证书配置时直接阻断抛错（彻底移除静默回退 `Android Debug` 证书的隐患，仅保留显式 `-PallowDebugFallbackForCi=true` 开关供无秘钥 CI 调试）。
+  - 在 [publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 新增 `verify_android_release_signature` 硬门禁：每次上传前强制调用 `apksigner verify --verbose --print-certs` 核验 `v2=true`、`v3=true` 且非 `CN=Android Debug`；在 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) Android 下载区补充新旧签名首次切换提示。
+- **双端验证与全通道同步发布（`v2.17.2 Build 269`）**：
+  - Android：`testDebugUnitTest`、`lintVitalRelease`、`assembleRelease` 与 `apksigner verify` 全通，`emulator-5554` 实装正式签名 APK 运行正常（`0` 崩溃）。
+  - iOS / iPadOS：`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器核验通过，OTA（`https://bananarey.us`）与 TestFlight Build `269` 同步上线。
+
+## 历史工作状态（2026年11月18日 · 18 视频源与漫画官方分类 1:1 对齐＋全源多页分页死锁根治＋91动漫新播放器 API 升级＋三端 Release 模拟器全绿验收与双通道同步上线 · v2.17.1 Build 268）
 
 - **版本号全链路同步至 `v2.17.1 (Build 268)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`ios/AuroraShelf/Resources/Info.plist`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`（`publish_ota.sh --check-versions` 校验通过）。
 - **全量 18 视频源与漫画源官方分类 1:1 对齐及分页死锁根治（Android + iPhone + iPad）**：

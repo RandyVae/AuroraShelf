@@ -146,6 +146,43 @@ if [ "${UPLOAD_APK}" -eq 1 ] && [ ! -f "${PROJECT_ROOT}/dist/Netgrey.apk" ]; the
   exit 1
 fi
 
+verify_android_release_signature() {
+  local apk_path="$1"
+  local sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
+  local apksigner_bin=""
+  if [ -d "${sdk_root}/build-tools" ]; then
+    apksigner_bin="$(ls -1 "${sdk_root}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -n 1 || true)"
+  fi
+  if [ -z "${apksigner_bin}" ] || [ ! -x "${apksigner_bin}" ]; then
+    echo "错误: 未找到 Android SDK build-tools/apksigner，无法校验正式 Release 签名！" >&2
+    exit 1
+  fi
+  local java_env=()
+  if [ -d "/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home" ]; then
+    java_env=("JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home")
+  fi
+  local verify_out
+  verify_out="$(env "${java_env[@]}" "${apksigner_bin}" verify --verbose --print-certs "${apk_path}")"
+  if echo "${verify_out}" | grep -qi "CN=Android Debug"; then
+    echo "错误: 检测到 ${apk_path} 仍使用 Android Debug 调试证书签名，已阻断发布！" >&2
+    exit 1
+  fi
+  if ! echo "${verify_out}" | grep -q "Verified using v2 scheme (APK Signature Scheme v2): true"; then
+    echo "错误: ${apk_path} 未开启 APK Signature Scheme v2！" >&2
+    exit 1
+  fi
+  if ! echo "${verify_out}" | grep -q "Verified using v3 scheme (APK Signature Scheme v3): true"; then
+    echo "错误: ${apk_path} 未开启 APK Signature Scheme v3！" >&2
+    exit 1
+  fi
+  echo "[PASS] Android 正式 Release 签名校验通过:"
+  echo "${verify_out}" | grep -E "(V3\.0 Signer|Signer #1).*certificate (DN|SHA-256 digest)|Verified using v[123] scheme" | sed 's/^/  /'
+}
+
+if [ "${UPLOAD_APK}" -eq 1 ]; then
+  verify_android_release_signature "${PROJECT_ROOT}/dist/Netgrey.apk"
+fi
+
 if [ "${UPLOAD_IPA}" -eq 1 ] && [ ! -f "${OUTPUT_DIR}/Netgrey.ipa" ]; then
   echo "错误: 未找到 iOS 构建产物 ${OUTPUT_DIR}/Netgrey.ipa" >&2
   exit 1

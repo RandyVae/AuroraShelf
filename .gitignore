@@ -18,6 +18,7 @@ dist/
 *.xcresult
 *.keystore
 *.jks
+keystore/
 .DS_Store
 __pycache__/
 *.py[cod]

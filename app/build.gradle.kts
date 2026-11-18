@@ -22,8 +22,8 @@ android {
         applicationId = "com.aurorashelf.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 268
-        versionName = "2.17.1"
+        versionCode = 269
+        versionName = "2.17.2"
         buildConfigField("String", "AUTH_API_BASE_URL", "\"https://bananarey.us/auth-api\"")
 
         buildConfigField("String", "PICACG_API_KEY", sourceSecret("PICACG_API_KEY").asBuildConfigString())
@@ -41,22 +41,32 @@ android {
     }
 
     signingConfigs {
-        create("releaseOptional") {
-            val requireReleaseKeystore = providers.gradleProperty("requireReleaseKeystore").orNull?.toBoolean() == true
+        create("release") {
+            val allowDebugFallbackForCi = providers.gradleProperty("allowDebugFallbackForCi").orNull?.toBoolean() == true
+            val isReleaseTaskRequested = gradle.startParameter.taskNames.any { taskName ->
+                taskName.contains("Release", ignoreCase = true)
+            }
             val storePath = providers.environmentVariable("AURORA_KEYSTORE_PATH").orNull
                 ?: sourceSecrets.getProperty("AURORA_KEYSTORE_PATH")
-            if (!storePath.isNullOrBlank() && file(storePath).isFile) {
-                storeFile = file(storePath)
+            val resolvedStoreFile = storePath?.takeIf { it.isNotBlank() }?.let { raw ->
+                val candidate = File(raw)
+                if (candidate.isAbsolute) candidate else rootProject.file(raw)
+            }
+            if (resolvedStoreFile != null && resolvedStoreFile.isFile) {
+                storeFile = resolvedStoreFile
                 storePassword = providers.environmentVariable("AURORA_KEYSTORE_PASSWORD").orNull
                     ?: sourceSecrets.getProperty("AURORA_KEYSTORE_PASSWORD")
                 keyAlias = providers.environmentVariable("AURORA_KEY_ALIAS").orNull
                     ?: sourceSecrets.getProperty("AURORA_KEY_ALIAS")
                 keyPassword = providers.environmentVariable("AURORA_KEY_PASSWORD").orNull
                     ?: sourceSecrets.getProperty("AURORA_KEY_PASSWORD")
-            } else if (requireReleaseKeystore) {
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            } else if (isReleaseTaskRequested && !allowDebugFallbackForCi) {
                 throw GradleException(
-                    "Release keystore is required (-PrequireReleaseKeystore=true), " +
-                        "but AURORA_KEYSTORE_PATH is missing or does not exist.",
+                    "Formal Android Release keystore is required for Release builds, " +
+                        "but AURORA_KEYSTORE_PATH is missing or does not exist (${resolvedStoreFile?.path ?: "unset"}).",
                 )
             } else {
                 val debugCfg = getByName("debug")
@@ -76,9 +86,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            // Uses releaseOptional keystore when AURORA_KEYSTORE_* is configured; otherwise retains the debug
-            // signature so existing OTA testers can upgrade in-place.
-            signingConfig = signingConfigs.getByName("releaseOptional")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

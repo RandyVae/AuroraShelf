@@ -1,4 +1,14 @@
-## 最新交接：2026-11-18 — 全量 18 视频源与漫画官方分类 1:1 对齐、全源多页分页死锁根治、91动漫新版播放器 API 适配、三端 Release 模拟器全规模验收与双通道同步上线 · v2.17.1 (Build 268)
+## 最新交接：2026-11-18 — Android 全面切换正式 Release 签名（RSA-4096 PKCS12 · V2/V3 强验签）与双通道同步上线 · v2.17.2 (Build 269)
+
+### 本次完成
+1. **Android 正式生产级 Release 签名体系落地**：
+   - 签发正式 `PKCS12` 生产密钥库（`RSA 4096-bit`、`SHA256withRSA`、有效期 10,000 天，`CN=Netgrey Release, OU=Mobile Engineering, O=Netgrey, L=Hong Kong, ST=Hong Kong, C=HK`，公开证书 SHA-256 指纹 `B9:44:D3:55:47:34:B4:14:BC:8E:6F:A7:ED:1B:03:EF:50:EA:32:34:CC:6E:B6:A9:49:55:1F:8E:3A:83:13:47`）；密钥库与凭据存放于本地未跟踪私有文件（见 `source-secrets.properties`，权限 `0600`，同时在本机 `~/.android/` 保存一份 `0600` 备份防误删），[.gitignore](file:///Users/itou/Documents/ChatGPT/91pron/.gitignore) 补充忽略 `keystore/`，[source-secrets.properties.example](file:///Users/itou/Documents/ChatGPT/91pron/source-secrets.properties.example) 补充空键模板。
+   - 重构 [build.gradle.kts](file:///Users/itou/Documents/ChatGPT/91pron/app/build.gradle.kts) 将 `release` 构建类型绑定至强制正式 `signingConfigs.getByName("release")`（开启 V2/V3 签名，缺失正式证书时直接阻断 Release 构建，不再静默回退 `debug.keystore`）。
+   - 在 [publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh) 新增 `apksigner verify --verbose --print-certs` 发布前强校验（验证 V2/V3 均为 `true` 且拦截任何 `CN=Android Debug` 证书）；在 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 补充首次从旧调试签名包升级至正式签名包的卸载重装提示。
+2. **双端验证与全通道同步发布（`v2.17.2 Build 269`）**：
+   - 全链路递增版本号至 `v2.17.2 (Build 269)`，`apksigner verify` 验证通过，`emulator-5554` 实装正式签名 APK 与 `iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 模拟器运行全绿，网页 OTA（`https://bananarey.us`）、TestFlight `Build 269` 与 GitHub Release `v2.17.2` 同步发布。
+
+## 历史交接：2026-11-18 — 全量 18 视频源与漫画官方分类 1:1 对齐、全源多页分页死锁根治、91动漫新版播放器 API 适配、三端 Release 模拟器全规模验收与双通道同步上线 · v2.17.1 (Build 268)
 
 ### 本次完成
 1. **18 视频源与漫画源官方分类对齐及多页分页死锁根治（Android + iPhone + iPad）**：
