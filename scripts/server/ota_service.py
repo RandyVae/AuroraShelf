@@ -51,7 +51,7 @@ GLOBAL_FAILED_INVITE_TIMESTAMPS = collections.deque()
 GLOBAL_INVITE_FAIL_LIMIT = 60
 GLOBAL_INVITE_FAIL_WINDOW = 600
 
-ENROLL_TOKEN_TTL = 600
+ENROLL_TOKEN_TTL = 1800
 ENROLL_NONCE_LOCK = threading.Lock()
 USED_ENROLL_NONCES = collections.OrderedDict()
 MAX_ENROLL_NONCES = 4096
@@ -213,7 +213,21 @@ def get_enrollment_secret():
     ).strip()
     if seed:
         return hashlib.sha256(f'netgrey-udid-enroll-v1:{seed}'.encode('utf-8')).digest()
-    return BOOT_SECRET
+    secret_file = f'{STATE_DIR}/enroll_secret.key'
+    try:
+        if os.path.exists(secret_file):
+            with open(secret_file, 'rb') as fh:
+                persisted = fh.read().strip()
+            if len(persisted) >= 32:
+                return hashlib.sha256(persisted).digest()
+        os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
+        generated = secrets.token_hex(32).encode('ascii')
+        fd = os.open(secret_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, 'wb') as fh:
+            fh.write(generated)
+        return hashlib.sha256(generated).digest()
+    except Exception:
+        return BOOT_SECRET
 
 
 def create_enrollment_token(ttl_seconds=ENROLL_TOKEN_TTL):
@@ -987,7 +1001,7 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
 
             qs = urllib.parse.parse_qs(parsed.query)
             enroll_token = (qs.get('token', [''])[0] or '').strip()
-            if not verify_enrollment_token(enroll_token, consume=True):
+            if not verify_enrollment_token(enroll_token, consume=False):
                 self.send_json(403, {'ok': False, 'error': '设备授权令牌无效或已过期，请返回网页重新输入口令获取描述文件'})
                 return
 
@@ -997,6 +1011,10 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
                 return
             if status != 200 or raw_body is None:
                 self.send_json(400, {'ok': False, 'error': 'Invalid Content-Length'})
+                return
+
+            if not verify_enrollment_token(enroll_token, consume=True):
+                self.send_json(403, {'ok': False, 'error': '设备授权令牌无效或已使用，请返回网页重新输入口令获取描述文件'})
                 return
 
             udid, product, device_name, version = extract_plist_fields(raw_body)
@@ -1086,8 +1104,8 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
             body = build_enrollment_mobileconfig(enroll_token)
             self.send_response(200)
             self.send_header('Content-Type', 'application/x-apple-aspen-config')
-            self.send_header('Content-Disposition', 'attachment; filename="Netgrey-UDID-Enroll.mobileconfig"')
-            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            self.send_header('X-Content-Type-Options', 'nosniff')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             self.wfile.write(body)

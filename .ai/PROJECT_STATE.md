@@ -1,6 +1,14 @@
 # Project State
 
-## 最新工作状态（2026年11月19日 · iOS 27 / iPadOS 27 SDK 与 Apple HIG 全量 28 项审计整改（三阶段全量落地）＋Xcode 27.2 零编译警告＋12 语种 539 键全覆盖＋三端 Release 模拟器全规模验收与三通道同步上线 · v2.17.6 Build 273）
+## 最新工作状态（2026年11月19日 · OTA 描述文件 `/api/udid/enroll.mobileconfig` Nginx 正则抢占 404 根治＋持久化令牌密钥与 Safari 原生 Profile 响应头加固）
+
+- **根因定位（已验证）**：远端 `/etc/nginx/sites-available/netgrey` 中 `location /api/` 原为普通前缀匹配，优先级低于下方的正则块 `location ~* \.mobileconfig$`；当手机端 `POST /api/udid/enroll`（`HTTP 200`）成功后跳转 `/api/udid/enroll.mobileconfig?token=...` 时，被 `location ~* \.mobileconfig$` 抢先拦截并按静态文件查找 `/var/www/netgrey/api/udid/enroll.mobileconfig`，直接由 Nginx 返回 `404 Not Found`。
+- **服务端与脚本修复并实部署生效**：
+  - [configure_auth_proxy.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/configure_auth_proxy.sh)：将 `/etc/nginx/sites-available/netgrey` 中的 `location /api/` 自动升级为高优先级前缀匹配 **`location ^~ /api/`**（阻断后续一切 `~` / `~*` 正则块抢占 `/api/*` 动态接口），并同步升级 SSH 辅助逻辑为无 TTY 兼容的 `SSH_ASKPASS_REQUIRE=force`。
+  - [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py)：① 移除 `/api/udid/enroll.mobileconfig` 的 `Content-Disposition: attachment` 响应头，保持纯净 `Content-Type: application/x-apple-aspen-config` 以直接唤起 iOS Safari 原生「允许下载配置描述文件」系统弹窗；② 新增 `/var/lib/netgrey-ota/enroll_secret.key`（`0600`）持久化 HMAC 种子并将 `ENROLL_TOKEN_TTL` 由 `600s` 延长至 `1800s`（30 分钟），防止服务重启或用户进入「系统设置」耗时较长导致令牌失效；③ 在 `/api/receive-udid` 读取完整请求体后再消费单次令牌。
+- **线上端到端实测通过**：`nginx -t` 与 `systemctl reload nginx`、`systemctl restart netgrey-ota.service` 均成功；公网实测 `POST https://bananarey.us/api/udid/enroll`（`HTTP 200`）→ `GET https://bananarey.us/api/udid/enroll.mobileconfig?token=...` 返回 `HTTP 200`、`Content-Type: application/x-apple-aspen-config` 及完整 `PayloadType = Profile Service` XML 描述文件。
+
+## 历史工作状态（2026年11月19日 · iOS 27 / iPadOS 27 SDK 与 Apple HIG 全量 28 项审计整改（三阶段全量落地）＋Xcode 27.2 零编译警告＋12 语种 539 键全覆盖＋三端 Release 模拟器全规模验收与三通道同步上线 · v2.17.6 Build 273）
 
 - **版本号全链路同步至 `v2.17.6 (Build 273)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`（`publish_ota.sh --check-versions` 校验通过）。
 - **iOS 27 / iPadOS 27 SDK 与 Apple HIG 28 项审计问题全量整改 + 9 项编译警告清零**：

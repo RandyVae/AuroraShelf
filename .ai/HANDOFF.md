@@ -1,4 +1,14 @@
-## 最新交接：2026-11-19 — iOS 27 / iPadOS 27 SDK 与 Apple HIG 全量 28 项审计整改（三阶段全部完成）、Xcode 27.2 零警告、三端 Release 验收与全通道同步上线 · v2.17.6 (Build 273)
+## 最新交接：2026-11-19 — 修复 OTA 网页点击安装描述文件报 Nginx `404 Not Found`（`location ^~ /api/` 阻断正则抢占 + `ota_service.py` Safari Profile 响应头与持久化令牌加固）
+
+### 本次完成
+1. **根因查明（`journalctl` + Nginx 配置核对已验证）**：
+   - 用户在 iPhone Safari 点击获取描述文件时，`POST /api/udid/enroll` 已成功抵达 `ota_service.py` 返回 `200`（见 `11:09:06`、`11:09:34`、`11:10:55` 日志），但随后跳转 `/api/udid/enroll.mobileconfig?token=...` 时，由于 `/etc/nginx/sites-available/netgrey` 的 `location /api/` 为普通前缀匹配，优先级低于 `location ~* \.mobileconfig$` 正则块，导致请求未转发至 `127.0.0.1:5000`，而是回落静态目录查找不存在的文件并返回 Nginx `404 Not Found`。
+2. **修复与线上验证**：
+   - 更新 [configure_auth_proxy.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/configure_auth_proxy.sh) 将 `location /api/` 升级为 `location ^~ /api/` 并部署重载 Nginx；
+   - 更新 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 移除 `.mobileconfig` 的 `Content-Disposition: attachment`（直接触发 iOS Safari 原生配置描述文件授权弹窗）、新增 `/var/lib/netgrey-ota/enroll_secret.key`（`0600`）跨重启持久化 HMAC 密钥、将令牌有效期延至 `1800s`，并在读取完请求体后再消费单次 nonce；
+   - 公网 HTTPS 端到端实测 `POST /api/udid/enroll` → `GET /api/udid/enroll.mobileconfig?token=...` 返回 `HTTP 200`、`Content-Type: application/x-apple-aspen-config` 与合法 `Profile Service` XML。
+
+## 历史交接：2026-11-19 — iOS 27 / iPadOS 27 SDK 与 Apple HIG 全量 28 项审计整改（三阶段全部完成）、Xcode 27.2 零警告、三端 Release 验收与全通道同步上线 · v2.17.6 (Build 273)
 
 ### 本次完成
 1. **iOS 27 / iPadOS 27 SDK 与 Apple HIG 28 项审计整改全量落地（`UI-01..08`、`UX-01..07`、`LOG-01..08`、`MOT-01..05`）+ 9 项编译警告清零**：

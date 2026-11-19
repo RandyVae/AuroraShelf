@@ -20,14 +20,22 @@ SSH_OPTS=(
   -o ControlPath=/tmp/netgrey-proxy-%r@%h:%p
   -o ControlPersist=60s
 )
-SSHPASS_BIN=""
+ASKPASS_SCRIPT=""
+cleanup_ssh_helpers() {
+  if [ -n "${ASKPASS_SCRIPT}" ] && [ -f "${ASKPASS_SCRIPT}" ]; then
+    rm -f "${ASKPASS_SCRIPT}"
+  fi
+}
+trap cleanup_ssh_helpers EXIT
+
 if [ -n "${SERVER_PASS}" ]; then
   SSH_OPTS+=(-o PubkeyAuthentication=no)
-  SSHPASS_BIN="$(command -v sshpass 2>/dev/null || echo /opt/homebrew/bin/sshpass)"
-  if [ ! -x "${SSHPASS_BIN}" ]; then
-    echo "Missing sshpass executable required for SERVER_PASS authentication" >&2
-    exit 1
-  fi
+  ASKPASS_SCRIPT="$(mktemp)"
+  chmod 700 "${ASKPASS_SCRIPT}"
+  cat > "${ASKPASS_SCRIPT}" <<'EOF'
+#!/bin/sh
+printf '%s\n' "${SSHPASS}"
+EOF
 fi
 
 REMOTE="${SERVER_USER}@${SERVER_IP}"
@@ -35,7 +43,8 @@ REMOTE="${SERVER_USER}@${SERVER_IP}"
 run_ssh() {
   local cmd="$1"
   if [ -n "${SERVER_PASS}" ]; then
-    SSHPASS="${SERVER_PASS}" "${SSHPASS_BIN}" -e ssh "${SSH_OPTS[@]}" "${REMOTE}" "${cmd}"
+    SSHPASS="${SERVER_PASS}" SSH_ASKPASS="${ASKPASS_SCRIPT}" SSH_ASKPASS_REQUIRE=force DISPLAY="${DISPLAY:-:0}" \
+      ssh "${SSH_OPTS[@]}" "${REMOTE}" "${cmd}"
   else
     ssh "${SSH_OPTS[@]}" "${REMOTE}" "${cmd}"
   fi
@@ -45,7 +54,8 @@ run_scp() {
   local src="$1"
   local dest="$2"
   if [ -n "${SERVER_PASS}" ]; then
-    SSHPASS="${SERVER_PASS}" "${SSHPASS_BIN}" -e scp "${SSH_OPTS[@]}" "${src}" "${REMOTE}:${dest}"
+    SSHPASS="${SERVER_PASS}" SSH_ASKPASS="${ASKPASS_SCRIPT}" SSH_ASKPASS_REQUIRE=force DISPLAY="${DISPLAY:-:0}" \
+      scp "${SSH_OPTS[@]}" "${src}" "${REMOTE}:${dest}"
   else
     scp "${SSH_OPTS[@]}" "${src}" "${REMOTE}:${dest}"
   fi
@@ -69,8 +79,13 @@ text = site.read_text()
 
 begin_marker = "    # BEGIN NETGREY AUTH & STATIC HARDENING"
 end_marker = "    # END NETGREY AUTH & STATIC HARDENING"
-api_marker = "    location /api/ {"
+plain_api_marker = "    location /api/ {"
+pref_api_marker = "    location ^~ /api/ {"
 
+if plain_api_marker in text:
+    text = text.replace(plain_api_marker, pref_api_marker, 1)
+
+api_marker = pref_api_marker
 if api_marker not in text:
     raise SystemExit("nginx API location marker missing")
 
