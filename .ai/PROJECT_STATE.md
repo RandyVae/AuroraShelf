@@ -1,12 +1,15 @@
 # Project State
 
-## 最新工作状态（2026年11月19日 · OTA 描述文件 `/api/udid/enroll.mobileconfig` Nginx 正则抢占 404 根治＋持久化令牌密钥与 Safari 原生 Profile 响应头加固）
+## 最新工作状态（2026年11月19日 · OTA 描述文件 `/api/udid/enroll.mobileconfig` Nginx 正则抢占 404 与 iOS 26/27 未签名 XML 拒载「无法下载描述文件」双层根治）
 
-- **根因定位（已验证）**：远端 `/etc/nginx/sites-available/netgrey` 中 `location /api/` 原为普通前缀匹配，优先级低于下方的正则块 `location ~* \.mobileconfig$`；当手机端 `POST /api/udid/enroll`（`HTTP 200`）成功后跳转 `/api/udid/enroll.mobileconfig?token=...` 时，被 `location ~* \.mobileconfig$` 抢先拦截并按静态文件查找 `/var/www/netgrey/api/udid/enroll.mobileconfig`，直接由 Nginx 返回 `404 Not Found`。
-- **服务端与脚本修复并实部署生效**：
-  - [configure_auth_proxy.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/configure_auth_proxy.sh)：将 `/etc/nginx/sites-available/netgrey` 中的 `location /api/` 自动升级为高优先级前缀匹配 **`location ^~ /api/`**（阻断后续一切 `~` / `~*` 正则块抢占 `/api/*` 动态接口），并同步升级 SSH 辅助逻辑为无 TTY 兼容的 `SSH_ASKPASS_REQUIRE=force`。
-  - [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py)：① 移除 `/api/udid/enroll.mobileconfig` 的 `Content-Disposition: attachment` 响应头，保持纯净 `Content-Type: application/x-apple-aspen-config` 以直接唤起 iOS Safari 原生「允许下载配置描述文件」系统弹窗；② 新增 `/var/lib/netgrey-ota/enroll_secret.key`（`0600`）持久化 HMAC 种子并将 `ENROLL_TOKEN_TTL` 由 `600s` 延长至 `1800s`（30 分钟），防止服务重启或用户进入「系统设置」耗时较长导致令牌失效；③ 在 `/api/receive-udid` 读取完整请求体后再消费单次令牌。
-- **线上端到端实测通过**：`nginx -t` 与 `systemctl reload nginx`、`systemctl restart netgrey-ota.service` 均成功；公网实测 `POST https://bananarey.us/api/udid/enroll`（`HTTP 200`）→ `GET https://bananarey.us/api/udid/enroll.mobileconfig?token=...` 返回 `HTTP 200`、`Content-Type: application/x-apple-aspen-config` 及完整 `PayloadType = Profile Service` XML 描述文件。
+- **双层根因定位（已验证）**：
+  1. **Nginx 正则抢占 `404`**：远端 `/etc/nginx/sites-available/netgrey` 中 `location /api/` 原为普通前缀匹配，被下方的静态正则块 `location ~* \.mobileconfig$` 抢占并返回 `404 Not Found`；
+  2. **iOS 26/27 拒载未签名 XML 报「无法下载描述文件」**：对比历史可用静态文件 `/var/www/netgrey/enroll.mobileconfig`（`5,007` B）与 Nginx 访问日志（`GET /api/udid/enroll.mobileconfig?token=... 200 1146`）确认，此前 `v2.17.0` 迁移动态生成后返回了 `1,146` B 明文未签名 XML，而 iOS 26/27 `MCProfileConnection` 对未携带受信任 TLS 证书链 CMS 签名的 `Profile Service` 描述文件直接弹窗拒绝（「无法下载描述文件」）；同时用户浏览器日志存在 Google App（`GSA/447.9`）内置 WebView 尝试及历史 URL 残留 `registered=false` 未自动反查签入状态的问题。
+- **服务端与前端修复并实部署生效**：
+  - [configure_auth_proxy.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/configure_auth_proxy.sh)：将 `location /api/` 升级为 **`location ^~ /api/`** 阻断一切正则抢占。
+  - [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py)：新增 `sign_mobileconfig_der(xml_bytes)`，调用 `openssl smime -sign` 使用 `/etc/letsencrypt/live/bananarey.us/{cert.pem,privkey.pem,chain.pem}` 对动态描述文件实时执行 DER CMS 签名（输出 `5,114` B，完整携带 `Let's Encrypt YE1 -> Root YE -> ISRG Root X2 -> ISRG Root X1` 信任链，与原静态可用文件 1:1 一致），补齐 `do_HEAD` 支持、持久化 `enroll_secret.key`（`0600`）与 `1800s` TTL，并确保已签入 IPA 的设备回跳绝不误标 `registered=false`。
+  - [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html)：新增非 Safari 浏览器（Google App `GSA`、Chrome `CriOS`、微信等）显式拦截指引，并在 URL 携带已知 `udid` 时无论 `registered` 旧参数为何均立即调用 `/api/udid/status` 自动解锁「立即安装 Netgrey」绿色按钮。
+- **线上端到端实测通过**：公网实测 `HEAD` / `GET /api/udid/enroll.mobileconfig?token=...` 返回 `HTTP 200`、`Content-Type: application/x-apple-aspen-config`、`Content-Length: 5114`（合法 ASN.1 DER CMS 签名包，`openssl pkcs7` 与 `openssl cms -verify` 校验通过），iOS 27.2 模拟器 Safari 实测成功弹出系统配置描述文件下载授权框。
 
 ## 历史工作状态（2026年11月19日 · iOS 27 / iPadOS 27 SDK 与 Apple HIG 全量 28 项审计整改（三阶段全量落地）＋Xcode 27.2 零编译警告＋12 语种 539 键全覆盖＋三端 Release 模拟器全规模验收与三通道同步上线 · v2.17.6 Build 273）
 

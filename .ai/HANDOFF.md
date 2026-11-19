@@ -1,12 +1,13 @@
-## 最新交接：2026-11-19 — 修复 OTA 网页点击安装描述文件报 Nginx `404 Not Found`（`location ^~ /api/` 阻断正则抢占 + `ota_service.py` Safari Profile 响应头与持久化令牌加固）
+## 最新交接：2026-11-19 — 根治 OTA 描述文件 Nginx `404` 与 iOS 26/27 未签名 XML 报「无法下载描述文件」（补齐 `openssl smime -sign` 实时 DER CMS 签名 + 非 Safari 识别 + 已签入设备自动解锁）
 
 ### 本次完成
-1. **根因查明（`journalctl` + Nginx 配置核对已验证）**：
-   - 用户在 iPhone Safari 点击获取描述文件时，`POST /api/udid/enroll` 已成功抵达 `ota_service.py` 返回 `200`（见 `11:09:06`、`11:09:34`、`11:10:55` 日志），但随后跳转 `/api/udid/enroll.mobileconfig?token=...` 时，由于 `/etc/nginx/sites-available/netgrey` 的 `location /api/` 为普通前缀匹配，优先级低于 `location ~* \.mobileconfig$` 正则块，导致请求未转发至 `127.0.0.1:5000`，而是回落静态目录查找不存在的文件并返回 Nginx `404 Not Found`。
-2. **修复与线上验证**：
-   - 更新 [configure_auth_proxy.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/configure_auth_proxy.sh) 将 `location /api/` 升级为 `location ^~ /api/` 并部署重载 Nginx；
-   - 更新 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 移除 `.mobileconfig` 的 `Content-Disposition: attachment`（直接触发 iOS Safari 原生配置描述文件授权弹窗）、新增 `/var/lib/netgrey-ota/enroll_secret.key`（`0600`）跨重启持久化 HMAC 密钥、将令牌有效期延至 `1800s`，并在读取完请求体后再消费单次 nonce；
-   - 公网 HTTPS 端到端实测 `POST /api/udid/enroll` → `GET /api/udid/enroll.mobileconfig?token=...` 返回 `HTTP 200`、`Content-Type: application/x-apple-aspen-config` 与合法 `Profile Service` XML。
+1. **两层真实根因查明（已验证）**：
+   - 第一层：`location /api/` 普通前缀被 `location ~* \.mobileconfig$` 正则抢占导致 Nginx `404`（已通过升级为 `location ^~ /api/` 解决）；
+   - 第二层：修复 `404` 后真机 Safari（`iPhone18,4` / `iOS 27.2`）收到 `200 1146` 仍提示「无法下载描述文件」——核对原 `v2.16.40` 可用的 `/var/www/netgrey/enroll.mobileconfig`（`5,007` B）确认，原静态文件采用 Let's Encrypt 证书链做了 `openssl smime -sign -nodetach -outform der` 签名，而 `v2.17.0` 改造为动态接口时仅返回了 `1,146` B 明文未签名 XML，被 iOS 26/27 `MCProfileConnection` 直接拒载；同时发现日志中有从 Google App（`GSA/447.9`）点击记录及旧 URL `?udid=...&registered=false` 阻塞已签入设备解锁。
+2. **修复与公网实测**：
+   - 在 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 新增 `sign_mobileconfig_der()` 调用 `openssl smime -sign` 实时签发 `5,114` B DER CMS 描述文件（含完整 Let's Encrypt `YE1 -> Root YE -> ISRG Root X2 -> ISRG Root X1` 证书链）并补齐 `do_HEAD`；
+   - 在 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 拦截非 Safari 内置浏览器提示切回 Safari，并在携带 `udid` 参数时自动向 `/api/udid/status` 核验签入状态即时解锁安装按钮；
+   - 已部署至远端服务器并通过 `openssl pkcs7` / `cms -verify` 与 `HEAD`/`GET` `200 OK`（`5,114` B）及 iOS 27.2 Safari 弹窗实测。
 
 ## 历史交接：2026-11-19 — iOS 27 / iPadOS 27 SDK 与 Apple HIG 全量 28 项审计整改（三阶段全部完成）、Xcode 27.2 零警告、三端 Release 验收与全通道同步上线 · v2.17.6 (Build 273)
 

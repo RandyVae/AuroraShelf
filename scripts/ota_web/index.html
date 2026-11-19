@@ -784,6 +784,12 @@
         }
 
         async function submitUdidEnroll() {
+            const ua = navigator.userAgent || '';
+            if (/iPhone|iPad|iPod/i.test(ua) && /(CriOS|FxiOS|EdgiOS|GSA\/|MicroMessenger|QQ\/|Weibo)/i.test(ua)) {
+                setUdidEnrollStatus('err', 'iOS 系统限制仅支持在「系统自带 Safari 浏览器」中下载配置描述文件。请复制 https://bananarey.us 到 Safari 打开后再点击。');
+                return;
+            }
+
             const codeEl = document.getElementById('udidInviteCode');
             const tfCodeEl = document.getElementById('tfInviteCode');
             const btn = document.getElementById('btnStep1');
@@ -843,13 +849,13 @@
             const regParam = urlParams.get('registered');
             const provParam = urlParams.get('provisioned');
 
-            if (udidParam && regParam === 'true') {
+            if (udidParam) {
                 localStorage.setItem('netgrey_udid', udidParam);
                 localStorage.setItem('netgrey_model', modelParam);
                 localStorage.setItem('netgrey_name', nameParam);
                 if (provParam === '1' || provParam === 'true') {
                     localStorage.setItem('netgrey_provisioned', '1');
-                } else {
+                } else if (provParam === '0' || provParam === 'false') {
                     localStorage.setItem('netgrey_provisioned', '0');
                 }
             }
@@ -860,12 +866,12 @@
             const savedProvisioned = localStorage.getItem('netgrey_provisioned') === '1';
             const statusText = document.getElementById('statusText');
 
-            if (regParam === 'false' && statusText) {
-                statusText.innerText = '设备注册未完成，请重新输入邀请口令授权或使用下方 TestFlight 通道';
-            } else if (savedUdid) {
+            if (savedUdid) {
                 const label = savedName || savedModel;
                 renderDeviceProvisionState(savedUdid, label, savedProvisioned);
                 checkUdidProvisionedStatus(false);
+            } else if (regParam === 'false' && statusText) {
+                statusText.innerText = '设备注册未完成，请重新输入邀请口令授权或使用下方 TestFlight 通道';
             } else if (statusText) {
                 statusText.innerText = '等待设备授权绑定（或直接使用下方 TestFlight）';
             }

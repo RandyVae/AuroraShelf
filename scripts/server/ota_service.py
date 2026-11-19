@@ -284,6 +284,38 @@ def verify_enrollment_token(token, consume=False):
     return True
 
 
+LE_CERT_DIR = '/etc/letsencrypt/live/bananarey.us'
+
+
+def sign_mobileconfig_der(xml_bytes):
+    cert_file = f'{LE_CERT_DIR}/cert.pem'
+    key_file = f'{LE_CERT_DIR}/privkey.pem'
+    chain_file = f'{LE_CERT_DIR}/chain.pem'
+    if all(os.path.exists(p) for p in (cert_file, key_file, chain_file)):
+        try:
+            proc = subprocess.run(
+                [
+                    'openssl', 'smime', '-sign',
+                    '-signer', cert_file,
+                    '-inkey', key_file,
+                    '-certfile', chain_file,
+                    '-nodetach',
+                    '-outform', 'der',
+                ],
+                input=xml_bytes,
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+            if proc.returncode == 0 and proc.stdout:
+                return proc.stdout
+            err = proc.stderr.decode('utf-8', errors='ignore')
+            print('[MobileConfig Sign Warning]:', err)
+        except Exception as e:
+            print('[MobileConfig Sign Exception]:', e)
+    return xml_bytes
+
+
 def build_enrollment_mobileconfig(token):
     callback_url = f'{ALLOWED_ORIGIN}/api/receive-udid?token={urllib.parse.quote(token, safe="")}'
     profile = {
@@ -291,20 +323,23 @@ def build_enrollment_mobileconfig(token):
             'URL': callback_url,
             'DeviceAttributes': [
                 'UDID',
+                'IMEI',
+                'ICCID',
                 'VERSION',
                 'PRODUCT',
                 'DEVICE_NAME',
             ],
         },
         'PayloadOrganization': 'Netgrey',
-        'PayloadDisplayName': 'Netgrey 设备授权登记 (UDID)',
+        'PayloadDisplayName': 'Netgrey 设备授权描述文件',
         'PayloadVersion': 1,
-        'PayloadUUID': '8C7E5B24-6A41-4D93-9F1E-2B5D8E4A1001',
-        'PayloadIdentifier': 'com.aurorashelf.app.udid-enroll',
-        'PayloadDescription': '此描述文件仅用于一次性读取设备 UDID 以登记开发者测试设备名录，完成后自动移除。',
+        'PayloadUUID': '9EC066B9-19A6-4876-B368-468BC8E64547',
+        'PayloadIdentifier': 'com.aurorashelf.enroll',
+        'PayloadDescription': '此描述文件用于获取本机的设备标识码（UDID），以便在您的设备上安装 Netgrey 内部版本。',
         'PayloadType': 'Profile Service',
     }
-    return plistlib.dumps(profile, fmt=plistlib.FMT_XML)
+    xml_bytes = plistlib.dumps(profile, fmt=plistlib.FMT_XML)
+    return sign_mobileconfig_der(xml_bytes)
 
 
 def get_apple_token():
@@ -1021,9 +1056,13 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
             apple_reg = False
             provisioned = False
             if udid and UDID_RE.match(udid):
-                apple_reg = register_device_with_apple(udid, device_name)
-                save_device(udid, product, device_name, version, apple_registered=apple_reg)
                 provisioned = is_udid_provisioned_in_current_ipa(udid)
+                already_reg = any(
+                    (d.get('udid') or '').lower() == udid.lower() and d.get('apple_registered')
+                    for d in load_devices()
+                )
+                apple_reg = register_device_with_apple(udid, device_name) or provisioned or already_reg
+                save_device(udid, product, device_name, version, apple_registered=apple_reg)
             else:
                 udid = ''
 
@@ -1088,6 +1127,25 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(404)
         self.end_headers()
 
+    def do_HEAD(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == '/api/udid/enroll.mobileconfig':
+            qs = urllib.parse.parse_qs(parsed.query)
+            enroll_token = (qs.get('token', [''])[0] or '').strip()
+            if not verify_enrollment_token(enroll_token, consume=False):
+                self.send_response(403)
+                self.end_headers()
+                return
+            body = build_enrollment_mobileconfig(enroll_token)
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/x-apple-aspen-config')
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            return
+        self.send_response(404)
+        self.end_headers()
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         client_ip = self.get_client_ip()
@@ -1098,6 +1156,11 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
                 return
             qs = urllib.parse.parse_qs(parsed.query)
             enroll_token = (qs.get('token', [''])[0] or '').strip()
+            invite_code = (qs.get('code', [''])[0] or '').strip()
+            if not enroll_token and invite_code:
+                verdict = check_invite_code_with_global_throttle(invite_code)
+                if verdict == 'ok':
+                    enroll_token = create_enrollment_token(ttl_seconds=ENROLL_TOKEN_TTL)
             if not verify_enrollment_token(enroll_token, consume=False):
                 self.send_json(403, {'ok': False, 'error': '描述文件链接已失效或未授权，请返回网页输入邀请口令重新获取'})
                 return
