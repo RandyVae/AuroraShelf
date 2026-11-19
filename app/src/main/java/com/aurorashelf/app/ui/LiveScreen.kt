@@ -47,6 +47,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -101,8 +102,6 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -1167,7 +1166,6 @@ private fun LiveRoomStatusOverlay(
 private fun StreamerInfoBar(
     item: LiveItem,
     onOpenExternal: () -> Unit,
-    onFullscreenToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -1253,20 +1251,12 @@ private fun StreamerInfoBar(
                 }
             }
         }
-        IconButton(onClick = onFullscreenToggle, modifier = Modifier.minimumInteractiveComponentSize().size(36.dp)) {
-            Icon(
-                Icons.Default.Fullscreen,
-                contentDescription = "全屏播放",
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(22.dp),
-            )
-        }
-        IconButton(onClick = onOpenExternal, modifier = Modifier.minimumInteractiveComponentSize().size(36.dp)) {
+        IconButton(onClick = onOpenExternal, modifier = Modifier.minimumInteractiveComponentSize()) {
             Icon(
                 Icons.AutoMirrored.Filled.OpenInNew,
                 contentDescription = "在系统浏览器中打开",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
+                modifier = Modifier.size(20.dp),
             )
         }
     }
@@ -1464,7 +1454,6 @@ private fun LivePlayerScreen(
                 StreamerInfoBar(
                     item = item,
                     onOpenExternal = openInBrowser,
-                    onFullscreenToggle = { onFullscreenChange(true) },
                 )
                 if (isTwoPaneLandscape) {
                     LiveLeftDetailPanel(
@@ -1794,10 +1783,11 @@ private fun NativeLivePlayer(
         // Top bar
         AnimatedVisibility(
             visible = controlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(AuroraMotion.fastEffects()),
+            exit = fadeOut(AuroraMotion.fastEffects()),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
+            val haptic = LocalHapticFeedback.current
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -1807,16 +1797,29 @@ private fun NativeLivePlayer(
                             listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent),
                         ),
                     )
-                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
+                    .then(
+                        if (isFullscreen) {
+                            Modifier.statusBarsPadding().displayCutoutPadding()
+                        } else {
+                            Modifier
+                        },
+                    )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 FilledTonalIconButton(
-                    onClick = onBack,
+                    onClick = {
+                        AuroraHaptics.tap(haptic)
+                        if (isFullscreen) {
+                            onFullscreenChange(false)
+                        } else {
+                            onBack()
+                        }
+                    },
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
                         containerColor = Color.Black.copy(alpha = 0.56f),
                         contentColor = Color.White,
                     ),
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
@@ -1824,7 +1827,7 @@ private fun NativeLivePlayer(
                         modifier = Modifier.size(20.dp),
                     )
                 }
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
                 Text(
                     text = item.username,
                     color = Color.White,
@@ -1832,55 +1835,21 @@ private fun NativeLivePlayer(
                     fontSize = 15.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
                 )
                 Spacer(Modifier.width(8.dp))
                 Surface(
                     color = AuroraCoral,
-                    shape = RoundedCornerShape(3.dp),
+                    shape = RoundedCornerShape(4.dp),
                 ) {
                     Text(
                         "LIVE",
                         color = Color.White,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                     )
                 }
-                Spacer(Modifier.weight(1f))
-                FilterChip(
-                    selected = isDanmakuEnabled,
-                    onClick = {
-                        isDanmakuEnabled = !isDanmakuEnabled
-                        feedbackMessage = if (isDanmakuEnabled) "已开启弹幕浮层" else "已开启纯净观看模式（评论已关闭）"
-                    },
-                    label = {
-                        Text(
-                            text = if (isDanmakuEnabled) "弹幕 开" else "纯净模式",
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(FilterChipDefaults.IconSize),
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        containerColor = Color.Black.copy(alpha = 0.62f),
-                        labelColor = Color.White,
-                        iconColor = Color.White,
-                        selectedContainerColor = AuroraCoral,
-                        selectedLabelColor = Color.White,
-                        selectedLeadingIconColor = Color.White,
-                    ),
-                    border = FilterChipDefaults.filterChipBorder(
-                        enabled = true,
-                        selected = isDanmakuEnabled,
-                        borderColor = Color.White.copy(alpha = 0.35f),
-                        selectedBorderColor = AuroraCoral,
-                    ),
-                )
             }
         }
 
@@ -1888,10 +1857,11 @@ private fun NativeLivePlayer(
         if (!isLoading && errorMessage == null) {
             AnimatedVisibility(
                 visible = controlsVisible,
-                enter = fadeIn(),
-                exit = fadeOut(),
+                enter = fadeIn(AuroraMotion.fastEffects()),
+                exit = fadeOut(AuroraMotion.fastEffects()),
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
+                val haptic = LocalHapticFeedback.current
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -1899,12 +1869,20 @@ private fun NativeLivePlayer(
                         .fillMaxWidth()
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)),
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.80f)),
                             ),
                         )
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .then(
+                            if (isFullscreen) {
+                                Modifier.navigationBarsPadding().displayCutoutPadding()
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
                     IconButton(onClick = {
+                        AuroraHaptics.toggle(haptic, isPaused)
                         if (isPaused) {
                             player.play()
                             isPaused = false
@@ -1920,6 +1898,7 @@ private fun NativeLivePlayer(
                         )
                     }
                     IconButton(onClick = {
+                        AuroraHaptics.toggle(haptic, isMuted)
                         if (isMuted) {
                             player.volume = 1f
                             isMuted = false
@@ -1935,19 +1914,42 @@ private fun NativeLivePlayer(
                         )
                     }
                     if (isFullscreen) {
-                        IconButton(onClick = {
-                            isDanmakuEnabled = !isDanmakuEnabled
-                            feedbackMessage = if (isDanmakuEnabled) "已开启弹幕浮层" else "已开启纯净观看模式（评论已关闭）"
-                        }) {
-                            Icon(
-                                if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
-                                contentDescription = if (isDanmakuEnabled) "关闭弹幕 (开启纯净模式)" else "开启弹幕",
-                                tint = if (isDanmakuEnabled) AuroraCoral else Color.LightGray,
-                            )
+                        Surface(
+                            onClick = {
+                                val next = !isDanmakuEnabled
+                                AuroraHaptics.toggle(haptic, next)
+                                isDanmakuEnabled = next
+                                feedbackMessage = if (next) "已开启弹幕浮层" else "已开启纯净观看模式（弹幕已关闭）"
+                            },
+                            shape = CircleShape,
+                            color = if (isDanmakuEnabled) AuroraCoral.copy(alpha = 0.88f) else AuroraMediaSurface.copy(alpha = 0.78f),
+                            contentColor = Color.White,
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .height(36.dp),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                            ) {
+                                Icon(
+                                    imageVector = if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
+                                    contentDescription = if (isDanmakuEnabled) "关闭弹幕" else "开启弹幕",
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text(
+                                    text = if (isDanmakuEnabled) "弹幕 开" else "纯净模式",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                            }
                         }
                     }
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { onFullscreenChange(!isFullscreen) }) {
+                    IconButton(onClick = {
+                        AuroraHaptics.tap(haptic)
+                        onFullscreenChange(!isFullscreen)
+                    }) {
                         Icon(
                             if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                             contentDescription = if (isFullscreen) "退出全屏" else "全屏播放",
@@ -2761,10 +2763,11 @@ private fun EmbeddedLivePlayer(
         // Top Bar in Inline and Fullscreen
         AnimatedVisibility(
             visible = controlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(AuroraMotion.fastEffects()),
+            exit = fadeOut(AuroraMotion.fastEffects()),
             modifier = Modifier.align(Alignment.TopCenter),
         ) {
+            val haptic = LocalHapticFeedback.current
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -2774,16 +2777,31 @@ private fun EmbeddedLivePlayer(
                             listOf(Color.Black.copy(alpha = 0.85f), Color.Transparent),
                         ),
                     )
-                    .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
+                    .then(
+                        if (isFullscreen) {
+                            Modifier.statusBarsPadding().displayCutoutPadding()
+                        } else {
+                            Modifier
+                        },
+                    )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
                 FilledTonalIconButton(
-                    onClick = onBack,
+                    onClick = {
+                        AuroraHaptics.tap(haptic)
+                        if (fullscreenView != null) {
+                            exitFullscreen()
+                        } else if (isFullscreen) {
+                            onFullscreenChange(false)
+                        } else {
+                            onBack()
+                        }
+                    },
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
                         containerColor = Color.Black.copy(alpha = 0.56f),
                         contentColor = Color.White,
                     ),
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
@@ -2792,7 +2810,7 @@ private fun EmbeddedLivePlayer(
                     )
                 }
                 item?.let {
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         text = it.username,
                         color = Color.White,
@@ -2800,18 +2818,19 @@ private fun EmbeddedLivePlayer(
                         fontSize = 15.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
                     Spacer(Modifier.width(8.dp))
                     Surface(
                         color = AuroraCoral,
-                        shape = RoundedCornerShape(3.dp),
+                        shape = RoundedCornerShape(4.dp),
                     ) {
                         Text(
                             "LIVE",
                             color = Color.White,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
                         )
                     }
                     Spacer(Modifier.width(6.dp))
@@ -2821,36 +2840,6 @@ private fun EmbeddedLivePlayer(
                         fontSize = 12.sp,
                     )
                 }
-                Spacer(Modifier.weight(1f))
-                // Danmaku mode switch pill
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = if (isDanmakuEnabled) AuroraCoral.copy(alpha = 0.85f) else Color.Black.copy(alpha = 0.65f),
-                    border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color.White.copy(alpha = 0.35f)),
-                    onClick = {
-                        isDanmakuEnabled = !isDanmakuEnabled
-                        feedbackMessage = if (isDanmakuEnabled) "已开启弹幕浮层" else "已开启纯净观看模式（评论已关闭）"
-                    },
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
-                            contentDescription = null,
-                            tint = Color.White,
-                            modifier = Modifier.size(15.dp),
-                        )
-                        Text(
-                            text = if (isDanmakuEnabled) "弹幕 开" else "纯净模式",
-                            color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    }
-                }
             }
         }
 
@@ -2858,10 +2847,11 @@ private fun EmbeddedLivePlayer(
         if (isPlayerReady) {
             AnimatedVisibility(
                 visible = controlsVisible,
-                enter = fadeIn(),
-                exit = fadeOut(),
+                enter = fadeIn(AuroraMotion.fastEffects()),
+                exit = fadeOut(AuroraMotion.fastEffects()),
                 modifier = Modifier.align(Alignment.BottomCenter),
             ) {
+                val haptic = LocalHapticFeedback.current
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -2869,19 +2859,32 @@ private fun EmbeddedLivePlayer(
                         .fillMaxWidth()
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f)),
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.80f)),
                             ),
                         )
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .then(
+                            if (isFullscreen) {
+                                Modifier.navigationBarsPadding().displayCutoutPadding()
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                 ) {
-                    IconButton(onClick = { setPlaybackPaused(!isPaused) }) {
+                    IconButton(onClick = {
+                        AuroraHaptics.toggle(haptic, isPaused)
+                        setPlaybackPaused(!isPaused)
+                    }) {
                         Icon(
                             if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
                             contentDescription = if (isPaused) "继续播放" else "暂停直播",
                             tint = Color.White,
                         )
                     }
-                    IconButton(onClick = { setPlaybackMuted(!isMuted) }) {
+                    IconButton(onClick = {
+                        AuroraHaptics.toggle(haptic, isMuted)
+                        setPlaybackMuted(!isMuted)
+                    }) {
                         Icon(
                             if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                             contentDescription = if (isMuted) "开启声音" else "静音",
@@ -2889,19 +2892,42 @@ private fun EmbeddedLivePlayer(
                         )
                     }
                     if (isFullscreen) {
-                        IconButton(onClick = {
-                            isDanmakuEnabled = !isDanmakuEnabled
-                            feedbackMessage = if (isDanmakuEnabled) "已开启弹幕浮层" else "已开启纯净观看模式（评论已关闭）"
-                        }) {
-                            Icon(
-                                if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
-                                contentDescription = if (isDanmakuEnabled) "关闭弹幕 (开启纯净模式)" else "开启弹幕",
-                                tint = if (isDanmakuEnabled) AuroraCoral else Color.LightGray,
-                            )
+                        Surface(
+                            onClick = {
+                                val next = !isDanmakuEnabled
+                                AuroraHaptics.toggle(haptic, next)
+                                isDanmakuEnabled = next
+                                feedbackMessage = if (next) "已开启弹幕浮层" else "已开启纯净观看模式（弹幕已关闭）"
+                            },
+                            shape = CircleShape,
+                            color = if (isDanmakuEnabled) AuroraCoral.copy(alpha = 0.88f) else AuroraMediaSurface.copy(alpha = 0.78f),
+                            contentColor = Color.White,
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .height(36.dp),
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                modifier = Modifier.padding(horizontal = 12.dp),
+                            ) {
+                                Icon(
+                                    imageVector = if (isDanmakuEnabled) Icons.Default.Subtitles else Icons.Default.SubtitlesOff,
+                                    contentDescription = if (isDanmakuEnabled) "关闭弹幕" else "开启弹幕",
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Text(
+                                    text = if (isDanmakuEnabled) "弹幕 开" else "纯净模式",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                            }
                         }
                     }
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { onFullscreenChange(!isFullscreen) }) {
+                    IconButton(onClick = {
+                        AuroraHaptics.tap(haptic)
+                        onFullscreenChange(!isFullscreen)
+                    }) {
                         Icon(
                             if (isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                             contentDescription = if (isFullscreen) "退出全屏" else "全屏播放",

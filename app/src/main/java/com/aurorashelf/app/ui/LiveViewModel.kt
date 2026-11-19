@@ -65,7 +65,9 @@ class LiveViewModel(
         ),
     )
     val uiState: StateFlow<LiveUiState> = mutableUiState.asStateFlow()
-    private var loadJob: Job? = null
+    private var refreshJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var feedGeneration: Long = 0L
     private var initialLoadRequested = false
 
     /** 首次进入直播页时才请求数据，重复调用保持幂等。 */
@@ -115,14 +117,15 @@ class LiveViewModel(
     }
 
     fun refresh() {
-        loadJob?.cancel()
+        refreshJob?.cancel()
+        loadMoreJob?.cancel()
         mutableUiState.update { it.copy(isLoading = it.items.isEmpty(), isLoadingMore = false, error = null) }
         load(1, replace = true)
     }
 
     fun loadMore() {
         val state = mutableUiState.value
-        if (state.isLoading || state.isLoadingMore || !state.canLoadMore || state.page < 1) return
+        if (state.isLoading || state.isLoadingMore || !state.canLoadMore || state.page < 1 || refreshJob?.isActive == true) return
         mutableUiState.update { it.copy(isLoadingMore = true, error = null) }
         load(state.page + 1, replace = false)
     }
@@ -135,10 +138,17 @@ class LiveViewModel(
     fun updateSearchQuery(query: String) = mutableUiState.update { it.copy(searchQuery = query) }
 
     private fun load(page: Int, replace: Boolean) {
-        loadJob?.cancel()
+        val gen = if (replace) {
+            refreshJob?.cancel()
+            loadMoreJob?.cancel()
+            ++feedGeneration
+        } else {
+            loadMoreJob?.cancel()
+            feedGeneration
+        }
         val sourceId = mutableUiState.value.selectedSourceId
         val category = mutableUiState.value.selectedCategory
-        loadJob = viewModelScope.launch {
+        val job = viewModelScope.launch {
             var activeSourceId = sourceId
             val result = runCatching {
                 if (sourceId == LiveSourceCatalog.HORNYSTUDENTS.id) {
@@ -156,11 +166,13 @@ class LiveViewModel(
                 }
             }
             result.onSuccess { res ->
+                if (feedGeneration != gen) return@onSuccess
                 if (page == 1 && res.items.isNotEmpty()) {
                     SourceSnapshotStore.putLiveFeed(activeSourceId, category.name, res.items)
                     preferences.saveLiveFeed(activeSourceId, category.name, res.items)
                 }
                 mutableUiState.update { current ->
+                    if (feedGeneration != gen) return@update current
                     val update = nextLivePage(
                         currentItems = current.items,
                         incomingItems = res.items,
@@ -179,6 +191,7 @@ class LiveViewModel(
                 }
             }.onFailure { failure ->
                 if (failure is CancellationException) return@onFailure
+                if (feedGeneration != gen) return@onFailure
                 val cached = preferences.cachedLiveFeed(activeSourceId, category.name)
                 mutableUiState.update { current ->
                     val fallbackItems = if (current.items.isNotEmpty()) current.items else (cached?.items.orEmpty())
@@ -191,6 +204,7 @@ class LiveViewModel(
                 }
             }
         }
+        if (replace) refreshJob = job else loadMoreJob = job
     }
 
     private fun Throwable.userMessage(): String = when (this) {

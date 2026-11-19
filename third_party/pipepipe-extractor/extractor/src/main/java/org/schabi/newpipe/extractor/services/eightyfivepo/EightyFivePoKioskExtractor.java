@@ -49,12 +49,35 @@ public final class EightyFivePoKioskExtractor extends KioskExtractor<StreamInfoI
     public InfoItemsPage<StreamInfoItem> getInitialPage()
             throws IOException, ExtractionException {
         assertPageFetched();
+        return extractCurrentDocument();
+    }
+
+    private InfoItemsPage<StreamInfoItem> extractCurrentDocument()
+            throws IOException, ExtractionException {
+        if (document == null) {
+            throw new org.schabi.newpipe.extractor.exceptions.ParsingException("85po kiosk page was not fetched");
+        }
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
         for (final EightyFivePoSearchResult result
-                : EightyFivePoParsingHelper.extractVideoCards(document, 40)) {
+                : EightyFivePoParsingHelper.extractVideoCards(document, 120)) {
             collector.commit(new EightyFivePoInfoItemExtractor(result));
         }
-        return new InfoItemsPage<>(collector, nextPage(document));
+        Page next = nextPage(document);
+        if (next == null && !collector.getItems().isEmpty()) {
+            final String loc = document.location();
+            final String pathPart = loc.contains("?") ? loc.substring(0, loc.indexOf('?')) : loc;
+            final java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("^(https://[^/]+/(?:ja|zh|en)?/?(?:latest-updates|most-popular|top-rated))(?:/(\\d+))?/?$")
+                    .matcher(pathPart);
+            if (m.find()) {
+                final int nextNum = m.group(2) == null ? 2 : Integer.parseInt(m.group(2)) + 1;
+                final String nextUrl = m.group(1) + "/" + nextNum + "/";
+                if (HtmlPagination.isSafeNext(loc, nextUrl)) {
+                    next = new Page(nextUrl);
+                }
+            }
+        }
+        return new InfoItemsPage<>(collector, next);
     }
 
     /** KVS publishes its async pager parameters on the next link, not in href. */
@@ -81,10 +104,11 @@ public final class EightyFivePoKioskExtractor extends KioskExtractor<StreamInfoI
     @Override
     public InfoItemsPage<StreamInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
-        if (page == null || !HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new org.schabi.newpipe.extractor.exceptions.ParsingException("Invalid next page");
         }
         document = EightyFivePoParsingHelper.fetchDocument(page.getUrl());
-        return getInitialPage();
+        return extractCurrentDocument();
     }
 }

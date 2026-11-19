@@ -49,9 +49,14 @@ public final class JavNoniKioskExtractor extends KioskExtractor<StreamInfoItem> 
     public InfoItemsPage<StreamInfoItem> getInitialPage()
             throws IOException, ExtractionException {
         assertPageFetched();
+        return extractCurrentDocument();
+    }
+
+    @Nonnull
+    private InfoItemsPage<StreamInfoItem> extractCurrentDocument() {
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
         for (final JavNoniSearchResult result
-                : JavNoniParsingHelper.extractVideoCards(document, 40)) {
+                : JavNoniParsingHelper.extractVideoCards(document, 120)) {
             collector.commit(new JavNoniInfoItemExtractor(result));
         }
         return new InfoItemsPage<>(collector, HtmlPagination.nextPage(document));
@@ -60,10 +65,11 @@ public final class JavNoniKioskExtractor extends KioskExtractor<StreamInfoItem> 
     @Override
     public InfoItemsPage<StreamInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
-        if (page == null || !HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new org.schabi.newpipe.extractor.exceptions.ParsingException("Invalid next page");
         }
         document = JavNoniParsingHelper.fetchDocument(page.getUrl());
-        return getInitialPage();
+        return extractCurrentDocument();
     }
 }

@@ -163,7 +163,7 @@ final class OhentaiKioskExtractor extends KioskExtractor<org.schabi.newpipe.extr
             throws ExtractionException {
         if (document == null) throw new ParsingException("OHentai kiosk page was not fetched");
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-        for (final OhentaiItem item : OhentaiParser.cards(document, 40)) {
+        for (final OhentaiItem item : OhentaiParser.cards(document, 120)) {
             collector.commit(new OhentaiItemExtractor(item));
         }
         Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document);
@@ -180,7 +180,8 @@ final class OhentaiKioskExtractor extends KioskExtractor<org.schabi.newpipe.extr
         return new InfoItemsPage<>(collector, next);
     }
     @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
-        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new ParsingException("Invalid next page");
         }
         document = OhentaiParser.fetch(page.getUrl());

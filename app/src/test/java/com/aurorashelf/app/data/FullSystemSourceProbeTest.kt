@@ -188,6 +188,87 @@ class FullSystemSourceProbeTest {
         println("=================================================================\n")
     }
 
+    @Test
+    fun probeMultiPageInfiniteLoadingAcrossAllVideoSources() = runBlocking {
+        assumeTrue(System.getenv("RUN_LIVE_SOURCE_TESTS") == "1")
+
+        val videoRepo = VideoRepository()
+        println("\n=================================================================")
+        println("    AURORA MULTI-PAGE INFINITE LOADING AUDIT (PAGES 1 -> 3)      ")
+        println("=================================================================")
+
+        val results = coroutineScope {
+            ContentSourceCatalog.sources.map { source ->
+                async {
+                    val startMs = System.currentTimeMillis()
+                    val firstCat = FeedCategory.availableFor(source.baseUrl).firstOrNull() ?: FeedCategory.RECENT
+                    val seen = LinkedHashSet<String>()
+                    val pageCounts = mutableListOf<Int>()
+                    val cumulativeUnique = mutableListOf<Int>()
+                    var errorNote = "OK"
+                    for (page in 1..3) {
+                        try {
+                            val items = withTimeoutOrNull(20_000L) {
+                                videoRepo.loadFeed(source.baseUrl, firstCat, page)
+                            }
+                            if (items == null) {
+                                pageCounts += -1
+                                cumulativeUnique += seen.size
+                                errorNote = "P$page timeout"
+                                break
+                            }
+                            pageCounts += items.size
+                            items.forEach { seen += it.id }
+                            cumulativeUnique += seen.size
+                        } catch (e: Exception) {
+                            pageCounts += -1
+                            cumulativeUnique += seen.size
+                            errorNote = "P$page ${e::class.java.simpleName}: ${e.message?.take(60)}"
+                            break
+                        }
+                    }
+                    MultiPageProbeResult(
+                        name = source.name,
+                        pageCounts = pageCounts,
+                        cumulativeUnique = cumulativeUnique,
+                        durationMs = System.currentTimeMillis() - startMs,
+                        detail = errorNote,
+                    )
+                }
+            }.awaitAll()
+        }
+
+        var passedMultiPage = 0
+        results.forEachIndexed { idx, res ->
+            val p1 = res.cumulativeUnique.getOrElse(0) { 0 }
+            val p3 = res.cumulativeUnique.lastOrNull() ?: 0
+            val grew = p1 > 0 && p3 > p1
+            if (grew) passedMultiPage++
+            val status = if (grew) "[GROW]" else if (p1 > 0) "[FLAT]" else "[FAIL]"
+            println(
+                "%-3d %-12s %-7s Pages=%-14s Unique=%-14s (%d ms) | %s".format(
+                    idx + 1,
+                    res.name,
+                    status,
+                    res.pageCounts.joinToString("/"),
+                    res.cumulativeUnique.joinToString("->"),
+                    res.durationMs,
+                    res.detail,
+                ),
+            )
+        }
+        println("Multi-page growth: $passedMultiPage / ${results.size} sources")
+        println("=================================================================\n")
+    }
+
+    data class MultiPageProbeResult(
+        val name: String,
+        val pageCounts: List<Int>,
+        val cumulativeUnique: List<Int>,
+        val durationMs: Long,
+        val detail: String,
+    )
+
     data class VideoProbeResult(
         val name: String,
         val baseUrl: String,

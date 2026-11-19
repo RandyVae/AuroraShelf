@@ -128,13 +128,21 @@ internal fun HomeScreen(
         }
     }
 
-    LaunchedEffect(listState, state.videos.size, state.canLoadMore, state.isLoading, state.isLoadingMore, state.loadMoreError) {
+    LaunchedEffect(
+        listState,
+        state.videos.size,
+        state.canLoadMore,
+        state.isLoading,
+        state.isRefreshing,
+        state.isLoadingMore,
+        state.loadMoreError,
+    ) {
         snapshotFlow {
             val layout = listState.layoutInfo
             val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: -1
             val totalItems = layout.totalItemsCount
-            totalItems > 0 && lastVisible >= totalItems - 5 &&
-                !state.isLoading && !state.isLoadingMore &&
+            totalItems > 0 && lastVisible >= totalItems - 6 &&
+                !state.isLoading && !state.isRefreshing && !state.isLoadingMore &&
                 state.canLoadMore && state.loadMoreError == null
         }.distinctUntilChanged().filter { it }.collect {
             onLoadMore()
@@ -159,26 +167,22 @@ internal fun HomeScreen(
         val afterSpotlight = remember(state.videos, spotlightCount) {
             state.videos.drop(spotlightCount)
         }
-        val top10Videos = remember(afterSpotlight) { afterSpotlight.take(10) }
-        val afterTop10 = remember(afterSpotlight, top10Videos) { afterSpotlight.drop(top10Videos.size) }
-        val recommendedVideos = remember(afterTop10) {
-            if (afterTop10.size > 10) afterTop10.take(10) else emptyList()
+        // Align with iOS HomeScreen: Hero (up to 4) + Top 10 horizontal shelf (when feed has plenty),
+        // then feed all remaining videos straight into the unlimited vertical exploration grid so page 1
+        // immediately renders the multi-column library instead of hiding 34 items in horizontal rows.
+        val top10Videos = remember(afterSpotlight) {
+            if (afterSpotlight.size >= 10) afterSpotlight.take(10) else emptyList()
         }
-        val afterRecommended = remember(afterTop10, recommendedVideos) {
-            afterTop10.drop(recommendedVideos.size)
-        }
-        val trendingVideos = remember(afterRecommended) {
-            if (afterRecommended.size > 14) afterRecommended.take(10) else emptyList()
-        }
-        val gridVideos = remember(afterRecommended, trendingVideos) {
-            afterRecommended.drop(trendingVideos.size)
+        val gridVideos = remember(afterSpotlight, top10Videos) {
+            val remaining = afterSpotlight.drop(top10Videos.size)
+            if (remaining.isEmpty()) afterSpotlight else remaining
         }
         val gridRows = remember(gridVideos, gridColumns) {
             gridVideos.chunked(gridColumns)
         }
 
         AuroraPullToRefreshBox(
-            isRefreshing = state.isLoading && state.videos.isNotEmpty(),
+            isRefreshing = (state.isLoading || state.isRefreshing) && state.videos.isNotEmpty(),
             onRefresh = onRefresh,
             indicatorPaddingTop = emptyHeaderSpacer,
             modifier = Modifier.fillMaxSize(),
@@ -264,67 +268,17 @@ internal fun HomeScreen(
                         }
                     }
 
-                    if (recommendedVideos.isNotEmpty()) {
-                        item(key = "recommended-heading") {
-                            AuroraSectionHeader(
-                                title = "为你推荐",
-                                subtitle = "猜你喜欢的精彩大片",
-                                modifier = Modifier.padding(top = 12.dp),
-                            )
-                        }
-                        item(key = "recommended-row") {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                items(
-                                    items = recommendedVideos,
-                                    key = { "rec-${it.id}" },
-                                ) { video ->
-                                    AuroraPosterCard(
-                                        video = video,
-                                        onClick = { onVideo(video) },
-                                        modifier = Modifier.animateItem(),
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (trendingVideos.isNotEmpty()) {
-                        item(key = "trending-heading") {
-                            AuroraSectionHeader(
-                                title = "热播精选",
-                                subtitle = "高口碑热门精选内容",
-                                modifier = Modifier.padding(top = 12.dp),
-                            )
-                        }
-                        item(key = "trending-row") {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                items(
-                                    items = trendingVideos,
-                                    key = { "trend-${it.id}" },
-                                ) { video ->
-                                    AuroraPosterCard(
-                                        video = video,
-                                        onClick = { onVideo(video) },
-                                        modifier = Modifier.animateItem(),
-                                    )
-                                }
-                            }
-                        }
-                    }
-
                     if (gridRows.isNotEmpty()) {
                         item(key = "explore-heading") {
+                            val sectionTitle = if (state.category.isAll) {
+                                "全部作品"
+                            } else {
+                                "${state.category.label} · 全部作品"
+                            }
+                            val countBadge = "${state.videos.size}${if (state.canLoadMore) "+" else ""}"
                             AuroraSectionHeader(
-                                title = "更多精彩视频",
-                                subtitle = "海量全库深度探索",
+                                title = sectionTitle,
+                                subtitle = "已加载 $countBadge 部视频 · 上滑持续加载",
                                 modifier = Modifier.padding(top = 12.dp),
                             )
                         }
@@ -360,13 +314,21 @@ internal fun HomeScreen(
 
                     if (state.isLoadingMore) {
                         item(key = "loading-more") {
-                            Box(
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 20.dp),
-                                contentAlignment = Alignment.Center,
                             ) {
-                                AuroraLoadingIndicator(modifier = Modifier.size(32.dp))
+                                Spacer(Modifier.weight(1f))
+                                AuroraLoadingIndicator(modifier = Modifier.size(28.dp))
+                                Text(
+                                    text = "正在加载更多视频…",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Spacer(Modifier.weight(1f))
                             }
                         }
                     } else if (state.loadMoreError != null && state.videos.isNotEmpty()) {
@@ -382,10 +344,23 @@ internal fun HomeScreen(
                                 }
                             }
                         }
+                    } else if (state.canLoadMore && state.videos.isNotEmpty() && !state.isRefreshing) {
+                        item(key = "load-more-trigger") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                TextButton(onClick = onLoadMore) {
+                                    Text("继续加载更多")
+                                }
+                            }
+                        }
                     } else if (!state.canLoadMore && state.videos.isNotEmpty()) {
                         item(key = "end-of-feed") {
                             Text(
-                                text = "已加载全部内容",
+                                text = "已加载全部 ${state.videos.size} 部内容",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.labelMedium,
                                 modifier = Modifier

@@ -44,7 +44,9 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
     private val mutableUiState = MutableStateFlow(ForumUiState())
     val uiState: StateFlow<ForumUiState> = mutableUiState.asStateFlow()
 
-    private var loadJob: Job? = null
+    private var refreshJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var feedGeneration: Long = 0L
     private var prefetchJob: Job? = null
     private var prefetchedPage: Int = 0
     private var prefetchedResult: ForumPage? = null
@@ -56,8 +58,9 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun ensureLoaded() {
         val state = mutableUiState.value
-        if (state.page != 0 || state.isLoading || loadJob?.isActive == true) return
-        loadJob = viewModelScope.launch {
+        if (state.page != 0 || state.isLoading || refreshJob?.isActive == true) return
+        val gen = ++feedGeneration
+        refreshJob = viewModelScope.launch {
             val cached = withContext(Dispatchers.IO) {
                 SourceSnapshotStore.getForumFeed("all")?.items?.takeIf { it.isNotEmpty() }
                     ?: preferences.cachedForumFirstPage()?.posts
@@ -68,20 +71,22 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 logSafely { Log.i(TAG, "first-screen cache posts=${cached.size}") }
             }
-            performRefresh()
+            performRefresh(gen)
         }
     }
 
     fun refresh() {
-        loadJob?.cancel()
+        refreshJob?.cancel()
+        loadMoreJob?.cancel()
         prefetchJob?.cancel()
         clearPrefetched()
-        loadJob = viewModelScope.launch {
-            performRefresh()
+        val gen = ++feedGeneration
+        refreshJob = viewModelScope.launch {
+            performRefresh(gen)
         }
     }
 
-    private suspend fun performRefresh() {
+    private suspend fun performRefresh(gen: Long) {
         val startedAt = System.currentTimeMillis()
         var loggedFirstResult = false
         mutableUiState.update {
@@ -89,7 +94,7 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
         }
         runCatching {
             repository.loadProgressively(1) { posts, unavailable, canLoadMore ->
-                if (posts.isEmpty()) return@loadProgressively
+                if (feedGeneration != gen || posts.isEmpty()) return@loadProgressively
                 if (!loggedFirstResult) {
                     loggedFirstResult = true
                     logSafely {
@@ -97,6 +102,7 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 mutableUiState.update {
+                    if (feedGeneration != gen) return@update it
                     it.copy(
                         posts = posts,
                         page = 1,
@@ -108,7 +114,9 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }.onSuccess { page ->
+            if (feedGeneration != gen) return@onSuccess
             mutableUiState.update {
+                if (feedGeneration != gen) return@update it
                 it.copy(
                     posts = page.posts,
                     page = 1,
@@ -126,21 +134,27 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             if (page.canLoadMore && page.posts.isNotEmpty()) prefetchPage(2)
-        }.onFailure(::handleFailure)
+        }.onFailure { failure ->
+            if (feedGeneration == gen) handleFailure(failure)
+        }
     }
 
     fun loadMore() {
         val state = mutableUiState.value
-        if (state.isLoading || state.isLoadingMore || !state.canLoadMore || state.page < 1) return
+        if (state.isLoading || state.isLoadingMore || !state.canLoadMore || state.page < 1 || refreshJob?.isActive == true) return
+        val gen = feedGeneration
         val targetPage = state.page + 1
-        loadJob = viewModelScope.launch {
+        loadMoreJob?.cancel()
+        loadMoreJob = viewModelScope.launch {
             mutableUiState.update { it.copy(isLoadingMore = true, loadMoreError = null) }
             // Wait for an in-flight prefetch instead of issuing a duplicate network request.
             prefetchJob?.join()
             val prefetched = takeFreshPrefetched(targetPage)
             val result = prefetched?.let { Result.success(it) } ?: runCatching { repository.load(targetPage) }
             result.onSuccess { page ->
+                if (feedGeneration != gen) return@onSuccess
                 mutableUiState.update { current ->
+                    if (feedGeneration != gen) return@update current
                     val existingKeys = current.posts.map { it.sourceId to it.id }.toSet()
                     val newUniquePosts = page.posts.filter { (it.sourceId to it.id) !in existingKeys }
                     current.copy(
@@ -153,11 +167,12 @@ class ForumViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 }
                 val updated = mutableUiState.value
-                if (updated.page == targetPage && updated.canLoadMore && page.posts.isNotEmpty()) {
+                if (feedGeneration == gen && updated.page == targetPage && updated.canLoadMore && page.posts.isNotEmpty()) {
                     prefetchPage(targetPage + 1)
                 }
             }.onFailure { failure ->
                 if (failure is CancellationException) return@onFailure
+                if (feedGeneration != gen) return@onFailure
                 mutableUiState.update { it.copy(isLoadingMore = false, loadMoreError = failure.userMessage()) }
             }
         }

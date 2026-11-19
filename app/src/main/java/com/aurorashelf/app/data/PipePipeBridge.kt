@@ -67,7 +67,7 @@ internal object PipePipeBridge {
                 size > MAX_METADATA_CACHE
         },
     )
-    internal val pageCursorCache = PageCursorCache<Page>(maxEntries = 64)
+    internal val pageCursorCache = PageCursorCache<Page>(maxEntries = 256)
 
     fun loadFeed(baseUrl: String, category: FeedCategory, page: Int): List<VideoItem> {
         return loadFeed(baseUrl, ContentSourceCatalog.category(baseUrl, category), page)

@@ -87,7 +87,15 @@ class VideoRepository {
                     // Huangguo ranking pages or end-of-feed numbered URLs return 404,
                     // and deprecated routes such as /ai-huanlian/ return 410 Gone.
                     if (ContentSourceCatalog.isHuangguo(baseUrl) && (error.statusCode == 404 || error.statusCode == 410)) {
-                        if (page > 1 && error.statusCode == 404) return@withContext emptyList()
+                        if (page > 1 && error.statusCode == 404) {
+                            // For ranking/recommend tabs where HTML /recommend/{p}/ terminates early,
+                            // seamlessly continue from the Edge full catalog so infinite scroll never stalls.
+                            if (category.id == "recommend") {
+                                val edgeOverflow = HuangguoEdgeGateway.fetchFeedById(baseUrl, "all", page)
+                                if (!edgeOverflow.isNullOrEmpty()) return@withContext edgeOverflow
+                            }
+                            return@withContext emptyList()
+                        }
                         val fallbackPath = if (page <= 1) "/original/" else "/original/$page/"
                         val fallbackUrl = URI(baseUrl.trimEnd('/')).resolve(fallbackPath).toString()
                         fetchDocument(fallbackUrl, baseUrl)
@@ -364,7 +372,8 @@ class VideoRepository {
             }
             if (ContentSourceCatalog.is91Dongman(baseUrl)) {
                 val effectiveBase = if (page > 1 && rawPath.trim('/') == "anime") "/anime/lifan/" else rawPath
-                val pagedPath = if (page <= 1) effectiveBase else "${effectiveBase.trimEnd('/')}/page/$page/"
+                val effectivePage = if (page > 1 && rawPath.trim('/') == "anime") page - 1 else page
+                val pagedPath = if (effectivePage <= 1) effectiveBase else "${effectiveBase.trimEnd('/')}/page/$effectivePage/"
                 return URI("${baseUrl.trimEnd('/')}/").resolve(pagedPath).toString()
             }
             if (ContentSourceCatalog.isHuangguo(baseUrl)) {

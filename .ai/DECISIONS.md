@@ -1,5 +1,16 @@
 # Existing Architectural Decisions
 
+## Android Video/Live Player Orthogonal Redesign, 18-Source Unlimited Pagination & Material 3 1.5.0 GA (v2.19.0 Build 275)
+
+Date: 2026-11-20
+
+Status: Implemented, verified on signed R8 Release APK + 18/18 multi-page live audit + 20/20 Android instrumented tests + 59/59 iOS live tests + iPhone/iPad Release simulators, and published in `v2.19.0 (Build 275)`.
+
+Decisions:
+1. **Material 3 `1.5.0` GA Adoption**: Upgrade `androidx.compose.material3:material3` from `1.5.0-rc01` to `1.5.0` GA while keeping the unconstrained `ShortNavigationBar` wrapper pattern validated across all 5 destinations.
+2. **O(1) Cursor Pagination & SWR Race Elimination Across All 18 Android Video Sources**: Eliminate `document == null` NPE and `assertPageFetched()` crashes across all 13 HTML PipePipe `KioskExtractor`s so `PipePipeBridge` performs O(1) direct cursor jumps instead of O(N²) page-1 re-walks; raise per-page extraction limits to `120`; separate `refreshJob`/`loadMoreJob` with `isRefreshing` and monotonic `feedGeneration` in `AuroraViewModel` (plus `ComicViewModel`/`LiveViewModel`/`ForumViewModel`) so SWR cache hits never trigger a frame-1 duplicate `page=1` `loadMore()` that permanently locks `canLoadMore = false`; tolerate up to 3 consecutive overlapping pages before terminating pagination; remove redundant HomeScreen horizontal shelves so page 1 immediately opens the unlimited multi-column grid; and sanitize path-illegal RFC characters (`[`, `]`, spaces) in `SourceAddress.resolve` and `MrDougaParser.requestUrl` so `MRDOUGA` slugs resolve cleanly.
+3. **Orthogonal Material 3 Expressive Video & Live Player Controls**: Anchor Enter/Exit Fullscreen consistently at bottom-right across both inline and fullscreen modes; trim inline top bar to `[Back]` + `[Cast][PiP][Play Settings]` backed by a unified dark Material 3 `ModalBottomSheet` (speed `0.5x..2.0x`, Fit/Fill, mute toggle, subtitle tracks) and deduplicate `PlayerDetails` to `[Favorite][Cache][Episodes]`; equip fullscreen with title/episode header, screen lock (`isScreenLocked` + left-edge unlock pill), fullscreen Cast, 2-tier bottom cinema dock (with fullscreen episode picker sheet & Next Episode), center double-tap Play/Pause, and hold-for-`2.0x` temporary boost; and fix `LiveScreen` fullscreen back navigation plus duplicate inline Danmaku / `StreamerInfoBar` fullscreen buttons.
+
 ## Android 17 (API 37) SDK Compliance & 100% Native Material 3 Expressive Migration (v2.18.0 Build 274)
 
 Date: 2026-11-20

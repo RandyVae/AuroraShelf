@@ -83,7 +83,9 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     )
     val uiState: StateFlow<ComicUiState> = mutableUiState.asStateFlow()
 
-    private var listJob: Job? = null
+    private var refreshJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var listGeneration: Long = 0L
     private var detailsJob: Job? = null
     private var readerJob: Job? = null
     private var detailsRequestToken: Long = 0L
@@ -104,7 +106,9 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     fun selectSource(sourceId: String) {
         if (sourceId == mutableUiState.value.selectedSourceId) return
         if (repository.availableSources.none { it.id == sourceId }) return
-        listJob?.cancel()
+        refreshJob?.cancel()
+        loadMoreJob?.cancel()
+        listGeneration++
         detailsJob?.cancel()
         readerJob?.cancel()
         detailsRequestToken++
@@ -158,7 +162,9 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     fun signOut() {
         val sourceId = mutableUiState.value.selectedSourceId
         repository.signOut(sourceId)
-        listJob?.cancel()
+        refreshJob?.cancel()
+        loadMoreJob?.cancel()
+        listGeneration++
         mutableUiState.update {
             it.copy(
                 comics = emptyList(),
@@ -230,22 +236,45 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadMore() {
         val state = mutableUiState.value
-        if (state.isLoading || state.isLoadingMore || !state.canLoadMore || state.page == 0) return
-        val nextPage = state.page + 1
-        listJob = viewModelScope.launch {
+        if (state.isLoading || state.isLoadingMore || !state.canLoadMore || state.page == 0 || refreshJob?.isActive == true) return
+        val gen = listGeneration
+        val startPage = state.page + 1
+        loadMoreJob?.cancel()
+        loadMoreJob = viewModelScope.launch {
             mutableUiState.update { it.copy(isLoadingMore = true, error = null, loadMoreError = null) }
-            runCatching { load(state.selectedSourceId, state.selectedCategoryId, state.activeQuery, nextPage) }
-                .onSuccess { result ->
+            runCatching {
+                var targetPage = startPage
+                var overlapRetries = 0
+                var lastRawSize = 0
+                var collectedNew: List<ComicSummary> = emptyList()
+                while (overlapRetries < 3) {
+                    val fetched = load(state.selectedSourceId, state.selectedCategoryId, state.activeQuery, targetPage)
+                    lastRawSize = fetched.size
+                    if (fetched.isEmpty()) break
+                    val existingKeys = mutableUiState.value.comics.asSequence().map { it.sourceId to it.id }.toHashSet()
+                    val fresh = fetched.distinctBy { it.sourceId to it.id }.filterNot { (it.sourceId to it.id) in existingKeys }
+                    if (fresh.isNotEmpty()) {
+                        collectedNew = fresh
+                        break
+                    }
+                    targetPage++
+                    overlapRetries++
+                }
+                Triple(collectedNew, targetPage, lastRawSize)
+            }
+                .onSuccess { (freshComics, resolvedPage, lastRawSize) ->
+                    if (listGeneration != gen) return@onSuccess
                     mutableUiState.update {
                         if (
+                            listGeneration != gen ||
                             it.selectedSourceId != state.selectedSourceId ||
                             it.selectedCategoryId != state.selectedCategoryId ||
                             it.activeQuery != state.activeQuery
                         ) it
                         else it.copy(
-                            comics = (it.comics + result).distinctBy { comic -> comic.sourceId to comic.id },
-                            page = nextPage,
-                            canLoadMore = result.isNotEmpty(),
+                            comics = (it.comics + freshComics).distinctBy { comic -> comic.sourceId to comic.id },
+                            page = resolvedPage,
+                            canLoadMore = freshComics.isNotEmpty() && lastRawSize > 0,
                             isLoadingMore = false,
                             loadMoreError = null,
                         )
@@ -253,6 +282,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 .onFailure { failure ->
                     if (failure is CancellationException) return@onFailure
+                    if (listGeneration != gen) return@onFailure
                     mutableUiState.update { it.copy(isLoadingMore = false, loadMoreError = failure.userMessage()) }
                 }
         }
@@ -374,7 +404,9 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadFirstPage(query: String) {
-        listJob?.cancel()
+        refreshJob?.cancel()
+        loadMoreJob?.cancel()
+        val gen = ++listGeneration
         val sourceId = mutableUiState.value.selectedSourceId
         val categoryId = mutableUiState.value.selectedCategoryId
         val startedAt = System.currentTimeMillis()
@@ -384,7 +416,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             emptyList()
         }
-        listJob = viewModelScope.launch {
+        refreshJob = viewModelScope.launch {
             mutableUiState.update { current ->
                 val fallbackComics = when {
                     query.isNotBlank() -> emptyList()
@@ -404,6 +436,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
             }
             runCatching { load(sourceId, categoryId, query, 1) }
                 .onSuccess { result ->
+                    if (listGeneration != gen) return@onSuccess
                     if (query.isBlank() && result.isNotEmpty()) {
                         SourceSnapshotStore.putComicFeed(sourceId, categoryId, result)
                         preferences.saveComicFeed(sourceId, categoryId, result)
@@ -413,6 +446,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     mutableUiState.update {
                         if (
+                            listGeneration != gen ||
                             it.selectedSourceId != sourceId ||
                             it.selectedCategoryId != categoryId ||
                             it.activeQuery != query
@@ -422,6 +456,7 @@ class ComicViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 .onFailure { failure ->
                     if (failure is CancellationException) return@onFailure
+                    if (listGeneration != gen) return@onFailure
                     mutableUiState.update {
                         val keepStale = query.isBlank() && it.selectedSourceId == sourceId && it.comics.isNotEmpty()
                         it.copy(

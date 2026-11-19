@@ -1,4 +1,20 @@
-## 最新交接：2026-11-20 — Android 客户端全面升级至 Google Android 17 (API 37) SDK 与 100% 原生 Material 3 Expressive、双端 Release 模拟器全规模验收与全通道同步上线 · v2.18.0 (Build 274)
+## 最新交接：2026-11-20 — Android 播放器控件全面重构、全量 18 视频源无限分页加载与 iOS 看齐、Material 3 `1.5.0` GA 升级及双端全通道同步上线 · v2.19.0 (Build 275)
+
+### 本次完成
+1. **Material 3 `1.5.0` GA 升级**：
+   - [build.gradle.kts](file:///Users/itou/Documents/ChatGPT/91pron/app/build.gradle.kts) 将 `androidx.compose.material3:material3` 从 `1.5.0-rc01` 升级至正式版 `1.5.0` GA；实机验证 `ShortNavigationBar` 5 Tab 与全站 Expressive 组件零回归。
+2. **Android 全量 18 视频源无限分页加载根治（与 iOS 100% 看齐）**：
+   - **PipePipe 13 个 HTML `KioskExtractor` 根治**：消除 `XVideos`、`85po`、`Pornhub`、`TokyoMotion`、`KissJAV`、`MissAV`、`MrDouga`、`OHentai`、`SpankBang`、`xHamster`、`XNXX`、`JavNoni`、`JavSb` 在直接游标跳转 `getPage(Page)` 时的 `document == null` NPE 与 `assertPageFetched()` 崩溃，将单页卡片上限由 `40/48/54` 放宽至 `120`，补齐 `XVideos` 确定性分页兜底；扩大 [PipePipeBridge.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PipePipeBridge.kt) 与 [X134Repository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/X134Repository.kt) 游标缓存，修复 [VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt) `91动漫` 总览跳页与 `黄果短剧` `recommend` P2+ 404 续翻，并在 [SourceAddress.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/SourceAddress.kt) 与 `MrDougaService.java` 补齐路径特殊字符编码恢复 `MRDOUGA` 播放。
+   - **ViewModel SWR 竞态与 HomeScreen 改造**：[AuroraViewModel.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AuroraViewModel.kt)（及 `ComicViewModel` / `LiveViewModel` / `ForumViewModel`）拆分 `refreshJob`/`loadMoreJob`、新增 `isRefreshing` 与 `feedGeneration` 阻断首帧 `page=1` 误锁死，新增 3 页连续重叠自动续翻并将 `MAX_KNOWN_VIDEOS` 扩至 `2,000`；[HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt) 移除冗余横排货架，首屏直出多列无限网格、实时视频计数与手动续载按钮。
+3. **Android 视频与直播播放器控件重构**：
+   - [NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt) & [PlayerScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PlayerScreen.kt)：全屏/退出全屏统一固定右下角，内嵌顶栏收敛为 `[←]` + `[投屏][画中画][⚙ 播放设置]`，新增统一暗色 `ModalBottomSheet` 播放设置面板（倍速/画幅/静音/字幕），详情区收敛为正交 `[收藏][缓存][选集]`；全屏补齐标题+剧集头、`[🔒 锁屏]`（独立悬浮解锁胶囊）、全屏投屏、两层电影底栏（进度条 + 倍速/画幅/静音/字幕/全屏选集抽屉/下一集 + 右下退出全屏）、中央双击改为播放/暂停与长按 `2.0x` 临时倍速快进。
+   - [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt)：修复全屏左上返回键误退出直播间（改为退出全屏）、移除内嵌态无效的顶栏「弹幕 开」与 `StreamerInfoBar` 重复全屏键、全屏底栏保留单一弹幕开关并补齐 `48dp` 热区与挖孔/导航栏安全区。
+4. **双端全规模验收与三通道同步发布（`v2.19.0 Build 275`）**：
+   - Android：单测 + Lint（`0` error / `0` warning）+ 在线全源审计（**18/18 视频源 Feed + Playback 全 `[PASS]`、18/18 源 P1→P3 多页持续增长 `[GROW]` 单源 60–200 条、9/9 免登漫画全通**）+ `20/20` 仪器化测试全绿；`emulator-5554` 正式签名 R8 Release APK 全模块及平板 `WideNavigationRail` 验收全绿。
+   - iOS / iPadOS：在线全源 XCTest `59/59` 全通（增强 `ComicRepositoryTests` 容错上游单个死分片节点），`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器全模块及《Lust Goddess》`Version 2.19.0` 走查通过。
+   - 网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,645,799` B、`Netgrey.ipa` `140,446,242` B，`/` 剩 `11G`）、TestFlight `Build 275` 与 GitHub Release `v2.19.0` 全部同步上线。
+
+## 历史交接：2026-11-20 — Android 客户端全面升级至 Google Android 17 (API 37) SDK 与 100% 原生 Material 3 Expressive、双端 Release 模拟器全规模验收与全通道同步上线 · v2.18.0 (Build 274)
 
 ### 本次完成
 1. **Android 17 (API 37) SDK 与平台合规升级**：

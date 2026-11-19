@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -34,6 +35,9 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -47,13 +51,12 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FormatListNumbered
-import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
@@ -63,6 +66,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
@@ -117,6 +121,7 @@ import com.aurorashelf.app.model.VideoDetailMetadata
 import com.aurorashelf.app.model.VideoItem
 import com.aurorashelf.app.ui.theme.AuroraHaptics
 import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
+import com.aurorashelf.app.ui.theme.AuroraInkSurface
 import com.aurorashelf.app.ui.theme.AuroraMotion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -154,6 +159,12 @@ internal fun PlayerScreen(
     var currentDurationMs by rememberSaveable(playbackUrl) { mutableLongStateOf(0L) }
     var isPlayerControllerVisible by remember(playbackUrl) { mutableStateOf(true) }
     var isEpisodePickerVisible by remember(video.id) { mutableStateOf(false) }
+    var isFullscreenEpisodesVisible by remember(video.id) { mutableStateOf(false) }
+    LaunchedEffect(isFullscreen) {
+        if (!isFullscreen) {
+            isFullscreenEpisodesVisible = false
+        }
+    }
     // Flow marker for logcat: the gap from this line to "timing ready" is the tap -> READY time.
     LaunchedEffect(video.id) { Log.i(TAG, "timing player screen opened") }
     val episodes by produceState<List<PlaybackEpisode>>(initialValue = emptyList(), key1 = video.pageUrl) {
@@ -391,6 +402,7 @@ internal fun PlayerScreen(
                 currentPositionMs = 0L
                 currentDurationMs = 0L
                 isEpisodePickerVisible = false
+                isFullscreenEpisodesVisible = false
                 val activeDevice = (castState as? CastState.Connected)?.device
                 if (activeDevice != null) {
                     launchCastForUrl(activeDevice, episode.pageUrl, episode.label, 0L)
@@ -398,7 +410,7 @@ internal fun PlayerScreen(
             }
             val handlePlaybackEnded: () -> Unit = {
                 val curNum = selectedEpisode
-                val nextEp = episodes.firstOrNull { it.number == curNum + 1 }
+                val nextEp = episodes.firstOrNull { it.number > curNum }
                 if (nextEp != null) {
                     handleEpisodeSelect(nextEp)
                 }
@@ -417,42 +429,6 @@ internal fun PlayerScreen(
                     modifier = Modifier.size(48.dp),
                 ) {
                     Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
-                }
-            }
-            val topBarRightControls: @Composable () -> Unit = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledIconButton(
-                        onClick = {
-                            AuroraHaptics.tap(haptic)
-                            isCastSheetVisible = true
-                        },
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = if (isCasting) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.56f),
-                            contentColor = if (isCasting) MaterialTheme.colorScheme.onPrimary else Color.White,
-                        ),
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
-                            contentDescription = if (isCasting) "投屏中" else "投屏",
-                        )
-                    }
-                    FilledIconButton(
-                        onClick = {
-                            AuroraHaptics.tap(haptic)
-                            onFullscreenChange(true)
-                        },
-                        colors = IconButtonDefaults.filledIconButtonColors(
-                            containerColor = Color.Black.copy(alpha = 0.56f),
-                            contentColor = Color.White,
-                        ),
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            Icons.Default.Fullscreen,
-                            contentDescription = "全屏播放",
-                        )
-                    }
                 }
             }
 
@@ -488,16 +464,11 @@ internal fun PlayerScreen(
                             selectedEpisode = selectedEpisode,
                             currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
                             isEpisodePickerVisible = isEpisodePickerVisible,
-                            isCasting = isCasting,
                             onFavorite = {
                                 AuroraHaptics.toggle(haptic, !isFavorite)
                                 onFavorite()
                             },
                             onCache = onCache,
-                            onCast = {
-                                AuroraHaptics.tap(haptic)
-                                isCastSheetVisible = true
-                            },
                             onToggleEpisodes = {
                                 AuroraHaptics.tap(haptic)
                                 isEpisodePickerVisible = !isEpisodePickerVisible
@@ -594,6 +565,20 @@ internal fun PlayerScreen(
                 isFullscreen = isFullscreen,
                 onFullscreenChange = onFullscreenChange,
                 onVideoOrientationChange = onVideoOrientationChange,
+                title = video.title,
+                episodeLabel = selectedEpisodeLabel,
+                hasEpisodes = episodes.size > 1,
+                hasNextEpisode = nextEpisode != null,
+                isCasting = isCasting,
+                onOpenCast = { isCastSheetVisible = true },
+                onOpenEpisodes = if (episodes.size > 1) {
+                    { isFullscreenEpisodesVisible = true }
+                } else {
+                    null
+                },
+                onNextEpisode = nextEpisode?.let { ep ->
+                    { handleEpisodeSelect(ep) }
+                },
                 onVideoAspectRatioChange = { videoAspectRatio = it },
                 onPositionChange = { currentPositionMs = it },
                 onDurationChange = { currentDurationMs = it },
@@ -602,7 +587,6 @@ internal fun PlayerScreen(
                 keepTopBarVisible = !isFullscreen && !isInPipMode && isCasting,
                 suppressPlayback = suppressPlayback,
                 topBarStart = topBarBackButton,
-                topBarEnd = topBarRightControls,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .then(
@@ -648,6 +632,15 @@ internal fun PlayerScreen(
                         isCastSheetVisible = false
                         launchCastForUrl(device, playbackUrl, selectedEpisodeLabel, currentPositionMs)
                     },
+                )
+            }
+
+            if (isFullscreen && isFullscreenEpisodesVisible && episodes.size > 1 && !isInPipMode) {
+                FullscreenEpisodeSheet(
+                    episodes = episodes,
+                    selectedEpisode = selectedEpisode,
+                    onSelect = handleEpisodeSelect,
+                    onDismiss = { isFullscreenEpisodesVisible = false },
                 )
             }
         }
@@ -741,6 +734,77 @@ private fun FloatingCastStatusBanner(
 }
 
 @Composable
+private fun FullscreenEpisodeSheet(
+    episodes: List<PlaybackEpisode>,
+    selectedEpisode: Int,
+    onSelect: (PlaybackEpisode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = AuroraInkSurface,
+        contentColor = Color.White,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.36f)) },
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+        ) {
+            Text(
+                text = "选集 (${selectedEpisode}/${episodes.size})",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+            )
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 104.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp),
+            ) {
+                gridItems(episodes, key = { it.pageUrl }) { episode ->
+                    val selected = episode.number == selectedEpisode
+                    Surface(
+                        onClick = { onSelect(episode) },
+                        shape = MaterialTheme.shapes.medium,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            Color.White.copy(alpha = 0.12f)
+                        },
+                        contentColor = if (selected) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            Color.White
+                        },
+                        modifier = Modifier.heightIn(min = 48.dp),
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                        ) {
+                            Text(
+                                text = episode.label.ifBlank { "第 ${episode.number} 集" },
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun PlayerDetails(
     video: VideoItem,
     isFavorite: Boolean,
@@ -750,10 +814,8 @@ private fun PlayerDetails(
     selectedEpisode: Int,
     currentEpisodeProgress: Float,
     isEpisodePickerVisible: Boolean,
-    isCasting: Boolean,
     onFavorite: () -> Unit,
     onCache: () -> Unit,
-    onCast: () -> Unit,
     onToggleEpisodes: () -> Unit,
     onEpisode: (PlaybackEpisode) -> Unit,
 ) {
@@ -872,17 +934,6 @@ private fun PlayerDetails(
                     OfflineCacheState.FAILED -> Icon(Icons.Default.Refresh, contentDescription = null)
                     null -> Icon(Icons.Default.Download, contentDescription = null)
                 }
-            }
-            PlayerActionButton(
-                label = if (isCasting) "投屏中" else "投屏",
-                selected = isCasting,
-                onClick = onCast,
-                modifier = Modifier.weight(1f),
-            ) {
-                Icon(
-                    imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
-                    contentDescription = null,
-                )
             }
             if (episodes.size > 1) {
                 PlayerActionButton(

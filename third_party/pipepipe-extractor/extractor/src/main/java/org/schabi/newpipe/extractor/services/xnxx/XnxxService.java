@@ -171,7 +171,7 @@ final class XnxxKioskExtractor extends KioskExtractor<org.schabi.newpipe.extract
             throws ExtractionException {
         if (document == null) throw new ParsingException("XNXX kiosk page was not fetched");
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-        for (final XnxxItem item : XnxxParser.cards(document, 48)) {
+        for (final XnxxItem item : XnxxParser.cards(document, 120)) {
             collector.commit(new XnxxItemExtractor(item));
         }
         Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document);
@@ -195,7 +195,8 @@ final class XnxxKioskExtractor extends KioskExtractor<org.schabi.newpipe.extract
         return new InfoItemsPage<>(collector, next);
     }
     @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
-        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new ParsingException("Invalid next page");
         }
         document = XnxxParser.fetch(page.getUrl());

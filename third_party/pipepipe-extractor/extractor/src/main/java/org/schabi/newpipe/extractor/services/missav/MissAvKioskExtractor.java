@@ -50,6 +50,14 @@ public final class MissAvKioskExtractor extends KioskExtractor<StreamInfoItem> {
     public InfoItemsPage<StreamInfoItem> getInitialPage()
             throws IOException, ExtractionException {
         assertPageFetched();
+        return extractCurrentDocument();
+    }
+
+    private InfoItemsPage<StreamInfoItem> extractCurrentDocument()
+            throws IOException, ExtractionException {
+        if (document == null) {
+            throw new org.schabi.newpipe.extractor.exceptions.ParsingException("MissAV kiosk page was not fetched");
+        }
         final StreamInfoItemsCollector collector =
                 new StreamInfoItemsCollector(getServiceId());
         for (final Element link : document.select("a[href*=/" + MissAvParsingHelper.DEFAULT_LANGUAGE
@@ -66,10 +74,11 @@ public final class MissAvKioskExtractor extends KioskExtractor<StreamInfoItem> {
     @Override
     public InfoItemsPage<StreamInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
-        if (page == null || !HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new org.schabi.newpipe.extractor.exceptions.ParsingException("Invalid next page");
         }
         document = MissAvParsingHelper.fetchDocument(page.getUrl());
-        return getInitialPage();
+        return extractCurrentDocument();
     }
 }

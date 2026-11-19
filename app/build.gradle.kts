@@ -22,8 +22,8 @@ android {
         applicationId = "com.aurorashelf.app"
         minSdk = 26
         targetSdk = 37
-        versionCode = 274
-        versionName = "2.18.0"
+        versionCode = 275
+        versionName = "2.19.0"
         buildConfigField("String", "AUTH_API_BASE_URL", "\"https://bananarey.us/auth-api\"")
 
         buildConfigField("String", "PICACG_API_KEY", sourceSecret("PICACG_API_KEY").asBuildConfigString())
@@ -139,10 +139,10 @@ dependencies {
     implementation("androidx.webkit:webkit:1.18.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.0")
-    // 100% Native Google Material 3 Expressive (MotionScheme, MaterialExpressiveTheme,
+    // 100% Native Google Material 3 Expressive 1.5.0 GA (MotionScheme, MaterialExpressiveTheme,
     // ShortNavigationBar, WideNavigationRail, LoadingIndicator, WavyProgressIndicator,
     // FloatingToolbar, ButtonGroup / ToggleButton) + Adaptive WindowSizeClass
-    implementation("androidx.compose.material3:material3:1.5.0-rc01")
+    implementation("androidx.compose.material3:material3:1.5.0")
     implementation("androidx.compose.material3.adaptive:adaptive:1.3.0")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")

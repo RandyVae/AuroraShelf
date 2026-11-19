@@ -45,6 +45,7 @@ data class AuroraUiState(
     val selectedVideo: VideoItem? = null,
     val isSearchOpen: Boolean = false,
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
     val canLoadMore: Boolean = true,
     val loadMoreError: String? = null,
@@ -54,7 +55,9 @@ data class AuroraUiState(
 class AuroraViewModel(application: Application) : AndroidViewModel(application) {
     private val preferences = AppPreferences.get(application)
     private val repository = VideoRepository()
-    private var feedJob: Job? = null
+    private var refreshJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var feedGeneration: Long = 0L
     private var searchJob: Job? = null
     private var searchGeneration: Long = 0L
     private var nextPage = 1
@@ -370,16 +373,26 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
 
     fun refresh() {
         val snapshot = _uiState.value
-        feedJob?.cancel()
-        nextPage = 1
+        refreshJob?.cancel()
+        loadMoreJob?.cancel()
+        val gen = ++feedGeneration
+        nextPage = if (snapshot.videos.isNotEmpty()) 2 else 1
         val startedAt = System.currentTimeMillis()
-        feedJob = viewModelScope.launch {
+        refreshJob = viewModelScope.launch {
             _uiState.update {
-                // 若当前已有 SWR 缓存内容，保持静默后台刷新而不清空首屏
-                it.copy(isLoading = it.videos.isEmpty(), isLoadingMore = false, canLoadMore = true, message = null)
+                // 若当前已有 SWR 缓存内容，保持静默后台刷新而不清空首屏，同时用 isRefreshing 阻断 frame-1 并发翻页竞争
+                it.copy(
+                    isLoading = it.videos.isEmpty(),
+                    isRefreshing = true,
+                    isLoadingMore = false,
+                    canLoadMore = true,
+                    loadMoreError = null,
+                    message = null,
+                )
             }
             runCatching { repository.loadFeed(snapshot.sourceUrl, snapshot.category, page = 1) }
                 .onSuccess { videos ->
+                    if (feedGeneration != gen) return@onSuccess
                     nextPage = 2
                     SourceSnapshotStore.putVideoFeed(snapshot.sourceUrl, snapshot.category.cacheKey, videos)
                     preferences.saveFeedCache(snapshot.sourceUrl, snapshot.category.cacheKey, videos)
@@ -396,20 +409,25 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
                             videos = videos,
                             allKnownVideos = capKnownVideos(videos, it.allKnownVideos, preferences.savedVideos()),
                             isLoading = false,
+                            isRefreshing = false,
                             canLoadMore = videos.isNotEmpty(),
+                            loadMoreError = null,
                             message = null,
                         )
                     }
                 }
                 .onFailure { error ->
                     if (error is CancellationException) throw error
+                    if (feedGeneration != gen) return@onFailure
                     val staleFallback = SourceSnapshotStore.getVideoFeed(snapshot.sourceUrl, snapshot.category.cacheKey)?.items.orEmpty()
                     _uiState.update {
                         val retainedVideos = if (it.videos.isNotEmpty()) it.videos else staleFallback
+                        if (retainedVideos.isNotEmpty()) nextPage = nextPage.coerceAtLeast(2)
                         it.copy(
                             videos = retainedVideos,
                             isLoading = false,
-                            canLoadMore = if (retainedVideos.isNotEmpty()) it.canLoadMore else false,
+                            isRefreshing = false,
+                            canLoadMore = retainedVideos.isNotEmpty(),
                             loadMoreError = null,
                             message = if (retainedVideos.isNotEmpty()) null else VideoRepository.friendlyLoadErrorMessage(error, "内容加载失败，请稍后重试。"),
                         )
@@ -420,31 +438,64 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
 
     fun loadMore() {
         val snapshot = _uiState.value
-        if (snapshot.isLoading || snapshot.isLoadingMore || !snapshot.canLoadMore) return
-        val requestedPage = nextPage
-        feedJob = viewModelScope.launch {
+        if (snapshot.isLoading || snapshot.isRefreshing || snapshot.isLoadingMore || !snapshot.canLoadMore || refreshJob?.isActive == true) return
+        val gen = feedGeneration
+        val startPage = nextPage.coerceAtLeast(2)
+        loadMoreJob?.cancel()
+        loadMoreJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoadingMore = true, loadMoreError = null, message = null) }
             runCatching {
-                repository.loadFeed(snapshot.sourceUrl, snapshot.category, page = requestedPage)
-            }.onSuccess { pageVideos ->
-                prefetchCovers(pageVideos)
-                _uiState.update { current ->
+                var requestedPage = startPage
+                var overlapRetries = 0
+                var lastRawSize = 0
+                var collectedNew: List<VideoItem> = emptyList()
+                // Tolerate up to MAX_CONSECUTIVE_OVERLAP_PAGES consecutive overlapping pages (e.g. pinned
+                // or rolling hot videos) so infinite scroll never terminates prematurely after 1 duplicate page.
+                while (overlapRetries < MAX_CONSECUTIVE_OVERLAP_PAGES) {
+                    val pageVideos = repository.loadFeed(snapshot.sourceUrl, snapshot.category, page = requestedPage)
+                    lastRawSize = pageVideos.size
                     if (pageVideos.isEmpty()) {
-                        return@update current.copy(isLoadingMore = false, canLoadMore = false, loadMoreError = null, message = null)
+                        break
                     }
-                    // The site can repeat pinned videos across pages. Only new IDs extend the feed.
-                    val newVideos = distinctNewVideos(current.videos, pageVideos)
-                    if (newVideos.isNotEmpty()) nextPage = requestedPage + 1
+                    val currentExisting = _uiState.value.videos
+                    val fresh = distinctNewVideos(currentExisting, pageVideos)
+                    if (fresh.isNotEmpty()) {
+                        collectedNew = fresh
+                        nextPage = requestedPage + 1
+                        break
+                    }
+                    requestedPage++
+                    nextPage = requestedPage
+                    overlapRetries++
+                }
+                Triple(collectedNew, lastRawSize, requestedPage)
+            }.onSuccess { (newVideos, lastRawSize, _) ->
+                if (feedGeneration != gen) return@onSuccess
+                if (newVideos.isNotEmpty()) {
+                    prefetchCovers(newVideos)
+                }
+                _uiState.update { current ->
+                    if (feedGeneration != gen) return@update current
+                    if (newVideos.isEmpty()) {
+                        return@update current.copy(
+                            isLoadingMore = false,
+                            canLoadMore = false,
+                            loadMoreError = null,
+                            message = null,
+                        )
+                    }
+                    val dedupedNew = distinctNewVideos(current.videos, newVideos)
                     current.copy(
-                        videos = current.videos + newVideos,
-                        allKnownVideos = capKnownVideos(newVideos, current.allKnownVideos, preferences.savedVideos()),
+                        videos = current.videos + dedupedNew,
+                        allKnownVideos = capKnownVideos(dedupedNew, current.allKnownVideos, preferences.savedVideos()),
                         isLoadingMore = false,
-                        canLoadMore = newVideos.isNotEmpty(),
+                        canLoadMore = lastRawSize > 0,
                         loadMoreError = null,
                     )
                 }
             }.onFailure { error ->
                 if (error is CancellationException) throw error
+                if (feedGeneration != gen) return@onFailure
                 _uiState.update {
                     it.copy(
                         isLoadingMore = false,
@@ -471,7 +522,8 @@ class AuroraViewModel(application: Application) : AndroidViewModel(application) 
 
         /** One detail prefetch per page per cache window keeps repeated refreshes cheap. */
         private const val DETAIL_PREFETCH_DEDUPE_MS = 60_000L
-        private const val MAX_KNOWN_VIDEOS = 500
+        private const val MAX_KNOWN_VIDEOS = 2_000
+        internal const val MAX_CONSECUTIVE_OVERLAP_PAGES = 3
 
         /** Process-wide de-duplication for detail-page prefetches triggered by feed refreshes. */
         private val recentDetailPrefetches = java.util.Collections.synchronizedMap(

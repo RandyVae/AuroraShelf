@@ -123,7 +123,7 @@ final class XHamsterKiosk extends KioskExtractor<StreamInfoItem> {
     @Nonnull @Override public InfoItemsPage<StreamInfoItem> getInitialPage()throws ExtractionException{
         if(page==null)throw new ParsingException("xHamster kiosk page was not fetched");
         StreamInfoItemsCollector out=new StreamInfoItemsCollector(getServiceId());
-        for(XHamsterItem i:XHamsterParser.cards(page,54))out.commit(new XHamsterItemExtractor(i));
+        for(XHamsterItem i:XHamsterParser.cards(page,120))out.commit(new XHamsterItemExtractor(i));
         Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(page);
         if (next == null && !out.getItems().isEmpty()) {
             final Matcher matcher = Pattern.compile("/(best|newest|4k|hd|full-length|subtitles)(?:/(\\d+))?/?$").matcher(page.location());
@@ -135,7 +135,8 @@ final class XHamsterKiosk extends KioskExtractor<StreamInfoItem> {
         return new InfoItemsPage<>(out, next);
     }
     @Override public InfoItemsPage<StreamInfoItem> getPage(Page p) throws IOException, ExtractionException {
-        if (p == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(page.location(), p.getUrl())) {
+        final String base = page != null ? page.location() : getUrl();
+        if (p == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(base, p.getUrl())) {
             throw new ParsingException("Invalid next page");
         }
         page = XHamsterParser.fetch(p.getUrl());

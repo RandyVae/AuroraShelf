@@ -27,25 +27,35 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.CastConnected
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureInPictureAlt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
+import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -56,6 +66,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -71,9 +82,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -107,7 +118,6 @@ import com.aurorashelf.app.data.PlaybackResolver
 import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.data.playback.ResilientHttpDataSourceFactory
 import com.aurorashelf.app.data.playback.ResilientLoadErrorHandlingPolicy
-import com.aurorashelf.app.ui.theme.AuroraCoral
 import com.aurorashelf.app.ui.theme.AuroraHaptics
 import com.aurorashelf.app.ui.theme.AuroraInkSurface
 import com.aurorashelf.app.ui.theme.AuroraMediaSurface
@@ -124,6 +134,18 @@ private data class PlayerHudData(
     val id: Long = System.nanoTime(),
 )
 
+private val PLAYER_SPEED_PRESETS = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+
+internal fun formatPlaybackSpeedLabel(speed: Float): String = when (speed) {
+    0.5f -> "0.5x"
+    0.75f -> "0.75x"
+    1.0f -> "1.0x"
+    1.25f -> "1.25x"
+    1.5f -> "1.5x"
+    2.0f -> "2.0x"
+    else -> "${speed}x"
+}
+
 /** Native playback of the site's published MP4/HLS source, with no sample-content fallback. */
 @androidx.annotation.OptIn(UnstableApi::class)
 @Composable
@@ -133,6 +155,14 @@ internal fun NativeSitePlayer(
     onFullscreenChange: (Boolean) -> Unit,
     onVideoOrientationChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    title: String = "",
+    episodeLabel: String? = null,
+    hasEpisodes: Boolean = false,
+    hasNextEpisode: Boolean = false,
+    isCasting: Boolean = false,
+    onOpenCast: (() -> Unit)? = null,
+    onOpenEpisodes: (() -> Unit)? = null,
+    onNextEpisode: (() -> Unit)? = null,
     onVideoAspectRatioChange: (Float) -> Unit = {},
     onPositionChange: (Long) -> Unit = {},
     onDurationChange: (Long) -> Unit = {},
@@ -188,8 +218,13 @@ internal fun NativeSitePlayer(
     var isPlaying by remember(pageUrl) { mutableStateOf(true) }
     var isScrubbing by remember(pageUrl) { mutableStateOf(false) }
     var isFillMode by rememberSaveable(pageUrl) { mutableStateOf(false) }
+    var isMuted by rememberSaveable(pageUrl) { mutableStateOf(false) }
     var showRemainingTime by rememberSaveable { mutableStateOf(true) }
     var playbackSpeed by rememberSaveable(pageUrl) { mutableFloatStateOf(1.0f) }
+    var isLongPressBoostActive by remember(pageUrl) { mutableStateOf(false) }
+    var isScreenLocked by remember(pageUrl) { mutableStateOf(false) }
+    var isLockOverlayVisible by remember(pageUrl) { mutableStateOf(false) }
+    var isSettingsSheetVisible by remember(pageUrl) { mutableStateOf(false) }
     var speedMenuExpanded by remember(pageUrl) { mutableStateOf(false) }
     var controlInteractionTick by remember(pageUrl) { mutableIntStateOf(0) }
     var hudState by remember(pageUrl) { mutableStateOf<PlayerHudData?>(null) }
@@ -212,17 +247,55 @@ internal fun NativeSitePlayer(
     val controllerVisibilityChange by rememberUpdatedState(onControllerVisibilityChange)
     val playbackEndedChange by rememberUpdatedState(onPlaybackEnded)
 
+    LaunchedEffect(player, playbackSpeed, isLongPressBoostActive) {
+        player.setPlaybackSpeed(if (isLongPressBoostActive) 2.0f else playbackSpeed)
+    }
+
+    LaunchedEffect(player, isMuted) {
+        player.volume = if (isMuted) 0f else 1f
+    }
+
     LaunchedEffect(isControllerVisible) {
         controllerVisibilityChange(isControllerVisible)
     }
 
     LaunchedEffect(isFullscreen) {
+        if (!isFullscreen) {
+            isScreenLocked = false
+            isLockOverlayVisible = false
+        }
+        isLongPressBoostActive = false
         isControllerVisible = true
         controlInteractionTick++
     }
 
-    LaunchedEffect(isControllerVisible, isPlaying, isScrubbing, subtitleMenuExpanded, speedMenuExpanded, controlInteractionTick) {
-        if (isControllerVisible && isPlaying && !isScrubbing && !subtitleMenuExpanded && !speedMenuExpanded) {
+    LaunchedEffect(isScreenLocked, isLockOverlayVisible) {
+        if (isScreenLocked && isLockOverlayVisible) {
+            delay(3_000L)
+            isLockOverlayVisible = false
+        }
+    }
+
+    LaunchedEffect(
+        isControllerVisible,
+        isPlaying,
+        isScrubbing,
+        isSettingsSheetVisible,
+        subtitleMenuExpanded,
+        speedMenuExpanded,
+        isScreenLocked,
+        isLongPressBoostActive,
+        controlInteractionTick,
+    ) {
+        if (isControllerVisible &&
+            isPlaying &&
+            !isScrubbing &&
+            !isSettingsSheetVisible &&
+            !subtitleMenuExpanded &&
+            !speedMenuExpanded &&
+            !isScreenLocked &&
+            !isLongPressBoostActive
+        ) {
             delay(3_500L)
             isControllerVisible = false
         }
@@ -574,16 +647,54 @@ internal fun NativeSitePlayer(
         controlInteractionTick++
     }
 
+    fun togglePlayPause(showFeedback: Boolean = false) {
+        val nextPlaying = !player.isPlaying
+        AuroraHaptics.toggle(haptic, nextPlaying)
+        if (player.isPlaying) {
+            player.pause()
+            isPlaying = false
+            if (showFeedback) showHud(Icons.Filled.Pause, "已暂停")
+        } else {
+            player.play()
+            isPlaying = true
+            if (showFeedback) showHud(Icons.Filled.PlayArrow, "继续播放")
+        }
+        controlInteractionTick++
+    }
+
     fun toggleFillMode() {
         isFillMode = !isFillMode
         showHud(
             icon = Icons.Default.AspectRatio,
-            text = if (isFillMode) "填满屏幕" else "适合屏幕",
+            text = if (isFillMode) "填满屏幕" else "适应屏幕",
         )
         controlInteractionTick++
     }
 
-    BackHandler(isFullscreen) { fullscreenChange(false) }
+    fun toggleMute() {
+        isMuted = !isMuted
+        AuroraHaptics.toggle(haptic, !isMuted)
+        showHud(
+            icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+            text = if (isMuted) "已静音" else "已恢复声音",
+        )
+        controlInteractionTick++
+    }
+
+    fun applyPlaybackSpeed(speed: Float) {
+        playbackSpeed = speed
+        player.setPlaybackSpeed(speed)
+        showHud(Icons.Default.Speed, "${formatPlaybackSpeedLabel(speed)} 倍速")
+        controlInteractionTick++
+    }
+
+    BackHandler(isFullscreen) {
+        if (isScreenLocked) {
+            isLockOverlayVisible = true
+        } else {
+            fullscreenChange(false)
+        }
+    }
     Box(
         modifier = modifier
             .onGloballyPositioned { coords ->
@@ -599,48 +710,91 @@ internal fun NativeSitePlayer(
                 }
             }
             .background(Color.Black)
-            .pointerInput(pageUrl, isFullscreen) {
+            .pointerInput(pageUrl, isFullscreen, isScreenLocked) {
                 val doubleTapTimeout = viewConfiguration.doubleTapTimeoutMillis
+                val longPressTimeout = viewConfiguration.longPressTimeoutMillis.coerceAtLeast(380L)
                 var lastTapMs = 0L
                 var lastTapOffset = Offset.Zero
                 var visibilityBeforeFirstTap = isControllerVisible
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = true)
-                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
-                    if (up.isConsumed) return@awaitEachGesture
-                    if ((up.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                    var cancelledOrMoved = false
+                    var upBeforeLongPress: PointerInputChange? = null
+                    withTimeoutOrNull(longPressTimeout) {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id }
+                            if (change == null || change.isConsumed) {
+                                cancelledOrMoved = true
+                                break
+                            }
+                            if (!change.pressed) {
+                                upBeforeLongPress = change
+                                break
+                            }
+                            if ((change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+                                cancelledOrMoved = true
+                                break
+                            }
+                        }
+                    }
+                    val releasedChange = upBeforeLongPress
+                    if (releasedChange == null) {
+                        if (!cancelledOrMoved && !isScreenLocked && player.isPlaying && error == null && !isLoading) {
+                            isLongPressBoostActive = true
+                            AuroraHaptics.segmentTick(haptic)
+                            try {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull { it.id == down.id }
+                                    if (change == null || !change.pressed) {
+                                        change?.consume()
+                                        break
+                                    }
+                                    change.consume()
+                                }
+                            } finally {
+                                isLongPressBoostActive = false
+                            }
+                        }
                         return@awaitEachGesture
                     }
-                    up.consume()
+                    releasedChange.consume()
+                    if (isScreenLocked) {
+                        isLockOverlayVisible = !isLockOverlayVisible
+                        return@awaitEachGesture
+                    }
                     val now = android.os.SystemClock.uptimeMillis()
                     val isDoubleTap = (now - lastTapMs) <= doubleTapTimeout &&
-                        (up.position - lastTapOffset).getDistance() <= viewConfiguration.touchSlop * 4f
+                        (releasedChange.position - lastTapOffset).getDistance() <= viewConfiguration.touchSlop * 4f
                     if (isDoubleTap) {
                         lastTapMs = 0L
                         isControllerVisible = visibilityBeforeFirstTap
                         val w = size.width.toFloat().coerceAtLeast(1f)
                         when {
-                            up.position.x < w * 0.35f -> {
+                            releasedChange.position.x < w * 0.35f -> {
+                                AuroraHaptics.segmentTick(haptic)
                                 seekRelative(-10_000L)
                                 showHud(Icons.Default.Replay10, "快退 10 秒")
                             }
-                            up.position.x > w * 0.65f -> {
+                            releasedChange.position.x > w * 0.65f -> {
+                                AuroraHaptics.segmentTick(haptic)
                                 seekRelative(10_000L)
                                 showHud(Icons.Default.Forward10, "快进 10 秒")
                             }
-                            else -> toggleFillMode()
+                            else -> togglePlayPause(showFeedback = true)
                         }
                     } else {
                         visibilityBeforeFirstTap = isControllerVisible
                         isControllerVisible = !isControllerVisible
                         controlInteractionTick++
                         lastTapMs = now
-                        lastTapOffset = up.position
+                        lastTapOffset = releasedChange.position
                     }
                 }
             }
-            .pointerInput(pageUrl, isFullscreen) {
-                if (!isFullscreen) return@pointerInput
+            .pointerInput(pageUrl, isFullscreen, isScreenLocked) {
+                if (!isFullscreen || isScreenLocked) return@pointerInput
                 var gestureSide = 0 // 1 = left (brightness), 2 = right (volume)
                 var accumDeltaY = 0f
                 var initialFraction = 0.5f
@@ -742,22 +896,37 @@ internal fun NativeSitePlayer(
             }
         }
         error?.let { message ->
-            Column(Modifier.align(Alignment.Center).background(Color.Black).padding(24.dp)) {
-                Text(message, color = Color.White)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .clip(MaterialTheme.shapes.large)
+                    .background(AuroraInkSurface.copy(alpha = 0.90f))
+                    .padding(horizontal = 24.dp, vertical = 18.dp),
+            ) {
+                Text(
+                    text = message,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
                 if (offlineVideo == null) {
-                    TextButton(onClick = {
-                        AuroraHaptics.tap(haptic)
-                        shouldResume = true
-                        recoveryStage = 1
-                        attempt++
-                    }) { Text("重新解析并播放") }
+                    FilledTonalButton(
+                        onClick = {
+                            AuroraHaptics.tap(haptic)
+                            shouldResume = true
+                            recoveryStage = 1
+                            attempt++
+                        },
+                        shape = CircleShape,
+                    ) { Text("重新解析并播放") }
                 }
             }
         }
 
-        // Material 3 Expressive 顶部控制栏
+        // Material 3 Expressive 顶部控制栏（零重复：返回/标题 + 锁屏[全屏] + 投屏 + 画中画 + 播放设置）
         AnimatedVisibility(
-            visible = !isInPipMode && (isControllerVisible || keepTopBarVisible || error != null),
+            visible = !isInPipMode && !isScreenLocked && (isControllerVisible || keepTopBarVisible || error != null),
             enter = fadeIn(AuroraMotion.fastEffects()),
             exit = fadeOut(AuroraMotion.fastEffects()),
             modifier = Modifier.fillMaxSize(),
@@ -767,11 +936,11 @@ internal fun NativeSitePlayer(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(if (isFullscreen) 96.dp else 72.dp)
+                            .height(if (isFullscreen) 104.dp else 72.dp)
                             .align(Alignment.TopCenter)
                             .background(
                                 Brush.verticalGradient(
-                                    listOf(Color.Black.copy(alpha = 0.76f), Color.Transparent),
+                                    listOf(Color.Black.copy(alpha = 0.78f), Color.Transparent),
                                 ),
                             ),
                     )
@@ -783,9 +952,15 @@ internal fun NativeSitePlayer(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .padding(
-                            horizontal = if (isFullscreen) 16.dp else 10.dp,
-                            vertical = 8.dp,
+                        .then(
+                            if (isFullscreen) {
+                                Modifier
+                                    .statusBarsPadding()
+                                    .displayCutoutPadding()
+                                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                            } else {
+                                Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                            },
                         ),
                 ) {
                     if (isFullscreen) {
@@ -801,143 +976,86 @@ internal fun NativeSitePlayer(
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "退出全屏",
                             )
                         }
+                        if (title.isNotBlank()) {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(1.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 4.dp),
+                            ) {
+                                Text(
+                                    text = title,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                if (!episodeLabel.isNullOrBlank()) {
+                                    Text(
+                                        text = episodeLabel,
+                                        color = Color.White.copy(alpha = 0.78f),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            }
+                        } else {
+                            Spacer(Modifier.weight(1f))
+                        }
                     } else {
                         topBarStart?.invoke()
+                        Spacer(Modifier.weight(1f))
                     }
 
-                    Spacer(Modifier.weight(1f))
+                    if (isFullscreen && isControllerVisible && error == null) {
+                        FilledTonalIconButton(
+                            onClick = {
+                                AuroraHaptics.toggle(haptic, true)
+                                isScreenLocked = true
+                                isControllerVisible = false
+                                isLockOverlayVisible = true
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
+                                contentColor = Color.White,
+                            ),
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LockOpen,
+                                contentDescription = "锁定屏幕",
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+
+                    if (onOpenCast != null && (isControllerVisible || keepTopBarVisible)) {
+                        FilledTonalIconButton(
+                            onClick = {
+                                AuroraHaptics.tap(haptic)
+                                controlInteractionTick++
+                                onOpenCast()
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = if (isCasting) MaterialTheme.colorScheme.primary else AuroraMediaSurface.copy(alpha = 0.76f),
+                                contentColor = if (isCasting) MaterialTheme.colorScheme.onPrimary else Color.White,
+                            ),
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
+                                contentDescription = if (isCasting) "投屏中" else "投屏",
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
 
                     if (isControllerVisible && error == null) {
-                        // 倍速选择胶囊（0.5x ~ 2.0x）
-                        Box {
-                            Surface(
-                                onClick = {
-                                    AuroraHaptics.tap(haptic)
-                                    speedMenuExpanded = true
-                                    controlInteractionTick++
-                                },
-                                shape = CircleShape,
-                                color = AuroraMediaSurface.copy(alpha = 0.76f),
-                                contentColor = Color.White,
-                                modifier = Modifier
-                                    .minimumInteractiveComponentSize()
-                                    .height(40.dp),
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.padding(horizontal = 14.dp),
-                                ) {
-                                    Text(
-                                        text = if (playbackSpeed == 1.0f) "1.0x" else "${playbackSpeed}x",
-                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = Color.White,
-                                    )
-                                }
-                            }
-                            DropdownMenu(
-                                expanded = speedMenuExpanded,
-                                onDismissRequest = { speedMenuExpanded = false },
-                                containerColor = AuroraInkSurface,
-                            ) {
-                                listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                if (speed == 1.0f) "正常 (1.0x)" else "${speed}x",
-                                                color = Color.White,
-                                            )
-                                        },
-                                        trailingIcon = {
-                                            if (playbackSpeed == speed) {
-                                                Icon(
-                                                    Icons.Default.Check,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                )
-                                            }
-                                        },
-                                        onClick = {
-                                            AuroraHaptics.segmentTick(haptic)
-                                            speedMenuExpanded = false
-                                            playbackSpeed = speed
-                                            player.setPlaybackSpeed(speed)
-                                            showHud(Icons.Default.Speed, "${speed}x 倍速")
-                                            controlInteractionTick++
-                                        },
-                                    )
-                                }
-                            }
-                        }
-
-                        if (subtitleOptions.isNotEmpty()) {
-                            Box {
-                                FilledTonalIconButton(
-                                    onClick = {
-                                        AuroraHaptics.tap(haptic)
-                                        subtitleMenuExpanded = true
-                                        controlInteractionTick++
-                                    },
-                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
-                                        contentColor = Color.White,
-                                    ),
-                                    modifier = Modifier.size(48.dp),
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Subtitles,
-                                        contentDescription = "字幕",
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = subtitleMenuExpanded,
-                                    onDismissRequest = { subtitleMenuExpanded = false },
-                                    containerColor = AuroraInkSurface,
-                                ) {
-                                    DropdownMenuItem(
-                                        text = { Text("关闭字幕", color = Color.White) },
-                                        trailingIcon = {
-                                            if (subtitleOptions.none { it.selected }) {
-                                                Icon(
-                                                    Icons.Default.Check,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                )
-                                            }
-                                        },
-                                        onClick = {
-                                            AuroraHaptics.toggle(haptic, false)
-                                            subtitleMenuExpanded = false
-                                            setSubtitlesEnabled(false)
-                                        },
-                                    )
-                                    subtitleOptions.forEach { option ->
-                                        DropdownMenuItem(
-                                            text = { Text(option.label, color = Color.White) },
-                                            trailingIcon = {
-                                                if (option.selected) {
-                                                    Icon(
-                                                        Icons.Default.Check,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                    )
-                                                }
-                                            },
-                                            onClick = {
-                                                AuroraHaptics.segmentTick(haptic)
-                                                subtitleMenuExpanded = false
-                                                selectSubtitle(option)
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
                         if (mainActivity?.supportsPip() == true && !isInPipMode) {
                             FilledTonalIconButton(
                                 onClick = {
@@ -962,24 +1080,32 @@ internal fun NativeSitePlayer(
                             }
                         }
 
-                        if (isFullscreen) {
-                            FilledTonalIconButton(
-                                onClick = {
-                                    AuroraHaptics.toggle(haptic, !isFillMode)
-                                    toggleFillMode()
+                        val hasActiveCustomSetting = playbackSpeed != 1.0f || isFillMode || isMuted
+                        FilledTonalIconButton(
+                            onClick = {
+                                AuroraHaptics.tap(haptic)
+                                isSettingsSheetVisible = true
+                                controlInteractionTick++
+                            },
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = if (hasActiveCustomSetting) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f)
+                                } else {
+                                    AuroraMediaSurface.copy(alpha = 0.76f)
                                 },
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
-                                    contentColor = Color.White,
-                                ),
-                                modifier = Modifier.size(48.dp),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AspectRatio,
-                                    contentDescription = if (isFillMode) "适合屏幕" else "填满屏幕",
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
+                                contentColor = if (hasActiveCustomSetting) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    Color.White
+                                },
+                            ),
+                            modifier = Modifier.size(48.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = "播放设置",
+                                modifier = Modifier.size(20.dp),
+                            )
                         }
                     }
 
@@ -990,9 +1116,9 @@ internal fun NativeSitePlayer(
             }
         }
 
-        // Material 3 Expressive 播放中枢控制与弹性时间轴
+        // Material 3 Expressive 播放中枢控制与底栏（全屏/小窗全屏键永远固定于右下角）
         AnimatedVisibility(
-            visible = !isInPipMode && isControllerVisible && error == null,
+            visible = !isInPipMode && !isScreenLocked && (isControllerVisible || error != null),
             enter = fadeIn(AuroraMotion.fastEffects()),
             exit = fadeOut(AuroraMotion.fastEffects()),
             modifier = Modifier.fillMaxSize(),
@@ -1001,16 +1127,21 @@ internal fun NativeSitePlayer(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (isFullscreen) 116.dp else 84.dp)
+                        .height(if (isFullscreen) 144.dp else 88.dp)
                         .align(Alignment.BottomCenter)
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.84f)),
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.86f)),
                             ),
                         ),
                 )
 
-                if (!isLoading) {
+                if (!isLoading && error == null && isControllerVisible) {
+                    val playCorner by animateDpAsState(
+                        targetValue = if (isPlaying) 20.dp else 32.dp,
+                        animationSpec = AuroraMotion.fastSpatial(),
+                        label = "player-play-corner",
+                    )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(if (isFullscreen) 32.dp else 20.dp),
@@ -1026,7 +1157,7 @@ internal fun NativeSitePlayer(
                                 containerColor = AuroraMediaSurface.copy(alpha = 0.74f),
                                 contentColor = Color.White,
                             ),
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.size(if (isFullscreen) 52.dp else 48.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Replay10,
@@ -1036,19 +1167,8 @@ internal fun NativeSitePlayer(
                         }
 
                         FilledIconButton(
-                            onClick = {
-                                val nextPlaying = !player.isPlaying
-                                AuroraHaptics.toggle(haptic, nextPlaying)
-                                if (player.isPlaying) {
-                                    player.pause()
-                                    isPlaying = false
-                                } else {
-                                    player.play()
-                                    isPlaying = true
-                                }
-                                controlInteractionTick++
-                            },
-                            shape = if (isPlaying) RoundedCornerShape(20.dp) else CircleShape,
+                            onClick = { togglePlayPause(showFeedback = false) },
+                            shape = RoundedCornerShape(playCorner),
                             colors = IconButtonDefaults.filledIconButtonColors(
                                 containerColor = MaterialTheme.colorScheme.primary,
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -1072,7 +1192,7 @@ internal fun NativeSitePlayer(
                                 containerColor = AuroraMediaSurface.copy(alpha = 0.74f),
                                 contentColor = Color.White,
                             ),
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.size(if (isFullscreen) 52.dp else 48.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Forward10,
@@ -1083,80 +1203,322 @@ internal fun NativeSitePlayer(
                     }
                 }
 
-                // 底部 Expressive 时间轴与剩余倒计时控制条
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal = if (isFullscreen) 20.dp else 14.dp,
-                            vertical = if (isFullscreen) 16.dp else 8.dp,
-                        ),
-                ) {
-                    Text(
-                        text = formatPlayerTimecode(currentPositionMs),
-                        color = Color.White,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                    )
-
-                    ExpressiveMediaScrubber(
-                        currentPositionMs = currentPositionMs,
-                        bufferedPositionMs = bufferedPositionMs,
-                        durationMs = durationMs,
-                        onScrubMove = { previewMs ->
-                            isScrubbing = true
-                            currentPositionMs = previewMs
-                        },
-                        onScrubCommit = { targetMs ->
-                            isScrubbing = false
-                            currentPositionMs = targetMs
-                            player.seekTo(targetMs)
-                            controlInteractionTick++
-                        },
+                if (isFullscreen) {
+                    // 全屏两层控制底座：上层时间轴，下层常用控制胶囊 + 右下角退出全屏
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier
-                            .weight(1f)
-                            .height(36.dp),
-                    )
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .displayCutoutPadding()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                    ) {
+                        if (error == null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(
+                                    text = formatPlayerTimecode(currentPositionMs),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Medium,
+                                    ),
+                                )
 
-                    Text(
-                        text = if (showRemainingTime) {
-                            formatRemainingPlayerTimecode(currentPositionMs, durationMs)
+                                ExpressiveMediaScrubber(
+                                    currentPositionMs = currentPositionMs,
+                                    bufferedPositionMs = bufferedPositionMs,
+                                    durationMs = durationMs,
+                                    onScrubMove = { previewMs ->
+                                        isScrubbing = true
+                                        currentPositionMs = previewMs
+                                    },
+                                    onScrubCommit = { targetMs ->
+                                        isScrubbing = false
+                                        currentPositionMs = targetMs
+                                        player.seekTo(targetMs)
+                                        controlInteractionTick++
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(36.dp),
+                                )
+
+                                Text(
+                                    text = if (showRemainingTime) {
+                                        formatRemainingPlayerTimecode(currentPositionMs, durationMs)
+                                    } else {
+                                        formatPlayerTimecode(durationMs)
+                                    },
+                                    color = Color.White.copy(alpha = 0.88f),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Medium,
+                                    ),
+                                    modifier = Modifier.clickable {
+                                        AuroraHaptics.segmentTick(haptic)
+                                        showRemainingTime = !showRemainingTime
+                                        controlInteractionTick++
+                                    },
+                                )
+                            }
+                        }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (error == null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .horizontalScroll(rememberScrollState()),
+                                ) {
+                                    Box {
+                                        PlayerQuickPill(
+                                            label = formatPlaybackSpeedLabel(playbackSpeed),
+                                            icon = Icons.Default.Speed,
+                                            selected = playbackSpeed != 1.0f,
+                                            onClick = {
+                                                AuroraHaptics.tap(haptic)
+                                                speedMenuExpanded = true
+                                                controlInteractionTick++
+                                            },
+                                        )
+                                        DropdownMenu(
+                                            expanded = speedMenuExpanded,
+                                            onDismissRequest = { speedMenuExpanded = false },
+                                            containerColor = AuroraInkSurface,
+                                        ) {
+                                            PLAYER_SPEED_PRESETS.forEach { speed ->
+                                                DropdownMenuItem(
+                                                    text = {
+                                                        Text(
+                                                            if (speed == 1.0f) "正常 (1.0x)" else formatPlaybackSpeedLabel(speed),
+                                                            color = Color.White,
+                                                        )
+                                                    },
+                                                    trailingIcon = {
+                                                        if (playbackSpeed == speed) {
+                                                            Icon(
+                                                                Icons.Default.Check,
+                                                                contentDescription = null,
+                                                                tint = MaterialTheme.colorScheme.primary,
+                                                            )
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        AuroraHaptics.segmentTick(haptic)
+                                                        speedMenuExpanded = false
+                                                        applyPlaybackSpeed(speed)
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    PlayerQuickPill(
+                                        label = if (isFillMode) "填满屏幕" else "适应屏幕",
+                                        icon = Icons.Default.AspectRatio,
+                                        selected = isFillMode,
+                                        onClick = {
+                                            AuroraHaptics.toggle(haptic, !isFillMode)
+                                            toggleFillMode()
+                                        },
+                                    )
+
+                                    PlayerQuickPill(
+                                        label = if (isMuted) "已静音" else "声音",
+                                        icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                                        selected = isMuted,
+                                        onClick = { toggleMute() },
+                                    )
+
+                                    if (subtitleOptions.isNotEmpty()) {
+                                        Box {
+                                            PlayerQuickPill(
+                                                label = "字幕",
+                                                icon = Icons.Default.Subtitles,
+                                                selected = subtitleOptions.any { it.selected },
+                                                onClick = {
+                                                    AuroraHaptics.tap(haptic)
+                                                    subtitleMenuExpanded = true
+                                                    controlInteractionTick++
+                                                },
+                                            )
+                                            DropdownMenu(
+                                                expanded = subtitleMenuExpanded,
+                                                onDismissRequest = { subtitleMenuExpanded = false },
+                                                containerColor = AuroraInkSurface,
+                                            ) {
+                                                DropdownMenuItem(
+                                                    text = { Text("关闭字幕", color = Color.White) },
+                                                    trailingIcon = {
+                                                        if (subtitleOptions.none { it.selected }) {
+                                                            Icon(
+                                                                Icons.Default.Check,
+                                                                contentDescription = null,
+                                                                tint = MaterialTheme.colorScheme.primary,
+                                                            )
+                                                        }
+                                                    },
+                                                    onClick = {
+                                                        AuroraHaptics.toggle(haptic, false)
+                                                        subtitleMenuExpanded = false
+                                                        setSubtitlesEnabled(false)
+                                                    },
+                                                )
+                                                subtitleOptions.forEach { option ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(option.label, color = Color.White) },
+                                                        trailingIcon = {
+                                                            if (option.selected) {
+                                                                Icon(
+                                                                    Icons.Default.Check,
+                                                                    contentDescription = null,
+                                                                    tint = MaterialTheme.colorScheme.primary,
+                                                                )
+                                                            }
+                                                        },
+                                                        onClick = {
+                                                            AuroraHaptics.segmentTick(haptic)
+                                                            subtitleMenuExpanded = false
+                                                            selectSubtitle(option)
+                                                        },
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if (hasEpisodes && onOpenEpisodes != null) {
+                                        PlayerQuickPill(
+                                            label = episodeLabel?.let { "选集 · $it" } ?: "选集",
+                                            icon = Icons.Default.FormatListNumbered,
+                                            selected = false,
+                                            onClick = {
+                                                AuroraHaptics.tap(haptic)
+                                                controlInteractionTick++
+                                                onOpenEpisodes()
+                                            },
+                                        )
+                                    }
+
+                                    if (hasNextEpisode && onNextEpisode != null) {
+                                        PlayerQuickPill(
+                                            label = "下一集",
+                                            icon = Icons.Default.SkipNext,
+                                            selected = false,
+                                            onClick = {
+                                                AuroraHaptics.confirm(haptic)
+                                                controlInteractionTick++
+                                                onNextEpisode()
+                                            },
+                                        )
+                                    }
+                                }
+                            } else {
+                                Spacer(Modifier.weight(1f))
+                            }
+
+                            FilledTonalIconButton(
+                                onClick = {
+                                    AuroraHaptics.tap(haptic)
+                                    fullscreenChange(false)
+                                },
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
+                                    contentColor = Color.White,
+                                ),
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FullscreenExit,
+                                    contentDescription = "退出全屏",
+                                    modifier = Modifier.size(22.dp),
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // 竖屏/内嵌单行底栏：时间轴 + 右下角固定全屏键
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(start = 12.dp, end = 6.dp, bottom = 4.dp, top = 4.dp),
+                    ) {
+                        if (error == null) {
+                            Text(
+                                text = formatPlayerTimecode(currentPositionMs),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Medium,
+                                ),
+                            )
+
+                            ExpressiveMediaScrubber(
+                                currentPositionMs = currentPositionMs,
+                                bufferedPositionMs = bufferedPositionMs,
+                                durationMs = durationMs,
+                                onScrubMove = { previewMs ->
+                                    isScrubbing = true
+                                    currentPositionMs = previewMs
+                                },
+                                onScrubCommit = { targetMs ->
+                                    isScrubbing = false
+                                    currentPositionMs = targetMs
+                                    player.seekTo(targetMs)
+                                    controlInteractionTick++
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(36.dp),
+                            )
+
+                            Text(
+                                text = if (showRemainingTime) {
+                                    formatRemainingPlayerTimecode(currentPositionMs, durationMs)
+                                } else {
+                                    formatPlayerTimecode(durationMs)
+                                },
+                                color = Color.White.copy(alpha = 0.88f),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Medium,
+                                ),
+                                modifier = Modifier.clickable {
+                                    AuroraHaptics.segmentTick(haptic)
+                                    showRemainingTime = !showRemainingTime
+                                    controlInteractionTick++
+                                },
+                            )
                         } else {
-                            formatPlayerTimecode(durationMs)
-                        },
-                        color = Color.White.copy(alpha = 0.88f),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Medium,
-                        ),
-                        modifier = Modifier.clickable {
-                            AuroraHaptics.segmentTick(haptic)
-                            showRemainingTime = !showRemainingTime
-                            controlInteractionTick++
-                        },
-                    )
+                            Spacer(Modifier.weight(1f))
+                        }
 
-                    if (isFullscreen) {
-                        FilledTonalIconButton(
+                        IconButton(
                             onClick = {
                                 AuroraHaptics.tap(haptic)
-                                fullscreenChange(false)
+                                fullscreenChange(true)
                             },
-                            colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
-                                contentColor = Color.White,
-                            ),
                             modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Default.FullscreenExit,
-                                contentDescription = "收起全屏",
-                                modifier = Modifier.size(20.dp),
+                                imageVector = Icons.Default.Fullscreen,
+                                contentDescription = "全屏播放",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     }
@@ -1164,9 +1526,90 @@ internal fun NativeSitePlayer(
             }
         }
 
+        // 全屏锁屏悬浮解锁胶囊
+        AnimatedVisibility(
+            visible = !isInPipMode && isFullscreen && isScreenLocked && isLockOverlayVisible,
+            enter = fadeIn(AuroraMotion.fastEffects()),
+            exit = fadeOut(AuroraMotion.fastEffects()),
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .displayCutoutPadding()
+                .padding(start = 20.dp),
+        ) {
+            Surface(
+                onClick = {
+                    AuroraHaptics.toggle(haptic, false)
+                    isScreenLocked = false
+                    isLockOverlayVisible = false
+                    isControllerVisible = true
+                    controlInteractionTick++
+                },
+                shape = CircleShape,
+                color = AuroraInkSurface.copy(alpha = 0.90f),
+                contentColor = Color.White,
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = "已锁屏 · 点击解锁",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White,
+                    )
+                }
+            }
+        }
+
+        // 长按 2.0x 临时倍速快进胶囊
+        AnimatedVisibility(
+            visible = !isInPipMode && isLongPressBoostActive,
+            enter = fadeIn(AuroraMotion.fastEffects()) + scaleIn(
+                initialScale = 0.92f,
+                animationSpec = AuroraMotion.fastSpatial(),
+            ),
+            exit = fadeOut(AuroraMotion.fastEffects()),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
+                .padding(top = 14.dp),
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.94f),
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f)),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FastForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text = "2.0x 倍速快进中",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    )
+                }
+            }
+        }
+
         // 顶部偏上 Expressive 动态 HUD 胶囊
         AnimatedVisibility(
-            visible = !isInPipMode && hudState != null,
+            visible = !isInPipMode && hudState != null && !isLongPressBoostActive,
             enter = fadeIn(AuroraMotion.fastEffects()) + scaleIn(
                 initialScale = 0.92f,
                 animationSpec = AuroraMotion.fastSpatial(),
@@ -1177,7 +1620,8 @@ internal fun NativeSitePlayer(
             ),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = if (isFullscreen) 68.dp else 56.dp),
+                .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
+                .padding(top = if (isFullscreen) 64.dp else 52.dp),
         ) {
             hudState?.let { hud ->
                 Surface(
@@ -1231,6 +1675,286 @@ internal fun NativeSitePlayer(
                 isControllerVisible = isControllerVisible,
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
+        }
+    }
+
+    if (isSettingsSheetVisible && !isInPipMode) {
+        PlayerSettingsSheet(
+            playbackSpeed = playbackSpeed,
+            isFillMode = isFillMode,
+            isMuted = isMuted,
+            subtitleOptions = subtitleOptions,
+            onDismiss = { isSettingsSheetVisible = false },
+            onSelectSpeed = { speed ->
+                AuroraHaptics.segmentTick(haptic)
+                applyPlaybackSpeed(speed)
+            },
+            onSetFillMode = { fill ->
+                if (isFillMode != fill) {
+                    AuroraHaptics.toggle(haptic, fill)
+                    toggleFillMode()
+                }
+            },
+            onToggleMute = { toggleMute() },
+            onDisableSubtitles = {
+                AuroraHaptics.toggle(haptic, false)
+                setSubtitlesEnabled(false)
+            },
+            onSelectSubtitle = { option ->
+                AuroraHaptics.segmentTick(haptic)
+                selectSubtitle(option)
+            },
+        )
+    }
+}
+
+@Composable
+private fun PlayerQuickPill(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = if (selected) {
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
+        } else {
+            AuroraMediaSurface.copy(alpha = 0.78f)
+        },
+        contentColor = if (selected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            Color.White
+        },
+        modifier = modifier
+            .minimumInteractiveComponentSize()
+            .height(36.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.padding(horizontal = 12.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlayerSettingsSheet(
+    playbackSpeed: Float,
+    isFillMode: Boolean,
+    isMuted: Boolean,
+    subtitleOptions: List<SubtitleOption>,
+    onDismiss: () -> Unit,
+    onSelectSpeed: (Float) -> Unit,
+    onSetFillMode: (Boolean) -> Unit,
+    onToggleMute: () -> Unit,
+    onDisableSubtitles: () -> Unit,
+    onSelectSubtitle: (SubtitleOption) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = AuroraInkSurface,
+        contentColor = Color.White,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = Color.White.copy(alpha = 0.36f)) },
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 24.dp),
+        ) {
+            Text(
+                text = "播放设置",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White,
+            )
+
+            // 1. 播放速度
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "播放速度",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.78f),
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                ) {
+                    PLAYER_SPEED_PRESETS.forEach { speed ->
+                        val selected = playbackSpeed == speed
+                        Surface(
+                            onClick = { onSelectSpeed(speed) },
+                            shape = CircleShape,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                Color.White.copy(alpha = 0.12f)
+                            },
+                            contentColor = if (selected) {
+                                MaterialTheme.colorScheme.onPrimary
+                            } else {
+                                Color.White
+                            },
+                            modifier = Modifier.heightIn(min = 42.dp),
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            ) {
+                                Text(
+                                    text = formatPlaybackSpeedLabel(speed),
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. 画面比例
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "画面比例",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White.copy(alpha = 0.78f),
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    listOf(false to "适应屏幕（默认）", true to "填满屏幕（裁切）").forEach { (fill, label) ->
+                        val selected = isFillMode == fill
+                        Surface(
+                            onClick = { onSetFillMode(fill) },
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                Color.White.copy(alpha = 0.10f)
+                            },
+                            contentColor = if (selected) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                Color.White
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp),
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. 音频
+            Surface(
+                onClick = onToggleMute,
+                shape = MaterialTheme.shapes.medium,
+                color = Color.White.copy(alpha = 0.08f),
+                contentColor = Color.White,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 52.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Icon(
+                        imageVector = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
+                        contentDescription = null,
+                        tint = if (isMuted) MaterialTheme.colorScheme.primary else Color.White,
+                    )
+                    Text(
+                        text = if (isMuted) "当前已静音（点击恢复声音）" else "声音已开启（点击静音）",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Switch(
+                        checked = !isMuted,
+                        onCheckedChange = { onToggleMute() },
+                    )
+                }
+            }
+
+            // 4. 字幕轨道
+            if (subtitleOptions.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "字幕轨道",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White.copy(alpha = 0.78f),
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                    ) {
+                        val isOff = subtitleOptions.none { it.selected }
+                        Surface(
+                            onClick = onDisableSubtitles,
+                            shape = CircleShape,
+                            color = if (isOff) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.12f),
+                            contentColor = if (isOff) MaterialTheme.colorScheme.onPrimary else Color.White,
+                            modifier = Modifier.heightIn(min = 42.dp),
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            ) {
+                                Text("关闭字幕", style = MaterialTheme.typography.labelLarge)
+                            }
+                        }
+                        subtitleOptions.forEach { option ->
+                            Surface(
+                                onClick = { onSelectSubtitle(option) },
+                                shape = CircleShape,
+                                color = if (option.selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.12f),
+                                contentColor = if (option.selected) MaterialTheme.colorScheme.onPrimary else Color.White,
+                                modifier = Modifier.heightIn(min = 42.dp),
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                ) {
+                                    Text(option.label, style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

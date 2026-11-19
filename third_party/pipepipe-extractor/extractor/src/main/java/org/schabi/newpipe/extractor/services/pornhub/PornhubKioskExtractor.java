@@ -49,8 +49,16 @@ public final class PornhubKioskExtractor extends KioskExtractor<StreamInfoItem> 
     public InfoItemsPage<StreamInfoItem> getInitialPage()
             throws IOException, ExtractionException {
         assertPageFetched();
+        return extractCurrentDocument();
+    }
+
+    private InfoItemsPage<StreamInfoItem> extractCurrentDocument()
+            throws IOException, ExtractionException {
+        if (document == null) {
+            throw new org.schabi.newpipe.extractor.exceptions.ParsingException("Pornhub kiosk page was not fetched");
+        }
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-        for (final PornhubSearchResult result : PornhubParsingHelper.extractVideoCards(document, 40)) {
+        for (final PornhubSearchResult result : PornhubParsingHelper.extractVideoCards(document, 120)) {
             collector.commit(new PornhubInfoItemExtractor(result));
         }
         Page next = HtmlPagination.nextPage(document);
@@ -70,10 +78,11 @@ public final class PornhubKioskExtractor extends KioskExtractor<StreamInfoItem> 
     @Override
     public InfoItemsPage<StreamInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
-        if (page == null || !HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new org.schabi.newpipe.extractor.exceptions.ParsingException("Invalid next page");
         }
         document = PornhubParsingHelper.fetchDocument(page.getUrl());
-        return getInitialPage();
+        return extractCurrentDocument();
     }
 }

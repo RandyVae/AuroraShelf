@@ -170,7 +170,7 @@ final class MrDougaKioskExtractor extends KioskExtractor<StreamInfoItem> {
     @Nonnull @Override public InfoItemsPage<StreamInfoItem> getInitialPage() throws IOException, ExtractionException {
         if (document == null) throw new ParsingException("MRDOUGA kiosk page was not fetched");
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-        for (final MrDougaItem item : MrDougaParser.cards(document, 40)) collector.commit(new MrDougaItemExtractor(item));
+        for (final MrDougaItem item : MrDougaParser.cards(document, 120)) collector.commit(new MrDougaItemExtractor(item));
         Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document);
         if (next == null && !collector.getItems().isEmpty()) {
             final String loc = document.location();
@@ -185,7 +185,8 @@ final class MrDougaKioskExtractor extends KioskExtractor<StreamInfoItem> {
         return new InfoItemsPage<>(collector, next);
     }
     @Override public InfoItemsPage<StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
-        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new ParsingException("Invalid next page");
         }
         document = MrDougaParser.fetch(page.getUrl());
@@ -351,7 +352,35 @@ final class MrDougaParser {
     static String normalize(final String value) { if (value == null) return ""; final String result = value.trim().replace("\\/", "/").replace("&amp;", "&"); return result.startsWith("//") ? "https:" + result : result.startsWith("/") ? BASE + result : result; }
     private static String requestUrl(final String value) throws ParsingException {
         try {
-            return URI.create(value).toASCIIString();
+            final String trimmed = value == null ? "" : value.trim();
+            final int schemeIdx = trimmed.indexOf("://");
+            final int pathStart = schemeIdx >= 0 ? trimmed.indexOf('/', schemeIdx + 3) : 0;
+            final int effectiveStart = pathStart < 0 ? trimmed.length() : pathStart;
+            final StringBuilder sb = new StringBuilder(trimmed.length() + 16);
+            for (int i = 0; i < trimmed.length(); i++) {
+                final char ch = trimmed.charAt(i);
+                if (i < effectiveStart) {
+                    sb.append(ch);
+                } else {
+                    switch (ch) {
+                        case ' ': sb.append("%20"); break;
+                        case '\u3000': sb.append("%E3%80%80"); break;
+                        case '[': sb.append("%5B"); break;
+                        case ']': sb.append("%5D"); break;
+                        case '{': sb.append("%7B"); break;
+                        case '}': sb.append("%7D"); break;
+                        case '|': sb.append("%7C"); break;
+                        case '^': sb.append("%5E"); break;
+                        case '`': sb.append("%60"); break;
+                        case '"': sb.append("%22"); break;
+                        case '<': sb.append("%3C"); break;
+                        case '>': sb.append("%3E"); break;
+                        case '\\': sb.append("%5C"); break;
+                        default: sb.append(ch); break;
+                    }
+                }
+            }
+            return URI.create(sb.toString()).toASCIIString();
         } catch (final IllegalArgumentException exception) {
             throw new ParsingException("Invalid MRDOUGA page URL", exception);
         }

@@ -49,9 +49,17 @@ public final class TokyoMotionKioskExtractor extends KioskExtractor<StreamInfoIt
     public InfoItemsPage<StreamInfoItem> getInitialPage()
             throws IOException, ExtractionException {
         assertPageFetched();
+        return extractCurrentDocument();
+    }
+
+    private InfoItemsPage<StreamInfoItem> extractCurrentDocument()
+            throws IOException, ExtractionException {
+        if (document == null) {
+            throw new org.schabi.newpipe.extractor.exceptions.ParsingException("TokyoMotion kiosk page was not fetched");
+        }
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
         for (final TokyoMotionSearchResult result
-                : TokyoMotionParsingHelper.extractVideoCards(document, 40)) {
+                : TokyoMotionParsingHelper.extractVideoCards(document, 120)) {
             collector.commit(new TokyoMotionInfoItemExtractor(result));
         }
         Page next = HtmlPagination.nextPage(document);
@@ -71,10 +79,11 @@ public final class TokyoMotionKioskExtractor extends KioskExtractor<StreamInfoIt
     @Override
     public InfoItemsPage<StreamInfoItem> getPage(final Page page)
             throws IOException, ExtractionException {
-        if (page == null || !HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new org.schabi.newpipe.extractor.exceptions.ParsingException("Invalid next page");
         }
         document = TokyoMotionParsingHelper.fetchDocument(page.getUrl());
-        return getInitialPage();
+        return extractCurrentDocument();
     }
 }

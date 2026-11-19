@@ -279,13 +279,38 @@ final class XVideosKioskExtractor extends KioskExtractor<org.schabi.newpipe.extr
             throws ExtractionException {
         if (document == null) throw new ParsingException("XVideos kiosk page was not fetched");
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-        for (final XVideosItem item : XVideosParser.cards(document, 40)) {
+        for (final XVideosItem item : XVideosParser.cards(document, 120)) {
             collector.commit(new XVideosItemExtractor(item));
         }
-        return new InfoItemsPage<>(collector, org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document));
+        Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document);
+        if (next == null && !collector.getItems().isEmpty()) {
+            next = fallbackNextPage(document.location());
+        }
+        return new InfoItemsPage<>(collector, next);
+    }
+    private Page fallbackNextPage(final String currentUrl) {
+        if (currentUrl == null || currentUrl.isEmpty()) return null;
+        final String stripped = currentUrl.split("[?#]", 2)[0].replaceAll("/+$", "");
+        final String nextUrl;
+        if (stripped.equals(XVideosParser.BASE)) {
+            nextUrl = XVideosParser.BASE + "/new/1";
+        } else if (stripped.matches(".*/new/\\d+$")) {
+            final int idx = stripped.lastIndexOf('/');
+            final int num = Integer.parseInt(stripped.substring(idx + 1));
+            nextUrl = stripped.substring(0, idx + 1) + (num + 1);
+        } else if (stripped.matches(".*/\\d+$") && !stripped.matches(".*/c/[^/]+-\\d+$")) {
+            final int idx = stripped.lastIndexOf('/');
+            final int num = Integer.parseInt(stripped.substring(idx + 1));
+            nextUrl = stripped.substring(0, idx + 1) + (num + 1);
+        } else {
+            nextUrl = stripped + "/1";
+        }
+        return org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(currentUrl, nextUrl)
+                ? new Page(nextUrl) : null;
     }
     @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
-        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new ParsingException("Invalid next page");
         }
         document = XVideosParser.fetch(page.getUrl());

@@ -32,8 +32,8 @@ import org.json.JSONObject
 internal object X134Repository {
     const val BASE_URL = "https://134x.com"
     private const val META_CACHE_TTL_MS = 15 * 60 * 1000L
-    private const val META_CACHE_MAX = 512
-    private const val CURSOR_CACHE_MAX = 128
+    private const val META_CACHE_MAX = 1024
+    private const val CURSOR_CACHE_MAX = 512
     internal const val MAX_DECODE_DEPTH = 64
 
     internal data class ServerFnHashes(

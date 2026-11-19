@@ -177,7 +177,7 @@ final class SpankBangKioskExtractor extends KioskExtractor<org.schabi.newpipe.ex
             throws ExtractionException {
         if (document == null) throw new ParsingException("SpankBang kiosk page was not fetched");
         final StreamInfoItemsCollector collector = new StreamInfoItemsCollector(getServiceId());
-        for (final SpankBangItem item : SpankBangParser.cards(document, 64)) {
+        for (final SpankBangItem item : SpankBangParser.cards(document, 120)) {
             collector.commit(new SpankBangInfoItemExtractor(item));
         }
         Page next = org.schabi.newpipe.extractor.utils.HtmlPagination.nextPage(document);
@@ -191,7 +191,8 @@ final class SpankBangKioskExtractor extends KioskExtractor<org.schabi.newpipe.ex
         return new InfoItemsPage<>(collector, next);
     }
     @Override public InfoItemsPage<org.schabi.newpipe.extractor.stream.StreamInfoItem> getPage(final Page page) throws IOException, ExtractionException {
-        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(document.location(), page.getUrl())) {
+        final String base = document != null ? document.location() : getUrl();
+        if (page == null || !org.schabi.newpipe.extractor.utils.HtmlPagination.isSafeNext(base, page.getUrl())) {
             throw new ParsingException("Invalid next page");
         }
         document = SpankBangParser.fetch(page.getUrl());
