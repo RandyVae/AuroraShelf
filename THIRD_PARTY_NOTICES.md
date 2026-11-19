@@ -28,7 +28,7 @@ Upstream license reference: <http://esotericsoftware.com/spine-editor-license>
 
 ## 3. AndroidX Media3 / ExoPlayer (Apache License 2.0)
 
-The Android client uses AndroidX Media3 (`media3-exoplayer`, `media3-exoplayer-hls`, `media3-ui`, `media3-database`, `media3-datasource`, v1.11.0) for hardware-accelerated MP4/HLS playback and local offline media caching. Copyright The Android Open Source Project; licensed under the **Apache License 2.0**.
+The Android client uses AndroidX Media3 (`media3-exoplayer`, `media3-exoplayer-hls`, `media3-ui`, `media3-database`, `media3-datasource`, v1.11.1) for hardware-accelerated MP4/HLS playback and local offline media caching. Copyright The Android Open Source Project; licensed under the **Apache License 2.0**.
 
 Project: <https://github.com/androidx/media>
 
@@ -44,7 +44,7 @@ Project: <https://github.com/square/okhttp>
 
 ## 5. Coil 3 (Apache License 2.0)
 
-The Android client uses Coil 3 (`io.coil-kt.coil3:coil-compose` and `coil-network-okhttp`, v3.3.0) for asynchronous image loading, memory/disk caching, and custom header/de-scrambling pipelines. Copyright Coil Contributors; licensed under the **Apache License 2.0**.
+The Android client uses Coil 3 (`io.coil-kt.coil3:coil-compose` and `coil-network-okhttp`, v3.6.3) for asynchronous image loading, memory/disk caching, and custom header/de-scrambling pipelines. Copyright Coil Contributors; licensed under the **Apache License 2.0**.
 
 Project: <https://github.com/coil-kt/coil>
 
@@ -52,29 +52,21 @@ Project: <https://github.com/coil-kt/coil>
 
 ## 6. Jsoup (MIT License)
 
-The Android client uses Jsoup (`org.jsoup:jsoup`, v1.21.2) for HTML parsing, DOM traversal, and sanitization across video, comic, and forum adapters. Copyright 2009-2025 Jonathan Hedley; licensed under the **MIT License**.
+The Android client uses Jsoup (`org.jsoup:jsoup`, v1.24.1) for HTML parsing, DOM traversal, and sanitization across video, comic, and forum adapters. Copyright 2009-2026 Jonathan Hedley; licensed under the **MIT License**.
 
 Project: <https://jsoup.org/> / <https://github.com/jhy/jsoup>
 
 ---
 
-## 7. Haze (Apache License 2.0)
+## 7. AndroidX Jetpack Compose, Material 3 Expressive & Adaptive, and Core SplashScreen (Apache License 2.0)
 
-The Android client uses Haze (`dev.chrisbanes.haze:haze` and `haze-materials`, v1.7.3) for hardware-accelerated background blur in Jetpack Compose surfaces. Copyright 2024 Chris Banes and contributors; licensed under the **Apache License 2.0**.
+The Android client uses official Google AndroidX Jetpack Compose (`compose-bom:2026.09.00`), Material 3 Expressive (`androidx.compose.material3:material3:1.5.0-rc01`), Material 3 Adaptive (`androidx.compose.material3.adaptive:adaptive:1.3.0`), and AndroidX Core SplashScreen (`androidx.core:core-splashscreen:1.2.0`) targeting Android 17 (API 37). Copyright The Android Open Source Project; licensed under the **Apache License 2.0**.
 
-Project: <https://github.com/chrisbanes/haze>
-
----
-
-## 8. AndroidLiquidGlass / Backdrop & Shapes (Apache License 2.0)
-
-The Android client uses `io.github.kyant0:backdrop` (v2.0.1) and `io.github.kyant0:shapes` (v1.2.1) from AndroidLiquidGlass for real-time optical refraction and liquid bottom-navigation lens effects. Copyright Kyant and contributors; licensed under the **Apache License 2.0**. Portions of the liquid navigation gesture interaction are adapted from the Apache-2.0 sample and attributed in source.
-
-Project: <https://github.com/Kyant0/AndroidLiquidGlass>
+Project: <https://developer.android.com/jetpack/androidx>
 
 ---
 
-## 9. Protocol & Public-Site Structure References
+## 8. Protocol & Public-Site Structure References
 
 The native Kotlin (Android) and Swift (iOS) comic adapters were independently written in Kotlin and Swift without bundling runtime scripts from the following open-source projects, which served as public protocol and document-structure references:
 

@@ -3,6 +3,7 @@ package com.aurorashelf.app.data.resilience
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import androidx.core.content.edit
 import java.net.URI
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
@@ -106,10 +107,10 @@ internal class SourceHealthRegistryStore(
             mirrorJson.put(key, arr)
         }
         runCatching {
-            prefs.edit()
-                .putString(KEY_HEALTH_JSON, healthJson.toString())
-                .putString(KEY_MIRRORS_JSON, mirrorJson.toString())
-                .apply()
+            prefs.edit {
+                putString(KEY_HEALTH_JSON, healthJson.toString())
+                putString(KEY_MIRRORS_JSON, mirrorJson.toString())
+            }
         }
     }
 
@@ -331,7 +332,7 @@ internal class SourceHealthRegistryStore(
         healthByHost.clear()
         learnedMirrorsBySource.clear()
         manifestMirrorsBySource.clear()
-        prefsProvider()?.edit()?.clear()?.commit()
+        prefsProvider()?.edit(commit = true) { clear() }
     }
 
     private data class RankedCandidate(

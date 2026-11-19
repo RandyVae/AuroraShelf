@@ -10,9 +10,15 @@
     <string name="cast_searching_lan">Scanning local network for TVs…</string>
     <string name="cast_empty_title">No DLNA TVs Found</string>
     <string name="cast_empty_subtitle">Ensure your phone and TV are on the same Wi-Fi network, or use System Wireless Cast above.</string>
+    <string name="cast_local_network_title">Local Network Access Required</string>
+    <string name="cast_local_network_subtitle">Android 17 requires local network permission to discover DLNA TVs on your Wi-Fi.</string>
+    <string name="cast_local_network_grant">Allow &amp; Scan</string>
+    <string name="cast_local_network_settings">Open Settings</string>
     <string name="theme_mode_title">Appearance</string>
     <string name="theme_mode_system">System</string>
     <string name="theme_mode_light">Light</string>
     <string name="theme_mode_dark">Dark</string>
     <string name="about_open_source_title">About &amp; Open Source Licenses</string>
+    <string name="pip_action_play">Play</string>
+    <string name="pip_action_pause">Pause</string>
 </resources>

@@ -1,15 +1,20 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+)
+
 package com.aurorashelf.app.ui
 
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.graphics.Rect
 import android.media.AudioManager
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -52,9 +57,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
@@ -99,8 +107,11 @@ import com.aurorashelf.app.data.PlaybackResolver
 import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.data.playback.ResilientHttpDataSourceFactory
 import com.aurorashelf.app.data.playback.ResilientLoadErrorHandlingPolicy
-import com.aurorashelf.app.ui.theme.AuroraBrandAccentDeep
 import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.ui.theme.AuroraHaptics
+import com.aurorashelf.app.ui.theme.AuroraInkSurface
+import com.aurorashelf.app.ui.theme.AuroraMediaSurface
+import com.aurorashelf.app.ui.theme.AuroraMotion
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import android.util.Log
@@ -227,6 +238,8 @@ internal fun NativeSitePlayer(
     val castManager = remember(context) { com.aurorashelf.app.cast.CastManager.getInstance(context) }
     val castState by castManager.castState.collectAsStateWithLifecycle()
     val currentCastState by rememberUpdatedState(castState)
+    val haptic = LocalHapticFeedback.current
+    var pipSourceRect by remember(pageUrl) { mutableStateOf<Rect?>(null) }
 
     LaunchedEffect(castState) {
         if (castState is com.aurorashelf.app.cast.CastState.Connected) {
@@ -234,7 +247,7 @@ internal fun NativeSitePlayer(
         }
     }
 
-    LaunchedEffect(mainActivity, isPlaying, error, suppressPlayback, videoSizePx, castState) {
+    LaunchedEffect(mainActivity, isPlaying, error, suppressPlayback, videoSizePx, castState, pipSourceRect) {
         val canAutoPip = isPlaying &&
             error == null &&
             !suppressPlayback &&
@@ -243,6 +256,16 @@ internal fun NativeSitePlayer(
             isPlayingVideo = canAutoPip,
             videoWidth = videoSizePx.first,
             videoHeight = videoSizePx.second,
+            sourceRectHint = pipSourceRect,
+            onTogglePlayback = {
+                if (player.isPlaying) {
+                    player.pause()
+                    isPlaying = false
+                } else {
+                    player.play()
+                    isPlaying = true
+                }
+            },
         )
     }
 
@@ -563,6 +586,18 @@ internal fun NativeSitePlayer(
     BackHandler(isFullscreen) { fullscreenChange(false) }
     Box(
         modifier = modifier
+            .onGloballyPositioned { coords ->
+                val bounds = coords.boundsInWindow()
+                val rect = Rect(
+                    bounds.left.roundToInt(),
+                    bounds.top.roundToInt(),
+                    bounds.right.roundToInt(),
+                    bounds.bottom.roundToInt(),
+                )
+                if (!rect.isEmpty && rect != pipSourceRect) {
+                    pipSourceRect = rect
+                }
+            }
             .background(Color.Black)
             .pointerInput(pageUrl, isFullscreen) {
                 val doubleTapTimeout = viewConfiguration.doubleTapTimeoutMillis
@@ -693,7 +728,10 @@ internal fun NativeSitePlayer(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.align(Alignment.Center),
             ) {
-                CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.size(36.dp))
+                AuroraLoadingIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(40.dp),
+                )
                 if (ContentSourceCatalog.isHuavod(pageUrl)) {
                     Text(
                         text = "正在准备超清视频流...",
@@ -708,6 +746,7 @@ internal fun NativeSitePlayer(
                 Text(message, color = Color.White)
                 if (offlineVideo == null) {
                     TextButton(onClick = {
+                        AuroraHaptics.tap(haptic)
                         shouldResume = true
                         recoveryStage = 1
                         attempt++
@@ -716,11 +755,11 @@ internal fun NativeSitePlayer(
             }
         }
 
-        // 顶部控制栏（与调用方返回/投屏/全屏共享单行排布，零重叠；画中画模式下隐藏全部控制浮层）
+        // Material 3 Expressive 顶部控制栏
         AnimatedVisibility(
             visible = !isInPipMode && (isControllerVisible || keepTopBarVisible || error != null),
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(AuroraMotion.fastEffects()),
+            exit = fadeOut(AuroraMotion.fastEffects()),
             modifier = Modifier.fillMaxSize(),
         ) {
             Box(Modifier.fillMaxSize()) {
@@ -732,8 +771,8 @@ internal fun NativeSitePlayer(
                             .align(Alignment.TopCenter)
                             .background(
                                 Brush.verticalGradient(
-                                    listOf(Color.Black.copy(alpha = 0.76f), Color.Transparent)
-                                )
+                                    listOf(Color.Black.copy(alpha = 0.76f), Color.Transparent),
+                                ),
                             ),
                     )
                 }
@@ -746,17 +785,20 @@ internal fun NativeSitePlayer(
                         .fillMaxWidth()
                         .padding(
                             horizontal = if (isFullscreen) 16.dp else 10.dp,
-                            vertical = 10.dp,
+                            vertical = 8.dp,
                         ),
                 ) {
                     if (isFullscreen) {
                         FilledTonalIconButton(
-                            onClick = { fullscreenChange(false) },
+                            onClick = {
+                                AuroraHaptics.tap(haptic)
+                                fullscreenChange(false)
+                            },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color.Black.copy(alpha = 0.54f),
+                                containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
                                 contentColor = Color.White,
                             ),
-                            modifier = Modifier.size(44.dp),
+                            modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowDown,
@@ -770,27 +812,28 @@ internal fun NativeSitePlayer(
                     Spacer(Modifier.weight(1f))
 
                     if (isControllerVisible && error == null) {
-                        // 倍速选择胶囊（Apple TV 0.5x ~ 2.0x）
+                        // 倍速选择胶囊（0.5x ~ 2.0x）
                         Box {
                             Surface(
                                 onClick = {
+                                    AuroraHaptics.tap(haptic)
                                     speedMenuExpanded = true
                                     controlInteractionTick++
                                 },
-                                shape = RoundedCornerShape(999.dp),
-                                color = Color.Black.copy(alpha = 0.54f),
+                                shape = CircleShape,
+                                color = AuroraMediaSurface.copy(alpha = 0.76f),
                                 contentColor = Color.White,
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-                                modifier = Modifier.height(40.dp),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .height(40.dp),
                             ) {
                                 Box(
                                     contentAlignment = Alignment.Center,
-                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    modifier = Modifier.padding(horizontal = 14.dp),
                                 ) {
                                     Text(
                                         text = if (playbackSpeed == 1.0f) "1.0x" else "${playbackSpeed}x",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                                         color = Color.White,
                                     )
                                 }
@@ -798,7 +841,7 @@ internal fun NativeSitePlayer(
                             DropdownMenu(
                                 expanded = speedMenuExpanded,
                                 onDismissRequest = { speedMenuExpanded = false },
-                                containerColor = Color(0xFF1C1F28),
+                                containerColor = AuroraInkSurface,
                             ) {
                                 listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
                                     DropdownMenuItem(
@@ -813,11 +856,12 @@ internal fun NativeSitePlayer(
                                                 Icon(
                                                     Icons.Default.Check,
                                                     contentDescription = null,
-                                                    tint = AuroraCoral,
+                                                    tint = MaterialTheme.colorScheme.primary,
                                                 )
                                             }
                                         },
                                         onClick = {
+                                            AuroraHaptics.segmentTick(haptic)
                                             speedMenuExpanded = false
                                             playbackSpeed = speed
                                             player.setPlaybackSpeed(speed)
@@ -829,32 +873,30 @@ internal fun NativeSitePlayer(
                             }
                         }
 
-                        // 字幕菜单（当视频包含字幕轨时展示）
                         if (subtitleOptions.isNotEmpty()) {
                             Box {
-                                Surface(
+                                FilledTonalIconButton(
                                     onClick = {
+                                        AuroraHaptics.tap(haptic)
                                         subtitleMenuExpanded = true
                                         controlInteractionTick++
                                     },
-                                    shape = CircleShape,
-                                    color = Color.Black.copy(alpha = 0.54f),
-                                    contentColor = Color.White,
-                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-                                    modifier = Modifier.size(44.dp),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
+                                        contentColor = Color.White,
+                                    ),
+                                    modifier = Modifier.size(48.dp),
                                 ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = Icons.Default.Subtitles,
-                                            contentDescription = "字幕",
-                                            modifier = Modifier.size(20.dp),
-                                        )
-                                    }
+                                    Icon(
+                                        imageVector = Icons.Default.Subtitles,
+                                        contentDescription = "字幕",
+                                        modifier = Modifier.size(20.dp),
+                                    )
                                 }
                                 DropdownMenu(
                                     expanded = subtitleMenuExpanded,
                                     onDismissRequest = { subtitleMenuExpanded = false },
-                                    containerColor = Color(0xFF1C1F28),
+                                    containerColor = AuroraInkSurface,
                                 ) {
                                     DropdownMenuItem(
                                         text = { Text("关闭字幕", color = Color.White) },
@@ -863,11 +905,12 @@ internal fun NativeSitePlayer(
                                                 Icon(
                                                     Icons.Default.Check,
                                                     contentDescription = null,
-                                                    tint = AuroraCoral,
+                                                    tint = MaterialTheme.colorScheme.primary,
                                                 )
                                             }
                                         },
                                         onClick = {
+                                            AuroraHaptics.toggle(haptic, false)
                                             subtitleMenuExpanded = false
                                             setSubtitlesEnabled(false)
                                         },
@@ -880,11 +923,12 @@ internal fun NativeSitePlayer(
                                                     Icon(
                                                         Icons.Default.Check,
                                                         contentDescription = null,
-                                                        tint = AuroraCoral,
+                                                        tint = MaterialTheme.colorScheme.primary,
                                                     )
                                                 }
                                             },
                                             onClick = {
+                                                AuroraHaptics.segmentTick(haptic)
                                                 subtitleMenuExpanded = false
                                                 selectSubtitle(option)
                                             },
@@ -894,45 +938,47 @@ internal fun NativeSitePlayer(
                             }
                         }
 
-                        // 画中画（PiP）手动入口
                         if (mainActivity?.supportsPip() == true && !isInPipMode) {
-                            Surface(
+                            FilledTonalIconButton(
                                 onClick = {
-                                    mainActivity.requestEnterPip(videoSizePx.first, videoSizePx.second)
-                                },
-                                shape = CircleShape,
-                                color = Color.Black.copy(alpha = 0.54f),
-                                contentColor = Color.White,
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-                                modifier = Modifier.size(44.dp),
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.PictureInPictureAlt,
-                                        contentDescription = "画中画",
-                                        modifier = Modifier.size(20.dp),
+                                    AuroraHaptics.tap(haptic)
+                                    mainActivity.requestEnterPip(
+                                        videoWidth = videoSizePx.first,
+                                        videoHeight = videoSizePx.second,
+                                        sourceRectHint = pipSourceRect,
                                     )
-                                }
+                                },
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
+                                    contentColor = Color.White,
+                                ),
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PictureInPictureAlt,
+                                    contentDescription = "画中画",
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
                         }
 
-                        // 画幅裁切切换（Fit / Fill）
                         if (isFullscreen) {
-                            Surface(
-                                onClick = { toggleFillMode() },
-                                shape = CircleShape,
-                                color = Color.Black.copy(alpha = 0.54f),
-                                contentColor = Color.White,
-                                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-                                modifier = Modifier.size(44.dp),
+                            FilledTonalIconButton(
+                                onClick = {
+                                    AuroraHaptics.toggle(haptic, !isFillMode)
+                                    toggleFillMode()
+                                },
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
+                                    contentColor = Color.White,
+                                ),
+                                modifier = Modifier.size(48.dp),
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = Icons.Default.AspectRatio,
-                                        contentDescription = if (isFillMode) "适合屏幕" else "填满屏幕",
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                }
+                                Icon(
+                                    imageVector = Icons.Default.AspectRatio,
+                                    contentDescription = if (isFillMode) "适合屏幕" else "填满屏幕",
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
                         }
                     }
@@ -944,55 +990,55 @@ internal fun NativeSitePlayer(
             }
         }
 
-        // Apple TV 原生风格主播放控制与底部弹性时间轴
+        // Material 3 Expressive 播放中枢控制与弹性时间轴
         AnimatedVisibility(
             visible = !isInPipMode && isControllerVisible && error == null,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(AuroraMotion.fastEffects()),
+            exit = fadeOut(AuroraMotion.fastEffects()),
             modifier = Modifier.fillMaxSize(),
         ) {
             Box(Modifier.fillMaxSize()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(if (isFullscreen) 110.dp else 80.dp)
+                        .height(if (isFullscreen) 116.dp else 84.dp)
                         .align(Alignment.BottomCenter)
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f))
-                            )
+                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.84f)),
+                            ),
                         ),
                 )
 
-                // 中央播放控制组（快退 10s + 主播放/暂停 + 快进 10s）
                 if (!isLoading) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(if (isFullscreen) 36.dp else 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(if (isFullscreen) 32.dp else 20.dp),
                         modifier = Modifier.align(Alignment.Center),
                     ) {
                         FilledTonalIconButton(
                             onClick = {
+                                AuroraHaptics.segmentTick(haptic)
                                 seekRelative(-10_000L)
                                 showHud(Icons.Default.Replay10, "快退 10 秒")
                             },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color.Black.copy(alpha = 0.52f),
+                                containerColor = AuroraMediaSurface.copy(alpha = 0.74f),
                                 contentColor = Color.White,
                             ),
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .size(if (isFullscreen) 48.dp else 44.dp),
+                            modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Replay10,
                                 contentDescription = "快退 10 秒",
-                                modifier = Modifier.size(if (isFullscreen) 24.dp else 20.dp),
+                                modifier = Modifier.size(24.dp),
                             )
                         }
 
                         FilledIconButton(
                             onClick = {
+                                val nextPlaying = !player.isPlaying
+                                AuroraHaptics.toggle(haptic, nextPlaying)
                                 if (player.isPlaying) {
                                     player.pause()
                                     isPlaying = false
@@ -1002,42 +1048,42 @@ internal fun NativeSitePlayer(
                                 }
                                 controlInteractionTick++
                             },
+                            shape = if (isPlaying) RoundedCornerShape(20.dp) else CircleShape,
                             colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = AuroraBrandAccentDeep.copy(alpha = 0.94f),
-                                contentColor = Color.White,
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
                             ),
-                            modifier = Modifier.size(if (isFullscreen) 64.dp else 52.dp),
+                            modifier = Modifier.size(if (isFullscreen) 64.dp else 56.dp),
                         ) {
                             Icon(
                                 imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                                 contentDescription = if (isPlaying) "暂停" else "播放",
-                                modifier = Modifier.size(if (isFullscreen) 32.dp else 26.dp),
+                                modifier = Modifier.size(if (isFullscreen) 32.dp else 28.dp),
                             )
                         }
 
                         FilledTonalIconButton(
                             onClick = {
+                                AuroraHaptics.segmentTick(haptic)
                                 seekRelative(10_000L)
                                 showHud(Icons.Default.Forward10, "快进 10 秒")
                             },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color.Black.copy(alpha = 0.52f),
+                                containerColor = AuroraMediaSurface.copy(alpha = 0.74f),
                                 contentColor = Color.White,
                             ),
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .size(if (isFullscreen) 48.dp else 44.dp),
+                            modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Forward10,
                                 contentDescription = "快进 10 秒",
-                                modifier = Modifier.size(if (isFullscreen) 24.dp else 20.dp),
+                                modifier = Modifier.size(24.dp),
                             )
                         }
                     }
                 }
 
-                // 底部 Apple TV 时间轴与剩余倒计时控制条
+                // 底部 Expressive 时间轴与剩余倒计时控制条
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1052,12 +1098,13 @@ internal fun NativeSitePlayer(
                     Text(
                         text = formatPlayerTimecode(currentPositionMs),
                         color = Color.White,
-                        fontSize = if (isFullscreen) 12.sp else 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium,
+                        ),
                     )
 
-                    AppleTvScrubberBar(
+                    ExpressiveMediaScrubber(
                         currentPositionMs = currentPositionMs,
                         bufferedPositionMs = bufferedPositionMs,
                         durationMs = durationMs,
@@ -1073,7 +1120,7 @@ internal fun NativeSitePlayer(
                         },
                         modifier = Modifier
                             .weight(1f)
-                            .height(32.dp),
+                            .height(36.dp),
                     )
 
                     Text(
@@ -1083,10 +1130,12 @@ internal fun NativeSitePlayer(
                             formatPlayerTimecode(durationMs)
                         },
                         color = Color.White.copy(alpha = 0.88f),
-                        fontSize = if (isFullscreen) 12.sp else 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium,
+                        ),
                         modifier = Modifier.clickable {
+                            AuroraHaptics.segmentTick(haptic)
                             showRemainingTime = !showRemainingTime
                             controlInteractionTick++
                         },
@@ -1094,19 +1143,20 @@ internal fun NativeSitePlayer(
 
                     if (isFullscreen) {
                         FilledTonalIconButton(
-                            onClick = { fullscreenChange(false) },
+                            onClick = {
+                                AuroraHaptics.tap(haptic)
+                                fullscreenChange(false)
+                            },
                             colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = Color.Black.copy(alpha = 0.54f),
+                                containerColor = AuroraMediaSurface.copy(alpha = 0.76f),
                                 contentColor = Color.White,
                             ),
-                            modifier = Modifier
-                                .minimumInteractiveComponentSize()
-                                .size(36.dp),
+                            modifier = Modifier.size(48.dp),
                         ) {
                             Icon(
                                 imageVector = Icons.Default.FullscreenExit,
                                 contentDescription = "收起全屏",
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(20.dp),
                             )
                         }
                     }
@@ -1114,25 +1164,32 @@ internal fun NativeSitePlayer(
             }
         }
 
-        // 顶部偏上紧凑动态 HUD 胶囊（音量、亮度、快进退、画幅、倍速 — 不遮挡中央播放键）
+        // 顶部偏上 Expressive 动态 HUD 胶囊
         AnimatedVisibility(
             visible = !isInPipMode && hudState != null,
-            enter = fadeIn() + scaleIn(initialScale = 0.92f),
-            exit = fadeOut() + scaleOut(targetScale = 0.92f),
+            enter = fadeIn(AuroraMotion.fastEffects()) + scaleIn(
+                initialScale = 0.92f,
+                animationSpec = AuroraMotion.fastSpatial(),
+            ),
+            exit = fadeOut(AuroraMotion.fastEffects()) + scaleOut(
+                targetScale = 0.92f,
+                animationSpec = AuroraMotion.fastEffects(),
+            ),
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = if (isFullscreen) 68.dp else 56.dp),
         ) {
             hudState?.let { hud ->
                 Surface(
-                    shape = RoundedCornerShape(999.dp),
-                    color = Color(0xCC16181F),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.2f)),
+                    shape = CircleShape,
+                    color = AuroraInkSurface.copy(alpha = 0.88f),
+                    contentColor = Color.White,
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     ) {
                         Icon(
                             imageVector = hud.icon,
@@ -1143,22 +1200,21 @@ internal fun NativeSitePlayer(
                         Text(
                             text = hud.text,
                             color = Color.White,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                         )
                         if (hud.progress != null) {
                             Box(
                                 modifier = Modifier
                                     .width(68.dp)
                                     .height(4.dp)
-                                    .clip(RoundedCornerShape(999.dp))
+                                    .clip(CircleShape)
                                     .background(Color.White.copy(alpha = 0.24f)),
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxHeight()
                                         .fillMaxWidth(hud.progress.coerceIn(0f, 1f))
-                                        .background(Color.White, RoundedCornerShape(999.dp)),
+                                        .background(MaterialTheme.colorScheme.primary, CircleShape),
                                 )
                             }
                         }
@@ -1167,7 +1223,6 @@ internal fun NativeSitePlayer(
             }
         }
 
-        // 仅在非全屏、非画中画且控制栏隐藏时保留底部 1.5dp 极细分割微线，全屏/PiP 观影时 100% 零遮挡
         if (!isFullscreen && !isInPipMode && !isControllerVisible) {
             PlayerBottomProgressBar(
                 currentPositionMs = currentPositionMs,
@@ -1181,7 +1236,7 @@ internal fun NativeSitePlayer(
 }
 
 @Composable
-private fun AppleTvScrubberBar(
+private fun ExpressiveMediaScrubber(
     currentPositionMs: Long,
     bufferedPositionMs: Long,
     durationMs: Long,
@@ -1189,6 +1244,7 @@ private fun AppleTvScrubberBar(
     onScrubCommit: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = LocalHapticFeedback.current
     var widthPx by remember { mutableIntStateOf(1) }
     var isDragging by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -1197,14 +1253,19 @@ private fun AppleTvScrubberBar(
     val bufferedFraction = calculateVideoBufferedFraction(bufferedPositionMs, durationMs)
 
     val trackHeight by animateDpAsState(
-        targetValue = if (isDragging) 8.dp else 4.dp,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
+        targetValue = if (isDragging) 10.dp else 4.dp,
+        animationSpec = AuroraMotion.fastSpatial(),
         label = "scrubber-track-height",
     )
-    val thumbSize by animateDpAsState(
-        targetValue = if (isDragging) 18.dp else 10.dp,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 400f),
-        label = "scrubber-thumb-size",
+    val thumbWidth by animateDpAsState(
+        targetValue = if (isDragging) 6.dp else 12.dp,
+        animationSpec = AuroraMotion.fastSpatial(),
+        label = "scrubber-thumb-width",
+    )
+    val thumbHeight by animateDpAsState(
+        targetValue = if (isDragging) 22.dp else 12.dp,
+        animationSpec = AuroraMotion.fastSpatial(),
+        label = "scrubber-thumb-height",
     )
 
     Box(
@@ -1227,30 +1288,40 @@ private fun AppleTvScrubberBar(
             .pointerInput(durationMs) {
                 detectTapGestures { offset ->
                     if (durationMs <= 0L) return@detectTapGestures
+                    AuroraHaptics.segmentTick(haptic)
                     val fraction = (offset.x / size.width.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
                     onScrubCommit((fraction * durationMs).toLong())
                 }
             }
             .pointerInput(durationMs) {
                 var lastTargetMs = currentPositionMs
+                var lastTickBucket = -1
                 detectHorizontalDragGestures(
                     onDragStart = { startOffset ->
                         if (durationMs <= 0L) return@detectHorizontalDragGestures
                         isDragging = true
+                        AuroraHaptics.segmentTick(haptic)
                         val fraction = (startOffset.x / size.width.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
                         lastTargetMs = (fraction * durationMs).toLong()
+                        lastTickBucket = (fraction * 24).toInt()
                         onScrubMove(lastTargetMs)
                     },
                     onHorizontalDrag = { change, _ ->
                         if (durationMs <= 0L) return@detectHorizontalDragGestures
                         change.consume()
                         val fraction = (change.position.x / size.width.toFloat().coerceAtLeast(1f)).coerceIn(0f, 1f)
+                        val bucket = (fraction * 24).toInt()
+                        if (bucket != lastTickBucket) {
+                            lastTickBucket = bucket
+                            AuroraHaptics.scrubTick(haptic)
+                        }
                         lastTargetMs = (fraction * durationMs).toLong()
                         onScrubMove(lastTargetMs)
                     },
                     onDragEnd = {
                         if (isDragging) {
                             isDragging = false
+                            AuroraHaptics.confirm(haptic)
                             onScrubCommit(lastTargetMs)
                         }
                     },
@@ -1263,12 +1334,12 @@ private fun AppleTvScrubberBar(
                 )
             },
     ) {
-        // 背景轨道
+        // M3 Expressive rounded capsule track
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(trackHeight)
-                .clip(RoundedCornerShape(999.dp))
+                .clip(CircleShape)
                 .background(Color.White.copy(alpha = 0.24f)),
         ) {
             if (bufferedFraction > 0.001f) {
@@ -1284,45 +1355,40 @@ private fun AppleTvScrubberBar(
                     modifier = Modifier
                         .fillMaxHeight()
                         .fillMaxWidth(progressFraction)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(AuroraCoral, Color(0xFFFF5277))
-                            )
-                        ),
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
                 )
             }
         }
 
-        // 滑块圆点
-        val thumbSizePx = with(density) { thumbSize.toPx() }
-        val knobOffsetX = ((widthPx * progressFraction) - thumbSizePx / 2f)
-            .coerceIn(0f, (widthPx - thumbSizePx).coerceAtLeast(0f))
+        // Material 3 vertical pill handle when scrubbing, dot when resting
+        val thumbWpx = with(density) { thumbWidth.toPx() }
+        val knobOffsetX = ((widthPx * progressFraction) - thumbWpx / 2f)
+            .coerceIn(0f, (widthPx - thumbWpx).coerceAtLeast(0f))
         Box(
             modifier = Modifier
                 .offset { IntOffset(knobOffsetX.roundToInt(), 0) }
-                .size(thumbSize)
+                .size(width = thumbWidth, height = thumbHeight)
                 .background(Color.White, CircleShape),
         )
 
-        // 拖拽时浮起的 Apple TV 时间戳气泡
         if (isDragging) {
-            val bubbleWidthPx = with(density) { 64.dp.toPx() }
+            val bubbleWidthPx = with(density) { 68.dp.toPx() }
             val bubbleOffsetX = ((widthPx * progressFraction) - bubbleWidthPx / 2f)
                 .coerceIn(0f, (widthPx - bubbleWidthPx).coerceAtLeast(0f))
-            val bubbleOffsetY = with(density) { (-28).dp.roundToPx() }
+            val bubbleOffsetY = with(density) { (-30).dp.roundToPx() }
             Surface(
-                shape = RoundedCornerShape(999.dp),
-                color = Color(0xDD1A1C24),
-                border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.3f)),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.inverseSurface,
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
                 modifier = Modifier.offset { IntOffset(bubbleOffsetX.roundToInt(), bubbleOffsetY) },
             ) {
                 Text(
                     text = formatPlayerTimecode(currentPositionMs),
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                    ),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                 )
             }
         }
@@ -1359,16 +1425,16 @@ internal fun PlayerBottomProgressBar(
     val progressFraction = calculateVideoProgressFraction(currentPositionMs, durationMs)
     val bufferedFraction = calculateVideoBufferedFraction(bufferedPositionMs, durationMs)
 
-    val targetHeight = if (isControllerVisible) 1.5.dp else 2.5.dp
+    val targetHeight = if (isControllerVisible) 2.dp else 3.dp
     val barHeight by animateDpAsState(
         targetValue = targetHeight,
-        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        animationSpec = AuroraMotion.fastSpatial(),
         label = "bottom-progress-height",
     )
 
     val progressAlpha by animateFloatAsState(
         targetValue = if (isControllerVisible) 0.5f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
+        animationSpec = AuroraMotion.fastEffects(),
         label = "bottom-progress-alpha",
     )
 
@@ -1376,33 +1442,25 @@ internal fun PlayerBottomProgressBar(
         modifier = modifier
             .fillMaxWidth()
             .height(barHeight)
-            // Permanent Apple HIG hairline divider line separating player viewport from content below
-            .background(Color.White.copy(alpha = 0.15f))
+            .background(Color.White.copy(alpha = 0.16f))
             .testTag("player-bottom-progress-divider"),
     ) {
-        // Buffered progress track (network cache ahead)
         if (bufferedFraction > 0.001f) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(bufferedFraction)
-                    .background(Color.White.copy(alpha = 0.32f * progressAlpha)),
+                    .background(Color.White.copy(alpha = 0.34f * progressAlpha)),
             )
         }
-        // Played progress track (Netgrey signature coral gradient)
         if (progressFraction > 0.001f) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(progressFraction)
                     .background(
-                        brush = Brush.horizontalGradient(
-                            listOf(
-                                AuroraCoral.copy(alpha = progressAlpha),
-                                Color(0xFFFF5277).copy(alpha = progressAlpha),
-                            )
-                        ),
-                        shape = RoundedCornerShape(topEnd = 1.dp, bottomEnd = 1.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = progressAlpha),
+                        shape = RoundedCornerShape(topEnd = 2.dp, bottomEnd = 2.dp),
                     ),
             )
         }

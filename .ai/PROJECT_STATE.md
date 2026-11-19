@@ -1,6 +1,22 @@
 # Project State
 
-## 最新工作状态（2026年11月19日 · OTA 描述文件 `/api/udid/enroll.mobileconfig` Nginx 正则抢占 404 与 iOS 26/27 未签名 XML 拒载「无法下载描述文件」双层根治）
+## 最新工作状态（2026年11月20日 · Android 客户端全面升级至 Google Android 17 (API 37) SDK 与 100% 原生 Material 3 Expressive 设计系统＋双端 Release 模拟器全规模验收与三通道同步上线 · v2.18.0 Build 274）
+
+- **版本号全链路同步至 `v2.18.0 (Build 274)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`（`publish_ota.sh --check-versions` 校验通过）。
+- **Android 17 (API 37) SDK 平台合规升级**：
+  - `app/build.gradle.kts` 升级 `compileSdk = 37`、`targetSdk = 37`、`compose-bom:2026.09.00`、`material3:1.5.0-rc01`、`adaptive:1.3.0`、`core-splashscreen:1.2.0`、`testOptions { animationsDisabled = true }`，移除 `haze` 与 `AndroidLiquidGlass`。
+  - `AndroidManifest.xml` 声明 `ACCESS_LOCAL_NETWORK`、`locales_config.xml`、`enableOnBackInvokedCallback="true"` 与大屏全向自适应；新增 [LocalNetworkPermission.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/cast/LocalNetworkPermission.kt) 在 Android 17 上于 DLNA/SSDP 扫描前走标准运行时权限流程；`AuroraShelfApp.kt` 对 `sw >= 600dp` 禁用方向锁定并支持桌面/键盘快捷键（`Ctrl/Meta+1..5`、`Ctrl/Meta+F`、`Esc`）；`GameActivity.kt` 与 `MainActivity.kt` 全面采用 Edge-to-Edge 与 Android 12+ `installSplashScreen()`。
+- **100% 原生 Material 3 Expressive UI/UX/动效全量重构**：
+  - 彻底删除 `app/src/main/java/com/aurorashelf/app/ui/liquid/` 与全部旧版仿 iOS/Netflix/AppleTV 壳（`GlassSurface`、`AppleSpring`、`applePressEffect`、`auroraSwipeBack`、`TextHandleMove`）。
+  - 主题与动效层（[Theme.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/theme/Theme.kt)、[Type.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/theme/Type.kt)、[Motion.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/theme/Motion.kt)）：落地 `MaterialExpressiveTheme`、`MotionScheme.expressive()`、三态（Light/Dark/High-Contrast）与 Material You 动态取色、`LocalAuroraSemanticColors`、严格区分 Spatial/Effects 弹簧且完整尊重系统 `LocalReduceMotion`（静默确定态进度与 `snap()` 过渡）及 Android 16/17 语义触觉 `AuroraHaptics`。
+  - 导航与全页面组件：主导航切换为 `ShortNavigationBar`（移除外层 `.fillMaxWidth()` 解决 `1.5.0-rc01` `EqualWeightContentMeasurePolicy` 单槽钳位缺陷）与平板 `WideNavigationRail`；全站刷新与加载升级为 `AuroraPullToRefreshBox`、`AuroraLoadingIndicator`（`LoadingIndicator`/`ContainedLoadingIndicator`）与 `AuroraWavyProgressBar`（`LinearWavyProgressIndicator`）；设置页与离线缓存落地连接式 `FilledTonalToggleButton`（`ButtonGroupDefaults.connected*ButtonShapes()`）及 `>= 840dp` 双栏布局；论坛落地 `>= 840dp` 双栏 List-Detail 并修复回退 WebView `body { overflow-x: clip }` 横向溢出；漫画阅读器接入光学居中 `HorizontalFloatingToolbar`；全部二级/详情页切换为原生 `PredictiveBackContainer`。
+  - 同步清零全部 Android Lint 警告（`0` error / `0` warning）与 Kotlin 编译警告，并更新 [THIRD_PARTY_NOTICES.md](file:///Users/itou/Documents/ChatGPT/91pron/THIRD_PARTY_NOTICES.md) 与新增 [Android17ExpressiveComplianceTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/Android17ExpressiveComplianceTest.kt)。
+- **双端验证与全通道同步发布（`v2.18.0 Build 274`）**：
+  - Android：`testDebugUnitTest`、`lintDebug`（`0` error / `0` warning）、`lintVitalRelease`、`assembleRelease`、`zipalign -c -P 16 -v 4`（16 KB 页对齐通过）、`apksigner verify`（`RSA-4096` V2+V3 通过）、在线 `FullSystemSourceProbeTest + ForumSourcesTest` 全通；仪器化测试 `HigAccessibilityTest`（6/6）、`AuroraFlowTest`（10/10）、`ForumReaderRegressionTest`、`ForumScrollRegressionTest`、`ForumImageSaverTest`、`JmUnscrambleTransformationTest` 共 **20/20** 全绿；`emulator-5554` 实装正式签名 R8 Release APK 全模块（首页浅/深色、视频实播、漫画详情与阅读器居中浮动工具栏、直播、论坛阅读器、个人/设置连接式按钮组、内置游戏 `Lust Goddess Version 2.18.0` 及 `2200×1600` 平板 `WideNavigationRail` + 双栏设置/论坛）视觉验收全绿。
+  - iOS / iPadOS：在线全源 XCTest `59/59` 全通（0 失败），`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器全模块（18 视频源、漫画、直播、论坛 281 贴及 `Lust Goddess Version 2.18.0`）走查通过。
+  - 三通道同步发布：网页 OTA `https://bananarey.us`（`Netgrey.apk` `143,629,451` B / `137M`、`Netgrey.ipa` `140,446,231` B / `134M`、`manifest.plist` `2.18.0`、`index.html` 均 `HTTP 200`，远端 `/` 剩 `11G`）、TestFlight Build `274`（`Upload succeeded`）与 GitHub Release `v2.18.0` 同步上线。
+
+## 历史工作状态（2026年11月19日 · OTA 描述文件 `/api/udid/enroll.mobileconfig` Nginx 正则抢占 404 与 iOS 26/27 未签名 XML 拒载「无法下载描述文件」双层根治）
 
 - **双层根因定位（已验证）**：
   1. **Nginx 正则抢占 `404`**：远端 `/etc/nginx/sites-available/netgrey` 中 `location /api/` 原为普通前缀匹配，被下方的静态正则块 `location ~* \.mobileconfig$` 抢占并返回 `404 Not Found`；

@@ -1,3 +1,8 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+)
+
 package com.aurorashelf.app.ui
 
 import android.annotation.SuppressLint
@@ -22,7 +27,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -42,29 +46,29 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -93,20 +97,21 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -135,8 +140,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.core.net.toUri
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -152,19 +155,11 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlin.math.roundToInt
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
-import coil3.compose.AsyncImage
-import coil3.network.NetworkHeaders
-import coil3.network.httpHeaders
-import coil3.request.ImageRequest
-import com.aurorashelf.app.data.StripchatLiveRepository
-import com.aurorashelf.app.data.LiveStreamResolveResult
-import com.aurorashelf.app.data.LiveStreamResolver
-import com.aurorashelf.app.data.VideoRepository
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -177,22 +172,32 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import coil3.compose.AsyncImage
+import coil3.network.NetworkHeaders
+import coil3.network.httpHeaders
+import coil3.request.ImageRequest
+import com.aurorashelf.app.data.LiveStreamResolveResult
+import com.aurorashelf.app.data.LiveStreamResolver
+import com.aurorashelf.app.data.StripchatLiveRepository
+import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.model.LiveCategory
 import com.aurorashelf.app.model.LiveComment
 import com.aurorashelf.app.model.LiveItem
 import com.aurorashelf.app.model.LiveSourceCatalog
 import com.aurorashelf.app.ui.theme.AuroraBrandAccentDeep
 import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.ui.theme.AuroraHaptics
 import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
 import com.aurorashelf.app.ui.theme.AuroraMediaLabel
+import com.aurorashelf.app.ui.theme.AuroraMediaMeta
 import com.aurorashelf.app.ui.theme.AuroraMediaMuted
 import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
-import com.aurorashelf.app.ui.theme.AuroraMediaRankFill
-import com.aurorashelf.app.ui.theme.AuroraMediaRankOutline
 import com.aurorashelf.app.ui.theme.AuroraMediaSurface
 import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
-import com.aurorashelf.app.ui.theme.AuroraMediaMeta
+import com.aurorashelf.app.ui.theme.AuroraMotion
+import com.aurorashelf.app.ui.theme.LocalAuroraSemanticColors
 import java.io.ByteArrayInputStream
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -287,9 +292,6 @@ private fun LiveFeed(
     val visibleItems = remember(state.items, state.searchQuery) {
         filterLiveItems(state.items, state.searchQuery)
     }
-    BackHandler(enabled = state.isSearchOpen) {
-        onCloseSearch()
-    }
     val isScrolled by remember {
         derivedStateOf {
             gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 40
@@ -298,7 +300,6 @@ private fun LiveFeed(
     val hasHeroBillboard = visibleItems.isNotEmpty() && state.searchQuery.isBlank() && !state.isSearchOpen
     val overlayDarkHeader = !isScrolled && (hasHeroBillboard || (!isLightTheme && !state.isSearchOpen))
     val prefetchContext = LocalContext.current
-    // task-17: warm the first screen's previews (bytes + decode) without touching card layout.
     LaunchedEffect(state.items) {
         if (state.items.isNotEmpty()) {
             CoverPrefetcher.prefetchLive(prefetchContext, state.items, limit = LIVE_COVER_PREFETCH_LIMIT)
@@ -317,238 +318,258 @@ private fun LiveFeed(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+    PredictiveBackContainer(
+        enabled = state.isSearchOpen,
+        onBack = onCloseSearch,
     ) {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = scaledAdaptiveMinSize(164.dp, fontScale)),
-            state = gridState,
-            contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = bottomPadding + 18.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxSize().testTag("live-grid"),
+        AuroraPullToRefreshBox(
+            isRefreshing = state.isLoading && state.items.isNotEmpty(),
+            onRefresh = onRefresh,
+            indicatorPaddingTop = emptyHeaderClearanceDp,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
         ) {
-            if (state.isLoading && state.items.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Spacer(Modifier.height(emptyHeaderClearanceDp))
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().height(260.dp)) {
-                        CircularProgressIndicator(color = AuroraCoral)
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = scaledAdaptiveMinSize(164.dp, fontScale)),
+                state = gridState,
+                contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = bottomPadding + 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("live-grid"),
+            ) {
+                if (state.isLoading && state.items.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Spacer(Modifier.height(emptyHeaderClearanceDp))
                     }
-                }
-            } else if (state.error != null && state.items.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Spacer(Modifier.height(emptyHeaderClearanceDp))
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    val altSourceId = if (state.selectedSourceId == LiveSourceCatalog.STRIPCHAT.id) {
-                        LiveSourceCatalog.HORNYSTUDENTS.id
-                    } else {
-                        LiveSourceCatalog.STRIPCHAT.id
-                    }
-                    val altSourceName = LiveSourceCatalog.find(altSourceId).name
-                    LiveError(
-                        message = state.error,
-                        onRetry = onRefresh,
-                        onSwitchSource = { onSelectSource(altSourceId) },
-                        switchSourceLabel = "切换至 $altSourceName 备用源",
-                    )
-                }
-            } else if (visibleItems.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Spacer(Modifier.height(emptyHeaderClearanceDp))
-                }
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    if (state.searchQuery.isNotBlank()) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth().height(260.dp),
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(260.dp),
                         ) {
-                            Text(
-                                "未找到与「${state.searchQuery}」匹配的直播间",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            OutlinedButton(onClick = { onSearchQueryChange("") }) {
-                                Text("清除筛选")
-                            }
+                            AuroraLoadingIndicator(contained = true)
                         }
-                    } else {
+                    }
+                } else if (state.error != null && state.items.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Spacer(Modifier.height(emptyHeaderClearanceDp))
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
                         val altSourceId = if (state.selectedSourceId == LiveSourceCatalog.STRIPCHAT.id) {
                             LiveSourceCatalog.HORNYSTUDENTS.id
                         } else {
                             LiveSourceCatalog.STRIPCHAT.id
                         }
                         val altSourceName = LiveSourceCatalog.find(altSourceId).name
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth().height(260.dp),
-                        ) {
-                            Text("当前分类没有公开直播", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            OutlinedButton(onClick = { onSelectSource(altSourceId) }) {
-                                Text("切换至 $altSourceName")
+                        LiveError(
+                            message = state.error,
+                            onRetry = onRefresh,
+                            onSwitchSource = { onSelectSource(altSourceId) },
+                            switchSourceLabel = "切换至 $altSourceName 备用源",
+                        )
+                    }
+                } else if (visibleItems.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Spacer(Modifier.height(emptyHeaderClearanceDp))
+                    }
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        if (state.searchQuery.isNotBlank()) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(260.dp),
+                            ) {
+                                Text(
+                                    "未找到与「${state.searchQuery}」匹配的直播间",
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                OutlinedButton(onClick = { onSearchQueryChange("") }, shape = CircleShape) {
+                                    Text("清除筛选")
+                                }
+                            }
+                        } else {
+                            val altSourceId = if (state.selectedSourceId == LiveSourceCatalog.STRIPCHAT.id) {
+                                LiveSourceCatalog.HORNYSTUDENTS.id
+                            } else {
+                                LiveSourceCatalog.STRIPCHAT.id
+                            }
+                            val altSourceName = LiveSourceCatalog.find(altSourceId).name
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(260.dp),
+                            ) {
+                                Text("当前分类没有公开直播", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                OutlinedButton(onClick = { onSelectSource(altSourceId) }, shape = CircleShape) {
+                                    Text("切换至 $altSourceName")
+                                }
                             }
                         }
                     }
-                }
-            } else {
-                if (hasHeroBillboard) {
-                    // 1. Netflix Live Hero Billboard at item 0 (full screen bleed)
-                    val heroItem = visibleItems.first()
-                    item(key = "hero-billboard", span = { GridItemSpan(maxLineSpan) }) {
-                        NetflixLiveHeroBillboard(
-                            item = heroItem,
-                            onOpen = { onOpen(heroItem) },
-                        )
-                    }
                 } else {
-                    item(key = "live-search-spacer", span = { GridItemSpan(maxLineSpan) }) {
-                        Spacer(Modifier.height(emptyHeaderClearanceDp))
-                    }
-                }
-
-                // 2. Pinned Categories Strip with Source Selection
-                item(key = "live-pinned-categories", span = { GridItemSpan(maxLineSpan) }) {
-                    CategoryStrip(
-                        testTag = "live-category-bar",
-                        isScrolled = isScrolled,
-                        applyBackground = false,
-                    ) {
-                        // 直播平台源切换 (Stripchat / HornyStudents)
-                        LiveSourceCatalog.sources.forEach { src ->
-                            NetflixCategoryChip(
-                                selected = state.selectedSourceId == src.id,
-                                onClick = { onSelectSource(src.id) },
-                                label = "源: ${src.name}",
+                    if (hasHeroBillboard) {
+                        val heroItem = visibleItems.first()
+                        item(key = "hero-billboard", span = { GridItemSpan(maxLineSpan) }) {
+                            LiveHeroSpotlight(
+                                item = heroItem,
+                                onOpen = { onOpen(heroItem) },
                             )
                         }
-                        Spacer(Modifier.width(6.dp))
-                        LiveCategory.entries.forEach { category ->
-                            NetflixCategoryChip(
-                                selected = state.selectedCategory == category,
-                                onClick = { onCategory(category) },
-                                label = category.label,
-                            )
+                    } else {
+                        item(key = "live-search-spacer", span = { GridItemSpan(maxLineSpan) }) {
+                            Spacer(Modifier.height(emptyHeaderClearanceDp))
                         }
                     }
-                }
 
-                // 3. Featured Live Streamers Shelf (Apple TV 4:3 native ratio)
-                if (hasHeroBillboard && visibleItems.size >= 5) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        NetflixSectionHeader(
-                            title = "热门推荐 FEATURED",
-                            subtitle = "热门实时直播",
-                        )
-                    }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
+                    item(key = "live-pinned-categories", span = { GridItemSpan(maxLineSpan) }) {
+                        CategoryStrip(
+                            testTag = "live-category-bar",
+                            isScrolled = isScrolled,
+                            applyBackground = false,
                         ) {
-                            val topPerformers = visibleItems.take(10)
-                            items(topPerformers, key = { "live-featured-${it.id}" }) { item ->
-                                LiveFeaturedCard(
-                                    item = item,
-                                    onClick = { onOpen(item) },
+                            LiveSourceCatalog.sources.forEach { src ->
+                                AuroraFilterChip(
+                                    selected = state.selectedSourceId == src.id,
+                                    onClick = { onSelectSource(src.id) },
+                                    label = "源: ${src.name}",
+                                )
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            LiveCategory.entries.forEach { category ->
+                                AuroraFilterChip(
+                                    selected = state.selectedCategory == category,
+                                    onClick = { onCategory(category) },
+                                    label = category.label,
                                 )
                             }
                         }
                     }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        NetflixSectionHeader(
-                            title = "正在直播",
+
+                    if (hasHeroBillboard && visibleItems.size >= 5) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            AuroraSectionHeader(
+                                title = "热门推荐 FEATURED",
+                                subtitle = "热门实时直播",
+                            )
+                        }
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                val topPerformers = visibleItems.take(10)
+                                items(topPerformers, key = { "live-featured-${it.id}" }) { item ->
+                                    LiveFeaturedCard(
+                                        item = item,
+                                        onClick = { onOpen(item) },
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                }
+                            }
+                        }
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            AuroraSectionHeader(
+                                title = "正在直播",
+                            )
+                        }
+                    }
+
+                    val gridItems = if (hasHeroBillboard) visibleItems.drop(1) else visibleItems
+                    items(gridItems, key = LiveItem::id) { item ->
+                        LiveCard(
+                            item = item,
+                            onClick = { onOpen(item) },
+                            modifier = Modifier.animateItem(),
                         )
                     }
                 }
 
-                val gridItems = if (hasHeroBillboard) visibleItems.drop(1) else visibleItems
-                items(gridItems, key = LiveItem::id) { item ->
-                    LiveCard(item = item, onClick = { onOpen(item) })
-                }
-            }
-
-            if (state.isLoadingMore) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth().padding(18.dp)) {
-                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                if (state.isLoadingMore) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(18.dp),
+                        ) {
+                            AuroraLoadingIndicator(modifier = Modifier.size(30.dp))
+                        }
+                    }
+                } else if (state.error != null && state.items.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        TextButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
+                            Text("加载更多失败，点击重试")
+                        }
                     }
                 }
-            } else if (state.error != null && state.items.isNotEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    TextButton(onClick = onLoadMore, modifier = Modifier.fillMaxWidth()) {
-                        Text("加载更多失败，点击重试")
-                    }
+            }
+
+            val headerModifier = when {
+                isScrolled -> Modifier.background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f))
+                overlayDarkHeader -> Modifier.background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.85f),
+                            Color.Black.copy(alpha = 0.40f),
+                            Color.Transparent,
+                        ),
+                    ),
+                )
+                else -> Modifier.background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
+                            Color.Transparent,
+                        ),
+                    ),
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .onSizeChanged { headerHeightPx = it.height }
+                    .then(headerModifier)
+                    .windowInsetsPadding(WindowInsets.statusBars),
+            ) {
+                if (state.isSearchOpen) {
+                    AuroraSearchBar(
+                        query = state.searchQuery,
+                        onQueryChange = onSearchQueryChange,
+                        placeholder = "搜索主播昵称或国家/地区",
+                        onSearch = {},
+                        onBack = onCloseSearch,
+                        onClear = { onSearchQueryChange("") },
+                        isSearching = state.isLoading,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        testTag = "live-search-field",
+                    )
+                } else {
+                    LiveHeader(
+                        onSearch = onSearch,
+                        onSettings = onSettings,
+                        searchLabel = if (state.searchQuery.isNotBlank()) state.searchQuery else "搜索直播",
+                        forceDark = overlayDarkHeader,
+                    )
                 }
-            }
-        }
-
-        val headerModifier = when {
-            isScrolled -> Modifier
-                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
-                .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
-            overlayDarkHeader -> Modifier.background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.Black.copy(alpha = 0.85f),
-                        Color.Black.copy(alpha = 0.40f),
-                        Color.Transparent,
-                    ),
-                ),
-            )
-            else -> Modifier.background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.background.copy(alpha = 0.96f),
-                        MaterialTheme.colorScheme.background.copy(alpha = 0.72f),
-                        Color.Transparent,
-                    ),
-                ),
-            )
-        }
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .onSizeChanged { headerHeightPx = it.height }
-                .then(headerModifier)
-                .windowInsetsPadding(WindowInsets.statusBars),
-        ) {
-            if (state.isSearchOpen) {
-                CenteredSearchBar(
-                    query = state.searchQuery,
-                    onQueryChange = onSearchQueryChange,
-                    placeholder = "搜索主播昵称或国家/地区",
-                    onSearch = {},
-                    onBack = onCloseSearch,
-                    onClear = { onSearchQueryChange("") },
-                    isSearching = state.isLoading,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    testTag = "live-search-field",
-                    forceDark = false,
-                )
-            } else {
-                LiveHeader(
-                    onSearch = onSearch,
-                    onSettings = onSettings,
-                    searchLabel = if (state.searchQuery.isNotBlank()) state.searchQuery else "搜索直播",
-                    forceDark = overlayDarkHeader,
-                )
-            }
-            if (state.isLoading) {
-                LinearProgressIndicator(
-                    color = AuroraCoral,
-                    trackColor = Color.Transparent,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp),
-                )
+                if (state.isLoading) {
+                    AuroraWavyProgressBar(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp),
+                    )
+                }
             }
         }
     }
@@ -561,8 +582,8 @@ private fun LiveHeader(
     searchLabel: String = "搜索直播",
     forceDark: Boolean = false,
 ) {
-    NetflixTopBar(forceDark = forceDark) {
-        NetflixSearchCapsule(
+    AuroraTopBar(forceDark = forceDark) {
+        AuroraSearchCapsule(
             label = searchLabel,
             onClick = onSearch,
             forceDark = forceDark,
@@ -571,13 +592,14 @@ private fun LiveHeader(
 }
 
 @Composable
-private fun NetflixLiveHeroBillboard(
+private fun LiveHeroSpotlight(
     item: LiveItem,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
+    val semanticColors = LocalAuroraSemanticColors.current
     val flag = countryFlag(item.countryCode)
     val previewBytes by produceState<ByteArray?>(initialValue = CoverImageLoader.peekMemory(item.thumbnailUrl), key1 = item.thumbnailUrl) {
         if (value == null) {
@@ -599,7 +621,11 @@ private fun NetflixLiveHeroBillboard(
         modifier = modifier
             .fillMaxWidth()
             .height(460.dp)
-            .clickable(role = Role.Button, onClick = onOpen),
+            .clip(MaterialTheme.shapes.extraLarge)
+            .clickable(role = Role.Button) {
+                AuroraHaptics.tap(haptic)
+                onOpen()
+            },
     ) {
         val isWideStage = maxWidth > 500.dp
         AsyncImage(
@@ -615,7 +641,7 @@ private fun NetflixLiveHeroBillboard(
                     .background(Color.Black.copy(alpha = 0.56f)),
             )
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = MaterialTheme.shapes.medium,
                 shadowElevation = 12.dp,
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
                 color = AuroraMediaPlaceholder,
@@ -634,7 +660,6 @@ private fun NetflixLiveHeroBillboard(
             }
         }
 
-        // Top dark vignette gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -651,7 +676,6 @@ private fun NetflixLiveHeroBillboard(
                 ),
         )
 
-        // Bottom dark dissolve gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -675,15 +699,23 @@ private fun NetflixLiveHeroBillboard(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 12.dp),
+                .padding(horizontal = 18.dp, vertical = 14.dp),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                NetflixBadge(text = "● LIVE 直播中", backgroundColor = AuroraCoral)
+                AuroraBadge(
+                    text = "● LIVE 直播中",
+                    backgroundColor = semanticColors.liveBadgeContainer,
+                    textColor = semanticColors.onLiveBadgeContainer,
+                )
                 if (item.isHd) {
-                    NetflixBadge(text = "高清直播", backgroundColor = Color(0xFF262626))
+                    AuroraBadge(
+                        text = "高清直播",
+                        backgroundColor = Color.Black.copy(alpha = 0.65f),
+                        textColor = Color.White,
+                    )
                 }
             }
 
@@ -706,7 +738,7 @@ private fun NetflixLiveHeroBillboard(
 
             Text(
                 text = "${formatViewerCount(item.viewersCount)} 人正在观看",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                style = MaterialTheme.typography.bodySmall,
                 color = AuroraMediaLabel,
                 textAlign = TextAlign.Center,
             )
@@ -715,34 +747,27 @@ private fun NetflixLiveHeroBillboard(
 
             Button(
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    AuroraHaptics.confirm(haptic)
                     onOpen()
                 },
-                shape = RoundedCornerShape(4.dp),
+                shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = Color.Black,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ),
-                contentPadding = PaddingValues(horizontal = 28.dp, vertical = 0.dp),
-                modifier = Modifier.height(38.dp),
+                contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
+                modifier = Modifier.heightIn(min = 48.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = Color.Black,
-                        modifier = Modifier.size(22.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "进入直播间",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color.Black,
-                        ),
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "进入直播间",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                )
             }
         }
     }
@@ -754,7 +779,9 @@ private fun LiveFeaturedCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
+    val semanticColors = LocalAuroraSemanticColors.current
     val previewBytes by produceState<ByteArray?>(initialValue = null, key1 = item.thumbnailUrl) {
         value = withContext(Dispatchers.IO) {
             CoverImageLoader.load(item.thumbnailUrl, liveReferer(item))
@@ -769,102 +796,106 @@ private fun LiveFeaturedCard(
         }
     }
 
-    Column(
-        modifier = modifier
-            .width(180.dp)
-            .clickable(role = Role.Button, onClick = onClick),
+    ElevatedCard(
+        onClick = {
+            AuroraHaptics.tap(haptic)
+            onClick()
+        },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        modifier = modifier.width(184.dp),
     ) {
-        // 4:3 Live video aspect ratio (180x135 dp)
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = AuroraMediaPlaceholder,
-            modifier = Modifier
-                .width(180.dp)
-                .height(135.dp),
-            shadowElevation = 4.dp,
-        ) {
-            Box(Modifier.fillMaxSize()) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(136.dp),
+            ) {
                 AsyncImage(
                     model = previewRequest,
                     contentDescription = item.username,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
-                // Top-right ● LIVE & viewers capsule
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
-                        .background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(10.dp))
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                        .background(Color.Black.copy(alpha = 0.68f), CircleShape)
+                        .padding(horizontal = 7.dp, vertical = 3.dp),
                 ) {
                     Box(
                         modifier = Modifier
                             .size(6.dp)
-                            .background(Color(0xFFFF3B30), CircleShape),
+                            .background(semanticColors.liveBadgeContainer, CircleShape),
                     )
                     Text(
                         text = "LIVE",
                         color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
                     )
                     if (item.viewersCount > 0) {
                         Text(
                             text = "· ${formatViewerCount(item.viewersCount)}",
                             color = Color.White.copy(alpha = 0.85f),
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Medium,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                         )
                     }
                 }
             }
-        }
-        Spacer(Modifier.height(6.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.size(24.dp),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
             ) {
-                AsyncImage(
-                    model = previewRequest,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${countryFlag(item.countryCode)} ${item.username}",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (item.isHd) "高清实时直播" else "实时公开直播",
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    AsyncImage(
+                        model = previewRequest,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${countryFlag(item.countryCode)} ${item.username}",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = if (item.isHd) "高清实时直播" else "实时公开直播",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
+private fun LiveCard(
+    item: LiveItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalAuroraSemanticColors.current
     val flag = countryFlag(item.countryCode)
     val context = LocalContext.current
     val previewBytes by produceState<ByteArray?>(initialValue = null, key1 = item.thumbnailUrl) {
@@ -872,7 +903,6 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
             CoverImageLoader.load(item.thumbnailUrl, liveReferer(item))
         }
     }
-    // URL-keyed memory cache so scrolling back does not decode the same ByteArray again.
     val previewRequest = remember(previewBytes, item.thumbnailUrl, context) {
         previewBytes?.takeIf { it.isNotEmpty() }?.let { bytes ->
             ImageRequest.Builder(context)
@@ -881,11 +911,17 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
                 .build()
         }
     }
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surface,
-        modifier = Modifier
+    Card(
+        onClick = {
+            AuroraHaptics.tap(haptic)
+            onClick()
+        },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        modifier = modifier
             .fillMaxWidth()
             .semantics { contentDescription = "观看 ${item.username} 的公开直播" }
             .testTag("live-card"),
@@ -902,34 +938,36 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
                 )
                 DarkModeArtworkScrim()
                 Surface(
-                    color = AuroraBrandAccentDeep,
-                    contentColor = Color.White,
-                    shape = RoundedCornerShape(4.dp),
+                    color = semanticColors.liveBadgeContainer,
+                    contentColor = semanticColors.onLiveBadgeContainer,
+                    shape = CircleShape,
                     modifier = Modifier.padding(6.dp),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                     ) {
-                        Icon(Icons.Default.LiveTv, contentDescription = null, modifier = Modifier.size(12.dp), tint = Color.White)
+                        Icon(Icons.Default.LiveTv, contentDescription = null, modifier = Modifier.size(12.dp))
                         Text("LIVE", style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.ExtraBold))
                     }
                 }
                 if (item.isHd) {
-                    // A bare white glyph can drop below 3:1 on bright thumbnails; the scrim
-                    // keeps the HD affordance readable on any cover image.
                     Surface(
                         color = Color.Black.copy(alpha = 0.65f),
                         contentColor = Color.White,
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.align(Alignment.TopEnd).padding(6.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp),
                     ) {
                         Icon(
                             Icons.Default.Hd,
                             contentDescription = "高清直播",
                             tint = Color.White,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp).size(16.dp),
+                            modifier = Modifier
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .size(16.dp),
                         )
                     }
                 }
@@ -939,20 +977,20 @@ private fun LiveCard(item: LiveItem, onClick: () -> Unit) {
                 maxLines = 1,
                 minLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(start = 8.dp, top = 8.dp, end = 8.dp),
+                modifier = Modifier.padding(start = 10.dp, top = 8.dp, end = 10.dp),
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.padding(start = 8.dp, top = 3.dp, end = 8.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 10.dp, top = 3.dp, end = 10.dp, bottom = 10.dp),
             ) {
                 Icon(Icons.Default.Visibility, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                 Text(
                     text = "${formatViewerCount(item.viewersCount)} 人观看",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    style = MaterialTheme.typography.labelSmall,
                     maxLines = 1,
                     minLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -1295,7 +1333,7 @@ private fun LivePlayerScreen(
         }
         val animatedStageHeight by animateDpAsState(
             targetValue = targetStageHeight,
-            animationSpec = spring(dampingRatio = 0.84f, stiffness = 320f),
+            animationSpec = AuroraMotion.defaultSpatial(),
             label = "live-stage-height",
         )
         val playerModifier = if (isFullscreen) {
@@ -1402,7 +1440,7 @@ private fun LivePlayerScreen(
                                 )
                                 Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
                             }
-                            CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
+                            AuroraLoadingIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
                             FilledTonalIconButton(
                                 onClick = onBack,
                                 colors = IconButtonDefaults.filledTonalIconButtonColors(
@@ -1413,7 +1451,7 @@ private fun LivePlayerScreen(
                                     .align(Alignment.TopStart)
                                     .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
                                     .padding(12.dp)
-                                    .size(44.dp),
+                                    .size(48.dp),
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", modifier = Modifier.size(20.dp))
                             }
@@ -1689,7 +1727,7 @@ private fun NativeLivePlayer(
                     )
                     Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
                 }
-                CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
+                AuroraLoadingIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
             }
         }
 
@@ -1719,17 +1757,17 @@ private fun NativeLivePlayer(
         // Floating Toast for Danmaku mode switch
         AnimatedVisibility(
             visible = feedbackMessage != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(AuroraMotion.fastEffects()),
+            exit = fadeOut(AuroraMotion.fastEffects()),
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
                 .padding(top = 56.dp),
         ) {
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xDD000000),
-                border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color(0x55FFFFFF)),
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.86f),
+                border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color.White.copy(alpha = 0.34f)),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
                 Row(
@@ -2639,7 +2677,7 @@ private fun EmbeddedLivePlayer(
                     )
                     Box(Modifier.fillMaxSize().background(AuroraImmersiveBackground.copy(alpha = 0.55f)))
                 }
-                CircularProgressIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
+                AuroraLoadingIndicator(color = AuroraCoral, modifier = Modifier.align(Alignment.Center))
             }
         }
         if (roomStatus != LiveRoomStatus.CONNECTING && roomStatus != LiveRoomStatus.READY) {
@@ -2686,17 +2724,17 @@ private fun EmbeddedLivePlayer(
         // Floating Toast for Danmaku mode switch
         AnimatedVisibility(
             visible = feedbackMessage != null,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(AuroraMotion.fastEffects()),
+            exit = fadeOut(AuroraMotion.fastEffects()),
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .then(if (isFullscreen) Modifier.statusBarsPadding() else Modifier)
                 .padding(top = 56.dp),
         ) {
             Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color(0xDD000000),
-                border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color(0x55FFFFFF)),
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.86f),
+                border = BorderStroke(1.dp, if (isDanmakuEnabled) AuroraCoral else Color.White.copy(alpha = 0.34f)),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             ) {
                 Row(
@@ -2975,8 +3013,8 @@ private fun FlyingDanmakuChip(
         modifier = Modifier
             .offset { IntOffset(offsetX.value.roundToInt(), with(density) { laneY.roundToPx() }) }
             .widthIn(max = 320.dp)
-            .background(Color(0x99000000), RoundedCornerShape(14.dp))
-            .border(BorderStroke(0.75.dp, Color(0x33FFFFFF)), RoundedCornerShape(14.dp))
+            .background(Color.Black.copy(alpha = 0.60f), CircleShape)
+            .border(BorderStroke(0.75.dp, Color.White.copy(alpha = 0.22f)), CircleShape)
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         Row(

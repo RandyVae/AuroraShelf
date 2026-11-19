@@ -1,26 +1,14 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+)
+
 package com.aurorashelf.app.ui
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.content.pm.ActivityInfo
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,80 +17,56 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.ScrollableDefaults
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.DownloadDone
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FormatListNumbered
-import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalToggleButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -110,94 +74,54 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import coil3.compose.AsyncImage
-import com.aurorashelf.app.model.AppDestination
-import com.aurorashelf.app.model.ContentSource
-import com.aurorashelf.app.model.ContentSourceCatalog
-import com.aurorashelf.app.model.ComicSourceInfo
-import com.aurorashelf.app.model.FeedCategory
-import com.aurorashelf.app.model.LiveSourceCatalog
-import com.aurorashelf.app.model.LiveSourceInfo
-import com.aurorashelf.app.model.VideoItem
 import com.aurorashelf.app.BuildConfig
+import com.aurorashelf.app.R
 import com.aurorashelf.app.data.AccountRepository
 import com.aurorashelf.app.data.AccountState
 import com.aurorashelf.app.data.AppPreferences
-import com.aurorashelf.app.data.ThemeMode
-import com.aurorashelf.app.data.SourceAddress
-import com.aurorashelf.app.data.PlaybackEpisode
-import com.aurorashelf.app.data.PlaybackResolver
 import com.aurorashelf.app.data.OfflineCacheManager
 import com.aurorashelf.app.data.OfflineCacheState
 import com.aurorashelf.app.data.OfflineVideo
+import com.aurorashelf.app.data.SourceAddress
+import com.aurorashelf.app.data.ThemeMode
 import com.aurorashelf.app.data.comic.ComicDownloadStatus
 import com.aurorashelf.app.data.comic.DownloadedComicChapter
-import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
-import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
-import com.aurorashelf.app.ui.theme.AuroraCoral
-import com.aurorashelf.app.ui.theme.AuroraMediaLabel
-import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
-import com.aurorashelf.app.ui.theme.AuroraProfileAccent
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import dev.chrisbanes.haze.HazeInputScale
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.HazeMaterials
-import dev.chrisbanes.haze.rememberHazeState
-import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.aurorashelf.app.model.ComicSourceInfo
+import com.aurorashelf.app.model.ContentSource
+import com.aurorashelf.app.model.ContentSourceCatalog
+import com.aurorashelf.app.model.LiveSourceCatalog
+import com.aurorashelf.app.model.LiveSourceInfo
+import com.aurorashelf.app.model.VideoItem
+import com.aurorashelf.app.ui.theme.AuroraHaptics
+import com.aurorashelf.app.ui.theme.AuroraMotion
+import com.aurorashelf.app.ui.theme.LocalAuroraSemanticColors
 
 private enum class SettingsRoute { OVERVIEW, VIDEO_SOURCES, COMIC_SOURCES, LIVE_SOURCES, OFFLINE_CACHE }
 
@@ -239,71 +163,76 @@ internal fun PersonalScreen(
     onOpenGame: () -> Unit = {},
     onAccount: () -> Unit = {},
 ) {
-    BackHandler(enabled = route != PersonalRoute.OVERVIEW) { onRoute(PersonalRoute.OVERVIEW) }
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
-        AnimatedContent(
-            targetState = route,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = "personal-route",
-        ) { currentRoute ->
-            when (currentRoute) {
-                PersonalRoute.OVERVIEW -> PersonalOverview(
-                    favoriteCount = favorites.size,
-                    historyCount = history.size,
-                    currentSource = ContentSourceCatalog.find(currentUrl)?.name ?: "自定义视频源",
-                    favorites = favorites,
-                    history = history,
-                    onVideo = onVideo,
-                    onFavorites = { onRoute(PersonalRoute.FAVORITES) },
-                    onHistory = { onRoute(PersonalRoute.HISTORY) },
-                    onSettings = { onRoute(PersonalRoute.SETTINGS) },
-                    onOpenGame = onOpenGame,
-                    onAccount = onAccount,
-                )
-                PersonalRoute.FAVORITES -> LibraryScreen(
-                    title = "我的收藏",
-                    emptyMessage = "收藏的视频会出现在这里",
-                    emptyActionLabel = "去首页看看",
-                    onEmptyAction = onBrowseHome,
-                    videos = favorites,
-                    onVideo = onVideo,
-                    onFavorite = onFavorite,
-                    favoriteIds = favoriteIds,
-                    onBack = { onRoute(PersonalRoute.OVERVIEW) },
-                    testTag = "personal-favorites",
-                    emptyIcon = Icons.Outlined.FavoriteBorder,
-                )
-                PersonalRoute.HISTORY -> LibraryScreen(
-                    title = "观看历史",
-                    emptyMessage = "播放过的视频会保留在这里",
-                    emptyActionLabel = "去首页看看",
-                    onEmptyAction = onBrowseHome,
-                    videos = history,
-                    onVideo = onVideo,
-                    onFavorite = onFavorite,
-                    favoriteIds = favoriteIds,
-                    onBack = { onRoute(PersonalRoute.OVERVIEW) },
-                    testTag = "personal-history",
-                    emptyIcon = Icons.Default.History,
-                )
-                PersonalRoute.SETTINGS -> SettingsScreen(
-                    currentUrl = currentUrl,
-                    comicSources = comicSources,
-                    selectedComicSourceId = selectedComicSourceId,
-                    selectedLiveSourceId = selectedLiveSourceId,
-                    comicDownloadedChapters = comicDownloadedChapters,
-                    onSave = onSave,
-                    onComicSource = onComicSource,
-                    onLiveSource = onLiveSource,
-                    onOpenCached = onOpenCached,
-                    onOpenComicDownload = onOpenComicDownload,
-                    onRemoveComicDownload = onRemoveComicDownload,
-                    onRetryComicDownload = onRetryComicDownload,
-                    onClearComicDownloads = onClearComicDownloads,
-                    onBrowseHome = onBrowseHome,
-                    onBack = { onRoute(PersonalRoute.OVERVIEW) },
-                )
-                PersonalRoute.ACCOUNT -> AccountScreen(onBack = { onRoute(PersonalRoute.OVERVIEW) })
+        val personalRouteTransition = AuroraMotion.expressiveFadeThrough()
+        PredictiveBackContainer(
+            enabled = route != PersonalRoute.OVERVIEW,
+            onBack = { onRoute(PersonalRoute.OVERVIEW) },
+        ) {
+            AnimatedContent(
+                targetState = route,
+                transitionSpec = { personalRouteTransition },
+                label = "personal-route",
+            ) { currentRoute ->
+                when (currentRoute) {
+                    PersonalRoute.OVERVIEW -> PersonalOverview(
+                        favoriteCount = favorites.size,
+                        historyCount = history.size,
+                        currentSource = ContentSourceCatalog.find(currentUrl)?.name ?: "自定义视频源",
+                        favorites = favorites,
+                        history = history,
+                        onVideo = onVideo,
+                        onFavorites = { onRoute(PersonalRoute.FAVORITES) },
+                        onHistory = { onRoute(PersonalRoute.HISTORY) },
+                        onSettings = { onRoute(PersonalRoute.SETTINGS) },
+                        onOpenGame = onOpenGame,
+                        onAccount = onAccount,
+                    )
+                    PersonalRoute.FAVORITES -> LibraryScreen(
+                        title = "我的收藏",
+                        emptyMessage = "收藏的视频会出现在这里",
+                        emptyActionLabel = "去首页看看",
+                        onEmptyAction = onBrowseHome,
+                        videos = favorites,
+                        onVideo = onVideo,
+                        onFavorite = onFavorite,
+                        favoriteIds = favoriteIds,
+                        onBack = { onRoute(PersonalRoute.OVERVIEW) },
+                        testTag = "personal-favorites",
+                        emptyIcon = Icons.Outlined.FavoriteBorder,
+                    )
+                    PersonalRoute.HISTORY -> LibraryScreen(
+                        title = "观看历史",
+                        emptyMessage = "播放过的视频会保留在这里",
+                        emptyActionLabel = "去首页看看",
+                        onEmptyAction = onBrowseHome,
+                        videos = history,
+                        onVideo = onVideo,
+                        onFavorite = onFavorite,
+                        favoriteIds = favoriteIds,
+                        onBack = { onRoute(PersonalRoute.OVERVIEW) },
+                        testTag = "personal-history",
+                        emptyIcon = Icons.Default.History,
+                    )
+                    PersonalRoute.SETTINGS -> SettingsScreen(
+                        currentUrl = currentUrl,
+                        comicSources = comicSources,
+                        selectedComicSourceId = selectedComicSourceId,
+                        selectedLiveSourceId = selectedLiveSourceId,
+                        comicDownloadedChapters = comicDownloadedChapters,
+                        onSave = onSave,
+                        onComicSource = onComicSource,
+                        onLiveSource = onLiveSource,
+                        onOpenCached = onOpenCached,
+                        onOpenComicDownload = onOpenComicDownload,
+                        onRemoveComicDownload = onRemoveComicDownload,
+                        onRetryComicDownload = onRetryComicDownload,
+                        onClearComicDownloads = onClearComicDownloads,
+                        onBrowseHome = onBrowseHome,
+                        onBack = { onRoute(PersonalRoute.OVERVIEW) },
+                    )
+                    PersonalRoute.ACCOUNT -> AccountScreen(onBack = { onRoute(PersonalRoute.OVERVIEW) })
+                }
             }
         }
     }
@@ -340,9 +269,11 @@ private fun PersonalOverview(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
             ) {
-                NetflixProfileAvatar(
+                AuroraProfileAvatar(
                     sizeDp = 56.dp,
                     contentDescription = "站点设置",
                     onClick = onSettings,
@@ -350,8 +281,7 @@ private fun PersonalOverview(
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
                     Text(
                         "我的",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 24.sp,
+                        style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.ExtraBold,
                         ),
                         color = MaterialTheme.colorScheme.onBackground,
@@ -368,7 +298,7 @@ private fun PersonalOverview(
 
         if (favorites.isNotEmpty()) {
             item {
-                NetflixSectionHeader(
+                AuroraSectionHeader(
                     title = "我的片单",
                     actionText = "全部 ($favoriteCount)",
                     onAction = onFavorites,
@@ -380,10 +310,11 @@ private fun PersonalOverview(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    items(favorites.take(10)) { video ->
-                        NetflixPosterShelfCard(
+                    items(favorites.take(10), key = { "fav-${it.id}" }) { video ->
+                        AuroraPosterCard(
                             video = video,
                             onClick = { onVideo(video) },
+                            modifier = Modifier.animateItem(),
                         )
                     }
                 }
@@ -392,7 +323,7 @@ private fun PersonalOverview(
 
         if (history.isNotEmpty()) {
             item {
-                NetflixSectionHeader(
+                AuroraSectionHeader(
                     title = "继续观看",
                     actionText = "全部 ($historyCount)",
                     onAction = onHistory,
@@ -404,10 +335,11 @@ private fun PersonalOverview(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    items(history.take(10)) { video ->
-                        NetflixPosterShelfCard(
+                    items(history.take(10), key = { "hist-${it.id}" }) { video ->
+                        AuroraPosterCard(
                             video = video,
                             onClick = { onVideo(video) },
+                            modifier = Modifier.animateItem(),
                         )
                     }
                 }
@@ -418,7 +350,7 @@ private fun PersonalOverview(
         item {
             SettingsNavigationCard {
                 SettingsNavigationRow(
-                    icon = { Icon(Icons.Default.Favorite, contentDescription = null, tint = AuroraCoral) },
+                    icon = { Icon(Icons.Default.Favorite, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     title = "收藏",
                     supporting = "稍后继续观看已保存的内容",
                     value = "$favoriteCount 个",
@@ -440,7 +372,7 @@ private fun PersonalOverview(
         item {
             SettingsNavigationCard {
                 SettingsNavigationRow(
-                    icon = { Icon(Icons.Default.SportsEsports, contentDescription = null, tint = AuroraCoral) },
+                    icon = { Icon(Icons.Default.SportsEsports, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
                     title = "游戏",
                     supporting = "欲望女神（Lust Goddess）· 战术 RPG",
                     value = "开始游戏",
@@ -502,7 +434,7 @@ private fun LibraryScreen(
             top = 28.dp,
             bottom = LocalDockHeight.current + 24.dp,
         ),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
@@ -525,7 +457,7 @@ private fun LibraryScreen(
                     isFavorite = video.id in favoriteIds,
                     onClick = { onVideo(video) },
                     onFavorite = { onFavorite(video) },
-                    modifier = Modifier,
+                    modifier = Modifier.animateItem(),
                 )
             }
         }
@@ -589,10 +521,6 @@ private fun SettingsScreen(
         0f
     }
 
-    BackHandler(enabled = route != SettingsRoute.OVERVIEW) {
-        route = SettingsRoute.OVERVIEW
-    }
-
     if (showClearConfirmation) {
         AlertDialog(
             onDismissRequest = { showClearConfirmation = false },
@@ -616,91 +544,174 @@ private fun SettingsScreen(
             },
         )
     }
+
+    val renderDetailRoute: @Composable (SettingsRoute, Boolean) -> Unit = { detailRoute, showBack ->
+        val effectiveBack: () -> Unit = if (showBack) {
+            { route = SettingsRoute.OVERVIEW }
+        } else {
+            onBack
+        }
+        when (detailRoute) {
+            SettingsRoute.OVERVIEW,
+            SettingsRoute.VIDEO_SOURCES -> VideoSourcesPage(
+                sourceUrl = sourceUrl,
+                selectedSourceId = selectedSourceId,
+                addressError = addressError,
+                onSourceUrl = { sourceUrl = it },
+                onSave = onSave,
+                onBack = effectiveBack,
+                showBackButton = showBack,
+            )
+            SettingsRoute.COMIC_SOURCES -> ComicSourcesPage(
+                sources = comicSources,
+                selectedSourceId = selectedComicSourceId,
+                onSource = onComicSource,
+                onBack = effectiveBack,
+                showBackButton = showBack,
+            )
+            SettingsRoute.LIVE_SOURCES -> LiveSourcesPage(
+                sources = LiveSourceCatalog.sources,
+                selectedSourceId = selectedLiveSourceId,
+                onSource = onLiveSource,
+                onBack = effectiveBack,
+                showBackButton = showBack,
+            )
+            SettingsRoute.OFFLINE_CACHE -> OfflineCachePage(
+                cachedVideos = cachedVideos,
+                comicChapters = comicDownloadedChapters,
+                completedCount = completedCount,
+                downloadedBytes = downloadedBytes,
+                completedComicCount = completedComicCount,
+                comicDownloadedBytes = comicDownloadedBytes,
+                totalActiveCount = totalActiveCount,
+                combinedActiveProgress = combinedActiveProgress,
+                onBack = effectiveBack,
+                showBackButton = showBack,
+                onOpenCached = onOpenCached,
+                onOpenComic = onOpenComicDownload,
+                onBrowseHome = onBrowseHome,
+                onClear = { isComic ->
+                    clearTargetIsComic = isComic
+                    showClearConfirmation = true
+                },
+                onRetry = cacheManager::retry,
+                onRemove = cacheManager::remove,
+                onRetryComic = onRetryComicDownload,
+                onRemoveComic = onRemoveComicDownload,
+            )
+        }
+    }
+
     Surface(
         color = MaterialTheme.colorScheme.background,
         modifier = Modifier.fillMaxSize(),
     ) {
-        AnimatedContent(
-            targetState = route,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = "settings-route",
-        ) { currentRoute ->
-            when (currentRoute) {
-                SettingsRoute.OVERVIEW -> SettingsOverview(
-                    selectedSource = ContentSourceCatalog.find(currentUrl),
-                    selectedComicSource = comicSources.find { it.id == selectedComicSourceId },
-                    selectedLiveSource = LiveSourceCatalog.find(selectedLiveSourceId),
-                    completedCount = completedCount,
-                    downloadedBytes = downloadedBytes,
-                    completedComicCount = completedComicCount,
-                    comicDownloadedBytes = comicDownloadedBytes,
-                    totalActiveCount = totalActiveCount,
-                    combinedActiveProgress = combinedActiveProgress,
-                    themeMode = themeMode,
-                    onThemeModeChange = { nextMode -> preferences.themeMode = nextMode },
-                    videoPreloadEnabled = videoPreloadEnabled,
-                    onVideoPreloadChange = { enabled ->
-                        videoPreloadEnabled = enabled
-                        preferences.videoPreloadEnabled = enabled
-                    },
-                    introAnimationEnabled = introAnimationEnabled,
-                    onIntroAnimationChange = { enabled ->
-                        introAnimationEnabled = enabled
-                        preferences.introAnimationEnabled = enabled
-                    },
-                    introSoundEnabled = introSoundEnabled,
-                    onIntroSoundChange = { enabled ->
-                        introSoundEnabled = enabled
-                        preferences.introSoundEnabled = enabled
-                    },
-                    onBack = onBack,
-                    onVideoSources = { route = SettingsRoute.VIDEO_SOURCES },
-                    onComicSources = { route = SettingsRoute.COMIC_SOURCES },
-                    onLiveSources = { route = SettingsRoute.LIVE_SOURCES },
-                    onOfflineCache = { route = SettingsRoute.OFFLINE_CACHE },
-                )
-                SettingsRoute.VIDEO_SOURCES -> VideoSourcesPage(
-                    sourceUrl = sourceUrl,
-                    selectedSourceId = selectedSourceId,
-                    addressError = addressError,
-                    onSourceUrl = { sourceUrl = it },
-                    onSave = onSave,
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isTwoPane = maxWidth >= 840.dp
+            if (isTwoPane) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(0.44f).fillMaxHeight()) {
+                        SettingsOverview(
+                            selectedSource = ContentSourceCatalog.find(currentUrl),
+                            selectedComicSource = comicSources.find { it.id == selectedComicSourceId },
+                            selectedLiveSource = LiveSourceCatalog.find(selectedLiveSourceId),
+                            completedCount = completedCount,
+                            downloadedBytes = downloadedBytes,
+                            completedComicCount = completedComicCount,
+                            comicDownloadedBytes = comicDownloadedBytes,
+                            totalActiveCount = totalActiveCount,
+                            combinedActiveProgress = combinedActiveProgress,
+                            themeMode = themeMode,
+                            onThemeModeChange = { nextMode -> preferences.themeMode = nextMode },
+                            videoPreloadEnabled = videoPreloadEnabled,
+                            onVideoPreloadChange = { enabled ->
+                                videoPreloadEnabled = enabled
+                                preferences.videoPreloadEnabled = enabled
+                            },
+                            introAnimationEnabled = introAnimationEnabled,
+                            onIntroAnimationChange = { enabled ->
+                                introAnimationEnabled = enabled
+                                preferences.introAnimationEnabled = enabled
+                            },
+                            introSoundEnabled = introSoundEnabled,
+                            onIntroSoundChange = { enabled ->
+                                introSoundEnabled = enabled
+                                preferences.introSoundEnabled = enabled
+                            },
+                            onBack = onBack,
+                            onVideoSources = { route = SettingsRoute.VIDEO_SOURCES },
+                            onComicSources = { route = SettingsRoute.COMIC_SOURCES },
+                            onLiveSources = { route = SettingsRoute.LIVE_SOURCES },
+                            onOfflineCache = { route = SettingsRoute.OFFLINE_CACHE },
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+                    Box(modifier = Modifier.weight(0.56f).fillMaxHeight()) {
+                        val settingsDetailTransition = AuroraMotion.expressiveFadeThrough()
+                        AnimatedContent(
+                            targetState = if (route == SettingsRoute.OVERVIEW) SettingsRoute.VIDEO_SOURCES else route,
+                            transitionSpec = { settingsDetailTransition },
+                            label = "settings-detail-pane",
+                        ) { activeDetail ->
+                            renderDetailRoute(activeDetail, false)
+                        }
+                    }
+                }
+            } else {
+                val settingsRouteTransition = AuroraMotion.expressiveFadeThrough()
+                PredictiveBackContainer(
+                    enabled = route != SettingsRoute.OVERVIEW,
                     onBack = { route = SettingsRoute.OVERVIEW },
-                )
-                SettingsRoute.COMIC_SOURCES -> ComicSourcesPage(
-                    sources = comicSources,
-                    selectedSourceId = selectedComicSourceId,
-                    onSource = onComicSource,
-                    onBack = { route = SettingsRoute.OVERVIEW },
-                )
-                SettingsRoute.LIVE_SOURCES -> LiveSourcesPage(
-                    sources = LiveSourceCatalog.sources,
-                    selectedSourceId = selectedLiveSourceId,
-                    onSource = onLiveSource,
-                    onBack = { route = SettingsRoute.OVERVIEW },
-                )
-                SettingsRoute.OFFLINE_CACHE -> OfflineCachePage(
-                    cachedVideos = cachedVideos,
-                    comicChapters = comicDownloadedChapters,
-                    completedCount = completedCount,
-                    downloadedBytes = downloadedBytes,
-                    completedComicCount = completedComicCount,
-                    comicDownloadedBytes = comicDownloadedBytes,
-                    totalActiveCount = totalActiveCount,
-                    combinedActiveProgress = combinedActiveProgress,
-                    onBack = { route = SettingsRoute.OVERVIEW },
-                    onOpenCached = onOpenCached,
-                    onOpenComic = onOpenComicDownload,
-                    onBrowseHome = onBrowseHome,
-                    onClear = { isComic ->
-                        clearTargetIsComic = isComic
-                        showClearConfirmation = true
-                    },
-                    onRetry = cacheManager::retry,
-                    onRemove = cacheManager::remove,
-                    onRetryComic = onRetryComicDownload,
-                    onRemoveComic = onRemoveComicDownload,
-                )
+                ) {
+                    AnimatedContent(
+                        targetState = route,
+                        transitionSpec = { settingsRouteTransition },
+                        label = "settings-route",
+                    ) { currentRoute ->
+                        if (currentRoute == SettingsRoute.OVERVIEW) {
+                            SettingsOverview(
+                                selectedSource = ContentSourceCatalog.find(currentUrl),
+                                selectedComicSource = comicSources.find { it.id == selectedComicSourceId },
+                                selectedLiveSource = LiveSourceCatalog.find(selectedLiveSourceId),
+                                completedCount = completedCount,
+                                downloadedBytes = downloadedBytes,
+                                completedComicCount = completedComicCount,
+                                comicDownloadedBytes = comicDownloadedBytes,
+                                totalActiveCount = totalActiveCount,
+                                combinedActiveProgress = combinedActiveProgress,
+                                themeMode = themeMode,
+                                onThemeModeChange = { nextMode -> preferences.themeMode = nextMode },
+                                videoPreloadEnabled = videoPreloadEnabled,
+                                onVideoPreloadChange = { enabled ->
+                                    videoPreloadEnabled = enabled
+                                    preferences.videoPreloadEnabled = enabled
+                                },
+                                introAnimationEnabled = introAnimationEnabled,
+                                onIntroAnimationChange = { enabled ->
+                                    introAnimationEnabled = enabled
+                                    preferences.introAnimationEnabled = enabled
+                                },
+                                introSoundEnabled = introSoundEnabled,
+                                onIntroSoundChange = { enabled ->
+                                    introSoundEnabled = enabled
+                                    preferences.introSoundEnabled = enabled
+                                },
+                                onBack = onBack,
+                                onVideoSources = { route = SettingsRoute.VIDEO_SOURCES },
+                                onComicSources = { route = SettingsRoute.COMIC_SOURCES },
+                                onLiveSources = { route = SettingsRoute.LIVE_SOURCES },
+                                onOfflineCache = { route = SettingsRoute.OFFLINE_CACHE },
+                            )
+                        } else {
+                            renderDetailRoute(currentRoute, true)
+                        }
+                    }
+                }
             }
         }
     }
@@ -756,7 +767,7 @@ private fun SettingsOverview(
                     onClick = onVideoSources,
                     modifier = Modifier.testTag("settings-video-sources"),
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsNavigationRow(
                     icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
                     title = "漫画源",
@@ -765,7 +776,7 @@ private fun SettingsOverview(
                     onClick = onComicSources,
                     modifier = Modifier.testTag("settings-comic-sources"),
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsNavigationRow(
                     icon = { Icon(Icons.Default.LiveTv, contentDescription = null) },
                     title = "直播源",
@@ -774,7 +785,7 @@ private fun SettingsOverview(
                     onClick = onLiveSources,
                     modifier = Modifier.testTag("settings-live-sources"),
                 )
-                HorizontalDivider(modifier = Modifier.padding(start = 68.dp))
+                HorizontalDivider(modifier = Modifier.padding(start = 68.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 val totalOfflineBytes = downloadedBytes + comicDownloadedBytes
                 val offlineSummary = if (totalActiveCount > 0) {
                     "下载中 $totalActiveCount 项 (${(combinedActiveProgress * 100).toInt()}%) · ${formatBytes(totalOfflineBytes)}"
@@ -839,6 +850,8 @@ private fun ThemeModeSelectorCard(
     selectedMode: ThemeMode,
     onSelectMode: (ThemeMode) -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val modes = ThemeMode.entries
     SettingsCard {
         Column(
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -857,7 +870,7 @@ private fun ThemeModeSelectorCard(
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("外观模式", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.theme_mode_title), style = MaterialTheme.typography.titleMedium)
                     Text(
                         "即时切换浅色、深色或跟随系统外观",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -866,30 +879,44 @@ private fun ThemeModeSelectorCard(
                 }
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                ThemeMode.entries.forEach { mode ->
+                modes.forEachIndexed { index, mode ->
                     val isSelected = mode == selectedMode
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onSelectMode(mode) },
-                        label = {
-                            Text(
-                                text = mode.label,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                maxLines = 1,
-                            )
+                    val label = when (mode) {
+                        ThemeMode.SYSTEM -> stringResource(R.string.theme_mode_system)
+                        ThemeMode.LIGHT -> stringResource(R.string.theme_mode_light)
+                        ThemeMode.DARK -> stringResource(R.string.theme_mode_dark)
+                    }
+                    FilledTonalToggleButton(
+                        checked = isSelected,
+                        onCheckedChange = {
+                            if (!isSelected) {
+                                AuroraHaptics.segmentTick(haptic)
+                                onSelectMode(mode)
+                            }
                         },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MaterialTheme.colorScheme.primary,
-                            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                        ),
+                        shapes = when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            modes.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 10.dp),
                         modifier = Modifier
                             .weight(1f)
                             .heightIn(min = 48.dp)
+                            .semantics { role = Role.RadioButton }
                             .testTag("theme-mode-${mode.storageKey}"),
-                    )
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
             }
         }
@@ -900,6 +927,7 @@ private fun ThemeModeSelectorCard(
 private fun AboutAndOpenSourceCard() {
     var showLicensesDialog by rememberSaveable { mutableStateOf(false) }
     val versionSummary = "v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})"
+    val aboutTitle = stringResource(R.string.about_open_source_title)
 
     if (showLicensesDialog) {
         AlertDialog(
@@ -918,13 +946,12 @@ private fun AboutAndOpenSourceCard() {
                         )
                     }
                     val notices = listOf(
-                        "AndroidX & Jetpack Compose / Material 3" to "Apache License 2.0",
+                        "AndroidX & Jetpack Compose / Material 3 Expressive & Adaptive" to "Apache License 2.0",
+                        "AndroidX Core SplashScreen & Activity Predictive Back" to "Apache License 2.0",
                         "AndroidX Media3 / ExoPlayer" to "Apache License 2.0",
                         "Square OkHttp" to "Apache License 2.0",
                         "Coil Image Loader" to "Apache License 2.0",
                         "Jsoup HTML Parser" to "MIT License",
-                        "Chris Banes Haze" to "Apache License 2.0",
-                        "Kyant0 AndroidLiquidGlass / Backdrop & Shapes" to "Apache License 2.0",
                         "TeamNewPipe / PipePipe Extractor & nanojson" to "GNU GPL v3.0 / MIT License",
                     )
                     items(notices) { (name, license) ->
@@ -946,39 +973,12 @@ private fun AboutAndOpenSourceCard() {
     SettingsNavigationCard {
         SettingsNavigationRow(
             icon = { Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-            title = "关于与开源许可",
+            title = aboutTitle,
             supporting = "查看当前构建版本与第三方开源组件许可声明",
             value = versionSummary,
             onClick = { showLicensesDialog = true },
             modifier = Modifier.testTag("settings-about-licenses"),
         )
-    }
-}
-
-@Composable
-private fun SettingsInfoCard(
-    icon: @Composable () -> Unit,
-    title: String,
-    supporting: String,
-) {
-    SettingsCard {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(18.dp),
-        ) {
-            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
-                icon()
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    supporting,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
     }
 }
 
@@ -991,6 +991,7 @@ private fun SettingsSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
     testTag: String,
 ) {
+    val haptic = LocalHapticFeedback.current
     SettingsCard {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -998,7 +999,14 @@ private fun SettingsSwitchRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 48.dp)
-                .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+                .toggleable(
+                    value = checked,
+                    role = Role.Switch,
+                    onValueChange = { next ->
+                        AuroraHaptics.toggle(haptic, next)
+                        onCheckedChange(next)
+                    },
+                )
                 .padding(horizontal = 18.dp, vertical = 14.dp)
                 .testTag(testTag),
         ) {
@@ -1043,13 +1051,14 @@ private fun IntroPreferenceRow(
 
 @Composable
 private fun SettingsCard(content: @Composable () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth(),
-        content = content,
+        content = { content() },
     )
 }
 
@@ -1058,8 +1067,10 @@ private fun SettingsSectionLabel(label: String) {
     Text(
         text = label,
         style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
-        color = AuroraCoral,
-        modifier = Modifier.padding(start = 6.dp, top = 14.dp, bottom = 4.dp),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .padding(start = 6.dp, top = 14.dp, bottom = 4.dp)
+            .semantics { heading() },
     )
 }
 
@@ -1086,14 +1097,14 @@ private fun SettingsNavigationRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(role = Role.Button) {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                AuroraHaptics.tap(haptic)
                 onClick()
             }
             .padding(horizontal = 18.dp, vertical = 16.dp),
     ) {
         Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
             contentColor = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(44.dp),
         ) {
@@ -1110,7 +1121,7 @@ private fun SettingsNavigationRow(
         value?.let {
             Text(
                 it,
-                color = AuroraCoral,
+                color = MaterialTheme.colorScheme.primary,
                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1131,18 +1142,30 @@ private fun SettingsPageHeader(
     subtitle: String,
     onBack: () -> Unit,
     backDescription: String = "返回设置",
+    showBackButton: Boolean = true,
 ) {
+    val haptic = LocalHapticFeedback.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp),
     ) {
-        IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = backDescription, tint = MaterialTheme.colorScheme.onBackground)
+        if (showBackButton) {
+            IconButton(
+                onClick = {
+                    AuroraHaptics.tap(haptic)
+                    onBack()
+                },
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = backDescription, tint = MaterialTheme.colorScheme.onBackground)
+            }
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 title,
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.semantics { heading() },
             )
@@ -1158,6 +1181,7 @@ private fun SettingsSubpageScaffold(
     subtitle: String,
     onBack: () -> Unit,
     listTag: String,
+    showBackButton: Boolean = true,
     content: LazyListScope.() -> Unit,
 ) {
     Column(
@@ -1166,7 +1190,12 @@ private fun SettingsSubpageScaffold(
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
         Box(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp)) {
-            SettingsPageHeader(title = title, subtitle = subtitle, onBack = onBack)
+            SettingsPageHeader(
+                title = title,
+                subtitle = subtitle,
+                onBack = onBack,
+                showBackButton = showBackButton,
+            )
         }
         LazyColumn(
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = LocalDockHeight.current + 24.dp),
@@ -1188,6 +1217,7 @@ private fun VideoSourcesPage(
     onSourceUrl: (String) -> Unit,
     onSave: (String) -> Unit,
     onBack: () -> Unit,
+    showBackButton: Boolean = true,
 ) {
     var filter by rememberSaveable { mutableStateOf("") }
     val filteredSources = remember(filter) {
@@ -1203,9 +1233,10 @@ private fun VideoSourcesPage(
         subtitle = "选择后立即刷新首页内容",
         onBack = onBack,
         listTag = "video-sources-page",
+        showBackButton = showBackButton,
     ) {
         item {
-            CenteredSearchBar(
+            AuroraSearchBar(
                 query = filter,
                 onQueryChange = { filter = it },
                 placeholder = "搜索视频源",
@@ -1218,7 +1249,9 @@ private fun VideoSourcesPage(
                 Text(
                     "没有匹配的视频源",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
                 )
             }
         } else {
@@ -1231,6 +1264,7 @@ private fun VideoSourcesPage(
                         source = source,
                         selected = selectedSourceId == source.id,
                         onClick = { onSave(source.baseUrl) },
+                        modifier = Modifier.animateItem(),
                     )
                 }
             }
@@ -1243,17 +1277,19 @@ private fun VideoSourcesPage(
                         source = source,
                         selected = selectedSourceId == source.id,
                         onClick = { onSave(source.baseUrl) },
+                        modifier = Modifier.animateItem(),
                     )
                 }
             }
         }
         item { SettingsSectionLabel("自定义站点") }
         item {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                shape = MaterialTheme.shapes.large,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.padding(18.dp)) {
@@ -1270,14 +1306,17 @@ private fun VideoSourcesPage(
                         isError = addressError != null,
                         supportingText = { Text(addressError ?: "请输入完整站点根地址") },
                         singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
+                        shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Button(
                         onClick = { onSave(sourceUrl) },
                         enabled = addressError == null,
+                        shape = CircleShape,
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
                     ) {
                         Icon(Icons.Default.CheckCircle, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -1295,6 +1334,7 @@ private fun ComicSourcesPage(
     selectedSourceId: String,
     onSource: (String) -> Unit,
     onBack: () -> Unit,
+    showBackButton: Boolean = true,
 ) {
     var filter by rememberSaveable { mutableStateOf("") }
     val filteredSources = remember(filter, sources) {
@@ -1308,9 +1348,10 @@ private fun ComicSourcesPage(
         subtitle = "选择后立即刷新漫画内容",
         onBack = onBack,
         listTag = "comic-sources-page",
+        showBackButton = showBackButton,
     ) {
         item {
-            CenteredSearchBar(
+            AuroraSearchBar(
                 query = filter,
                 onQueryChange = { filter = it },
                 placeholder = "搜索漫画源",
@@ -1323,7 +1364,9 @@ private fun ComicSourcesPage(
                 Text(
                     "没有匹配的漫画源",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
                 )
             }
         } else {
@@ -1332,6 +1375,7 @@ private fun ComicSourcesPage(
                     source = source,
                     selected = selectedSourceId == source.id,
                     onClick = { onSource(source.id) },
+                    modifier = Modifier.animateItem(),
                 )
             }
         }
@@ -1349,6 +1393,7 @@ private fun OfflineCachePage(
     totalActiveCount: Int,
     combinedActiveProgress: Float,
     onBack: () -> Unit,
+    showBackButton: Boolean = true,
     onOpenCached: (VideoItem) -> Unit,
     onOpenComic: (DownloadedComicChapter) -> Unit,
     onBrowseHome: () -> Unit,
@@ -1358,6 +1403,7 @@ private fun OfflineCachePage(
     onRetryComic: (String) -> Unit,
     onRemoveComic: (String) -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
     var selectedTab by rememberSaveable { mutableStateOf(OfflineMediaTab.VIDEO) }
     var statusFilter by rememberSaveable { mutableStateOf(OfflineStatusFilter.ALL) }
     val totalStorageBytes = downloadedBytes + comicDownloadedBytes
@@ -1399,17 +1445,20 @@ private fun OfflineCachePage(
         subtitle = subtitleText,
         onBack = onBack,
         listTag = "offline-cache-page",
+        showBackButton = showBackButton,
     ) {
         item {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(16.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                shape = MaterialTheme.shapes.large,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -1418,44 +1467,54 @@ private fun OfflineCachePage(
                     ) {
                         Text(
                             if (totalActiveCount > 0) "正在后台下载 $totalActiveCount 项任务" else "本地存储空间",
-                            style = MaterialTheme.typography.labelLarge,
+                            style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
                             if (totalActiveCount > 0) "${(combinedActiveProgress * 100).toInt()}%" else "已占用 ${formatBytes(totalStorageBytes)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = AuroraCoral,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold,
                         )
                     }
                     if (totalActiveCount > 0) {
-                        LinearProgressIndicator(
+                        AuroraWavyProgressBar(
                             progress = { combinedActiveProgress },
-                            color = AuroraCoral,
-                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f),
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp),
                         )
                     } else {
+                        val videoShare = if (totalStorageBytes > 0L) {
+                            (downloadedBytes.toFloat() / totalStorageBytes.toFloat()).coerceIn(0.06f, 0.94f)
+                        } else {
+                            0.06f
+                        }
+                        val comicShare = if (totalStorageBytes > 0L && comicDownloadedBytes > 0L) {
+                            (comicDownloadedBytes.toFloat() / totalStorageBytes.toFloat()).coerceIn(0.06f, 0.94f)
+                        } else {
+                            0.04f
+                        }
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(8.dp)
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.14f)),
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
                         ) {
                             Row(Modifier.fillMaxSize()) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxHeight()
-                                        .fillMaxWidth(if (downloadedBytes > 0L) 0.22f else 0.06f)
-                                        .background(Color(0xFF0A84FF)),
+                                        .fillMaxWidth(videoShare)
+                                        .background(MaterialTheme.colorScheme.primary),
                                 )
                                 Spacer(Modifier.width(2.dp))
                                 Box(
                                     modifier = Modifier
                                         .fillMaxHeight()
-                                        .fillMaxWidth(if (comicDownloadedBytes > 0L) 0.14f else 0.04f)
-                                        .background(Color(0xFFFF9F0A)),
+                                        .fillMaxWidth(comicShare)
+                                        .background(MaterialTheme.colorScheme.tertiary),
                                 )
                             }
                         }
@@ -1464,16 +1523,16 @@ private fun OfflineCachePage(
                         horizontalArrangement = Arrangement.spacedBy(14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFF0A84FF)))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primary))
                             Text(
                                 "视频 $completedCount/${cachedVideos.size} (${formatBytes(downloadedBytes)})",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Box(Modifier.size(6.dp).clip(CircleShape).background(Color(0xFFFF9F0A)))
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Box(Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiary))
                             Text(
                                 "漫画 $completedComicCount/${comicChapters.size} (${formatBytes(comicDownloadedBytes)})",
                                 style = MaterialTheme.typography.labelSmall,
@@ -1485,37 +1544,40 @@ private fun OfflineCachePage(
             }
         }
         item {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(14.dp),
+            val tabs = listOf(
+                OfflineMediaTab.VIDEO to "视频 (${cachedVideos.size})",
+                OfflineMediaTab.COMIC to "漫画 (${comicChapters.size})",
+            )
+            Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    val tabs = listOf(
-                        OfflineMediaTab.VIDEO to "视频 (${cachedVideos.size})",
-                        OfflineMediaTab.COMIC to "漫画 (${comicChapters.size})",
-                    )
-                    tabs.forEach { (tab, label) ->
-                        val selected = selectedTab == tab
-                        Surface(
-                            onClick = { selectedTab = tab },
-                            color = if (selected) MaterialTheme.colorScheme.surface else Color.Transparent,
-                            shape = RoundedCornerShape(10.dp),
-                            tonalElevation = if (selected) 2.dp else 0.dp,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            )
-                        }
+                tabs.forEachIndexed { index, (tab, label) ->
+                    val selected = selectedTab == tab
+                    FilledTonalToggleButton(
+                        checked = selected,
+                        onCheckedChange = {
+                            if (!selected) {
+                                AuroraHaptics.segmentTick(haptic)
+                                selectedTab = tab
+                            }
+                        },
+                        shapes = if (index == 0) {
+                            ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        } else {
+                            ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 48.dp)
+                            .semantics { role = Role.Tab },
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                            maxLines = 1,
+                        )
                     }
                 }
             }
@@ -1550,11 +1612,15 @@ private fun OfflineCachePage(
                     }
                     FilterChip(
                         selected = statusFilter == filter,
-                        onClick = { statusFilter = filter },
+                        onClick = {
+                            AuroraHaptics.segmentTick(haptic)
+                            statusFilter = filter
+                        },
                         label = { Text("${filter.label} ($count)") },
+                        shape = CircleShape,
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AuroraCoral,
-                            selectedLabelColor = Color.White,
+                            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         ),
                     )
                 }
@@ -1563,22 +1629,25 @@ private fun OfflineCachePage(
         if (selectedTab == OfflineMediaTab.VIDEO) {
             if (cachedVideos.isEmpty()) {
                 item {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        shape = RoundedCornerShape(24.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        shape = MaterialTheme.shapes.large,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 48.dp),
                         ) {
                             Icon(
                                 Icons.Default.Download,
                                 contentDescription = null,
-                                tint = AuroraCoral,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(36.dp),
                             )
                             Text("暂无离线视频", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
@@ -1586,29 +1655,31 @@ private fun OfflineCachePage(
                                 "播放视频时点击缓存按钮，任务和已下载内容会显示在这里。",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
                             )
                             Button(
                                 onClick = onBrowseHome,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                                ),
+                                shape = CircleShape,
+                                modifier = Modifier.heightIn(min = 48.dp),
                             ) { Text("去首页缓存视频") }
                         }
                     }
                 }
             } else if (filteredVideos.isEmpty()) {
                 item {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        ),
+                        shape = MaterialTheme.shapes.large,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
                         ) {
                             Text("当前筛选无视频任务", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                             Text("可切换状态筛选查看其他视频下载记录。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1620,7 +1691,9 @@ private fun OfflineCachePage(
                     TextButton(
                         onClick = { onClear(false) },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
                     ) {
                         Icon(Icons.Default.DeleteSweep, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -1633,28 +1706,32 @@ private fun OfflineCachePage(
                         onOpen = { if (cached.isPlayableOffline) onOpenCached(cached.asVideoItem()) },
                         onRetry = { onRetry(cached) },
                         onRemove = { onRemove(cached.id) },
+                        modifier = Modifier.animateItem(),
                     )
                 }
             }
         } else {
             if (comicChapters.isEmpty()) {
                 item {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        shape = RoundedCornerShape(24.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        shape = MaterialTheme.shapes.large,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 48.dp),
                         ) {
                             Icon(
                                 Icons.AutoMirrored.Filled.MenuBook,
                                 contentDescription = null,
-                                tint = AuroraCoral,
+                                tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(36.dp),
                             )
                             Text("暂无离线漫画", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface)
@@ -1669,16 +1746,19 @@ private fun OfflineCachePage(
                 }
             } else if (filteredComics.isEmpty()) {
                 item {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(20.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        ),
+                        shape = MaterialTheme.shapes.large,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
                         ) {
                             Text("当前筛选无漫画任务", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                             Text("可切换状态筛选查看其他漫画章节记录。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1690,7 +1770,9 @@ private fun OfflineCachePage(
                     TextButton(
                         onClick = { onClear(true) },
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp),
                     ) {
                         Icon(Icons.Default.DeleteSweep, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
@@ -1707,6 +1789,7 @@ private fun OfflineCachePage(
                         },
                         onRetry = { onRetryComic(chapter.id) },
                         onRemove = { onRemoveComic(chapter.id) },
+                        modifier = Modifier.animateItem(),
                     )
                 }
             }
@@ -1720,6 +1803,7 @@ private fun OfflineComicChapterRow(
     onOpen: () -> Unit,
     onRetry: () -> Unit,
     onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val pct = (chapter.progress.coerceIn(0f, 1f) * 100).toInt()
     val maxPages = maxOf(chapter.totalPages, chapter.downloadedPages)
@@ -1731,14 +1815,15 @@ private fun OfflineComicChapterRow(
         ComicDownloadStatus.PAUSED -> "已暂停 · ${chapter.downloadedPages}/$maxPages 页"
         ComicDownloadStatus.FAILED -> chapter.errorMessage?.takeIf { it.isNotBlank() }?.let { "失败: $it" } ?: "下载失败"
     }
-    Surface(
+    Card(
         onClick = onOpen,
         enabled = chapter.status == ComicDownloadStatus.COMPLETED,
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = RoundedCornerShape(20.dp),
-        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        shape = MaterialTheme.shapes.large,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1758,7 +1843,7 @@ private fun OfflineComicChapterRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
-                    color = AuroraCoral,
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                     detail,
@@ -1771,10 +1856,11 @@ private fun OfflineComicChapterRow(
                     chapter.status == ComicDownloadStatus.RESOLVING ||
                     chapter.status == ComicDownloadStatus.QUEUED
                 ) {
-                    LinearProgressIndicator(
+                    AuroraWavyProgressBar(
                         progress = { chapter.progress.coerceIn(0f, 1f) },
-                        color = AuroraCoral,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
                     )
                 }
             }
@@ -1796,9 +1882,8 @@ private fun OfflineCacheRow(
     onOpen: () -> Unit,
     onRetry: () -> Unit,
     onRemove: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    // HIG G3: expose the download state (and progress when downloading) as a readable
-    // description so screen readers do not have to infer it from the small detail line.
     val cacheStatusDescription = when (cached.state) {
         OfflineCacheState.RESOLVING -> "正在解析缓存地址"
         OfflineCacheState.QUEUED -> "等待缓存"
@@ -1807,14 +1892,15 @@ private fun OfflineCacheRow(
         OfflineCacheState.FAILED -> "缓存失败，可重试"
         OfflineCacheState.REMOVING -> "正在删除缓存"
     }
-    Surface(
+    Card(
         onClick = onOpen,
         enabled = cached.isPlayableOffline,
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shape = RoundedCornerShape(20.dp),
-        modifier = Modifier
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        shape = MaterialTheme.shapes.large,
+        modifier = modifier
             .fillMaxWidth()
             .semantics { stateDescription = cacheStatusDescription },
     ) {
@@ -1855,10 +1941,11 @@ private fun OfflineCacheRow(
                 }.joinToString(" · ")
                 Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 if (cached.state == OfflineCacheState.DOWNLOADING) {
-                    LinearProgressIndicator(
+                    AuroraWavyProgressBar(
                         progress = { (cached.percentDownloaded / 100f).coerceIn(0f, 1f) },
-                        color = AuroraCoral,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
                     )
                 }
             }
@@ -1875,23 +1962,27 @@ private fun OfflineCacheRow(
 }
 
 @Composable
-private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -> Unit) {
+private fun SourceOption(
+    source: ContentSource,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val haptic = LocalHapticFeedback.current
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val selectedBg = if (isLight) Color(0xFFEAF2FF) else Color(0xFF1E2838)
-    Surface(
+    val scheme = MaterialTheme.colorScheme
+    val semanticsColors = LocalAuroraSemanticColors.current
+    Card(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            AuroraHaptics.segmentTick(haptic)
             if (!selected) onClick()
         },
-        color = if (selected) selectedBg else MaterialTheme.colorScheme.surface,
-        contentColor = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(
-            1.dp,
-            if (selected) AuroraProfileAccent.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant,
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) scheme.primaryContainer else scheme.surfaceContainerLow,
+            contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        border = if (selected) BorderStroke(1.5.dp, scheme.primary) else null,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1901,77 +1992,73 @@ private fun SourceOption(source: ContentSource, selected: Boolean, onClick: () -
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.Default.PlayArrow,
                 contentDescription = null,
-                tint = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (selected) scheme.primary else scheme.onSurfaceVariant,
             )
             Column(Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-                    val badgeBg = when {
-                        isLight && source.isDirectDomestic -> Color(0x1A1B873F)
-                        isLight -> Color(0x1A0066CC)
-                        source.isDirectDomestic -> Color(0x1F34C759)
-                        else -> Color(0x1F0A84FF)
-                    }
-                    val badgeBorder = when {
-                        isLight && source.isDirectDomestic -> Color(0x4D1B873F)
-                        isLight -> Color(0x4D0066CC)
-                        source.isDirectDomestic -> Color(0x4034C759)
-                        else -> Color(0x400A84FF)
-                    }
-                    val badgeText = when {
-                        isLight && source.isDirectDomestic -> Color(0xFF137333)
-                        isLight -> Color(0xFF0055B3)
-                        source.isDirectDomestic -> Color(0xFF34C759)
-                        else -> Color(0xFF64D2FF)
-                    }
+                    Text(
+                        source.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    val badgeBg = if (source.isDirectDomestic) semanticsColors.directContainer else semanticsColors.overseasContainer
+                    val badgeText = if (source.isDirectDomestic) semanticsColors.onDirectContainer else semanticsColors.onOverseasContainer
                     val badgeLabel = if (source.isDirectDomestic) "直连" else "海外"
                     Surface(
                         color = badgeBg,
-                        shape = RoundedCornerShape(6.dp),
-                        border = BorderStroke(0.5.dp, badgeBorder),
+                        shape = RoundedCornerShape(8.dp),
                     ) {
                         Text(
                             text = badgeLabel,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                            ),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             color = badgeText,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                         )
                     }
                 }
                 Spacer(Modifier.height(2.dp))
-                Text(source.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    source.description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.82f) else scheme.onSurfaceVariant,
+                )
             }
             if (selected) {
-                Text("使用中", style = MaterialTheme.typography.labelMedium, color = AuroraProfileAccent)
+                Text(
+                    "使用中",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.primary,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ComicSourceOption(source: ComicSourceInfo, selected: Boolean, onClick: () -> Unit) {
+private fun ComicSourceOption(
+    source: ComicSourceInfo,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val haptic = LocalHapticFeedback.current
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val selectedBg = if (isLight) Color(0xFFEAF2FF) else Color(0xFF1E2838)
-    Surface(
+    val scheme = MaterialTheme.colorScheme
+    Card(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            AuroraHaptics.segmentTick(haptic)
             if (!selected) onClick()
         },
-        color = if (selected) selectedBg else MaterialTheme.colorScheme.surface,
-        contentColor = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(
-            1.dp,
-            if (selected) AuroraProfileAccent.copy(alpha = 0.55f) else MaterialTheme.colorScheme.outlineVariant,
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) scheme.primaryContainer else scheme.surfaceContainerLow,
+            contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        border = if (selected) BorderStroke(1.5.dp, scheme.primary) else null,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -1981,14 +2068,18 @@ private fun ComicSourceOption(source: ComicSourceInfo, selected: Boolean, onClic
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.AutoMirrored.Filled.MenuBook,
                 contentDescription = null,
-                tint = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (selected) scheme.primary else scheme.onSurfaceVariant,
             )
             Column(Modifier.weight(1f)) {
-                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    source.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
                 Text(
                     source.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.82f) else scheme.onSurfaceVariant,
                 )
             }
             Text(
@@ -1998,7 +2089,8 @@ private fun ComicSourceOption(source: ComicSourceInfo, selected: Boolean, onClic
                     else -> ""
                 },
                 style = MaterialTheme.typography.labelMedium,
-                color = if (selected) AuroraProfileAccent else AuroraCoral,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                color = scheme.primary,
             )
         }
     }
@@ -2010,6 +2102,7 @@ private fun LiveSourcesPage(
     selectedSourceId: String,
     onSource: (String) -> Unit,
     onBack: () -> Unit,
+    showBackButton: Boolean = true,
 ) {
     var filter by rememberSaveable { mutableStateOf("") }
     val filteredSources = remember(filter, sources) {
@@ -2023,9 +2116,10 @@ private fun LiveSourcesPage(
         subtitle = "选择后立即刷新直播内容",
         onBack = onBack,
         listTag = "live-sources-page",
+        showBackButton = showBackButton,
     ) {
         item {
-            CenteredSearchBar(
+            AuroraSearchBar(
                 query = filter,
                 onQueryChange = { filter = it },
                 placeholder = "搜索直播源",
@@ -2038,7 +2132,9 @@ private fun LiveSourcesPage(
                 Text(
                     "没有匹配的直播源",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 48.dp),
                 )
             }
         } else {
@@ -2047,6 +2143,7 @@ private fun LiveSourcesPage(
                     source = source,
                     selected = selectedSourceId == source.id,
                     onClick = { onSource(source.id) },
+                    modifier = Modifier.animateItem(),
                 )
             }
         }
@@ -2058,19 +2155,22 @@ private fun LiveSourceOption(
     source: LiveSourceInfo,
     selected: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
-    val selectedBg = if (isLight) Color(0xFFEAF2FF) else MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
-    Surface(
-        onClick = onClick,
-        color = if (selected) selectedBg else MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(
-            1.dp,
-            if (selected) AuroraProfileAccent.copy(alpha = 0.85f)
-            else MaterialTheme.colorScheme.outlineVariant,
+    val haptic = LocalHapticFeedback.current
+    val scheme = MaterialTheme.colorScheme
+    Card(
+        onClick = {
+            AuroraHaptics.segmentTick(haptic)
+            if (!selected) onClick()
+        },
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) scheme.primaryContainer else scheme.surfaceContainerLow,
+            contentColor = if (selected) scheme.onPrimaryContainer else scheme.onSurface,
         ),
-        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        border = if (selected) BorderStroke(1.5.dp, scheme.primary) else null,
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -2080,21 +2180,26 @@ private fun LiveSourceOption(
             Icon(
                 if (selected) Icons.Default.CheckCircle else Icons.Default.LiveTv,
                 contentDescription = null,
-                tint = if (selected) AuroraProfileAccent else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (selected) scheme.primary else scheme.onSurfaceVariant,
             )
             Column(Modifier.weight(1f)) {
-                Text(source.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                Text(
+                    source.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
                 Text(
                     source.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (selected) scheme.onPrimaryContainer.copy(alpha = 0.82f) else scheme.onSurfaceVariant,
                 )
             }
             if (selected) {
                 Text(
                     "使用中",
                     style = MaterialTheme.typography.labelMedium,
-                    color = AuroraProfileAccent,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.primary,
                 )
             }
         }

@@ -1,4 +1,22 @@
-## 最新交接：2026-11-19 — 根治 OTA 描述文件 Nginx `404` 与 iOS 26/27 未签名 XML 报「无法下载描述文件」（补齐 `openssl smime -sign` 实时 DER CMS 签名 + 非 Safari 识别 + 已签入设备自动解锁）
+## 最新交接：2026-11-20 — Android 客户端全面升级至 Google Android 17 (API 37) SDK 与 100% 原生 Material 3 Expressive、双端 Release 模拟器全规模验收与全通道同步上线 · v2.18.0 (Build 274)
+
+### 本次完成
+1. **Android 17 (API 37) SDK 与平台合规升级**：
+   - [build.gradle.kts](file:///Users/itou/Documents/ChatGPT/91pron/app/build.gradle.kts) 升级至 `compileSdk = 37` / `targetSdk = 37`、`compose-bom:2026.09.00`、`material3:1.5.0-rc01`、`adaptive:1.3.0`、`core-splashscreen:1.2.0`，彻底移除 `dev.chrisbanes.haze` 与 `AndroidLiquidGlass` 依赖，并配置 `testOptions { animationsDisabled = true }`。
+   - [AndroidManifest.xml](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/AndroidManifest.xml) 新增 `ACCESS_LOCAL_NETWORK` 权限与 [locales_config.xml](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/res/xml/locales_config.xml)，新增 [LocalNetworkPermission.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/cast/LocalNetworkPermission.kt) 接入 [CastDeviceSheet.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/CastDeviceSheet.kt)；[AuroraShelfApp.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AuroraShelfApp.kt) 使用 `currentWindowAdaptiveInfoV2()`、对大屏（`sw >= 600dp`）解除方向锁定并补齐桌面快捷键（`Ctrl/Meta+1..5`、`Ctrl/Meta+F`、`Esc`）。
+2. **100% 原生 Material 3 Expressive 全站重构与关键缺陷根治**：
+   - 删除 `app/src/main/java/com/aurorashelf/app/ui/liquid/` 全部 4 个文件；新增 [Motion.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/theme/Motion.kt)（`AuroraMotion` + `AuroraHaptics` + `LocalReduceMotion`），更新 [Theme.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/theme/Theme.kt)、[Type.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/theme/Type.kt)、[AppComponents.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AppComponents.kt) 及 `HomeScreen` / `PlayerScreen` / `NativeSitePlayer` / `ComicScreen` / `LiveScreen` / `ForumScreen` / `PersonalScreen` / `SearchScreen` / `AccountScreen` / `IntroAnimation`。
+   - **实机验证期间捕获并修复的关键问题**：
+     1. 修复 `material3:1.5.0-rc01` `ShortNavigationBar` 传入 `.fillMaxWidth()` 时 `Surface` 向下传播 `minWidth` 导致 `EqualWeightContentMeasurePolicy` 把第 0 个 Tab 扩宽至全屏、后 4 个 Tab 挤出屏幕的问题；
+     2. 修复 `ComicScreen.kt` `HorizontalFloatingToolbar` 中章节页码未加 `Modifier.align(Alignment.CenterVertically)` 导致的垂直偏上问题；
+     3. 修复 `LocalReduceMotion == true` 时 `AuroraLoadingIndicator` / `AuroraWavyProgressBar` / `AuroraPullToRefreshBox` 仍运行无限旋转动画及 `HomeScreen`/`PlayerScreen` 叠层同 key `sharedBounds` 冲突导致的 Compose 测试空闲挂起；
+     4. 修复 `v2.17.4` 遗留的 `ForumScreen.kt` `MOBILE_FORUM_SCRIPT` `body { overflow-x: visible }` 回归（改为 `overflow-x: clip`），`ForumReaderRegressionTest` 恢复通过。
+3. **双端全规模验收与三通道同步发布（`v2.18.0 Build 274`）**：
+   - 新增 [Android17ExpressiveComplianceTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/Android17ExpressiveComplianceTest.kt)；Android 单测、Lint（`0` error / `0` warning）、在线全源探针、`20/20` 仪器化 UI/无障碍测试、16 KB 对齐及 `RSA-4096` V2/V3 验签全绿；`emulator-5554` 正式签名 R8 Release APK 全模块及平板双栏走查通过。
+   - iOS / iPadOS 在线全源 XCTest `59/59` 全通，`iPhone 18 Pro` 与 `iPad Pro 13-inch (M5)` Release 模拟器全模块及《Lust Goddess》`Version 2.18.0` 走查通过。
+   - 网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,629,451` B、`Netgrey.ipa` `140,446,231` B，`/` 剩 `11G`）、TestFlight `Build 274` 与 GitHub Release `v2.18.0` 全部同步上线。
+
+## 历史交接：2026-11-19 — 根治 OTA 描述文件 Nginx `404` 与 iOS 26/27 未签名 XML 报「无法下载描述文件」（补齐 `openssl smime -sign` 实时 DER CMS 签名 + 非 Safari 识别 + 已签入设备自动解锁）
 
 ### 本次完成
 1. **两层真实根因查明（已验证）**：

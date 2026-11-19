@@ -1,20 +1,11 @@
 package com.aurorashelf.app.game
 
-import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
-import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.ColorFilter
-import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.PixelFormat
-import android.graphics.Rect
 import android.graphics.Typeface
-import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -22,7 +13,6 @@ import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -30,55 +20,49 @@ import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import kotlin.math.abs
 import kotlin.math.max
 
 /**
  * Immersive standalone Activity for Lust Goddess Tactical RPG.
- * Follows the host window orientation with zero-distraction fullscreen cutout handling,
- * hardware-accelerated WebGL/Spine rendering, durable offline save persistence,
- * and an Apple HIG floating exit capsule to seamlessly return to AuroraShelf video feeds.
+ * Uses Android 17 edge-to-edge APIs, responsive multi-window orientation support,
+ * predictive back preview scaling, hardware-accelerated WebGL/Spine rendering,
+ * and durable offline save persistence.
  */
 class GameActivity : ComponentActivity() {
     private var webView: WebView? = null
     private var assetServer: GameAssetServer? = null
     private var saveBridge: GameSaveBridge? = null
     private var exitCapsule: View? = null
+    private var rootContainer: FrameLayout? = null
     private val handler = Handler(Looper.getMainLooper())
     private val autoFadeRunnable = Runnable {
-        exitCapsule?.animate()?.alpha(0.40f)?.setDuration(350)?.start()
+        exitCapsule?.animate()?.alpha(0.44f)?.setDuration(320)?.start()
     }
 
-    @SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
-    @Suppress("DEPRECATION")
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Android 17 large-screen compliant: never force-lock orientation.
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
 
-        val window = window
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.TRANSPARENT
-        if (Build.VERSION.SDK_INT >= 29) {
-            window.isNavigationBarContrastEnforced = false
-        }
-        if (Build.VERSION.SDK_INT >= 28) {
-            val lp = window.attributes
-            lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            window.attributes = lp
-        }
 
         WebView.setWebContentsDebuggingEnabled((applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0)
 
@@ -92,14 +76,13 @@ class GameActivity : ComponentActivity() {
             val port = server.start()
             activeAssetPort = port
             url = server.buildEntryUrl()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             assetServer = null
         }
 
         val s = wv.settings
         s.javaScriptEnabled = true
         s.domStorageEnabled = true
-        s.databaseEnabled = true
         val usingLocalHttp = activeAssetPort > 0
         s.allowFileAccess = !usingLocalHttp
         s.allowContentAccess = !usingLocalHttp
@@ -180,7 +163,8 @@ class GameActivity : ComponentActivity() {
         wv.isFocusableInTouchMode = true
         wv.requestFocus()
 
-        val rootLayout = FrameLayout(this)
+        val rootLayout = FrameLayout(this).also { rootContainer = it }
+        rootLayout.setBackgroundColor(Color.rgb(7, 9, 15))
         rootLayout.addView(
             wv,
             FrameLayout.LayoutParams(
@@ -220,7 +204,32 @@ class GameActivity : ComponentActivity() {
         scheduleAutoFade()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackProgressed(backEvent: BackEventCompat) {
+                val p = backEvent.progress.coerceIn(0f, 1f)
+                val scale = 1f - 0.08f * p
+                val shift = dpToPx(24) * p * if (backEvent.swipeEdge == BackEventCompat.EDGE_RIGHT) -1f else 1f
+                rootContainer?.apply {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = shift
+                }
+            }
+
+            override fun handleOnBackCancelled() {
+                rootContainer?.animate()
+                    ?.scaleX(1f)
+                    ?.scaleY(1f)
+                    ?.translationX(0f)
+                    ?.setDuration(180)
+                    ?.start()
+            }
+
             override fun handleOnBackPressed() {
+                rootContainer?.apply {
+                    scaleX = 1f
+                    scaleY = 1f
+                    translationX = 0f
+                }
                 val current = webView
                 if (current != null) {
                     current.evaluateJavascript("window.handleAppBack ? window.handleAppBack() : false") { value ->
@@ -244,18 +253,17 @@ class GameActivity : ComponentActivity() {
         val capsule = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            elevation = dpToPx(8).toFloat()
+            elevation = dpToPx(6).toFloat()
 
             val bg = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dpToPx(16).toFloat()
-                setColor(Color.argb(220, 20, 24, 38))
-                setStroke(dpToPx(1), Color.argb(60, 255, 255, 255))
+                cornerRadius = dpToPx(24).toFloat()
+                setColor(Color.argb(232, 25, 31, 44))
+                setStroke(dpToPx(1), Color.argb(72, 184, 192, 206))
             }
             background = bg
         }
 
-        // 左半部：··· 功能菜单
         val menuBtn = TextView(this).apply {
             text = "···"
             contentDescription = "游戏功能菜单"
@@ -267,20 +275,18 @@ class GameActivity : ComponentActivity() {
             isClickable = true
             isFocusable = true
             setOnClickListener { v ->
-                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                v.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                 showMiniProgramMenu(v)
             }
         }
         capsule.addView(menuBtn)
 
-        // 中间半透明垂直分割线
         val divider = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(dpToPx(1), dpToPx(18))
-            setBackgroundColor(Color.argb(60, 255, 255, 255))
+            setBackgroundColor(Color.argb(72, 184, 192, 206))
         }
         capsule.addView(divider)
 
-        // 右半部：✕ 关闭退出按键
         val closeBtn = TextView(this).apply {
             text = "✕"
             contentDescription = "退出游戏"
@@ -292,7 +298,7 @@ class GameActivity : ComponentActivity() {
             isClickable = true
             isFocusable = true
             setOnClickListener { v ->
-                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                v.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
                 finish()
             }
         }
@@ -305,7 +311,7 @@ class GameActivity : ComponentActivity() {
         val popup = android.widget.PopupMenu(this, anchor)
         popup.menu.add(0, 1, 0, if (isMuted) "开启音效" else "静音")
         popup.menu.add(0, 2, 1, "重新加载")
-        popup.menu.add(0, 3, 2, "退出小程序")
+        popup.menu.add(0, 3, 2, "退出游戏")
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> {
@@ -340,7 +346,6 @@ class GameActivity : ComponentActivity() {
         ).toInt()
 
     private fun hideSystemBars() {
-        WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         controller.hide(WindowInsetsCompat.Type.systemBars())
@@ -379,48 +384,7 @@ class GameActivity : ComponentActivity() {
         assetServer?.stop()
         assetServer = null
         exitCapsule = null
+        rootContainer = null
         super.onDestroy()
-    }
-
-    private class ChevronLeftDrawable(private val color: Int, private val strokeWidthPx: Float) : Drawable() {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = this@ChevronLeftDrawable.color
-            style = Paint.Style.STROKE
-            strokeWidth = strokeWidthPx
-            strokeCap = Paint.Cap.ROUND
-            strokeJoin = Paint.Join.ROUND
-        }
-        private val path = Path()
-
-        override fun onBoundsChange(bounds: Rect) {
-            super.onBoundsChange(bounds)
-            path.reset()
-            val w = bounds.width().toFloat()
-            val h = bounds.height().toFloat()
-            val startX = bounds.left + w * 0.70f
-            val midX = bounds.left + w * 0.30f
-            val topY = bounds.top + h * 0.20f
-            val midY = bounds.top + h * 0.50f
-            val botY = bounds.top + h * 0.80f
-            path.moveTo(startX, topY)
-            path.lineTo(midX, midY)
-            path.lineTo(startX, botY)
-        }
-
-        override fun draw(canvas: Canvas) {
-            canvas.drawPath(path, paint)
-        }
-
-        override fun setAlpha(alpha: Int) {
-            paint.alpha = alpha
-        }
-
-        override fun setColorFilter(colorFilter: ColorFilter?) {
-            paint.colorFilter = colorFilter
-        }
-
-        @Deprecated("Deprecated in Java")
-        @Suppress("DEPRECATION")
-        override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
     }
 }

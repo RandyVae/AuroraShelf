@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.aurorashelf.app.ui.theme
 
 import android.content.ContentResolver
@@ -11,125 +13,246 @@ import android.view.accessibility.AccessibilityManager
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlin.math.pow
 
 val AuroraCoral = Color(0xFFFF4F7B)
-private val AuroraDarkBackground = Color(0xFF070B12)
-private val AuroraDarkSurface = Color(0xFF111722)
-private val AuroraDarkText = Color(0xFFF5F7FB)
-private val AuroraDarkMuted = Color(0xFFB6BFCC)
+private val AuroraDarkBackground = Color(0xFF0A0D14)
+private val AuroraDarkSurface = Color(0xFF10141D)
+private val AuroraDarkText = Color(0xFFF3F5FA)
+private val AuroraDarkMuted = Color(0xFFB8C0CE)
 
+/**
+ * Material 3 Expressive tonal dark fallback scheme with full 5-tier `surfaceContainer*` elevation roles.
+ */
 private val AuroraDarkColors = darkColorScheme(
     primary = AuroraCoral,
-    // Dark maroon instead of white: white on #FF4F7B is only 3.15:1, below WCAG AA 4.5:1,
-    // while #3F0015 on the same coral is 5.45:1 and keeps the brand tone.
+    // Dark maroon on coral reaches 5.45:1 (WCAG AA >= 4.5:1), whereas white on #FF4F7B is only 3.15:1.
     onPrimary = Color(0xFF3F0015),
-    primaryContainer = Color(0xFFFFB0C2),
-    onPrimaryContainer = Color(0xFF3F0015),
+    primaryContainer = Color(0xFF7B1637),
+    onPrimaryContainer = Color(0xFFFFD9E2),
+    secondary = Color(0xFFE5BDC7),
+    onSecondary = Color(0xFF432931),
+    secondaryContainer = Color(0xFF5B3F47),
+    onSecondaryContainer = Color(0xFFFFD9E2),
+    tertiary = Color(0xFFEFBD94),
+    onTertiary = Color(0xFF48290C),
+    tertiaryContainer = Color(0xFF613F20),
+    onTertiaryContainer = Color(0xFFFFDCC2),
     background = AuroraDarkBackground,
     onBackground = AuroraDarkText,
     surface = AuroraDarkSurface,
     onSurface = AuroraDarkText,
-    surfaceVariant = Color(0xFF1B2330),
+    surfaceDim = Color(0xFF0B0E15),
+    surfaceBright = Color(0xFF313641),
+    surfaceContainerLowest = Color(0xFF06080D),
+    surfaceContainerLow = Color(0xFF151A25),
+    surfaceContainer = Color(0xFF191F2C),
+    surfaceContainerHigh = Color(0xFF232A38),
+    surfaceContainerHighest = Color(0xFF2E3545),
+    surfaceVariant = Color(0xFF232A38),
     onSurfaceVariant = AuroraDarkMuted,
-    outline = Color(0xFF5C6879),
-    outlineVariant = Color(0xFF303946),
+    outline = Color(0xFF6D7788),
+    outlineVariant = Color(0xFF363F4E),
+    inverseSurface = Color(0xFFE6E8F0),
+    inverseOnSurface = Color(0xFF1C2029),
+    inversePrimary = Color(0xFFB42352),
     error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6),
+    scrim = Color.Black,
 )
 
+/**
+ * Material 3 Expressive tonal light fallback scheme with full 5-tier `surfaceContainer*` elevation roles.
+ */
 private val AuroraLightColors = lightColorScheme(
     primary = Color(0xFFB42352),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFFFD9E2),
     onPrimaryContainer = Color(0xFF3F0017),
-    background = Color(0xFFF8F9FE),
-    onBackground = Color(0xFF191C20),
-    surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF191C20),
-    surfaceVariant = Color(0xFFE9EDF5),
-    onSurfaceVariant = Color(0xFF555C68),
-    outline = Color(0xFF737985),
-    outlineVariant = Color(0xFFC3C7D0),
+    secondary = Color(0xFF75565F),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFFFD9E2),
+    onSecondaryContainer = Color(0xFF2B151C),
+    tertiary = Color(0xFF7D5635),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFFDCC2),
+    onTertiaryContainer = Color(0xFF2F1500),
+    background = Color(0xFFFBF8FA),
+    onBackground = Color(0xFF1B1B1F),
+    surface = Color(0xFFFBF8FA),
+    onSurface = Color(0xFF1B1B1F),
+    surfaceDim = Color(0xFFDBD9DD),
+    surfaceBright = Color(0xFFFBF8FA),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFF5F2F6),
+    surfaceContainer = Color(0xFFF0ECF2),
+    surfaceContainerHigh = Color(0xFFE9E6EC),
+    surfaceContainerHighest = Color(0xFFE4E1E7),
+    surfaceVariant = Color(0xFFECE6EE),
+    onSurfaceVariant = Color(0xFF4F4B54),
+    outline = Color(0xFF726C77),
+    outlineVariant = Color(0xFFC9C3CE),
+    inverseSurface = Color(0xFF303034),
+    inverseOnSurface = Color(0xFFF3F0F4),
+    inversePrimary = Color(0xFFFFB1C4),
     error = Color(0xFFBA1A1A),
+    onError = Color.White,
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002),
+    scrim = Color.Black,
 )
 
 /**
- * Increase Contrast (HIG "Increase Contrast" / WCAG 1.4.6) light fallback palette.
- *
- * Measured WCAG 2.1 contrast ratios for the critical pairs (normal palette in brackets):
- * - onBackground/background: **21.00:1** (16.26:1)
- * - onSurface/surface: **21.00:1** (17.10:1)
- * - onSurfaceVariant/surface: **9.29:1** (6.74:1)
- * - onPrimary/primary: **9.78:1** (6.36:1)
- * - error/surface: **8.92:1** (6.46:1)
- * - outline/surface (non-text boundary): **7.00:1** (4.37:1)
- *
- * Every text pair reaches the 7:1 custom foreground/background target and the outline
- * reaches 4.5:1; each pair is strictly stronger than the normal light palette.
+ * Increase Contrast (WCAG 1.4.6 AAA >= 7:1 text, >= 4.5:1 non-text) light palette.
  */
 internal val AuroraHighContrastLightColors = lightColorScheme(
     primary = Color(0xFF8B0034),
     onPrimary = Color.White,
     primaryContainer = Color(0xFFFFD9E2),
-    onPrimaryContainer = Color(0xFF3F0017),
+    onPrimaryContainer = Color(0xFF2A000E),
+    secondary = Color(0xFF4E2D37),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFFFD9E2),
+    onSecondaryContainer = Color(0xFF210B12),
+    tertiary = Color(0xFF523214),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFFDCC2),
+    onTertiaryContainer = Color(0xFF200E00),
     background = Color.White,
     onBackground = Color.Black,
     surface = Color.White,
     onSurface = Color.Black,
+    surfaceDim = Color(0xFFDADADA),
+    surfaceBright = Color.White,
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color(0xFFF5F5F5),
+    surfaceContainer = Color(0xFFEDEDED),
+    surfaceContainerHigh = Color(0xFFE5E5E5),
+    surfaceContainerHighest = Color(0xFFDDDDDD),
     surfaceVariant = Color(0xFFF2F2F2),
-    onSurfaceVariant = Color(0xFF474747),
-    outline = Color(0xFF595959),
-    outlineVariant = Color(0xFF8A8A8A),
+    onSurfaceVariant = Color(0xFF3D3D3D),
+    outline = Color(0xFF525252),
+    outlineVariant = Color(0xFF7A7A7A),
+    inverseSurface = Color(0xFF141414),
+    inverseOnSurface = Color.White,
+    inversePrimary = Color(0xFFFFB3C6),
     error = Color(0xFF990000),
     onError = Color.White,
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF410002),
+    scrim = Color.Black,
 )
 
 /**
- * Increase Contrast dark fallback palette.
- *
- * Measured WCAG 2.1 contrast ratios for the critical pairs (normal palette in brackets):
- * - onBackground/background: **21.00:1** (18.37:1)
- * - onSurface/surface: **19.80:1** (16.74:1)
- * - onSurfaceVariant/surface: **12.84:1** (9.67:1)
- * - onPrimary/primary: **12.52:1** (5.45:1)
- * - error/surface: **11.66:1** (10.58:1)
- * - outline/surface (non-text boundary): **9.13:1** (3.17:1)
- *
- * Dark chrome keeps the base/elevated distinction: the background is pure black while the
- * surface stays slightly raised at #0A0A0A. Every pair is strictly stronger than the normal
- * dark palette, including the brand coral button pair (black ink on a lighter coral).
+ * Increase Contrast (WCAG 1.4.6 AAA >= 7:1 text, >= 4.5:1 non-text) dark palette.
  */
 internal val AuroraHighContrastDarkColors = darkColorScheme(
     primary = Color(0xFFFFB3C6),
     onPrimary = Color.Black,
     primaryContainer = Color(0xFFFFB0C2),
-    onPrimaryContainer = Color(0xFF3F0015),
+    onPrimaryContainer = Color(0xFF29000D),
+    secondary = Color(0xFFFFD0DC),
+    onSecondary = Color.Black,
+    secondaryContainer = Color(0xFF7A5660),
+    onSecondaryContainer = Color.White,
+    tertiary = Color(0xFFFFD3AE),
+    onTertiary = Color.Black,
+    tertiaryContainer = Color(0xFF7D5635),
+    onTertiaryContainer = Color.White,
     background = Color.Black,
     onBackground = Color.White,
     surface = Color(0xFF0A0A0A),
     onSurface = Color.White,
-    surfaceVariant = Color(0xFF141414),
-    onSurfaceVariant = Color(0xFFD0D0D0),
-    outline = Color(0xFFB0B0B0),
-    outlineVariant = Color(0xFF5A5A5A),
+    surfaceDim = Color.Black,
+    surfaceBright = Color(0xFF333333),
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF121212),
+    surfaceContainer = Color(0xFF1A1A1A),
+    surfaceContainerHigh = Color(0xFF222222),
+    surfaceContainerHighest = Color(0xFF2C2C2C),
+    surfaceVariant = Color(0xFF181818),
+    onSurfaceVariant = Color(0xFFD8D8D8),
+    outline = Color(0xFFB5B5B5),
+    outlineVariant = Color(0xFF6B6B6B),
+    inverseSurface = Color.White,
+    inverseOnSurface = Color.Black,
+    inversePrimary = Color(0xFF8B0034),
     error = Color(0xFFFFB4AB),
     onError = Color.Black,
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color.White,
+    scrim = Color.Black,
 )
+
+/**
+ * Semantic domain badges (direct domestic vs overseas route, forum board tags, live status).
+ * Always theme-aware so UI screens never hardcode raw `Color(0x...)` literals.
+ */
+@Immutable
+internal data class AuroraSemanticColors(
+    val directContainer: Color,
+    val onDirectContainer: Color,
+    val overseasContainer: Color,
+    val onOverseasContainer: Color,
+    val liveBadgeContainer: Color,
+    val onLiveBadgeContainer: Color,
+    val forumPrimaryBadge: Color,
+    val forumSecondaryBadge: Color,
+    val forumTertiaryBadge: Color,
+    val forumFallbackBadge: Color,
+    val onForumBadge: Color,
+)
+
+private val AuroraSemanticLight = AuroraSemanticColors(
+    directContainer = Color(0xFFD7F3DF),
+    onDirectContainer = Color(0xFF0E5A27),
+    overseasContainer = Color(0xFFD7E8FF),
+    onOverseasContainer = Color(0xFF00458F),
+    liveBadgeContainer = Color(0xFFC61A3E),
+    onLiveBadgeContainer = Color.White,
+    forumPrimaryBadge = Color(0xFFB42352),
+    forumSecondaryBadge = Color(0xFF1F6E3D),
+    forumTertiaryBadge = Color(0xFF00645D),
+    forumFallbackBadge = Color(0xFF9A4D00),
+    onForumBadge = Color.White,
+)
+
+private val AuroraSemanticDark = AuroraSemanticColors(
+    directContainer = Color(0xFF143C24),
+    onDirectContainer = Color(0xFF86E8A6),
+    overseasContainer = Color(0xFF123254),
+    onOverseasContainer = Color(0xFF99CCFF),
+    liveBadgeContainer = Color(0xFFFF4F7B),
+    onLiveBadgeContainer = Color(0xFF3F0015),
+    forumPrimaryBadge = Color(0xFF8C1D40),
+    forumSecondaryBadge = Color(0xFF1E5E36),
+    forumTertiaryBadge = Color(0xFF0F5752),
+    forumFallbackBadge = Color(0xFF7D4310),
+    onForumBadge = Color.White,
+)
+
+internal val LocalAuroraSemanticColors = staticCompositionLocalOf { AuroraSemanticDark }
 
 /**
  * Picks the fallback palette for the requested state: normal light/dark or the increased
@@ -146,42 +269,27 @@ internal fun auroraFallbackColorScheme(darkTheme: Boolean): ColorScheme =
     auroraColorScheme(darkTheme, highContrast = false)
 
 /**
- * Immersive media surfaces stay black on purpose (HIG allows media apps to keep dark-only
- * chrome). This token keeps that exception explicit instead of scattering raw hex values.
+ * Immersive media surfaces stay dark by design (video player, fullscreen live, comic canvas).
  */
 internal val AuroraImmersiveBackground = Color(0xFF000000)
-
-/** Neutral glass container tints for the floating navigation, one per appearance. */
-internal val AuroraGlassContainerLight = Color(0xFFFAFAFA)
-internal val AuroraGlassContainerDark = Color(0xFF121212)
-internal const val AuroraGlassContainerAlpha = 0.4f
-
-/** Opaque ink surface used by forced-dark glass panels (player controls, immersive chrome). */
-internal val AuroraInkSurface = Color(0xFF111722)
+internal val AuroraInkSurface = Color(0xFF141822)
 internal val AuroraInkContent = Color.White
+internal val AuroraReaderBackground = Color(0xFF101218)
 
-/** Reading surface for the comic reader; immersive media chrome stays dark by design. */
-internal val AuroraReaderBackground = Color(0xFF111111)
-
-/**
- * Semantic tokens for artwork overlays and immersive media chrome.
- * These fixed dark values are intentionally limited to image/video surfaces; normal page
- * backgrounds and text continue to come from [MaterialTheme.colorScheme].
- */
 internal val AuroraMediaScrim = Color.Black
 internal val AuroraMediaOnImage = Color.White
 internal val AuroraMediaInk = Color.Black
-internal val AuroraMediaSurface = Color(0xFF141414)
-internal val AuroraMediaSurfaceVariant = Color(0xFF1F1F1F)
-internal val AuroraMediaMuted = Color(0xFFA3A3A3)
-internal val AuroraMediaOutline = Color(0xFF404040)
-internal val AuroraMediaLabel = Color(0xFFD6D6D6)
-internal val AuroraMediaPlaceholder = Color(0xFF1A1A1A)
-internal val AuroraMediaMeta = Color(0xFF888888)
-internal val AuroraMediaRankOutline = Color(0xFF757575)
-internal val AuroraMediaRankFill = Color(0xFF121212)
-internal val AuroraProfileAccent = Color(0xFF0071EB)
-internal val AuroraBrandAccentDeep = Color(0xFFB81D24)
+internal val AuroraMediaSurface = Color(0xFF161A22)
+internal val AuroraMediaSurfaceVariant = Color(0xFF222834)
+internal val AuroraMediaMuted = Color(0xFFA8B0BE)
+internal val AuroraMediaOutline = Color(0xFF3E4656)
+internal val AuroraMediaLabel = Color(0xFFDCE1EA)
+internal val AuroraMediaPlaceholder = Color(0xFF1A1E28)
+internal val AuroraMediaMeta = Color(0xFF8E96A4)
+internal val AuroraMediaRankOutline = Color(0xFF788090)
+internal val AuroraMediaRankFill = Color(0xFF141822)
+internal val AuroraProfileAccent = Color(0xFF2962FF)
+internal val AuroraBrandAccentDeep = Color(0xFFB42352)
 
 /** Shared dimensions for interactive controls and recurring layout primitives. */
 internal object AuroraDimens {
@@ -192,53 +300,32 @@ internal object AuroraDimens {
     val settingsCardPadding = 18.dp
 }
 
-private val AuroraShapes = Shapes(
+/** Material 3 Expressive rounded shape scale. */
+private val AuroraExpressiveShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(14.dp),
-    medium = RoundedCornerShape(20.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp),
+    small = RoundedCornerShape(12.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(24.dp),
+    extraLarge = RoundedCornerShape(32.dp),
 )
 
-/** WCAG 2.1 AA text contrast threshold for the dynamic-color guard. */
 private const val MIN_TEXT_CONTRAST = 4.5
-
-/** WCAG 2.1 non-text contrast threshold for icons and boundaries. */
 private const val MIN_NON_TEXT_CONTRAST = 3.0
 
-/**
- * Known keys that persist Android's high-contrast-text ("高对比度文字/字体") switch.
- *
- * AOSP uses `high_text_contrast_enabled`; some OEM skins persist their own variant under
- * `Settings.Secure`/`Settings.Global`. No public `Settings` constant exists for any of
- * these keys, so they are kept as literals. Unknown vendor keys remain undetected.
- */
 private val HIGH_TEXT_CONTRAST_SETTING_KEYS = listOf(
     "high_text_contrast_enabled",
     "accessibility_high_text_contrast_enabled",
     "high_contrast_text",
 )
 
-/**
- * Coerces one sRGB channel to linear light, per WCAG 2.1 relative luminance.
- * Values are assumed to be gamma-encoded sRGB components in `0f..1f`.
- */
 private fun linearizeChannel(channel: Float): Double {
     val value = channel.toDouble().coerceIn(0.0, 1.0)
     return if (value <= 0.04045) value / 12.92 else ((value + 0.055) / 1.055).pow(2.4)
 }
 
-/** WCAG 2.1 relative luminance for an opaque sRGB [Color]. */
 private fun Color.relativeLuminance(): Double =
     0.2126 * linearizeChannel(red) + 0.7152 * linearizeChannel(green) + 0.0722 * linearizeChannel(blue)
 
-/**
- * WCAG 2.1 contrast ratio `(L1 + 0.05) / (L2 + 0.05)`, symmetric in its arguments.
- *
- * Returns `1.0` for identical colors and `21.0` for black on white. Intended for the
- * opaque sRGB design tokens used by this theme; translucent colors are evaluated as if
- * they were opaque (all current scheme tokens are fully opaque).
- */
 internal fun contrastRatio(foreground: Color, background: Color): Double {
     val foregroundLuminance = foreground.relativeLuminance()
     val backgroundLuminance = background.relativeLuminance()
@@ -247,14 +334,6 @@ internal fun contrastRatio(foreground: Color, background: Color): Double {
     return (lighter + 0.05) / (darker + 0.05)
 }
 
-/**
- * True when a Material You dynamic scheme should be replaced by an Aurora fallback.
- *
- * Text pairs must reach WCAG AA 4.5:1: onBackground/background, onSurface/surface,
- * onSurfaceVariant/surface and onPrimary/primary. The outline/surface icon and border
- * pair must reach the 3:1 non-text threshold. A wallpaper-derived scheme that fails any
- * of these is discarded in favor of [auroraColorScheme], which is contrast-audited.
- */
 internal fun schemeNeedsFallback(scheme: ColorScheme): Boolean {
     val textPairs = listOf(
         scheme.onBackground to scheme.background,
@@ -268,29 +347,11 @@ internal fun schemeNeedsFallback(scheme: ColorScheme): Boolean {
     return contrastRatio(scheme.outline, scheme.surface) < MIN_NON_TEXT_CONTRAST
 }
 
-/**
- * Parses a persisted high-contrast flag. Only `"1"` and `"true"` (case-insensitive,
- * surrounding whitespace ignored) count as enabled; `null`, `"0"`, `"false"` and every
- * other value keep the normal palette.
- *
- * Internal and free of Android APIs so the accepted value shapes can be unit-tested.
- */
 internal fun parseHighContrastValue(raw: String?): Boolean {
     val value = raw?.trim().orEmpty()
     return value == "1" || value.equals("true", ignoreCase = true)
 }
 
-/**
- * Reads Android's high-contrast-text flag, probing every key in
- * `HIGH_TEXT_CONTRAST_SETTING_KEYS` through [Settings.Secure] first and [Settings.Global]
- * second.
- *
- * Any single key reading `1`/`true` enables the high-contrast palette. Read failures
- * (missing provider, `SecurityException` on locked-down OEM images) are treated as `false`.
- *
- * Boundary: this covers the AOSP key plus the known OEM aliases only; a vendor switch
- * that persists an unknown key remains undetected and the app keeps the normal palette.
- */
 internal fun readHighTextContrastSetting(contentResolver: ContentResolver): Boolean = runCatching {
     HIGH_TEXT_CONTRAST_SETTING_KEYS.any { key ->
         val secureValue = Settings.Secure.getString(contentResolver, key)
@@ -299,19 +360,6 @@ internal fun readHighTextContrastSetting(contentResolver: ContentResolver): Bool
     }
 }.getOrDefault(false)
 
-/**
- * Best-effort "Increase Contrast" detection.
- *
- * Android 16 (API 36, [Build.VERSION_CODES.BAKLAVA]) exposes the authoritative public
- * query `AccessibilityManager.isHighContrastTextEnabled()`, so it is used when available.
- * Every release additionally probes the known setting keys because:
- * - devices below API 36 have no public query API;
- * - some OEM skins expose their own "high contrast fonts/text" switch that does not
- *   reach this API, and a stale/false negative must not disable the legibility upgrade.
- *
- * Known boundary: a vendor switch that persists an unknown key remains invisible here,
- * and the app keeps the normal palette on that skin.
- */
 internal fun isSystemHighContrastTextEnabled(context: Context): Boolean {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
         val official = runCatching {
@@ -323,14 +371,6 @@ internal fun isSystemHighContrastTextEnabled(context: Context): Boolean {
     return runCatching { readHighTextContrastSetting(context.contentResolver) }.getOrDefault(false)
 }
 
-/**
- * Tracks the system high-contrast flag for the lifetime of the composition.
- *
- * The initial value is read synchronously (a provider query is cheap and avoids a
- * palette flash). A [ContentObserver] on every known Secure/Global key URI refreshes the
- * state when the user toggles the system setting while the app is running; failures to
- * register or unregister are ignored because this is a non-essential enhancement.
- */
 @Composable
 private fun rememberSystemHighContrastText(context: Context): Boolean {
     val appContext = remember(context) { context.applicationContext ?: context }
@@ -360,19 +400,26 @@ fun AuroraTheme(
 ) {
     val context = LocalContext.current
     val highContrast = rememberSystemHighContrastText(context)
+    val reduceMotion = rememberSystemReduceMotion(context)
     val fallbackScheme = auroraColorScheme(darkTheme, highContrast)
-    // Increase Contrast cannot be expressed by wallpaper-derived dynamic colors, and a
-    // dynamic scheme that fails the WCAG guard is replaced by the audited fallback.
+    // Material You dynamic colors on Android 12+ with WCAG AA contrast guard & high-contrast override.
     val colorScheme = if (!highContrast && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         val dynamicScheme = if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         if (schemeNeedsFallback(dynamicScheme)) fallbackScheme else dynamicScheme
     } else {
         fallbackScheme
     }
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = AuroraTypography,
-        shapes = AuroraShapes,
-        content = content,
-    )
+    val semanticColors = if (darkTheme) AuroraSemanticDark else AuroraSemanticLight
+    CompositionLocalProvider(
+        LocalReduceMotion provides reduceMotion,
+        LocalAuroraSemanticColors provides semanticColors,
+    ) {
+        MaterialExpressiveTheme(
+            colorScheme = colorScheme,
+            motionScheme = MotionScheme.expressive(),
+            typography = AuroraTypography,
+            shapes = AuroraExpressiveShapes,
+            content = content,
+        )
+    }
 }

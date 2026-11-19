@@ -1,5 +1,17 @@
 # Existing Architectural Decisions
 
+## Android 17 (API 37) SDK Compliance & 100% Native Material 3 Expressive Migration (v2.18.0 Build 274)
+
+Date: 2026-11-20
+
+Status: Implemented, verified on signed R8 Release APK (phone + tablet breakpoints) and iPhone/iPad Release simulators, 20/20 Android instrumented tests + 59/59 iOS live source tests passed, and published in `v2.18.0 (Build 274)`.
+
+Decisions:
+1. **Complete Removal of Non-Native Blur / iOS-Clone Shells**: Remove `dev.chrisbanes.haze`, `AndroidLiquidGlass`, `app/src/main/java/com/aurorashelf/app/ui/liquid/*`, and custom Netflix/AppleTV scaffolding in favor of 100% official Material 3 Expressive (`material3:1.5.0-rc01`, `adaptive:1.3.0`, `compose-bom:2026.09.00`) backed by `MaterialExpressiveTheme`, `MotionScheme.expressive()`, `LocalAuroraSemanticColors`, and Material You dynamic color with WCAG AA fallback.
+2. **Android 17 (API 37) Platform Readiness**: Target `compileSdk = 37` / `targetSdk = 37` with 16 KB ELF page alignment, `ACCESS_LOCAL_NETWORK` declaration and runtime permission guard (`LocalNetworkPermission.kt`) prior to LAN DLNA discovery, unrestricted large-screen resizability (zero orientation locking when `sw >= 600dp`), per-app `locales_config.xml`, Android 12+ `core-splashscreen`, desktop keyboard shortcuts (`Ctrl/Meta+1..5`, `Ctrl/Meta+F`, `Esc`), and native `PredictiveBackHandler` (`PredictiveBackContainer`).
+3. **Material 3 `1.5.0-rc01` `ShortNavigationBar` Constraint Workaround & Expressive Motion Discipline**: Never pass `Modifier.fillMaxWidth()` directly to `ShortNavigationBar` in `1.5.0-rc01` because its internal `Surface` propagates `minWidth` into `EqualWeightContentMeasurePolicy`, clamping every destination item to full screen width; keep `minWidth` unconstrained inside a full-width wrapper `Box` so `ShortNavigationBar` spans `maxWidth` while splitting all 5 tabs into equal columns. Gate all Spatial/Effects motion through `AuroraMotion` (`snap()` when `LocalReduceMotion` is active), render static determinate progress indicators under Reduced Motion, and avoid pairing `sharedBounds` across an always-visible background `HomeScreen` and an overlay `PlayerScreen`.
+4. **WebView Fallback Overflow Clipping (`ForumScreen.kt`)**: Use `body { overflow-x: clip !important; overflow-y: visible !important; }` in `MOBILE_FORUM_SCRIPT` so the single-scroller `html` vertical inertial scroll from `v2.17.4` stays intact while strictly preventing horizontal scroll overflow (`ForumReaderRegressionTest`).
+
 ## iOS 27 / iPadOS 27 SDK & Apple HIG 28-Item Audit Remediation Architecture (v2.17.6 Build 273)
 
 Date: 2026-11-19

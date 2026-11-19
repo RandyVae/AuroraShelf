@@ -2,6 +2,7 @@ package com.aurorashelf.app.data.resilience
 
 import android.content.Context
 import android.util.Log
+import androidx.core.content.edit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,10 +47,9 @@ internal object RemoteSourceManifest {
                     learnRedirectMirror = false,
                 )
                 if (applyManifestJson(res.body)) {
-                    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                        .edit()
-                        .putString(KEY_JSON, res.body)
-                        .apply()
+                    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit {
+                        putString(KEY_JSON, res.body)
+                    }
                     Log.i(TAG, "synced remote source manifest latency=${res.latencyMs}ms")
                 }
             }

@@ -1,7 +1,13 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+)
+
 package com.aurorashelf.app.ui
 
-import android.annotation.SuppressLint
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -20,45 +26,42 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Article
@@ -70,23 +73,26 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -97,12 +103,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -111,12 +120,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.aurorashelf.app.ui.theme.AuroraCoral
-import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
-import com.aurorashelf.app.ui.theme.AuroraMediaLabel
-import com.aurorashelf.app.ui.theme.AuroraMediaMuted
-import com.aurorashelf.app.ui.theme.AuroraMediaSurface
-import org.json.JSONArray
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -141,12 +144,16 @@ import com.aurorashelf.app.data.forum.ForumThreadParser
 import com.aurorashelf.app.data.forum.deduplicateForumImageUrls
 import com.aurorashelf.app.data.forum.shouldForwardCookies
 import com.aurorashelf.app.model.ForumPost
+import com.aurorashelf.app.ui.theme.AuroraHaptics
+import com.aurorashelf.app.ui.theme.AuroraMotion
+import com.aurorashelf.app.ui.theme.LocalAuroraSemanticColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 
 @Composable
 internal fun ForumScreen(
@@ -165,24 +172,11 @@ internal fun ForumScreen(
 ) {
     // Keep the list state in composition while the reader is open.
     val listState = rememberLazyListState()
-    val isScrolled by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 40
-        }
-    }
     LaunchedEffect(state.posts.size) {
         if (state.posts.isNotEmpty()) {
-            kotlinx.coroutines.delay(400)
+            delay(400)
             ForumPostCache.prefetchAll(state.posts.map { it.url }, limit = POST_PREFETCH_LIMIT, concurrency = 2)
         }
-    }
-    state.selectedPost?.let { post ->
-        ForumReader(post = post, onClose = onClosePost)
-        return
-    }
-
-    BackHandler(enabled = state.isSearchOpen) {
-        onCloseSearch()
     }
 
     val visiblePosts = remember(state.posts, state.selectedSourceId, state.searchQuery) {
@@ -205,237 +199,349 @@ internal fun ForumScreen(
         }.distinctUntilChanged().filter { it }.collect { onLoadMore() }
     }
 
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val isTwoPane = maxWidth >= 840.dp
+            val selectedPost = state.selectedPost
+            if (selectedPost != null && !isTwoPane) {
+                ForumReader(post = selectedPost, onClose = onClosePost)
+            } else if (isTwoPane && selectedPost != null) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(0.42f).fillMaxHeight()) {
+                        ForumFeedPane(
+                            state = state,
+                            visiblePosts = visiblePosts,
+                            listState = listState,
+                            bottomPadding = bottomPadding,
+                            onRefresh = onRefresh,
+                            onLoadMore = onLoadMore,
+                            onPost = onPost,
+                            onSelectSource = onSelectSource,
+                            onSearch = onSearch,
+                            onSearchQueryChange = onSearchQueryChange,
+                            onCloseSearch = onCloseSearch,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+                    Box(modifier = Modifier.weight(0.58f).fillMaxHeight()) {
+                        ForumReader(post = selectedPost, onClose = onClosePost)
+                    }
+                }
+            } else {
+                ForumFeedPane(
+                    state = state,
+                    visiblePosts = visiblePosts,
+                    listState = listState,
+                    bottomPadding = bottomPadding,
+                    onRefresh = onRefresh,
+                    onLoadMore = onLoadMore,
+                    onPost = onPost,
+                    onSelectSource = onSelectSource,
+                    onSearch = onSearch,
+                    onSearchQueryChange = onSearchQueryChange,
+                    onCloseSearch = onCloseSearch,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ForumFeedPane(
+    state: ForumUiState,
+    visiblePosts: List<ForumPost>,
+    listState: LazyListState,
+    bottomPadding: Dp,
+    onRefresh: () -> Unit,
+    onLoadMore: () -> Unit,
+    onPost: (ForumPost) -> Unit,
+    onSelectSource: (String?) -> Unit,
+    onSearch: () -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    onCloseSearch: () -> Unit,
+) {
+    val isScrolled by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 40
+        }
+    }
     var headerHeightPx by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
     val headerSpacerHeight = remember(headerHeightPx, density) {
         if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() + 8.dp } else 115.dp
     }
 
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize()) {
+    PredictiveBackContainer(
+        enabled = state.isSearchOpen,
+        onBack = onCloseSearch,
+    ) {
+        AuroraPullToRefreshBox(
+            isRefreshing = state.isLoading && state.posts.isNotEmpty(),
+            onRefresh = onRefresh,
+            indicatorPaddingTop = headerSpacerHeight,
+            modifier = Modifier.fillMaxSize(),
+        ) {
             LazyColumn(
                 state = listState,
                 flingBehavior = ScrollableDefaults.flingBehavior(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 0.dp, bottom = bottomPadding + 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxSize().testTag("forum-feed"),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("forum-feed"),
             ) {
                 item(key = "forum-header-spacer") {
                     Spacer(Modifier.height(headerSpacerHeight))
                 }
 
-        if (state.unavailableSources.isNotEmpty()) {
-            item(key = "forum-unavailable") {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        "${state.unavailableSources.joinToString("、")}暂时不可用，已继续显示其他内容",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                    )
-                }
-            }
-        }
-
-        if (state.error != null && state.posts.isEmpty().not()) {
-            item(key = "forum-refresh-error") {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth().testTag("forum-refresh-error-banner"),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Text(
-                            text = "刷新失败: ${state.error}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.weight(1f),
-                        )
-                        TextButton(
-                            onClick = onRefresh,
-                            colors = ButtonDefaults.textButtonColors(
-                                contentColor = MaterialTheme.colorScheme.error,
+                if (state.unavailableSources.isNotEmpty()) {
+                    item(key = "forum-unavailable") {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("重试")
+                            Text(
+                                "${state.unavailableSources.joinToString("、")}暂时不可用，已继续显示其他内容",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                            )
+                        }
+                    }
+                }
+
+                if (state.error != null && state.posts.isNotEmpty()) {
+                    item(key = "forum-refresh-error") {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            ),
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("forum-refresh-error-banner"),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Warning,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Text(
+                                    text = "刷新失败: ${state.error}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(
+                                    onClick = onRefresh,
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error,
+                                    ),
+                                ) {
+                                    Text("重试")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (state.isLoading && state.posts.isEmpty()) {
+                    item(key = "forum-loading") {
+                        Box(
+                            Modifier
+                                .fillParentMaxSize()
+                                .padding(top = 120.dp),
+                            contentAlignment = Alignment.TopCenter,
+                        ) {
+                            AuroraLoadingIndicator(
+                                contained = true,
+                                modifier = Modifier.testTag("forum-loading"),
+                            )
+                        }
+                    }
+                } else if (state.error != null && state.posts.isEmpty()) {
+                    item(key = "forum-error") {
+                        ForumError(message = state.error, onRetry = onRefresh)
+                    }
+                } else if (visiblePosts.isEmpty() && state.posts.isNotEmpty()) {
+                    item(key = "forum-empty") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = if (state.searchQuery.isNotBlank()) {
+                                    "未找到与「${state.searchQuery}」匹配的帖子"
+                                } else {
+                                    "该板块暂未抓取到更多帖子，请下拉刷新或浏览【全部】"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else {
+                    items(visiblePosts, key = { "${it.sourceId}:${it.id}" }, contentType = { "forum_post" }) { post ->
+                        ForumPostCard(
+                            post = post,
+                            isSelected = state.selectedPost?.url == post.url,
+                            onClick = { onPost(post) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
+
+                if (state.isLoadingMore) {
+                    item(key = "forum-loading-more") {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AuroraLoadingIndicator(modifier = Modifier.size(30.dp))
+                        }
+                    }
+                } else if (state.loadMoreError != null && state.posts.isNotEmpty()) {
+                    item(key = "forum-load-more-error") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text = state.loadMoreError,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                            TextButton(onClick = onLoadMore) {
+                                Text("加载失败，点击重试")
+                            }
                         }
                     }
                 }
             }
-        }
 
-        if (state.isLoading && state.posts.isEmpty()) {
-            item(key = "forum-loading") {
-                Box(Modifier.fillParentMaxSize().padding(top = 120.dp), contentAlignment = Alignment.TopCenter) {
-                    CircularProgressIndicator(modifier = Modifier.testTag("forum-loading"))
-                }
+            val headerModifier = if (isScrolled) {
+                Modifier.background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f))
+            } else {
+                Modifier.background(
+                    Brush.verticalGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.94f),
+                            MaterialTheme.colorScheme.background.copy(alpha = 0.65f),
+                            Color.Transparent,
+                        ),
+                    ),
+                )
             }
-        } else if (state.error != null && state.posts.isEmpty()) {
-            item(key = "forum-error") {
-                ForumError(message = state.error, onRetry = onRefresh)
-            }
-        } else if (visiblePosts.isEmpty() && state.posts.isNotEmpty()) {
-            item(key = "forum-empty") {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 48.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = if (state.searchQuery.isNotBlank()) {
-                            "未找到与「${state.searchQuery}」匹配的帖子"
-                        } else {
-                            "该板块暂未抓取到更多帖子，请下拉刷新或浏览【全部】"
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        } else {
-            items(visiblePosts, key = { "${it.sourceId}:${it.id}" }, contentType = { "forum_post" }) { post ->
-                ForumPostCard(post = post, onClick = { onPost(post) })
-            }
-        }
 
-        if (state.isLoadingMore) {
-            item(key = "forum-loading-more") {
-                Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                }
-            }
-        } else if (state.loadMoreError != null && state.posts.isNotEmpty()) {
-            item(key = "forum-load-more-error") {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = state.loadMoreError,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .then(headerModifier)
+                    .onSizeChanged { size ->
+                        if (size.height > 0) headerHeightPx = size.height
+                    }
+                    .windowInsetsPadding(WindowInsets.statusBars),
+            ) {
+                if (state.isSearchOpen) {
+                    AuroraSearchBar(
+                        query = state.searchQuery,
+                        onQueryChange = onSearchQueryChange,
+                        placeholder = "搜索社区帖子、作者或板块",
+                        onSearch = {},
+                        onBack = onCloseSearch,
+                        onClear = { onSearchQueryChange("") },
+                        isSearching = state.isLoading,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        testTag = "forum-search-field",
                     )
-                    TextButton(onClick = onLoadMore) {
-                        Text("加载失败，点击重试")
+                } else {
+                    AuroraTopBar {
+                        AuroraSearchCapsule(
+                            label = if (state.searchQuery.isNotBlank()) state.searchQuery else "搜索社区",
+                            onClick = onSearch,
+                        )
+                    }
+                    CategoryStrip(
+                        testTag = "forum-category-bar",
+                        isScrolled = isScrolled,
+                        applyBackground = false,
+                    ) {
+                        AuroraFilterChip(
+                            selected = state.selectedSourceId == null,
+                            onClick = { onSelectSource(null) },
+                            label = "全部",
+                        )
+                        AuroraFilterChip(
+                            selected = state.selectedSourceId == "t66y",
+                            onClick = { onSelectSource("t66y") },
+                            label = "草榴社区",
+                        )
+                        AuroraFilterChip(
+                            selected = state.selectedSourceId == "t66y_16",
+                            onClick = { onSelectSource("t66y_16") },
+                            label = "达盖尔的旗帜",
+                        )
+                        AuroraFilterChip(
+                            selected = state.selectedSourceId == "t906",
+                            onClick = { onSelectSource("t906") },
+                            label = "91自拍论坛",
+                        )
                     }
                 }
+                if (state.isLoading) {
+                    AuroraWavyProgressBar(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp),
+                    )
+                }
             }
         }
     }
-
-    val headerModifier = if (isScrolled) {
-        Modifier
-            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
-            .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
-    } else {
-        Modifier.background(
-            Brush.verticalGradient(
-                listOf(
-                    MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
-                    MaterialTheme.colorScheme.background.copy(alpha = 0.60f),
-                    Color.Transparent,
-                ),
-            ),
-        )
-    }
-
-    Column(
-        modifier = Modifier
-            .align(Alignment.TopCenter)
-            .fillMaxWidth()
-            .then(headerModifier)
-            .onSizeChanged { size ->
-                if (size.height > 0) headerHeightPx = size.height
-            }
-            .windowInsetsPadding(WindowInsets.statusBars),
-    ) {
-        if (state.isSearchOpen) {
-            CenteredSearchBar(
-                query = state.searchQuery,
-                onQueryChange = onSearchQueryChange,
-                placeholder = "搜索社区帖子、作者或板块",
-                onSearch = {},
-                onBack = onCloseSearch,
-                onClear = { onSearchQueryChange("") },
-                isSearching = state.isLoading,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                testTag = "forum-search-field",
-                forceDark = false,
-            )
-        } else {
-            NetflixTopBar {
-                NetflixSearchCapsule(
-                    label = if (state.searchQuery.isNotBlank()) state.searchQuery else "搜索社区",
-                    onClick = onSearch,
-                )
-            }
-            CategoryStrip(
-                testTag = "forum-category-bar",
-                isScrolled = isScrolled,
-                applyBackground = false,
-            ) {
-                NetflixCategoryChip(
-                    selected = state.selectedSourceId == null,
-                    onClick = { onSelectSource(null) },
-                    label = "全部",
-                )
-                NetflixCategoryChip(
-                    selected = state.selectedSourceId == "t66y",
-                    onClick = { onSelectSource("t66y") },
-                    label = "草榴社区",
-                )
-                NetflixCategoryChip(
-                    selected = state.selectedSourceId == "t66y_16",
-                    onClick = { onSelectSource("t66y_16") },
-                    label = "达盖尔的旗帜",
-                )
-                NetflixCategoryChip(
-                    selected = state.selectedSourceId == "t906",
-                    onClick = { onSelectSource("t906") },
-                    label = "91自拍论坛",
-                )
-            }
-        }
-        if (state.isLoading) {
-            LinearProgressIndicator(
-                color = AuroraCoral,
-                trackColor = Color.Transparent,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp),
-            )
-        }
-    }
-}
-}
 }
 
 @Composable
-private fun ForumPostCard(post: ForumPost, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(12.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-        modifier = Modifier
+private fun ForumPostCard(
+    post: ForumPost,
+    isSelected: Boolean = false,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalAuroraSemanticColors.current
+    val scheme = MaterialTheme.colorScheme
+    Card(
+        onClick = {
+            AuroraHaptics.tap(haptic)
+            onClick()
+        },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) scheme.secondaryContainer else scheme.surfaceContainerLow,
+            contentColor = if (isSelected) scheme.onSecondaryContainer else scheme.onSurface,
+        ),
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier
             .fillMaxWidth()
             .testTag("forum-post"),
     ) {
@@ -447,51 +553,46 @@ private fun ForumPostCard(post: ForumPost, onClick: () -> Unit) {
                     fontWeight = FontWeight.Bold,
                     lineHeight = 20.sp,
                 ),
-                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val badgeColor = when (post.sourceId) {
-                    "t906" -> Color(0xFFE50914) // Netflix Red / 91
-                    "t66y" -> Color(0xFF2E7D32) // Forest Green / 1024
-                    "t66y_16" -> Color(0xFF00695C) // Peacock Green / 达盖尔
-                    "sis" -> AuroraCoral
-                    else -> Color(0xFFE65100)
+                    "t906" -> semanticColors.forumPrimaryBadge
+                    "t66y" -> semanticColors.forumSecondaryBadge
+                    "t66y_16" -> semanticColors.forumTertiaryBadge
+                    "sis" -> scheme.primary
+                    else -> semanticColors.forumFallbackBadge
                 }
                 Surface(
                     color = badgeColor,
-                    shape = RoundedCornerShape(3.dp),
+                    contentColor = semanticColors.onForumBadge,
+                    shape = RoundedCornerShape(6.dp),
                 ) {
                     Text(
                         text = post.sourceName,
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White,
-                        ),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.ExtraBold),
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                     )
                 }
                 Text(
                     text = post.author,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = scheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
                 Text(
                     text = post.replyCount.toString(),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                 )
                 if (post.updatedLabel.isNotBlank()) {
                     Text(
                         text = post.updatedLabel,
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = scheme.onSurfaceVariant,
                     )
                 }
             }
@@ -501,13 +602,21 @@ private fun ForumPostCard(post: ForumPost, onClick: () -> Unit) {
 
 @Composable
 private fun ForumError(message: String, onRetry: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.errorContainer,
-        contentColor = MaterialTheme.colorScheme.onErrorContainer,
-        shape = RoundedCornerShape(24.dp),
-        modifier = Modifier.fillMaxWidth().padding(top = 48.dp),
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+        ),
+        shape = MaterialTheme.shapes.large,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 48.dp),
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(28.dp)) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(28.dp),
+        ) {
             Text(message, style = MaterialTheme.typography.bodyMedium)
             TextButton(onClick = onRetry) { Text("重新加载") }
         }
@@ -750,12 +859,12 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 }
                 if (effectiveDetectedImages.isNotEmpty()) {
                     Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = AuroraCoral.copy(alpha = 0.14f),
-                        border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.35f)),
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier
                             .padding(end = 2.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                            .clip(CircleShape)
                             .clickable(enabled = !isSavingImage) {
                                 val requests = effectiveDetectedImages.map { buildImageRequest(it, activeThreadUrl) }
                                 triggerBatchSaveWithPermission(requests)
@@ -765,19 +874,17 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                         ) {
                             Icon(
                                 Icons.Default.Download,
                                 contentDescription = "下载本帖全部图片",
-                                tint = AuroraCoral,
-                                modifier = Modifier.size(15.dp),
+                                modifier = Modifier.size(16.dp),
                             )
                             Text(
                                 text = batchSaveProgress?.let { "${it.first}/${it.second}" } ?: "下载 ${effectiveDetectedImages.size} 图",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = AuroraCoral,
                                 maxLines = 1,
                             )
                         }
@@ -785,11 +892,12 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 }
                 IconButton(
                     onClick = { isWebMode = !isWebMode },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Icon(
                         imageVector = if (isWebMode) Icons.AutoMirrored.Filled.Article else Icons.AutoMirrored.Filled.OpenInNew,
                         contentDescription = if (isWebMode) "切换为原生极速阅读" else "切换为原网页视图",
-                        tint = if (isWebMode) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = if (isWebMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp),
                     )
                 }
@@ -798,6 +906,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                         ForumPostCache.remove(activeThreadUrl)
                         refreshNonce += 1
                     },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Icon(
                         Icons.Default.Refresh,
@@ -811,7 +920,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
@@ -825,13 +934,14 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                             text = "${(completed * 100 / total.coerceAtLeast(1))}%",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = AuroraCoral,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
-                    LinearProgressIndicator(
+                    AuroraWavyProgressBar(
                         progress = { completed.toFloat() / total.coerceAtLeast(1).toFloat() },
-                        modifier = Modifier.fillMaxWidth().height(4.dp),
-                        color = AuroraCoral,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp),
                     )
                 }
             }
@@ -842,24 +952,28 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     val detail = nativeDetail
                     when {
                         isNativeLoading && detail == null -> {
-                            LinearProgressIndicator(
-                                Modifier.fillMaxWidth().align(Alignment.TopCenter),
-                                color = AuroraCoral,
+                            AuroraWavyProgressBar(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .align(Alignment.TopCenter),
                             )
-                            Surface(
-                                color = MaterialTheme.colorScheme.surface,
-                                contentColor = MaterialTheme.colorScheme.onSurface,
-                                shape = RoundedCornerShape(24.dp),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                modifier = Modifier.align(Alignment.Center).testTag("forum-reader-loading"),
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                ),
+                                shape = MaterialTheme.shapes.extraLarge,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .testTag("forum-reader-loading"),
                             ) {
                                 Column(
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.spacedBy(14.dp),
                                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
                                 ) {
-                                    CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp, color = AuroraCoral)
-                                    Text("正在加载帖子正文", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                                    AuroraLoadingIndicator(contained = true)
+                                    Text("正在加载帖子正文", style = MaterialTheme.typography.titleSmall)
                                 }
                             }
                         }
@@ -876,7 +990,7 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                                 Text(nativeError.orEmpty(), color = MaterialTheme.colorScheme.onBackground)
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     TextButton(onClick = { refreshNonce += 1 }) {
-                                        Text("重新加载", color = AuroraCoral)
+                                        Text("重新加载")
                                     }
                                     TextButton(onClick = { isWebMode = true }) {
                                         Text("原网页打开")
@@ -887,9 +1001,10 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
 
                         detail != null -> {
                             if (isNativeLoading) {
-                                LinearProgressIndicator(
-                                    Modifier.fillMaxWidth().align(Alignment.TopCenter),
-                                    color = AuroraCoral,
+                                AuroraWavyProgressBar(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .align(Alignment.TopCenter),
                                 )
                             }
                             NativeForumThreadContent(
@@ -905,7 +1020,9 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                                 onConfirmSaveDialog = { imgUrl ->
                                     pendingImageRequest = buildImageRequest(imgUrl, activeThreadUrl)
                                 },
-                                modifier = Modifier.fillMaxSize().testTag("forum-reader-content"),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("forum-reader-content"),
                             )
                         }
                     }
@@ -932,15 +1049,21 @@ private fun ForumReader(post: ForumPost, onClose: () -> Unit) {
                     Surface(
                         color = MaterialTheme.colorScheme.inverseSurface,
                         contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                        shape = RoundedCornerShape(18.dp),
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(20.dp).testTag("forum-image-saving"),
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(20.dp)
+                            .testTag("forum-image-saving"),
                     ) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 14.dp),
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 12.dp),
                         ) {
-                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                            AuroraLoadingIndicator(
+                                modifier = Modifier.size(20.dp),
+                                color = MaterialTheme.colorScheme.inversePrimary,
+                            )
                             Text("正在保存图片…", style = MaterialTheme.typography.bodyMedium)
                         }
                     }
@@ -1026,18 +1149,21 @@ private fun NativeForumThreadContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    val semanticColors = LocalAuroraSemanticColors.current
                     val badgeColor = when (post.sourceId) {
-                        "t906" -> Color(0xFFE50914)
-                        "t66y" -> Color(0xFF2E7D32)
-                        "t66y_16" -> Color(0xFF00695C)
-                        else -> AuroraCoral
+                        "t906" -> semanticColors.forumPrimaryBadge
+                        "t66y" -> semanticColors.forumSecondaryBadge
+                        "t66y_16" -> semanticColors.forumTertiaryBadge
+                        else -> MaterialTheme.colorScheme.primary
                     }
-                    Surface(color = badgeColor, shape = RoundedCornerShape(4.dp)) {
+                    Surface(
+                        color = badgeColor,
+                        contentColor = semanticColors.onForumBadge,
+                        shape = RoundedCornerShape(6.dp),
+                    ) {
                         Text(
                             text = post.sourceName,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
                         )
                     }
@@ -1170,6 +1296,8 @@ private fun ForumPaginationStrip(
     onSelectPage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val scheme = MaterialTheme.colorScheme
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1179,21 +1307,24 @@ private fun ForumPaginationStrip(
     ) {
         pageLinks.forEach { link ->
             Surface(
-                onClick = { if (!link.isCurrent) onSelectPage(link.url) },
+                onClick = {
+                    if (!link.isCurrent) {
+                        AuroraHaptics.segmentTick(haptic)
+                        onSelectPage(link.url)
+                    }
+                },
                 enabled = !link.isCurrent,
-                shape = RoundedCornerShape(10.dp),
-                color = if (link.isCurrent) AuroraCoral else MaterialTheme.colorScheme.surface,
-                border = BorderStroke(
-                    1.dp,
-                    if (link.isCurrent) AuroraCoral else MaterialTheme.colorScheme.outlineVariant,
-                ),
+                shape = CircleShape,
+                color = if (link.isCurrent) scheme.primaryContainer else scheme.surfaceContainerLow,
+                contentColor = if (link.isCurrent) scheme.onPrimaryContainer else scheme.onSurface,
+                border = if (link.isCurrent) null else BorderStroke(1.dp, scheme.outlineVariant),
             ) {
                 Text(
                     text = link.label,
-                    color = if (link.isCurrent) Color.White else MaterialTheme.colorScheme.onSurface,
-                    fontSize = 13.sp,
-                    fontWeight = if (link.isCurrent) FontWeight.Bold else FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = if (link.isCurrent) FontWeight.Bold else FontWeight.Medium,
+                    ),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
                 )
             }
         }
@@ -1205,8 +1336,8 @@ private fun ForumFloorHeaderRow(floor: ForumFloor) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            border = BorderStroke(0.8.dp, MaterialTheme.colorScheme.outlineVariant),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.size(32.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -1214,7 +1345,6 @@ private fun ForumFloorHeaderRow(floor: ForumFloor) {
                     text = floor.author.take(1).uppercase(),
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -1234,15 +1364,14 @@ private fun ForumFloorHeaderRow(floor: ForumFloor) {
                 )
                 if (floor.isOp) {
                     Surface(
-                        color = AuroraCoral.copy(alpha = 0.16f),
-                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        shape = RoundedCornerShape(6.dp),
                     ) {
                         Text(
                             text = "楼主",
-                            color = AuroraCoral,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
                         )
                     }
                 }
@@ -1417,7 +1546,7 @@ private fun ForumNativeImageCard(
             .combinedClickable(
                 onClick = {},
                 onLongClick = {
-                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    AuroraHaptics.longPress(haptic)
                     onLongPress()
                 },
             ),
@@ -1447,10 +1576,10 @@ private fun ForumNativeImageCard(
         )
 
         if (activeRatio <= 0f && !isFailed) {
-            CircularProgressIndicator(
-                color = AuroraCoral,
-                strokeWidth = 2.5.dp,
-                modifier = Modifier.size(26.dp).align(Alignment.Center),
+            AuroraLoadingIndicator(
+                modifier = Modifier
+                    .size(28.dp)
+                    .align(Alignment.Center),
             )
         }
 
@@ -1458,7 +1587,9 @@ private fun ForumNativeImageCard(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(16.dp),
             ) {
                 Text(
                     text = "外链图片加载失败",
@@ -1471,25 +1602,23 @@ private fun ForumNativeImageCard(
                         retryKey += 1
                     },
                 ) {
-                    Text("点击重试", color = AuroraCoral)
+                    Text("点击重试")
                 }
             }
         } else {
             Surface(
                 onClick = onSaveClick,
                 enabled = !isSavingImage,
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xC8121216),
-                border = BorderStroke(0.8.dp, Color.White.copy(alpha = 0.24f)),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.78f),
+                contentColor = Color.White,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(8.dp),
             ) {
                 Text(
                     text = "保存原图",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                 )
             }
@@ -1708,29 +1837,39 @@ private fun ForumWebFallbackContent(
     Box(modifier) {
         val contentAlpha by animateFloatAsState(
             targetValue = if (!isLoading && error == null) 1f else 0f,
-            animationSpec = tween(durationMillis = 180),
+            animationSpec = AuroraMotion.fastEffects(),
             label = "forum reader content",
         )
         AndroidView(
             factory = { webView },
-            modifier = Modifier.fillMaxSize().alpha(contentAlpha).testTag("forum-reader-content"),
+            modifier = Modifier
+                .fillMaxSize()
+                .alpha(contentAlpha)
+                .testTag("forum-reader-content"),
         )
         if (isLoading) {
-            LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter), color = AuroraCoral)
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                shape = RoundedCornerShape(24.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                modifier = Modifier.align(Alignment.Center).testTag("forum-reader-loading"),
+            AuroraWavyProgressBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.TopCenter),
+            )
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
+                shape = MaterialTheme.shapes.extraLarge,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .testTag("forum-reader-loading"),
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 24.dp),
                 ) {
-                    CircularProgressIndicator(Modifier.size(32.dp), strokeWidth = 3.dp, color = AuroraCoral)
-                    Text("正在整理帖子排版", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+                    AuroraLoadingIndicator(contained = true)
+                    Text("正在整理帖子排版", style = MaterialTheme.typography.titleSmall)
                 }
             }
         }
@@ -1738,10 +1877,13 @@ private fun ForumWebFallbackContent(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.align(Alignment.Center).background(MaterialTheme.colorScheme.background).padding(24.dp),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(24.dp),
             ) {
                 Text(message, color = MaterialTheme.colorScheme.onBackground)
-                TextButton(onClick = { webView.reload() }) { Text("重新加载", color = AuroraCoral) }
+                TextButton(onClick = { webView.reload() }) { Text("重新加载") }
             }
         }
     }
@@ -1905,7 +2047,7 @@ internal val MOBILE_FORUM_SCRIPT =
           height: auto !important;
           margin: 0 !important;
           padding: 0 !important;
-          overflow-x: visible !important;
+          overflow-x: clip !important;
           overflow-y: visible !important;
           touch-action: pan-y pinch-zoom !important;
         }

@@ -36,15 +36,15 @@ class HigAccessibilityTest {
     fun bottomNavigationTabsMeet48DpTouchTarget() {
         compose.waitUntil(timeoutMillis = 10_000) {
             compose.onAllNodes(
-                hasClickAction() and hasAnyAncestor(hasTestTag("liquid-navigation")),
+                hasClickAction() and hasAnyAncestor(hasTestTag("m3-navigation-bar")),
             ).fetchSemanticsNodes().size == 5
         }
         val minTouchTargetPx = with(compose.density) { 48.dp.toPx() }
         val tabs = compose.onAllNodes(
-            hasClickAction() and hasAnyAncestor(hasTestTag("liquid-navigation")),
+            hasClickAction() and hasAnyAncestor(hasTestTag("m3-navigation-bar")),
         ).fetchSemanticsNodes()
 
-        assertEquals("悬浮底栏应有 5 个可点击导航项", 5, tabs.size)
+        assertEquals("原生 Material 3 ShortNavigationBar 应有 5 个可点击导航项", 5, tabs.size)
         tabs.forEachIndexed { index, node ->
             val bounds = node.boundsInRoot
             assertTrue(
@@ -85,7 +85,7 @@ class HigAccessibilityTest {
         compose.onNodeWithContentDescription("首页").performClick()
 
         val bottomTabs = compose.onAllNodes(
-            hasClickAction() and hasAnyAncestor(hasTestTag("liquid-navigation")),
+            hasClickAction() and hasAnyAncestor(hasTestTag("m3-navigation-bar")),
         ).fetchSemanticsNodes()
         bottomTabs.forEachIndexed { index, node ->
             val hasDescription = node.config.getOrNull(SemanticsProperties.ContentDescription)

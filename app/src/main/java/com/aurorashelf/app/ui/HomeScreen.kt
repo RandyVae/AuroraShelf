@@ -1,14 +1,13 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+)
+
 package com.aurorashelf.app.ui
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,12 +22,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -36,95 +33,72 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.gestures.ScrollableDefaults
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.Cast
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.unit.IntSize
-import kotlin.math.max
-import kotlin.math.min
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.luminance
-import android.animation.ValueAnimator
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
-import androidx.compose.material3.minimumInteractiveComponentSize
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.aurorashelf.app.data.AccountRepository
-import com.aurorashelf.app.data.AccountState
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.aurorashelf.app.model.SourceCategory
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aurorashelf.app.data.AccountRepository
+import com.aurorashelf.app.data.AccountState
 import com.aurorashelf.app.model.ContentSourceCatalog
+import com.aurorashelf.app.model.SourceCategory
 import com.aurorashelf.app.model.VideoItem
-import com.aurorashelf.app.ui.theme.AuroraCoral
-import com.aurorashelf.app.ui.theme.AuroraDimens
-import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
+import com.aurorashelf.app.ui.theme.AuroraHaptics
 import com.aurorashelf.app.ui.theme.AuroraMediaLabel
-import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
+import com.aurorashelf.app.ui.theme.AuroraMotion
+import com.aurorashelf.app.ui.theme.LocalReduceMotion
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
-
-private val HomeBackground = AuroraImmersiveBackground
-private val HomeAccent = AuroraCoral
-private val HomeMediaLabel = AuroraMediaLabel
-private val HomeMediaPlaceholder = AuroraMediaPlaceholder
 
 @Composable
 internal fun HomeScreen(
@@ -145,7 +119,7 @@ internal fun HomeScreen(
     val density = LocalDensity.current
     var headerHeightPx by remember { mutableIntStateOf(0) }
     val emptyHeaderSpacer = remember(headerHeightPx, density) {
-        if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() + 12.dp } else 130.dp
+        if (headerHeightPx > 0) with(density) { headerHeightPx.toDp() + 12.dp } else 132.dp
     }
     val listState = rememberLazyListState()
     val isScrolled by remember {
@@ -203,6 +177,12 @@ internal fun HomeScreen(
             gridVideos.chunked(gridColumns)
         }
 
+        AuroraPullToRefreshBox(
+            isRefreshing = state.isLoading && state.videos.isNotEmpty(),
+            onRefresh = onRefresh,
+            indicatorPaddingTop = emptyHeaderSpacer,
+            modifier = Modifier.fillMaxSize(),
+        ) {
             LazyColumn(
                 state = listState,
                 flingBehavior = ScrollableDefaults.flingBehavior(),
@@ -228,16 +208,13 @@ internal fun HomeScreen(
                                     .height(260.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                CircularProgressIndicator(
-                                    color = Color(0xFFE50914),
-                                    modifier = Modifier.size(32.dp),
-                                )
+                                AuroraLoadingIndicator(contained = true)
                             }
                         }
                     }
                 } else {
                     item(key = "hero-billboard") {
-                        NetflixHeroBillboard(
+                        HeroSpotlightBanner(
                             videos = spotlightVideos,
                             favoriteIds = state.favoriteIds,
                             onPlay = { onVideo(it) },
@@ -260,25 +237,27 @@ internal fun HomeScreen(
 
                     if (top10Videos.isNotEmpty()) {
                         item(key = "top-10-heading") {
-                            NetflixSectionHeader(
+                            AuroraSectionHeader(
                                 title = "今日热播 Top 10",
                                 subtitle = "每日精选热门影视排行榜",
+                                modifier = Modifier.padding(top = 8.dp),
                             )
                         }
                         item(key = "top-10-row") {
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
                                 itemsIndexed(
                                     items = top10Videos,
                                     key = { _, v -> "top10-${v.id}" },
                                 ) { index, video ->
-                                    NetflixTop10Card(
+                                    Top10ExpressiveCard(
                                         rank = index + 1,
                                         video = video,
                                         onClick = { onVideo(video) },
+                                        modifier = Modifier.animateItem(),
                                     )
                                 }
                             }
@@ -287,9 +266,10 @@ internal fun HomeScreen(
 
                     if (recommendedVideos.isNotEmpty()) {
                         item(key = "recommended-heading") {
-                            NetflixSectionHeader(
+                            AuroraSectionHeader(
                                 title = "为你推荐",
                                 subtitle = "猜你喜欢的精彩大片",
+                                modifier = Modifier.padding(top = 12.dp),
                             )
                         }
                         item(key = "recommended-row") {
@@ -302,9 +282,10 @@ internal fun HomeScreen(
                                     items = recommendedVideos,
                                     key = { "rec-${it.id}" },
                                 ) { video ->
-                                    NetflixPosterShelfCard(
+                                    AuroraPosterCard(
                                         video = video,
                                         onClick = { onVideo(video) },
+                                        modifier = Modifier.animateItem(),
                                     )
                                 }
                             }
@@ -313,9 +294,10 @@ internal fun HomeScreen(
 
                     if (trendingVideos.isNotEmpty()) {
                         item(key = "trending-heading") {
-                            NetflixSectionHeader(
+                            AuroraSectionHeader(
                                 title = "热播精选",
                                 subtitle = "高口碑热门精选内容",
+                                modifier = Modifier.padding(top = 12.dp),
                             )
                         }
                         item(key = "trending-row") {
@@ -328,9 +310,10 @@ internal fun HomeScreen(
                                     items = trendingVideos,
                                     key = { "trend-${it.id}" },
                                 ) { video ->
-                                    NetflixPosterShelfCard(
+                                    AuroraPosterCard(
                                         video = video,
                                         onClick = { onVideo(video) },
+                                        modifier = Modifier.animateItem(),
                                     )
                                 }
                             }
@@ -339,9 +322,10 @@ internal fun HomeScreen(
 
                     if (gridRows.isNotEmpty()) {
                         item(key = "explore-heading") {
-                            NetflixSectionHeader(
+                            AuroraSectionHeader(
                                 title = "更多精彩视频",
                                 subtitle = "海量全库深度探索",
+                                modifier = Modifier.padding(top = 12.dp),
                             )
                         }
 
@@ -353,7 +337,8 @@ internal fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                                    .animateItem(),
                             ) {
                                 row.forEach { video ->
                                     VideoGridCard(
@@ -381,10 +366,7 @@ internal fun HomeScreen(
                                     .padding(vertical = 20.dp),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                CircularProgressIndicator(
-                                    color = Color(0xFFE50914),
-                                    modifier = Modifier.size(28.dp),
-                                )
+                                AuroraLoadingIndicator(modifier = Modifier.size(32.dp))
                             }
                         }
                     } else if (state.loadMoreError != null && state.videos.isNotEmpty()) {
@@ -415,67 +397,69 @@ internal fun HomeScreen(
                     }
                 }
             }
+        }
 
-            val overlayDarkHeader = !isScrolled && state.videos.isNotEmpty()
-            val headerModifier = if (isScrolled) {
-                Modifier
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
-                    .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
-            } else if (overlayDarkHeader) {
-                Modifier.background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.Black.copy(alpha = 0.85f),
-                            Color.Black.copy(alpha = 0.40f),
-                            Color.Transparent,
-                        ),
+        val overlayDarkHeader = !isScrolled && state.videos.isNotEmpty()
+        val headerModifier = if (isScrolled) {
+            Modifier.background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f))
+        } else if (overlayDarkHeader) {
+            Modifier.background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color.Black.copy(alpha = 0.82f),
+                        Color.Black.copy(alpha = 0.36f),
+                        Color.Transparent,
                     ),
-                )
-            } else {
-                Modifier.background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
-            }
+                ),
+            )
+        } else {
+            Modifier.background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
+        }
 
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .then(headerModifier)
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .onSizeChanged { size ->
-                        if (size.height > 0) headerHeightPx = size.height
-                    },
-            ) {
-                HomeHeader(
-                    onSearch = onSearch,
-                    onSettings = onSettings,
-                    forceDark = overlayDarkHeader,
-                )
-                CategoryBar(
-                    selected = state.category,
-                    sourceUrl = state.sourceUrl,
-                    onCategory = onCategory,
-                    isScrolled = isScrolled,
-                    forceDark = overlayDarkHeader,
-                )
-                if (state.isLoading) {
-                    LinearProgressIndicator(
-                        color = Color(0xFFE50914),
-                        trackColor = Color.Transparent,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(2.dp),
-                    )
-                }
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .then(headerModifier)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .onSizeChanged { size ->
+                    if (size.height > 0) headerHeightPx = size.height
+                },
+        ) {
+            HomeHeader(
+                onSearch = onSearch,
+                onSettings = onSettings,
+                forceDark = overlayDarkHeader,
+            )
+            CategoryBar(
+                selected = state.category,
+                sourceUrl = state.sourceUrl,
+                onCategory = onCategory,
+                isScrolled = isScrolled,
+                forceDark = overlayDarkHeader,
+            )
+            if (isScrolled) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             }
+            if (state.isLoading) {
+                AuroraWavyProgressBar(
+                    trackColor = Color.Transparent,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun AccountOnboardingCard(onOpenAccount: () -> Unit) {
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, HomeAccent.copy(alpha = 0.35f)),
+    val haptic = LocalHapticFeedback.current
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        shape = MaterialTheme.shapes.large,
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp)
@@ -483,15 +467,40 @@ private fun AccountOnboardingCard(onOpenAccount: () -> Unit) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(16.dp),
         ) {
-            Icon(Icons.Default.Person, contentDescription = null, tint = HomeAccent, modifier = Modifier.size(28.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("注册免费账号", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                Text("同步片单与历史，后续会员权益也会保留在账号中", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.Person, contentDescription = null)
+                }
             }
-            Button(onClick = onOpenAccount, contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    "注册免费账号",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "同步片单与历史，后续会员权益也会保留在账号中",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Button(
+                onClick = {
+                    AuroraHaptics.tap(haptic)
+                    onOpenAccount()
+                },
+                shape = CircleShape,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.heightIn(min = 44.dp),
+            ) {
                 Text("注册 / 登录")
             }
         }
@@ -508,11 +517,11 @@ private fun HomeHeader(
     forceDark: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    NetflixTopBar(
+    AuroraTopBar(
         modifier = modifier,
         forceDark = forceDark,
     ) {
-        NetflixSearchCapsule(
+        AuroraSearchCapsule(
             label = "搜索视频",
             onClick = onSearch,
             forceDark = forceDark,
@@ -537,7 +546,7 @@ private fun CategoryBar(
         forceDark = forceDark,
     ) {
         ContentSourceCatalog.sourceCategories(sourceUrl).forEach { category ->
-            NetflixCategoryChip(
+            AuroraFilterChip(
                 selected = selected == category,
                 onClick = { onCategory(category) },
                 label = category.label,
@@ -558,13 +567,10 @@ internal fun resolveHeroPresentationStyle(
     imageHeightPx: Int,
     containerWidthPx: Int,
     containerHeightPx: Int,
-): HeroPresentationStyle {
-    // 顶部 Hero 海报统一全幅铺满（ContentScale.Crop），避免横图退化为局部悬浮卡片
-    return HeroPresentationStyle.FULL_BLEED
-}
+): HeroPresentationStyle = HeroPresentationStyle.FULL_BLEED
 
 @Composable
-private fun NetflixHeroBillboard(
+private fun HeroSpotlightBanner(
     videos: List<VideoItem>,
     favoriteIds: Set<String>,
     onPlay: (VideoItem) -> Unit,
@@ -577,9 +583,8 @@ private fun NetflixHeroBillboard(
     var currentIndex by remember { mutableIntStateOf(0) }
     val video = videos.getOrNull(currentIndex) ?: videos.first()
     val isFavorite = video.id in favoriteIds
+    val reduceMotion = LocalReduceMotion.current
 
-    // 6.5s 自动轮播聚光灯画廊（尊重系统「减少动画」无障碍设置）
-    val reduceMotion = remember { !ValueAnimator.areAnimatorsEnabled() }
     LaunchedEffect(videos.size, reduceMotion) {
         if (videos.size > 1 && !reduceMotion) {
             while (true) {
@@ -592,307 +597,184 @@ private fun NetflixHeroBillboard(
     val density = LocalDensity.current
     val containerHeightPx = LocalWindowInfo.current.containerSize.height
     val screenHeightDp = if (containerHeightPx > 0) with(density) { containerHeightPx.toDp().value } else 720f
-    val heroHeight = (screenHeightDp * 0.72f).coerceIn(300f, 460f).dp
-    var containerSizePx by remember { mutableStateOf(IntSize.Zero) }
+    val heroHeight = (screenHeightDp * 0.68f).coerceIn(320f, 480.dp.value).dp
     val heroVideo = remember(video) {
         val heroUrl = video.heroThumbnailUrl
         if (heroUrl.isNullOrBlank()) video else video.copy(thumbnailUrl = heroUrl)
     }
-    var imageDims by remember(heroVideo.thumbnailUrl) { mutableStateOf<Pair<Int, Int>?>(null) }
-    val presentationStyle = imageDims?.let { (w, h) ->
-        resolveHeroPresentationStyle(
-            imageWidthPx = w,
-            imageHeightPx = h,
-            containerWidthPx = containerSizePx.width,
-            containerHeightPx = containerSizePx.height,
-        )
-    } ?: HeroPresentationStyle.FULL_BLEED
 
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(heroHeight)
             .clipToBounds()
-            .onSizeChanged { containerSizePx = it }
-            .clickable(role = Role.Button, onClick = { onDetails(video) }),
+            .clickable(role = Role.Button, onClick = {
+                AuroraHaptics.tap(haptic)
+                onDetails(video)
+            }),
     ) {
-        // 底层沉浸图片：fullBleed 直接全屏高清铺满；cinemaStage 使用纯 Kotlin 软件模糊的低分辨率环境垫底，规避 RenderEffect 在部分 GPU 上的条纹伪影并保持海报无裁切清晰
         MediaImage(
             video = heroVideo,
             contentScale = ContentScale.Crop,
             originalSize = true,
-            ambientBlur = (presentationStyle == HeroPresentationStyle.CINEMA_STAGE),
-            onImageDimensions = { w, h -> imageDims = w to h },
             modifier = Modifier.fillMaxSize(),
         )
-        if (presentationStyle == HeroPresentationStyle.CINEMA_STAGE) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.34f)),
-            )
-        }
 
-        // Top dark vignette gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .height(180.dp)
                 .align(Alignment.TopCenter)
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color.Black.copy(alpha = 0.88f),
-                            Color.Black.copy(alpha = 0.45f),
+                            Color.Black.copy(alpha = 0.80f),
+                            Color.Black.copy(alpha = 0.36f),
                             Color.Transparent,
                         ),
                     ),
                 ),
         )
 
-        // Bottom dark dissolve gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.72f)
+                .fillMaxHeight(0.74f)
                 .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
                             0.0f to Color.Transparent,
-                            0.38f to Color.Transparent,
-                            0.62f to Color.Black.copy(alpha = 0.65f),
-                            0.82f to Color.Black.copy(alpha = 0.90f),
+                            0.36f to Color.Transparent,
+                            0.64f to Color.Black.copy(alpha = 0.62f),
+                            0.84f to Color.Black.copy(alpha = 0.88f),
                             1.0f to Color.Black.copy(alpha = 0.96f),
                         ),
                     ),
                 ),
         )
 
-        // 前景无裁切高清舞台层（CINEMA_STAGE 模式下贴合原图纵横比居中悬浮，严禁溢出或超限放大）
-        if (presentationStyle == HeroPresentationStyle.CINEMA_STAGE) {
-            val dims = imageDims
-            if (dims != null) {
-                val imgW = dims.first
-                val imgH = dims.second
-                val naturalAspect = (imgW.toFloat() / imgH.toFloat()).coerceIn(0.45f, 4.2f)
-                val maxNaturalWidthDp = with(density) { (imgW * 1.45f).toDp() }
-                BoxWithConstraints(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(top = 82.dp, bottom = 148.dp, start = 16.dp, end = 16.dp),
-                ) {
-                    val uncappedW = min(maxWidth.value, maxHeight.value * naturalAspect)
-                    val fittedW = if (min(imgW, imgH) < 560) {
-                        min(uncappedW, maxNaturalWidthDp.value).dp
-                    } else {
-                        uncappedW.dp
-                    }
-                    val fittedH = (fittedW.value / naturalAspect).dp
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        shadowElevation = 14.dp,
-                        border = BorderStroke(0.75.dp, Color.White.copy(alpha = 0.22f)),
-                        color = Color.Transparent,
-                        modifier = Modifier
-                            .size(width = fittedW, height = fittedH)
-                            .clip(RoundedCornerShape(16.dp)),
-                    ) {
-                        MediaImage(
-                            video = heroVideo,
-                            contentScale = ContentScale.Fit,
-                            originalSize = true,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
-            }
-        }
-
-        // Overlaid Billboard Content
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 20.dp, vertical = 14.dp),
         ) {
             Text(
                 text = video.title,
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 22.sp,
-                    lineHeight = 28.sp,
-                ),
+                style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 12.dp),
+                modifier = Modifier.padding(horizontal = 8.dp),
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(6.dp))
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = "热门精选",
-                    color = HomeMediaLabel,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "  •  ",
-                    color = HomeAccent,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                )
-                Text(
-                    text = "多线路直连",
-                    color = HomeMediaLabel,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                if (video.duration.isNotBlank()) {
-                    Text(
-                        text = "  •  ",
-                        color = HomeAccent,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text(
-                        text = video.duration,
-                        color = HomeMediaLabel,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
+            val meta = buildList {
+                add("热门精选")
+                add("多线路直连")
+                video.duration.takeIf { it.isNotBlank() && it != "--:--" }?.let(::add)
+            }.joinToString("  ·  ")
+            Text(
+                text = meta,
+                style = MaterialTheme.typography.labelMedium,
+                color = AuroraMediaLabel,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
 
             Spacer(Modifier.height(14.dp))
 
+            // Material 3 Expressive pill action cluster
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+                horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable(
-                            role = Role.Button,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onFavorite(video)
-                            },
-                        )
-                        .padding(vertical = 4.dp),
+                FilledTonalIconButton(
+                    onClick = {
+                        AuroraHaptics.toggle(haptic, !isFavorite)
+                        onFavorite(video)
+                    },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color.White.copy(alpha = 0.18f),
+                        contentColor = if (isFavorite) MaterialTheme.colorScheme.primary else Color.White,
+                    ),
+                    modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Check else Icons.Default.Add,
                         contentDescription = if (isFavorite) "已在片单" else "我的片单",
-                        tint = if (isFavorite) HomeAccent else Color.White,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = if (isFavorite) "已在片单" else "我的片单",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                        color = if (isFavorite) HomeAccent else Color.White,
-                        fontWeight = FontWeight.Medium,
                     )
                 }
 
                 Button(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        AuroraHaptics.confirm(haptic)
                         onPlay(video)
                     },
-                    shape = RoundedCornerShape(4.dp),
+                    shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
                     ),
-                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 0.dp),
-                    modifier = Modifier
-                        .height(38.dp)
-                        .padding(horizontal = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 28.dp, vertical = 0.dp),
+                    modifier = Modifier.height(48.dp),
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.Black,
-                            modifier = Modifier.size(22.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = "播放",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = Color.Black,
-                            ),
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "播放",
+                        style = MaterialTheme.typography.labelLarge,
+                    )
                 }
 
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable(
-                            role = Role.Button,
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onDetails(video)
-                            },
-                        )
-                        .padding(vertical = 4.dp),
+                FilledTonalIconButton(
+                    onClick = {
+                        AuroraHaptics.tap(haptic)
+                        onDetails(video)
+                    },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color.White.copy(alpha = 0.18f),
+                        contentColor = Color.White,
+                    ),
+                    modifier = Modifier.size(48.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.Info,
                         contentDescription = "详情",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "详情",
-                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium,
                     )
                 }
             }
 
             if (videos.size > 1) {
-                Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(12.dp))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 2.dp),
                 ) {
                     videos.indices.forEach { index ->
                         val isSelected = index == currentIndex
                         val targetWidth by animateDpAsState(
-                            targetValue = if (isSelected) 22.dp else 6.dp,
-                            animationSpec = spring(dampingRatio = 0.85f, stiffness = 380f),
-                            label = "indicator-width",
+                            targetValue = if (isSelected) 24.dp else 6.dp,
+                            animationSpec = AuroraMotion.fastSpatial(),
+                            label = "hero-indicator-width",
                         )
                         Box(
                             modifier = Modifier
                                 .width(targetWidth)
                                 .height(6.dp)
                                 .clip(CircleShape)
-                                .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.35f))
+                                .background(if (isSelected) Color.White else Color.White.copy(alpha = 0.36f))
                                 .clickable {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    AuroraHaptics.segmentTick(haptic)
                                     currentIndex = index
                                 },
                         )
@@ -904,100 +786,30 @@ private fun NetflixHeroBillboard(
 }
 
 @Composable
-private fun NetflixTop10Card(
+private fun Top10ExpressiveCard(
     rank: Int,
     video: VideoItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val haptic = LocalHapticFeedback.current
-    val rankText = "$rank"
-    val rankWidth = if (rank >= 10) 30.dp else 20.dp
-    val totalWidth = 140.dp + rankWidth + 8.dp
-
+    val rankWidth = if (rank >= 10) 36.dp else 24.dp
     Row(
         verticalAlignment = Alignment.Bottom,
-        modifier = modifier
-            .width(totalWidth)
-            .clickable(role = Role.Button) {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onClick()
-            },
+        modifier = modifier.width(146.dp + rankWidth + 8.dp),
     ) {
-        // Subtle 34sp Apple TV translucent rank watermark
         Box(
             modifier = Modifier
                 .width(rankWidth)
-                .padding(bottom = 36.dp),
+                .padding(bottom = 44.dp),
             contentAlignment = Alignment.BottomCenter,
         ) {
-            Text(
-                text = rankText,
-                fontSize = 34.sp,
-                lineHeight = 34.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
-            )
+            AuroraRankNumber(rank = rank)
         }
         Spacer(Modifier.width(8.dp))
-        // Standard 140x210 poster card with metadata below
-        Column(modifier = Modifier.width(140.dp)) {
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = Color(0xFF1E1E1E),
-                modifier = Modifier
-                    .width(140.dp)
-                    .height(210.dp),
-                shadowElevation = 6.dp,
-            ) {
-                Box(Modifier.fillMaxSize()) {
-                    MediaImage(
-                        video = video,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    if (video.duration.isNotBlank() && video.duration != "--:--") {
-                        Text(
-                            text = video.duration,
-                            color = Color.White,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(6.dp)
-                                .background(
-                                    Color.Black.copy(alpha = 0.72f),
-                                    RoundedCornerShape(4.dp),
-                                )
-                                .padding(horizontal = 5.dp, vertical = 2.dp),
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = video.title,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    lineHeight = 16.sp,
-                ),
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(2.dp))
-            Text(
-                text = listOf(video.views, video.author)
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() }
-                    .distinct()
-                    .joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        AuroraPosterCard(
+            video = video,
+            onClick = onClick,
+        )
     }
 }
 
@@ -1010,92 +822,91 @@ private fun VideoGridCard(
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(role = Role.Button) {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onClick()
-            }
-            .testTag("home-grid-card"),
+
+    Card(
+        onClick = {
+            AuroraHaptics.tap(haptic)
+            onClick()
+        },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        modifier = modifier.testTag("home-grid-card"),
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(16 / 10f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-        ) {
-            MediaImage(video = video, modifier = Modifier.fillMaxSize())
-            if (video.duration.isNotBlank()) {
-                Text(
-                    text = video.duration,
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(6.dp)
-                        .background(HomeBackground.copy(alpha = 0.78f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
-                )
-            }
-        }
-        Row(
-            verticalAlignment = Alignment.Top,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 2.dp),
-        ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(
-                    text = video.title,
-                    style = MaterialTheme.typography.titleSmall.copy(fontSize = 13.sp),
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 2,
-                    minLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = listOf(video.author, video.views)
-                        .map { it.trim() }
-                        .filter { it.isNotBlank() }
-                        .distinct()
-                        .joinToString(" · "),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            IconButton(
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onFavorite()
-                },
+        Column {
+            Box(
                 modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .size(36.dp)
-                    .offset(x = 6.dp, y = (-4).dp),
+                    .fillMaxWidth()
+                    .aspectRatio(16 / 10f),
             ) {
-                Icon(
-                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
-                    tint = if (isFavorite) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(18.dp),
-                )
+                MediaImage(video = video, modifier = Modifier.fillMaxSize())
+                if (video.duration.isNotBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.74f),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(6.dp),
+                    ) {
+                        Text(
+                            text = video.duration,
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
+                }
+            }
+            Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 10.dp, end = 2.dp, top = 8.dp, bottom = 8.dp),
+            ) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text(
+                        text = video.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        minLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = listOf(video.author, video.views)
+                            .map { it.trim() }
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                            .joinToString(" · ")
+                            .ifBlank { " " },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        AuroraHaptics.toggle(haptic, !isFavorite)
+                        onFavorite()
+                    },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
+                        contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
             }
         }
     }
 }
 
-/** Font scale at which the two-column home feed drops to one column (HIG C7). */
 private const val SINGLE_COLUMN_FONT_SCALE = 1.5f
-
-/** Font scale at which the fixed-width search entry becomes an icon-only button (HIG C7/E6). */
-private const val LARGE_FONT_SEARCH_SCALE = 1.5f

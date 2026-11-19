@@ -10,9 +10,15 @@
     <string name="cast_searching_lan">正在搜尋區域網絡內的電視裝置…</string>
     <string name="cast_empty_title">未發現支援 DLNA 的電視</string>
     <string name="cast_empty_subtitle">請確認手機與電視連接在同一 Wi-Fi 網絡，或使用上方「系統無線投屏 / 畫面鏡像」</string>
+    <string name="cast_local_network_title">需要區域網絡裝置存取權限</string>
+    <string name="cast_local_network_subtitle">Android 17 需要授權區域網絡權限，方可偵測同一 Wi-Fi 網絡內的 DLNA 電視裝置。</string>
+    <string name="cast_local_network_grant">授權並掃描</string>
+    <string name="cast_local_network_settings">前往系統設定</string>
     <string name="theme_mode_title">外觀模式</string>
     <string name="theme_mode_system">跟隨系統</string>
-    <string name="theme_mode_light">淺色模式</string>
-    <string name="theme_mode_dark">深色模式</string>
+    <string name="theme_mode_light">淺色</string>
+    <string name="theme_mode_dark">深色</string>
     <string name="about_open_source_title">關於與開源許可</string>
+    <string name="pip_action_play">播放</string>
+    <string name="pip_action_pause">暫停</string>
 </resources>

@@ -1,6 +1,7 @@
 @file:OptIn(
-    dev.chrisbanes.haze.ExperimentalHazeApi::class,
-    dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi::class,
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+    androidx.compose.animation.ExperimentalSharedTransitionApi::class,
 )
 
 package com.aurorashelf.app.ui
@@ -8,369 +9,318 @@ package com.aurorashelf.app.ui
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
-import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.activity.BackEventCompat
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.ScrollableDefaults
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
-import androidx.compose.foundation.gestures.horizontalDrag
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.animation.core.Spring
-import androidx.compose.runtime.mutableFloatStateOf
-import kotlin.math.roundToInt
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FormatListNumbered
-import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.CastConnected
-import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.util.lerp
-import androidx.compose.runtime.rememberCoroutineScope
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.composed
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.ui.util.lerp
+import androidx.core.graphics.scale
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.size.Size as CoilSize
-import com.aurorashelf.app.model.AppDestination
-import com.aurorashelf.app.model.ContentSource
-import com.aurorashelf.app.model.ContentSourceCatalog
-import com.aurorashelf.app.model.ComicSourceInfo
-import com.aurorashelf.app.model.FeedCategory
+import com.aurorashelf.app.R
 import com.aurorashelf.app.model.VideoItem
-import com.aurorashelf.app.data.SourceAddress
-import com.aurorashelf.app.data.PlaybackEpisode
-import com.aurorashelf.app.data.PlaybackResolver
-import com.aurorashelf.app.data.OfflineCacheManager
-import com.aurorashelf.app.data.OfflineCacheState
-import com.aurorashelf.app.data.OfflineVideo
-import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
-import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
-import com.aurorashelf.app.ui.theme.AuroraCoral
 import com.aurorashelf.app.ui.theme.AuroraBrandAccentDeep
-import com.aurorashelf.app.ui.theme.AuroraDimens
-import com.aurorashelf.app.ui.theme.AuroraGlassContainerDark
-import com.aurorashelf.app.ui.theme.AuroraGlassContainerLight
-import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
-import com.aurorashelf.app.ui.theme.AuroraInkContent
-import com.aurorashelf.app.ui.theme.AuroraInkSurface
-import com.aurorashelf.app.ui.theme.AuroraMediaInk
-import com.aurorashelf.app.ui.theme.AuroraMediaLabel
-import com.aurorashelf.app.ui.theme.AuroraMediaMeta
-import com.aurorashelf.app.ui.theme.AuroraMediaMuted
-import com.aurorashelf.app.ui.theme.AuroraMediaOnImage
-import com.aurorashelf.app.ui.theme.AuroraMediaOutline
-import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
-import com.aurorashelf.app.ui.theme.AuroraMediaRankFill
-import com.aurorashelf.app.ui.theme.AuroraMediaRankOutline
-import com.aurorashelf.app.ui.theme.AuroraMediaSurface
-import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
-import com.aurorashelf.app.ui.theme.AuroraProfileAccent
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
+import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.ui.theme.AuroraHaptics
+import com.aurorashelf.app.ui.theme.AuroraMotion
+import com.aurorashelf.app.ui.theme.LocalReduceMotion
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import dev.chrisbanes.haze.HazeInputScale
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.HazeMaterials
-import dev.chrisbanes.haze.rememberHazeState
-import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
-internal val LocalWindowLayout = androidx.compose.runtime.compositionLocalOf { WindowLayout.calculate(393f, 690f, false) }
-internal val LocalDockHeight = androidx.compose.runtime.compositionLocalOf { 112.dp }
-internal val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
-internal val LocalBackdrop = staticCompositionLocalOf<Backdrop?> { null }
+internal val LocalWindowLayout = compositionLocalOf { WindowLayout.calculate(393f, 690f, false) }
+internal val LocalDockHeight = compositionLocalOf { 80.dp }
+internal val LocalSharedTransitionScope = staticCompositionLocalOf<SharedTransitionScope?> { null }
+internal val LocalAnimatedVisibilityScope = staticCompositionLocalOf<AnimatedVisibilityScope?> { null }
 
 data class CastController(
     val onOpenCastSheet: () -> Unit = {},
     val isCasting: Boolean = false,
 )
 
-/**
- * Apple HIG fluid spring physics specification tokens.
- * Mimics iOS system-wide continuous fluid interruptible motion.
- */
-object AppleSpring {
-    /**
-     * Crisp, micro-bouncy spring for buttons, chips, card presses and toggles.
-     * Mimics iOS UIControl tactile spring (damping ratio 0.82, stiffness 380).
-     */
-    val Snappy = spring<Float>(
-        dampingRatio = 0.82f,
-        stiffness = 380f,
-    )
-
-    val SnappyDp = spring<Dp>(
-        dampingRatio = 0.82f,
-        stiffness = 380f,
-    )
-
-    /**
-     * Smooth, non-oscillating fluid spring for tab switches, sheets, and morph expansions.
-     * Mimics iOS UIViewController transitions (damping ratio 0.88, stiffness 260).
-     */
-    val Gentle = spring<Float>(
-        dampingRatio = 0.88f,
-        stiffness = 260f,
-    )
-
-    val GentleOffset = spring<IntOffset>(
-        dampingRatio = 0.88f,
-        stiffness = 260f,
-    )
-
-    /**
-     * Playful rubber-band spring for dock indicators and pull-to-refresh releases.
-     * Mimics iOS UIScrollView rubber-band bounce (damping ratio 0.72, stiffness 200).
-     */
-    val Bouncy = spring<Float>(
-        dampingRatio = 0.72f,
-        stiffness = 200f,
-    )
-}
+internal val LocalCastController = compositionLocalOf { CastController() }
 
 /**
- * Apple HIG fluid press scale micro-interaction.
- * Depresses the target element to [pressedScale] (default 0.96f) on finger-down,
- * and releases with Apple's signature low-bouncy spring physics on finger-up.
+ * Material 3 Expressive loading indicator (morphing polygon shapes) with deterministic
+ * Reduce Motion fallback to a calm progress indicator.
  */
-fun Modifier.applePressEffect(
-    enabled: Boolean = true,
-    pressedScale: Float = 0.96f,
-    onClick: (() -> Unit)? = null,
-): Modifier = composed {
-    if (!enabled) return@composed this
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) pressedScale else 1f,
-        animationSpec = AppleSpring.Snappy,
-        label = "applePressScale",
-    )
-    val haptic = LocalHapticFeedback.current
-
-    this
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
-        .then(
-            if (onClick != null) {
-                Modifier.clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    role = Role.Button,
-                ) {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onClick()
-                }
-            } else {
-                Modifier
-            }
+@Composable
+internal fun AuroraLoadingIndicator(
+    modifier: Modifier = Modifier,
+    contained: Boolean = false,
+    color: Color = MaterialTheme.colorScheme.primary,
+) {
+    if (LocalReduceMotion.current) {
+        // Respect Android system Remove Animations / Reduced Motion without infinite spin loops.
+        CircularProgressIndicator(
+            progress = { 0.72f },
+            color = color,
+            trackColor = color.copy(alpha = 0.22f),
+            strokeWidth = 3.dp,
+            modifier = modifier.size(32.dp),
         )
+    } else if (contained) {
+        ContainedLoadingIndicator(
+            modifier = modifier,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            indicatorColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    } else {
+        LoadingIndicator(
+            modifier = modifier,
+            color = color,
+        )
+    }
 }
 
-internal val LocalCastController = androidx.compose.runtime.compositionLocalOf { CastController() }
+/**
+ * Material 3 Expressive wavy progress indicator for top feed refresh and download tasks.
+ */
+@Composable
+internal fun AuroraWavyProgressBar(
+    modifier: Modifier = Modifier,
+    progress: (() -> Float)? = null,
+    color: Color = MaterialTheme.colorScheme.primary,
+    trackColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+) {
+    val reduceMotion = LocalReduceMotion.current
+    if (progress != null) {
+        if (reduceMotion) {
+            LinearProgressIndicator(
+                progress = progress,
+                color = color,
+                trackColor = trackColor,
+                modifier = modifier,
+            )
+        } else {
+            LinearWavyProgressIndicator(
+                progress = progress,
+                color = color,
+                trackColor = trackColor,
+                modifier = modifier,
+            )
+        }
+    } else {
+        if (reduceMotion) {
+            LinearProgressIndicator(
+                progress = { 0.55f },
+                color = color,
+                trackColor = trackColor,
+                modifier = modifier,
+            )
+        } else {
+            LinearWavyProgressIndicator(
+                color = color,
+                trackColor = trackColor,
+                modifier = modifier,
+            )
+        }
+    }
+}
+
+/**
+ * Native Material 3 Expressive PullToRefresh container using `PullToRefreshDefaults.LoadingIndicator`.
+ */
+@Composable
+internal fun AuroraPullToRefreshBox(
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    indicatorPaddingTop: Dp = 0.dp,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val state = rememberPullToRefreshState()
+    val reduceMotion = LocalReduceMotion.current
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        state = state,
+        modifier = modifier,
+        indicator = {
+            if (!reduceMotion) {
+                PullToRefreshDefaults.LoadingIndicator(
+                    state = state,
+                    isRefreshing = isRefreshing,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = indicatorPaddingTop),
+                )
+            } else if (isRefreshing) {
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    tonalElevation = 2.dp,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = indicatorPaddingTop + 12.dp),
+                ) {
+                    AuroraLoadingIndicator(
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier
+                            .padding(8.dp)
+                            .size(20.dp),
+                    )
+                }
+            }
+        },
+        content = content,
+    )
+}
 
 @Composable
 internal fun StatusBanner(message: String, onRefresh: () -> Unit) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    val haptic = LocalHapticFeedback.current
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ),
+        shape = MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("status-banner")
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .testTag("status-banner"),
     ) {
-        Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        IconButton(onClick = onRefresh) {
-            Icon(Icons.Default.Refresh, contentDescription = "重新加载")
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 14.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+        ) {
+            Icon(
+                Icons.Outlined.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(
+                onClick = {
+                    AuroraHaptics.tap(haptic)
+                    onRefresh()
+                },
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = "重新加载")
+            }
         }
     }
 }
@@ -384,37 +334,46 @@ internal fun VideoListRow(
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
-    Surface(
+    Card(
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            AuroraHaptics.tap(haptic)
             onClick()
         },
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.56f),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f)),
-        modifier = modifier.fillMaxWidth().animateContentSize(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        shape = MaterialTheme.shapes.medium,
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = AuroraMotion.defaultSpatial()),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.padding(8.dp),
+            modifier = Modifier.padding(10.dp),
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth(LocalWindowLayout.current.rowThumbnailFraction)
                     .aspectRatio(16 / 10f)
-                    .clip(RoundedCornerShape(14.dp)),
+                    .clip(MaterialTheme.shapes.small),
             ) {
                 MediaImage(video = video, modifier = Modifier.fillMaxSize())
-                Text(
-                    text = video.duration,
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(topStart = 10.dp))
-                        .padding(horizontal = 7.dp, vertical = 4.dp),
-                )
+                if (video.duration.isNotBlank()) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.74f),
+                        shape = RoundedCornerShape(topStart = 8.dp),
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                    ) {
+                        Text(
+                            text = video.duration,
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                        )
+                    }
+                }
             }
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -426,14 +385,35 @@ internal fun VideoListRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Text(video.author, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(video.views, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (video.author.isNotBlank()) {
+                    Text(
+                        video.author,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (video.views.isNotBlank()) {
+                    Text(
+                        video.views,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-            IconButton(onClick = onFavorite) {
+            IconButton(
+                onClick = {
+                    AuroraHaptics.toggle(haptic, !isFavorite)
+                    onFavorite()
+                },
+            ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
-                    tint = if (isFavorite) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -460,7 +440,7 @@ internal fun createAmbientBlurredBitmap(cacheKey: String?, bytes: ByteArray): Im
         val sampled = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts) ?: return null
         val targetW = 40
         val targetH = 40
-        val tiny = Bitmap.createScaledBitmap(sampled, targetW, targetH, true)
+        val tiny = sampled.scale(targetW, targetH)
         if (tiny !== sampled) sampled.recycle()
 
         val count = targetW * targetH
@@ -561,9 +541,6 @@ internal fun MediaImage(
             null
         }
     }
-    // A ByteArray model has no stable cache key on its own; using the URL as the memory key lets
-    // Coil reuse the decoded bitmap when the row scrolls back instead of decoding it again.
-    // Hero banners set originalSize = true and use a #original suffix so grid downsampling never degrades Hero fidelity.
     val coverRequest = remember(imageBytes, video.thumbnailUrl, originalSize, context) {
         imageBytes?.takeIf { it.isNotEmpty() }?.let { bytes ->
             val key = coverMemoryCacheKey(video.thumbnailUrl)?.let {
@@ -580,7 +557,7 @@ internal fun MediaImage(
     }
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
+        modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh),
     ) {
         if (ambientBlur && ambientBitmap != null) {
             Image(
@@ -606,14 +583,8 @@ internal fun MediaImage(
             )
             DarkModeArtworkScrim()
         } else if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary,
-            )
+            AuroraLoadingIndicator(modifier = Modifier.size(28.dp))
         } else {
-            // Covers are best-effort: show a neutral placeholder plus an explicit retry
-            // affordance instead of failing silently (HIG: keep the user in control).
             Icon(
                 imageVector = Icons.Outlined.Image,
                 contentDescription = null,
@@ -636,10 +607,6 @@ internal fun MediaImage(
     }
 }
 
-/**
- * HIG A7: network artwork is dimmed slightly in dark mode so covers do not glare at night.
- * The scrim only paints; it has no pointer input, so taps keep reaching the parent card.
- */
 @Composable
 internal fun BoxScope.DarkModeArtworkScrim() {
     if (MaterialTheme.colorScheme.background.luminance() <= 0.5f) {
@@ -651,11 +618,6 @@ internal fun BoxScope.DarkModeArtworkScrim() {
     }
 }
 
-/**
- * C3/C7: scale the adaptive artwork column width with the system font scale (capped at 1.6x)
- * so a large font naturally collapses the grid to a single column instead of squeezing cards.
- * Below the large-text threshold the base width is kept untouched, so default layouts are unchanged.
- */
 internal fun scaledAdaptiveMinSize(base: Dp, fontScale: Float): Dp =
     if (fontScale < LARGE_FONT_SCALE_THRESHOLD) {
         base
@@ -679,66 +641,36 @@ internal fun EmptyState(
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 96.dp),
+            .padding(vertical = 84.dp, horizontal = 24.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(42.dp))
-        Text(message, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        if (actionLabel != null && onAction != null) {
-            Button(onClick = onAction) { Text(actionLabel) }
-        }
-    }
-}
-
-@Composable
-internal fun GlassSurface(
-    shape: Shape,
-    modifier: Modifier = Modifier,
-    forceDark: Boolean = false,
-    content: @Composable () -> Unit,
-) {
-    val hazeState = LocalHazeState.current
-    val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
-    val isLightTheme = !isDark
-    val materialColor = if (forceDark) AuroraInkSurface else MaterialTheme.colorScheme.surface
-    val surfaceContentColor = if (forceDark) AuroraInkContent else MaterialTheme.colorScheme.onSurface
-    val containerColor = if (forceDark) {
-        AuroraInkSurface.copy(alpha = 0.85f)
-    } else if (isLightTheme) {
-        AuroraGlassContainerLight.copy(alpha = 0.88f)
-    } else {
-        AuroraGlassContainerDark.copy(alpha = 0.82f)
-    }
-    val outlineColor = if (forceDark) {
-        Color.White.copy(alpha = 0.15f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-    }
-    val glassModifier = if (hazeState != null) {
-        Modifier
-            .hazeEffect(
-                state = hazeState,
-                style = HazeMaterials.thin(materialColor),
-            ) {
-                blurRadius = 24.dp
-                noiseFactor = 0.045f
-                inputScale = HazeInputScale.Auto
-                blurredEdgeTreatment = BlurredEdgeTreatment(shape)
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.size(64.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(30.dp),
+                )
             }
-            .background(containerColor, shape)
-    } else {
-        Modifier.background(containerColor, shape)
-    }
-    Box(
-        modifier = modifier
-            .clip(shape)
-            .then(glassModifier)
-            .border(
-                BorderStroke(1.dp, outlineColor),
-                shape,
-            ),
-    ) {
-        CompositionLocalProvider(LocalContentColor provides surfaceContentColor) {
-            content()
+        }
+        Text(
+            message,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        if (actionLabel != null && onAction != null) {
+            Button(
+                onClick = onAction,
+                shape = CircleShape,
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) {
+                Text(actionLabel)
+            }
         }
     }
 }
@@ -757,25 +689,17 @@ internal fun CategoryStrip(
     val backgroundModifier = if (!applyBackground) {
         Modifier
     } else if (isScrolled) {
-        Modifier
-            .background(
-                if (isDark) Color(0xFF000000).copy(alpha = 0.94f)
-                else MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
-            )
-            .border(
-                BorderStroke(
-                    0.5.dp,
-                    if (isDark) Color(0xFF222222) else MaterialTheme.colorScheme.outlineVariant,
-                ),
-                RectangleShape,
-            )
+        Modifier.background(
+            if (isDark) MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f)
+            else MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.96f),
+        )
     } else {
         val edgeColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
         Modifier.background(
             Brush.verticalGradient(
                 listOf(
-                    edgeColor.copy(alpha = 0.85f),
-                    edgeColor.copy(alpha = 0.40f),
+                    edgeColor.copy(alpha = 0.80f),
+                    edgeColor.copy(alpha = 0.36f),
                     Color.Transparent,
                 ),
             ),
@@ -788,11 +712,12 @@ internal fun CategoryStrip(
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-                .heightIn(min = 44.dp)
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .heightIn(min = 48.dp)
                 .then(if (testTag != null) Modifier.testTag(testTag) else Modifier),
         ) {
             content()
@@ -800,8 +725,11 @@ internal fun CategoryStrip(
     }
 }
 
+/**
+ * 100% Native Material 3 Expressive category FilterChip with semantic haptics and full-pill shape.
+ */
 @Composable
-internal fun NetflixCategoryChip(
+internal fun AuroraFilterChip(
     selected: Boolean,
     onClick: () -> Unit,
     label: String,
@@ -810,95 +738,98 @@ internal fun NetflixCategoryChip(
     forceDark: Boolean = false,
 ) {
     val haptic = LocalHapticFeedback.current
-    val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
+    val scheme = MaterialTheme.colorScheme
     val containerColor by animateColorAsState(
-        targetValue = if (selected) {
-            if (isDark) Color.White else MaterialTheme.colorScheme.primary
-        } else {
-            if (isDark) Color(0x66000000) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f)
+        targetValue = when {
+            selected && forceDark -> Color.White
+            selected -> scheme.secondaryContainer
+            forceDark -> Color.Black.copy(alpha = 0.48f)
+            else -> scheme.surfaceContainerHigh
         },
-        animationSpec = spring(stiffness = 500f, dampingRatio = 0.8f),
-        label = "chip-bg",
+        animationSpec = AuroraMotion.fastEffects(),
+        label = "m3-chip-bg",
     )
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) {
-            if (isDark) Color.Black else MaterialTheme.colorScheme.onPrimary
-        } else {
-            if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
+    val labelColor by animateColorAsState(
+        targetValue = when {
+            selected && forceDark -> Color.Black
+            selected -> scheme.onSecondaryContainer
+            forceDark -> Color.White
+            else -> scheme.onSurfaceVariant
         },
-        animationSpec = spring(stiffness = 500f, dampingRatio = 0.8f),
-        label = "chip-fg",
-    )
-    val borderColor by animateColorAsState(
-        targetValue = if (selected) {
-            Color.Transparent
-        } else if (isDark) {
-            Color(0x66FFFFFF)
-        } else {
-            MaterialTheme.colorScheme.outlineVariant
-        },
-        animationSpec = spring(stiffness = 500f, dampingRatio = 0.8f),
-        label = "chip-border",
+        animationSpec = AuroraMotion.fastEffects(),
+        label = "m3-chip-fg",
     )
 
-    Surface(
+    FilterChip(
+        selected = selected,
         onClick = {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            AuroraHaptics.segmentTick(haptic)
             onClick()
         },
-        shape = CircleShape,
-        color = containerColor,
-        contentColor = contentColor,
-        border = if (!selected) BorderStroke(1.dp, borderColor) else null,
-        modifier = modifier.heightIn(min = 36.dp).applePressEffect(pressedScale = 0.94f),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
-        ) {
+        label = {
             Text(
                 text = label,
-                fontSize = 13.sp,
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
             )
-            if (hasDropdown) {
-                Spacer(Modifier.width(2.dp))
+        },
+        trailingIcon = if (hasDropdown) {
+            {
                 Icon(
-                    Icons.Default.ArrowDropDown,
+                    imageVector = Icons.Default.ArrowDropDown,
                     contentDescription = null,
-                    tint = contentColor,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(18.dp),
                 )
             }
-        }
-    }
+        } else {
+            null
+        },
+        shape = CircleShape,
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = containerColor,
+            labelColor = labelColor,
+            iconColor = labelColor,
+            selectedContainerColor = containerColor,
+            selectedLabelColor = labelColor,
+            selectedLeadingIconColor = labelColor,
+            selectedTrailingIconColor = labelColor,
+        ),
+        border = if (selected) {
+            null
+        } else {
+            FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = false,
+                borderColor = if (forceDark) Color.White.copy(alpha = 0.28f) else scheme.outlineVariant,
+                borderWidth = 1.dp,
+            )
+        },
+        modifier = modifier.heightIn(min = 38.dp),
+    )
 }
 
+/** Crisp geometric Netgrey brand mark drawn with Material theme primary accent. */
 @Composable
-internal fun NetflixNLogo(
+internal fun AuroraBrandMark(
     modifier: Modifier = Modifier,
-    redColor: Color = AuroraCoral,
-    darkRedColor: Color = AuroraBrandAccentDeep,
+    primaryColor: Color = MaterialTheme.colorScheme.primary,
+    accentDeepColor: Color = AuroraBrandAccentDeep,
 ) {
     Canvas(modifier = modifier) {
         val w = size.width
         val h = size.height
-        val barW = w * 0.32f
-
-        // Left vertical stem
+        val barW = w * 0.30f
         drawRect(
-            color = darkRedColor,
+            color = accentDeepColor,
             topLeft = Offset(0f, 0f),
             size = Size(barW, h),
         )
-        // Right vertical stem
         drawRect(
-            color = darkRedColor,
+            color = accentDeepColor,
             topLeft = Offset(w - barW, 0f),
             size = Size(barW, h),
         )
-        // Diagonal ribbon overlapping stems
         val diagonalPath = Path().apply {
             moveTo(0f, 0f)
             lineTo(barW, 0f)
@@ -906,93 +837,88 @@ internal fun NetflixNLogo(
             lineTo(w - barW, h)
             close()
         }
-        drawPath(
-            path = diagonalPath,
-            color = redColor,
-        )
+        drawPath(path = diagonalPath, color = primaryColor)
     }
 }
 
+/** Native Material 3 circular tonal profile avatar. */
 @Composable
-internal fun NetflixProfileAvatar(
+internal fun AuroraProfileAvatar(
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
-    sizeDp: Dp = 28.dp,
+    sizeDp: Dp = 44.dp,
     contentDescription: String = "站点设置",
 ) {
     val haptic = LocalHapticFeedback.current
-    val clickableModifier = if (onClick != null) {
-        Modifier
-            .minimumInteractiveComponentSize()
-            .clickable(
-                role = Role.Button,
-                onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onClick()
-                },
-            ).semantics { this.contentDescription = contentDescription }
-    } else Modifier
-
-    Box(
-        modifier = modifier
-            .size(sizeDp)
-            .clip(RoundedCornerShape(sizeDp * 0.16f))
-            .background(AuroraProfileAccent) // Netflix Profile Blue
-            .then(clickableModifier),
-        contentAlignment = Alignment.Center,
-    ) {
-        Canvas(modifier = Modifier.size(sizeDp * 0.64f)) {
-            val w = size.width
-            val h = size.height
-            // Eyes
-            drawCircle(
-                color = Color.White,
-                radius = w * 0.08f,
-                center = Offset(w * 0.33f, h * 0.36f),
-            )
-            drawCircle(
-                color = Color.White,
-                radius = w * 0.08f,
-                center = Offset(w * 0.67f, h * 0.36f),
-            )
-            // Smile arc
-            val smilePath = Path().apply {
-                moveTo(w * 0.28f, h * 0.58f)
-                quadraticTo(
-                    w * 0.5f, h * 0.82f,
-                    w * 0.72f, h * 0.58f,
+    val baseModifier = modifier
+        .size(sizeDp)
+        .then(
+            if (onClick != null) {
+                Modifier
+                    .minimumInteractiveComponentSize()
+                    .semantics { this.contentDescription = contentDescription }
+            } else {
+                Modifier
+            },
+        )
+    if (onClick != null) {
+        Surface(
+            onClick = {
+                AuroraHaptics.tap(haptic)
+                onClick()
+            },
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = baseModifier,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(sizeDp * 0.54f),
                 )
             }
-            drawPath(
-                path = smilePath,
-                color = Color.White,
-                style = Stroke(width = w * 0.09f, cap = StrokeCap.Round),
-            )
+        }
+    } else {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = baseModifier,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(sizeDp * 0.54f),
+                )
+            }
         }
     }
 }
 
 @Composable
-internal fun NetflixRankNumber(
+internal fun AuroraRankNumber(
     rank: Int,
     modifier: Modifier = Modifier,
     fontSize: TextUnit = 34.sp,
-    outlineColor: Color = Color.Transparent,
-    fillColor: Color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.45f),
+    fillColor: Color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
 ) {
-    val rankText = "$rank"
     Text(
-        text = rankText,
-        fontSize = fontSize,
-        lineHeight = fontSize,
-        fontWeight = FontWeight.Bold,
+        text = "$rank",
+        style = MaterialTheme.typography.displaySmall.copy(
+            fontSize = fontSize,
+            lineHeight = fontSize,
+            fontWeight = FontWeight.Black,
+        ),
         color = fillColor,
         modifier = modifier,
     )
 }
 
 @Composable
-internal fun NetflixSectionHeader(
+internal fun AuroraSectionHeader(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
@@ -1004,7 +930,7 @@ internal fun NetflixSectionHeader(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = 6.dp),
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Row(
@@ -1012,138 +938,141 @@ internal fun NetflixSectionHeader(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (badgeText != null) {
-                    Surface(
-                        color = AuroraBrandAccentDeep,
-                        shape = RoundedCornerShape(3.dp),
-                    ) {
-                        Text(
-                            text = badgeText,
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                        )
-                    }
+                    AuroraBadge(text = badgeText)
                 }
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 17.sp,
-                        letterSpacing = (-0.3).sp,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
                     ),
                     color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.semantics { heading() },
                 )
             }
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
         }
         if (actionText != null && onAction != null) {
-            Text(
-                text = actionText,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .clickable(role = Role.Button, onClick = onAction)
-                    .padding(horizontal = 6.dp, vertical = 8.dp),
-            )
+            TextButton(
+                onClick = onAction,
+                modifier = Modifier.minimumInteractiveComponentSize(),
+            ) {
+                Text(
+                    text = actionText,
+                    style = MaterialTheme.typography.labelLarge,
+                )
+            }
         }
     }
 }
 
 @Composable
-internal fun NetflixBadge(
+internal fun AuroraBadge(
     text: String,
     modifier: Modifier = Modifier,
-    backgroundColor: Color = AuroraBrandAccentDeep,
-    textColor: Color = Color.White,
+    backgroundColor: Color = MaterialTheme.colorScheme.primaryContainer,
+    textColor: Color = MaterialTheme.colorScheme.onPrimaryContainer,
 ) {
     Surface(
         color = backgroundColor,
-        shape = RoundedCornerShape(3.dp),
+        contentColor = textColor,
+        shape = CircleShape,
         modifier = modifier,
     ) {
         Text(
             text = text,
-            color = textColor,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.ExtraBold,
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
         )
     }
 }
 
+/**
+ * Native Material 3 Expressive poster card with standard Ripple indication and tonal elevation.
+ */
 @Composable
-internal fun NetflixPosterShelfCard(
+internal fun AuroraPosterCard(
     video: VideoItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .width(140.dp)
-            .applePressEffect(onClick = onClick),
+    val haptic = LocalHapticFeedback.current
+    ElevatedCard(
+        onClick = {
+            AuroraHaptics.tap(haptic)
+            onClick()
+        },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        modifier = modifier.width(146.dp),
     ) {
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier
-                .width(140.dp)
-                .height(210.dp),
-            shadowElevation = 4.dp,
-        ) {
-            Box(Modifier.fillMaxSize()) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(206.dp),
+            ) {
                 MediaImage(
                     video = video,
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (video.duration.isNotBlank() && video.duration != "--:--") {
-                    Text(
-                        text = video.duration,
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
+                    Surface(
+                        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.74f),
+                        shape = RoundedCornerShape(8.dp),
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 5.dp, vertical = 2.dp),
-                    )
+                            .padding(6.dp),
+                    ) {
+                        Text(
+                            text = video.duration,
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
                 }
             }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = video.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    minLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = video.views.ifBlank { video.author }.ifBlank { " " },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = video.title,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                lineHeight = 16.sp,
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = video.views.ifBlank { video.author },
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
+/**
+ * Native Material 3 Expressive Top App Bar (clean tonal chrome, 48dp touch targets, Cast action).
+ */
 @Composable
-internal fun NetflixTopBar(
+internal fun AuroraTopBar(
     modifier: Modifier = Modifier,
     titleTestTag: String? = null,
     onCast: (() -> Unit)? = null,
@@ -1151,25 +1080,26 @@ internal fun NetflixTopBar(
     forceDark: Boolean = false,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
+    val haptic = LocalHapticFeedback.current
     val castController = LocalCastController.current
     val actualOnCast = onCast ?: { castController.onOpenCastSheet() }
     val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        NetflixNLogo(modifier = Modifier.size(width = 22.dp, height = 34.dp))
+        AuroraBrandMark(
+            primaryColor = if (forceDark) AuroraCoral else MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(width = 20.dp, height = 28.dp),
+        )
         Text(
-            text = "Netgrey",
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = (-0.5).sp,
-                fontSize = 22.sp,
-            ),
-            color = AuroraCoral,
+            text = stringResource(R.string.app_name),
+            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold),
+            color = if (forceDark) Color.White else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .semantics { heading() }
                 .then(if (titleTestTag != null) Modifier.testTag(titleTestTag) else Modifier),
@@ -1177,14 +1107,22 @@ internal fun NetflixTopBar(
         Spacer(Modifier.weight(1f))
 
         IconButton(
-            onClick = { actualOnCast() },
+            onClick = {
+                AuroraHaptics.tap(haptic)
+                actualOnCast()
+            },
             modifier = Modifier.minimumInteractiveComponentSize(),
         ) {
             Icon(
                 imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
                 contentDescription = if (isCasting) "正在投屏至电视" else "投屏",
-                tint = if (isCasting) MaterialTheme.colorScheme.primary else if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(22.dp),
+                tint = if (isCasting) {
+                    MaterialTheme.colorScheme.primary
+                } else if (isDark) {
+                    Color.White
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
             )
         }
 
@@ -1192,8 +1130,11 @@ internal fun NetflixTopBar(
     }
 }
 
+/**
+ * Native Material 3 pill search trigger in TopBar; collapses to a 48dp IconButton at >= 130% font scale.
+ */
 @Composable
-internal fun NetflixSearchCapsule(
+internal fun AuroraSearchCapsule(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1202,60 +1143,57 @@ internal fun NetflixSearchCapsule(
     val haptic = LocalHapticFeedback.current
     val fontScale = LocalDensity.current.fontScale
     val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
-    val fgColor = if (isDark) AuroraMediaLabel else MaterialTheme.colorScheme.onSurfaceVariant
+    val containerColor = if (forceDark) {
+        Color.Black.copy(alpha = 0.46f)
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    }
+    val fgColor = if (forceDark) Color.White.copy(alpha = 0.92f) else MaterialTheme.colorScheme.onSurfaceVariant
+
     if (fontScale >= 1.3f) {
         IconButton(
             onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                AuroraHaptics.tap(haptic)
                 onClick()
             },
-            modifier = modifier.size(40.dp),
+            modifier = modifier.minimumInteractiveComponentSize(),
         ) {
             Icon(
                 imageVector = Icons.Outlined.Search,
                 contentDescription = label,
                 tint = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(24.dp),
             )
         }
     } else {
         Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = if (isDark) Color(0xFF262626).copy(alpha = 0.85f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.90f),
-            border = BorderStroke(
-                0.8.dp,
-                if (isDark) Color(0xFF454545) else MaterialTheme.colorScheme.outlineVariant,
-            ),
+            onClick = {
+                AuroraHaptics.tap(haptic)
+                onClick()
+            },
+            shape = CircleShape,
+            color = containerColor,
+            contentColor = fgColor,
+            border = if (forceDark) BorderStroke(1.dp, Color.White.copy(alpha = 0.24f)) else null,
             modifier = modifier
+                .heightIn(min = 40.dp)
                 .minimumInteractiveComponentSize()
-                .height(36.dp)
-                .clickable(
-                    role = Role.Button,
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onClick()
-                    },
-                )
                 .semantics { contentDescription = label },
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .padding(horizontal = 12.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             ) {
                 Icon(
                     imageVector = Icons.Outlined.Search,
                     contentDescription = null,
                     tint = fgColor,
-                    modifier = Modifier.size(17.dp),
+                    modifier = Modifier.size(18.dp),
                 )
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.labelLarge,
                     color = fgColor,
-                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                 )
             }
@@ -1263,8 +1201,12 @@ internal fun NetflixSearchCapsule(
     }
 }
 
+/**
+ * 100% Native Material 3 Expressive SearchBar surface (`surfaceContainerHigh`, full-pill shape,
+ * guaranteed 48dp minimum touch targets on every internal icon button).
+ */
 @Composable
-internal fun CenteredSearchBar(
+internal fun AuroraSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
     placeholder: String,
@@ -1274,38 +1216,36 @@ internal fun CenteredSearchBar(
     isSearching: Boolean = false,
     modifier: Modifier = Modifier,
     testTag: String? = null,
-    forceDark: Boolean = false,
 ) {
     val haptic = LocalHapticFeedback.current
-    val isDark = forceDark || MaterialTheme.colorScheme.background.luminance() <= 0.5f
-    val contentFg = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
-    val mutedFg = if (isDark) AuroraMediaLabel else MaterialTheme.colorScheme.onSurfaceVariant
-    GlassSurface(
-        shape = RoundedCornerShape(24.dp),
-        forceDark = forceDark,
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        shape = CircleShape,
+        color = scheme.surfaceContainerHigh,
+        contentColor = scheme.onSurface,
+        tonalElevation = 2.dp,
         modifier = modifier
             .fillMaxWidth()
-            .height(48.dp),
+            .heightIn(min = 56.dp),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 6.dp),
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp),
         ) {
             if (onBack != null) {
                 IconButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        AuroraHaptics.tap(haptic)
                         onBack()
                     },
-                    modifier = Modifier.size(38.dp),
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Default.ArrowBack,
                         contentDescription = "返回",
-                        tint = contentFg,
-                        modifier = Modifier.size(20.dp),
+                        tint = scheme.onSurface,
                     )
                 }
             }
@@ -1313,31 +1253,27 @@ internal fun CenteredSearchBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(horizontal = if (onBack == null) 12.dp else 4.dp),
+                    .padding(horizontal = if (onBack == null) 16.dp else 4.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 if (query.isEmpty()) {
                     Text(
                         text = placeholder,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 14.sp,
-                            color = mutedFg,
-                        ),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = scheme.onSurfaceVariant,
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 BasicTextField(
                     value = query,
                     onValueChange = onQueryChange,
                     singleLine = true,
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 14.sp,
-                        color = contentFg,
-                    ),
-                    cursorBrush = SolidColor(AuroraCoral),
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(color = scheme.onSurface),
+                    cursorBrush = SolidColor(scheme.primary),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        AuroraHaptics.confirm(haptic)
                         onSearch()
                     }),
                     modifier = Modifier
@@ -1350,45 +1286,39 @@ internal fun CenteredSearchBar(
             if (query.isNotEmpty() && onClear != null) {
                 IconButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        AuroraHaptics.tap(haptic)
                         onClear()
                     },
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "清除",
-                        tint = mutedFg,
-                        modifier = Modifier.size(16.dp),
+                        tint = scheme.onSurfaceVariant,
                     )
                 }
             }
 
             if (isSearching) {
                 Box(
-                    modifier = Modifier.size(38.dp),
+                    modifier = Modifier.size(48.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = AuroraCoral,
-                    )
+                    AuroraLoadingIndicator(modifier = Modifier.size(24.dp))
                 }
             } else {
                 IconButton(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        AuroraHaptics.confirm(haptic)
                         onSearch()
                     },
                     enabled = query.isNotBlank(),
-                    modifier = Modifier.size(38.dp),
+                    modifier = Modifier.minimumInteractiveComponentSize(),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = "开始搜索",
-                        tint = if (query.isNotBlank()) contentFg else mutedFg.copy(alpha = 0.45f),
-                        modifier = Modifier.size(20.dp),
+                        contentDescription = stringResource(R.string.action_search),
+                        tint = if (query.isNotBlank()) scheme.primary else scheme.onSurfaceVariant.copy(alpha = 0.45f),
                     )
                 }
             }
@@ -1397,9 +1327,9 @@ internal fun CenteredSearchBar(
 }
 
 /**
- * Wraps an in-app destination with Android's native SDK [PredictiveBackHandler] motion
- * (live finger-tracked scale, directional edge shift, rounded card reveal, and smooth spring settle)
- * paired with seamless edge drag-back via [auroraSwipeBack].
+ * 100% Native Android 17 Predictive Back container powered exclusively by [PredictiveBackHandler]
+ * and [MaterialTheme.motionScheme]. Removes any custom edge-drag interceptor so system gesture
+ * navigation works without gesture contention or competing trajectories.
  */
 @Composable
 internal fun PredictiveBackContainer(
@@ -1412,7 +1342,9 @@ internal fun PredictiveBackContainer(
     var swipeEdge by remember { mutableIntStateOf(BackEventCompat.EDGE_LEFT) }
     var touchDeltaY by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
-    val shiftPx = with(density) { 42.dp.toPx() }
+    val shiftPx = with(density) { 36.dp.toPx() }
+    val reduceMotion = LocalReduceMotion.current
+    val settleSpec = AuroraMotion.fastSpatial<Float>()
 
     PredictiveBackHandler(enabled = enabled) { backEvents ->
         var initialY: Float? = null
@@ -1420,18 +1352,14 @@ internal fun PredictiveBackContainer(
             backEvents.collect { event ->
                 val startY = initialY ?: event.touchY.also { initialY = it }
                 swipeEdge = event.swipeEdge
-                touchDeltaY = ((event.touchY - startY) * 0.12f)
-                    .coerceIn(-shiftPx, shiftPx)
+                touchDeltaY = ((event.touchY - startY) * 0.10f).coerceIn(-shiftPx, shiftPx)
                 progress.snapTo(event.progress.coerceIn(0f, 1f))
             }
             onBack()
         } catch (_: CancellationException) {
             progress.animateTo(
                 targetValue = 0f,
-                animationSpec = spring(
-                    dampingRatio = 0.85f,
-                    stiffness = Spring.StiffnessMedium,
-                ),
+                animationSpec = settleSpec,
             )
             touchDeltaY = 0f
         }
@@ -1440,18 +1368,21 @@ internal fun PredictiveBackContainer(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .auroraSwipeBack(enabled = enabled, onDismiss = onBack)
             .graphicsLayer {
                 val p = progress.value
                 if (p > 0f) {
-                    val scale = lerp(1f, 0.88f, p)
-                    scaleX = scale
-                    scaleY = scale
-                    val direction = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -1f else 1f
-                    translationX = direction * shiftPx * p
-                    translationY = touchDeltaY * p
-                    shape = RoundedCornerShape((28f * p).dp)
-                    clip = true
+                    if (reduceMotion) {
+                        alpha = lerp(1f, 0.85f, p)
+                    } else {
+                        val scale = lerp(1f, 0.90f, p)
+                        scaleX = scale
+                        scaleY = scale
+                        val direction = if (swipeEdge == BackEventCompat.EDGE_RIGHT) -1f else 1f
+                        translationX = direction * shiftPx * p
+                        translationY = touchDeltaY * p
+                        shape = RoundedCornerShape((28f * p).dp)
+                        clip = true
+                    }
                 }
             },
     ) {
@@ -1459,91 +1390,8 @@ internal fun PredictiveBackContainer(
     }
 }
 
-/**
- * Enables edge swipe-to-dismiss with continuous finger tracking, Material predictive scale/corner
- * feedback, and uninterrupted exit translation on release.
- */
-internal fun Modifier.auroraSwipeBack(
-    enabled: Boolean = true,
-    onDismiss: () -> Unit,
-): Modifier = composed {
-    if (!enabled) return@composed this
-    val dragOffsetPx = remember { Animatable(0f) }
-    var isDragging by remember { mutableStateOf(false) }
-    var containerWidthPx by remember { mutableFloatStateOf(1080f) }
-    val scope = rememberCoroutineScope()
-    val density = LocalDensity.current
-    val haptic = LocalHapticFeedback.current
-    val triggerDistancePx = with(density) { 96.dp.toPx() }
-    val edgeThresholdPx = with(density) { 24.dp.toPx() }
-
-    this
-        .onSizeChanged { containerWidthPx = it.width.toFloat().coerceAtLeast(1f) }
-        .graphicsLayer {
-            val offset = dragOffsetPx.value.coerceAtLeast(0f)
-            if (offset > 0f) {
-                val p = (offset / containerWidthPx).coerceIn(0f, 1f)
-                translationX = offset
-                val scale = lerp(1f, 0.92f, p)
-                scaleX = scale
-                scaleY = scale
-                shape = RoundedCornerShape((24f * p).dp)
-                clip = true
-            }
-        }
-        .pointerInput(enabled) {
-            awaitEachGesture {
-                val down = awaitFirstDown(requireUnconsumed = false)
-                // Only inspect horizontal touch slop when the gesture starts inside the left edge zone.
-                // Exiting immediately for mid-screen touches prevents consuming slight diagonal thumb arcs
-                // and never dispatches MotionEvent.ACTION_CANCEL to child LazyColumn / WebView views.
-                if (down.position.x > edgeThresholdPx) {
-                    return@awaitEachGesture
-                }
-                var initialOverSlop = 0f
-                val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
-                    if (over > 0f) {
-                        change.consume()
-                        initialOverSlop = over
-                    }
-                }
-                if (drag != null) {
-                    isDragging = true
-                    if (initialOverSlop > 0f) {
-                        scope.launch { dragOffsetPx.snapTo(initialOverSlop) }
-                    }
-                    val completed = try {
-                        horizontalDrag(drag.id) { change ->
-                            val deltaX = change.positionChange().x
-                            change.consume()
-                            val next = (dragOffsetPx.value + deltaX).coerceAtLeast(0f)
-                            scope.launch { dragOffsetPx.snapTo(next) }
-                        }
-                    } finally {
-                        isDragging = false
-                    }
-                    if (completed && dragOffsetPx.value > triggerDistancePx) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        scope.launch {
-                            dragOffsetPx.animateTo(
-                                targetValue = containerWidthPx,
-                                animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
-                            )
-                            onDismiss()
-                        }
-                    } else {
-                        scope.launch {
-                            dragOffsetPx.animateTo(
-                                targetValue = 0f,
-                                animationSpec = spring(
-                                    dampingRatio = 0.85f,
-                                    stiffness = Spring.StiffnessMediumLow,
-                                ),
-                            )
-                        }
-                    }
-                }
-            }
-        }
+internal tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
-

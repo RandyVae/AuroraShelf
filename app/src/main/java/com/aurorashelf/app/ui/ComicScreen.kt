@@ -1,14 +1,15 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+    androidx.compose.foundation.ExperimentalFoundationApi::class,
+)
+
 package com.aurorashelf.app.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -19,30 +20,28 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,28 +54,31 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BrokenImage
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -93,18 +95,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -113,7 +112,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.lazy.rememberLazyListState
 import coil3.compose.AsyncImage
 import coil3.imageLoader
 import coil3.network.NetworkHeaders
@@ -123,9 +121,6 @@ import coil3.request.ImageRequest
 import coil3.request.transformations
 import coil3.size.Precision
 import coil3.size.Size
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import com.aurorashelf.app.data.VideoRepository
 import com.aurorashelf.app.data.comic.ComicDownloadStatus
 import com.aurorashelf.app.data.comic.ComicPageResolver
 import com.aurorashelf.app.data.comic.DownloadedComicChapter
@@ -133,26 +128,19 @@ import com.aurorashelf.app.model.ComicChapter
 import com.aurorashelf.app.model.ComicDetails
 import com.aurorashelf.app.model.ComicPage
 import com.aurorashelf.app.model.ComicSummary
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.CheckCircle
 import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.ui.theme.AuroraHaptics
 import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
 import com.aurorashelf.app.ui.theme.AuroraMediaLabel
-import com.aurorashelf.app.ui.theme.AuroraMediaMuted
 import com.aurorashelf.app.ui.theme.AuroraMediaPlaceholder
-import com.aurorashelf.app.ui.theme.AuroraMediaRankFill
-import com.aurorashelf.app.ui.theme.AuroraMediaRankOutline
-import com.aurorashelf.app.ui.theme.AuroraMediaSurface
-import com.aurorashelf.app.ui.theme.AuroraMediaSurfaceVariant
+import com.aurorashelf.app.ui.theme.AuroraMotion
 import com.aurorashelf.app.ui.theme.AuroraReaderBackground
+import com.aurorashelf.app.ui.theme.LocalAuroraSemanticColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.withContext
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ComicScreen(
     state: ComicUiState,
@@ -186,13 +174,14 @@ internal fun ComicScreen(
         color = MaterialTheme.colorScheme.background,
         modifier = Modifier.fillMaxSize(),
     ) {
+        val comicScreenTransition = AuroraMotion.expressiveFadeThrough()
         AnimatedContent(
             targetState = when {
                 state.reader != null -> "reader"
                 state.details != null -> "details"
                 else -> "library"
             },
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            transitionSpec = { comicScreenTransition },
             label = "comic-screen",
         ) { screen ->
             when (screen) {
@@ -244,8 +233,8 @@ internal fun ComicScreen(
     if (showDownloadSheet) {
         ModalBottomSheet(
             onDismissRequest = { showDownloadSheet = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            containerColor = MaterialTheme.colorScheme.surface,
+            sheetState = rememberBottomSheetState(SheetValue.Hidden, setOf(SheetValue.PartiallyExpanded)),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ) {
             ComicDownloadProgressSheetContent(
                 chapters = downloadedChapters,
@@ -261,7 +250,7 @@ internal fun ComicScreen(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.65f))
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.65f))
                 .clickable(
                     interactionSource = blockerInteraction,
                     indication = null,
@@ -269,8 +258,8 @@ internal fun ComicScreen(
                 ),
         ) {
             Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.surface,
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 6.dp,
             ) {
                 Column(
@@ -278,11 +267,7 @@ internal fun ComicScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.padding(horizontal = 28.dp, vertical = 22.dp),
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        strokeWidth = 3.dp,
-                        color = AuroraCoral,
-                    )
+                    AuroraLoadingIndicator(contained = true)
                     Text(
                         text = "正在加载章节…",
                         style = MaterialTheme.typography.bodyMedium,
@@ -327,7 +312,6 @@ internal fun ComicScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun ComicLibrary(
     state: ComicUiState,
@@ -346,15 +330,12 @@ private fun ComicLibrary(
     val gridState = rememberLazyGridState()
     val fontScale = LocalDensity.current.fontScale
     val prefetchContext = LocalContext.current
-    // task-17: warm the first screen's comic covers with the same requests the grid uses.
     LaunchedEffect(state.comics) {
         if (state.comics.isNotEmpty()) {
             CoverPrefetcher.prefetchComicCovers(prefetchContext, state.comics, limit = COMIC_COVER_PREFETCH_LIMIT)
         }
     }
     val selectedSource = state.sources.find { it.id == state.selectedSourceId }
-    // snapshotFlow keeps firing when the next page grows the list, unlike a derivedStateOf
-    // boolean that can stay latched at true and never request the following page.
     LaunchedEffect(
         gridState,
         state.selectedSourceId,
@@ -378,7 +359,6 @@ private fun ComicLibrary(
     }
 
     var isSearchOpen by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = isSearchOpen) { isSearchOpen = false }
 
     val isScrolled by remember {
         derivedStateOf {
@@ -387,215 +367,231 @@ private fun ComicLibrary(
     }
 
     val bottomInset = LocalDockHeight.current + 24.dp
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+    PredictiveBackContainer(
+        enabled = isSearchOpen,
+        onBack = { isSearchOpen = false },
     ) {
-        LazyVerticalGrid(
-            // C3: widen artwork columns with the system font scale (capped) so >=150% font
-            // collapses the covers to a single column instead of squeezing the text.
-            columns = GridCells.Adaptive(minSize = scaledAdaptiveMinSize(154.dp, fontScale)),
-            state = gridState,
-            contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = bottomInset),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            modifier = Modifier.fillMaxSize().testTag("comic-library-grid"),
+        AuroraPullToRefreshBox(
+            isRefreshing = state.isLoading && state.comics.isNotEmpty(),
+            onRefresh = onRefresh,
+            indicatorPaddingTop = 132.dp,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
         ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Spacer(Modifier.height(130.dp))
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = scaledAdaptiveMinSize(154.dp, fontScale)),
+                state = gridState,
+                contentPadding = PaddingValues(start = 16.dp, top = 0.dp, end = 16.dp, bottom = bottomInset),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .testTag("comic-library-grid"),
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Spacer(Modifier.height(130.dp))
+                }
+
+                if (selectedSource?.requiresAuthentication == true && !state.isSourceAuthenticated) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        ComicSourceAuthCard(
+                            isLoading = state.isAuthorizing,
+                            error = state.authError,
+                            onAuthenticate = onAuthenticate,
+                        )
+                    }
+                } else if (state.isLoading && state.comics.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(260.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AuroraLoadingIndicator(contained = true)
+                        }
+                    }
+                } else if (state.error != null && state.comics.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        ComicError(message = state.error, onRetry = onRefresh)
+                    }
+                } else if (state.comics.isEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        ComicEmpty(message = if (state.activeQuery.isBlank()) "当前漫画源暂无内容" else "没有找到相关漫画")
+                    }
+                } else {
+                    if (state.activeQuery.isBlank()) {
+                        val heroComic = state.comics.first()
+                        item(key = "hero-comic-billboard", span = { GridItemSpan(maxLineSpan) }) {
+                            ComicHeroSpotlight(
+                                comic = heroComic,
+                                onRead = { onComic(heroComic) },
+                            )
+                        }
+                    }
+
+                    if (state.comics.size >= 5 && state.activeQuery.isBlank()) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            AuroraSectionHeader(
+                                title = "人气精选 TRENDING",
+                                subtitle = "近期读者最爱作品",
+                            )
+                        }
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                val topComics = state.comics.take(10)
+                                itemsIndexed(topComics, key = { _, c -> "trend-${c.sourceId}:${c.id}" }) { _, comic ->
+                                    ComicFeaturedCard(
+                                        comic = comic,
+                                        onClick = { onComic(comic) },
+                                        modifier = Modifier.animateItem(),
+                                    )
+                                }
+                            }
+                        }
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            AuroraSectionHeader(
+                                title = "为你推荐",
+                            )
+                        }
+                    }
+
+                    val feedComics = if (state.activeQuery.isBlank()) state.comics.drop(1) else state.comics
+                    items(feedComics, key = { "${it.sourceId}:${it.id}" }) { comic ->
+                        ComicCard(
+                            comic = comic,
+                            onClick = { onComic(comic) },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
+
+                if (state.isLoadingMore) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Box(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(72.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            AuroraLoadingIndicator(modifier = Modifier.size(30.dp))
+                        }
+                    }
+                }
+                (state.loadMoreError ?: state.error)?.let { message ->
+                    if (state.comics.isNotEmpty()) {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            TextButton(
+                                onClick = {
+                                    if (state.loadMoreError != null && state.page > 0) {
+                                        onLoadMore()
+                                    } else {
+                                        onRefresh()
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("$message（点击重试）")
+                            }
+                        }
+                    }
+                }
             }
 
-            if (selectedSource?.requiresAuthentication == true && !state.isSourceAuthenticated) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    ComicSourceAuthCard(
-                        isLoading = state.isAuthorizing,
-                        error = state.authError,
-                        onAuthenticate = onAuthenticate,
-                    )
-                }
-            } else if (state.isLoading && state.comics.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(Modifier.fillMaxWidth().height(260.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = AuroraCoral)
-                    }
-                }
-            } else if (state.error != null && state.comics.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    ComicError(message = state.error, onRetry = onRefresh)
-                }
-            } else if (state.comics.isEmpty()) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    ComicEmpty(message = if (state.activeQuery.isBlank()) "当前漫画源暂无内容" else "没有找到相关漫画")
-                }
+            // Native Material 3 Expressive Top App Bar & category strip
+            val overlayDarkHeader = !isScrolled && !isSearchOpen && state.comics.isNotEmpty() && state.activeQuery.isBlank()
+            val headerModifier = if (isScrolled) {
+                Modifier.background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f))
+            } else if (overlayDarkHeader) {
+                Modifier.background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Black.copy(alpha = 0.85f),
+                            Color.Black.copy(alpha = 0.40f),
+                            Color.Transparent,
+                        ),
+                    ),
+                )
             } else {
-                // Netflix Hero Spotlight for the leading title at item 0 (full bleed)
-                if (state.activeQuery.isBlank()) {
-                    val heroComic = state.comics.first()
-                    item(key = "hero-comic-billboard", span = { GridItemSpan(maxLineSpan) }) {
-                        NetflixComicHeroBillboard(
-                            comic = heroComic,
-                            onRead = { onComic(heroComic) },
-                        )
-                    }
-                }
+                Modifier.background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
+            }
 
-                // Popular Trending Comics Shelf (Apple Books 2:3 Gallery)
-                if (state.comics.size >= 5 && state.activeQuery.isBlank()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        NetflixSectionHeader(
-                            title = "人气精选 TRENDING",
-                            subtitle = "近期读者最爱作品",
+            Column(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .then(headerModifier)
+                    .windowInsetsPadding(WindowInsets.statusBars),
+            ) {
+                if (isSearchOpen) {
+                    AuroraSearchBar(
+                        query = state.query,
+                        onQueryChange = onQuery,
+                        placeholder = "搜索漫画",
+                        onSearch = onSearch,
+                        onBack = {
+                            isSearchOpen = false
+                            if (state.query.isNotEmpty()) {
+                                onQuery("")
+                                onSearch()
+                            }
+                        },
+                        onClear = {
+                            onQuery("")
+                            onSearch()
+                        },
+                        isSearching = state.isLoading,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        testTag = "comic-search-field",
+                    )
+                } else {
+                    AuroraTopBar(
+                        titleTestTag = "comic-library-title",
+                        modifier = Modifier.padding(bottom = 6.dp),
+                        forceDark = overlayDarkHeader,
+                    ) {
+                        ComicDownloadProgressIcon(
+                            downloadedChapters = downloadedChapters,
+                            forceDark = overlayDarkHeader,
+                            onClick = onOpenDownloadProgress,
+                        )
+                        AuroraSearchCapsule(
+                            label = if (state.activeQuery.isNotBlank()) state.activeQuery else "搜索漫画",
+                            onClick = { isSearchOpen = true },
+                            forceDark = overlayDarkHeader,
                         )
                     }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
+                    val categories = selectedSource?.categories.orEmpty()
+                    if (categories.isNotEmpty()) {
+                        CategoryStrip(
+                            testTag = "comic-category-bar",
+                            isScrolled = isScrolled,
+                            applyBackground = false,
+                            forceDark = overlayDarkHeader,
                         ) {
-                            val topComics = state.comics.take(10)
-                            itemsIndexed(topComics) { _, comic ->
-                                ComicFeaturedCard(
-                                    comic = comic,
-                                    onClick = { onComic(comic) },
+                            categories.forEach { category ->
+                                AuroraFilterChip(
+                                    selected = category.id == state.selectedCategoryId,
+                                    onClick = { onCategory(category.id) },
+                                    label = category.label,
+                                    forceDark = overlayDarkHeader,
                                 )
                             }
                         }
                     }
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        NetflixSectionHeader(
-                            title = "为你推荐",
-                        )
-                    }
                 }
-
-                val feedComics = if (state.activeQuery.isBlank()) state.comics.drop(1) else state.comics
-                items(feedComics, key = { "${it.sourceId}:${it.id}" }) { comic ->
-                    ComicCard(comic = comic, onClick = { onComic(comic) })
-                }
-            }
-
-            if (state.isLoadingMore) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Box(Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(modifier = Modifier.size(26.dp), strokeWidth = 3.dp, color = AuroraCoral)
-                    }
-                }
-            }
-            (state.loadMoreError ?: state.error)?.let { message ->
-                if (state.comics.isNotEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        TextButton(
-                            onClick = {
-                                if (state.loadMoreError != null && state.page > 0) {
-                                    onLoadMore()
-                                } else {
-                                    onRefresh()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("$message（点击重试）")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Floating Top Bar with dynamic gradient / blur background
-        val overlayDarkHeader = !isScrolled && !isSearchOpen && state.comics.isNotEmpty() && state.activeQuery.isBlank()
-        val headerModifier = if (isScrolled) {
-            Modifier
-                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
-                .border(BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant), RectangleShape)
-        } else if (overlayDarkHeader) {
-            Modifier.background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.Black.copy(alpha = 0.85f),
-                        Color.Black.copy(alpha = 0.40f),
-                        Color.Transparent,
-                    ),
-                ),
-            )
-        } else {
-            Modifier.background(MaterialTheme.colorScheme.background.copy(alpha = 0.96f))
-        }
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .then(headerModifier)
-                .windowInsetsPadding(WindowInsets.statusBars),
-        ) {
-            if (isSearchOpen) {
-                CenteredSearchBar(
-                    query = state.query,
-                    onQueryChange = onQuery,
-                    placeholder = "搜索漫画",
-                    onSearch = onSearch,
-                    onBack = {
-                        isSearchOpen = false
-                        if (state.query.isNotEmpty()) {
-                            onQuery("")
-                            onSearch()
-                        }
-                    },
-                    onClear = {
-                        onQuery("")
-                        onSearch()
-                    },
-                    isSearching = state.isLoading,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    testTag = "comic-search-field",
-                    forceDark = false,
-                )
-            } else {
-                NetflixTopBar(
-                    titleTestTag = "comic-library-title",
-                    modifier = Modifier.padding(bottom = 6.dp),
-                    forceDark = overlayDarkHeader,
-                ) {
-                    ComicDownloadProgressIcon(
-                        downloadedChapters = downloadedChapters,
-                        forceDark = overlayDarkHeader,
-                        onClick = onOpenDownloadProgress,
-                    )
-                    NetflixSearchCapsule(
-                        label = if (state.activeQuery.isNotBlank()) state.activeQuery else "搜索漫画",
-                        onClick = { isSearchOpen = true },
-                        forceDark = overlayDarkHeader,
+                if (state.isLoading) {
+                    AuroraWavyProgressBar(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp),
                     )
                 }
-                val categories = selectedSource?.categories.orEmpty()
-                if (categories.isNotEmpty()) {
-                    CategoryStrip(
-                        testTag = "comic-category-bar",
-                        isScrolled = isScrolled,
-                        applyBackground = false,
-                        forceDark = overlayDarkHeader,
-                    ) {
-                        categories.forEach { category ->
-                            NetflixCategoryChip(
-                                selected = category.id == state.selectedCategoryId,
-                                onClick = { onCategory(category.id) },
-                                label = category.label,
-                                forceDark = overlayDarkHeader,
-                            )
-                        }
-                    }
-                }
-            }
-            if (state.isLoading) {
-                LinearProgressIndicator(
-                    color = AuroraCoral,
-                    trackColor = Color.Transparent,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(2.dp),
-                )
             }
         }
     }
@@ -609,10 +605,12 @@ private fun ComicSourceAuthCard(
 ) {
     var account by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    Surface(
-        color = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(20.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        shape = MaterialTheme.shapes.large,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(
@@ -620,7 +618,7 @@ private fun ComicSourceAuthCard(
             modifier = Modifier.padding(20.dp),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("授权哔咔漫画", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                Text("授权哔咔漫画", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(
                     "账号仅用于换取访问令牌，密码不会保存。",
                     style = MaterialTheme.typography.bodyMedium,
@@ -633,13 +631,7 @@ private fun ComicSourceAuthCard(
                 label = { Text("邮箱账号") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedBorderColor = AuroraCoral,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                ),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
@@ -650,13 +642,7 @@ private fun ComicSourceAuthCard(
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = { onAuthenticate(account, password) }),
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                    focusedBorderColor = AuroraCoral,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                ),
+                shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth(),
             )
             error?.let {
@@ -665,14 +651,13 @@ private fun ComicSourceAuthCard(
             Button(
                 onClick = { onAuthenticate(account, password) },
                 enabled = !isLoading && account.isNotBlank() && password.isNotBlank(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                shape = CircleShape,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp),
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                    AuroraLoadingIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
                     Spacer(Modifier.width(9.dp))
                 }
                 Text(if (isLoading) "正在授权" else "登录并连接", fontWeight = FontWeight.Bold)
@@ -682,7 +667,7 @@ private fun ComicSourceAuthCard(
 }
 
 @Composable
-private fun NetflixComicHeroBillboard(
+private fun ComicHeroSpotlight(
     comic: ComicSummary,
     onRead: () -> Unit,
     modifier: Modifier = Modifier,
@@ -692,7 +677,11 @@ private fun NetflixComicHeroBillboard(
         modifier = modifier
             .fillMaxWidth()
             .height(460.dp)
-            .clickable(role = Role.Button, onClick = onRead),
+            .clip(MaterialTheme.shapes.extraLarge)
+            .clickable(role = Role.Button) {
+                AuroraHaptics.tap(haptic)
+                onRead()
+            },
     ) {
         val isWideStage = maxWidth > 500.dp
         ComicCoverImage(
@@ -706,7 +695,7 @@ private fun NetflixComicHeroBillboard(
                     .background(Color.Black.copy(alpha = 0.56f)),
             )
             Surface(
-                shape = RoundedCornerShape(14.dp),
+                shape = MaterialTheme.shapes.medium,
                 shadowElevation = 12.dp,
                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f)),
                 color = AuroraMediaPlaceholder,
@@ -724,7 +713,6 @@ private fun NetflixComicHeroBillboard(
             }
         }
 
-        // Top dark vignette gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -741,7 +729,6 @@ private fun NetflixComicHeroBillboard(
                 ),
         )
 
-        // Bottom dark dissolve gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -765,20 +752,16 @@ private fun NetflixComicHeroBillboard(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 10.dp),
+                .padding(horizontal = 18.dp, vertical = 14.dp),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = "MANGA SPOTLIGHT",
-                    color = AuroraCoral,
-                    fontSize = 11.sp,
+            Text(
+                text = "MANGA SPOTLIGHT",
+                color = AuroraCoral,
+                style = MaterialTheme.typography.labelMedium.copy(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 1.sp,
-                )
-            }
+                ),
+            )
 
             Spacer(Modifier.height(4.dp))
 
@@ -800,7 +783,7 @@ private fun NetflixComicHeroBillboard(
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = comic.subtitle,
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                    style = MaterialTheme.typography.bodySmall,
                     color = AuroraMediaLabel,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
@@ -812,34 +795,27 @@ private fun NetflixComicHeroBillboard(
 
             Button(
                 onClick = {
-                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    AuroraHaptics.confirm(haptic)
                     onRead()
                 },
-                shape = RoundedCornerShape(4.dp),
+                shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White,
-                    contentColor = Color.Black,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ),
-                contentPadding = PaddingValues(horizontal = 28.dp, vertical = 0.dp),
-                modifier = Modifier.height(38.dp),
+                contentPadding = PaddingValues(horizontal = 28.dp, vertical = 12.dp),
+                modifier = Modifier.heightIn(min = 48.dp),
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
-                        contentDescription = null,
-                        tint = Color.Black,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = "开始阅读",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            color = Color.Black,
-                        ),
-                    )
-                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "开始阅读",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                )
             }
         }
     }
@@ -851,101 +827,120 @@ private fun ComicFeaturedCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .width(140.dp)
-            .clickable(role = Role.Button, onClick = onClick),
+    val haptic = LocalHapticFeedback.current
+    ElevatedCard(
+        onClick = {
+            AuroraHaptics.tap(haptic)
+            onClick()
+        },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+        modifier = modifier.width(142.dp),
     ) {
-        Surface(
-            shape = RoundedCornerShape(10.dp),
-            color = AuroraMediaPlaceholder,
-            modifier = Modifier
-                .width(140.dp)
-                .height(210.dp),
-            shadowElevation = 4.dp,
-        ) {
-            Box(Modifier.fillMaxSize()) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(206.dp),
+            ) {
                 ComicCoverImage(
                     comic = comic,
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (comic.subtitle.isNotBlank()) {
-                    Text(
-                        text = comic.subtitle,
-                        color = Color.White,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
+                    Surface(
+                        color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(6.dp),
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(6.dp)
-                            .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 5.dp, vertical = 2.dp),
-                    )
+                            .padding(6.dp),
+                    ) {
+                        Text(
+                            text = comic.subtitle,
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                        )
+                    }
                 }
             }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = comic.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 2,
+                    minLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = comic.subtitle.ifBlank { "精选漫画" },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = comic.title,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                lineHeight = 16.sp,
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = comic.subtitle.ifBlank { "精选漫画" },
-            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
 @Composable
-private fun ComicCard(comic: ComicSummary, onClick: () -> Unit) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(bottom = 6.dp),
+private fun ComicCard(
+    comic: ComicSummary,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    Card(
+        onClick = {
+            AuroraHaptics.tap(haptic)
+            onClick()
+        },
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        modifier = modifier.fillMaxWidth(),
     ) {
-        Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            modifier = Modifier.fillMaxWidth().aspectRatio(0.72f),
-        ) {
-            Box(Modifier.fillMaxSize()) {
+        Column {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(0.72f),
+            ) {
                 ComicCoverImage(comic = comic, modifier = Modifier.fillMaxSize())
             }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    text = comic.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 2,
+                    minLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = comic.subtitle.ifBlank { " " },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    minLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
-        Text(
-            text = comic.title,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-            ),
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 2,
-            minLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 2.dp),
-        )
-        Text(
-            text = comic.subtitle.ifBlank { " " },
-            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            minLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 2.dp),
-        )
     }
 }
 
@@ -955,13 +950,14 @@ private fun ComicDownloadProgressIcon(
     forceDark: Boolean,
     onClick: () -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
     val activeCount = downloadedChapters.count {
         it.status == ComicDownloadStatus.QUEUED ||
             it.status == ComicDownloadStatus.RESOLVING ||
             it.status == ComicDownloadStatus.DOWNLOADING
     }
     val tint = if (activeCount > 0) {
-        AuroraCoral
+        MaterialTheme.colorScheme.primary
     } else if (forceDark) {
         Color.White
     } else {
@@ -969,8 +965,13 @@ private fun ComicDownloadProgressIcon(
     }
     Box(contentAlignment = Alignment.TopEnd) {
         IconButton(
-            onClick = onClick,
-            modifier = Modifier.testTag("comic-download-progress-button"),
+            onClick = {
+                AuroraHaptics.tap(haptic)
+                onClick()
+            },
+            modifier = Modifier
+                .minimumInteractiveComponentSize()
+                .testTag("comic-download-progress-button"),
         ) {
             Icon(
                 Icons.Default.Download,
@@ -979,19 +980,20 @@ private fun ComicDownloadProgressIcon(
             )
         }
         if (activeCount > 0) {
-            Box(
-                contentAlignment = Alignment.Center,
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
                 modifier = Modifier
                     .padding(top = 6.dp, end = 6.dp)
-                    .size(16.dp)
-                    .clip(CircleShape)
-                    .background(AuroraCoral),
+                    .size(16.dp),
             ) {
-                Text(
-                    text = activeCount.coerceAtMost(99).toString(),
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                    color = Color.White,
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = activeCount.coerceAtMost(99).toString(),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                    )
+                }
             }
         }
     }
@@ -1046,21 +1048,24 @@ private fun ComicDownloadProgressSheetContent(
                     "${(avgProgress * 100).toInt()}%",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = AuroraCoral,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }
         if (activeChapters.isNotEmpty()) {
-            LinearProgressIndicator(
+            AuroraWavyProgressBar(
                 progress = { avgProgress },
-                color = AuroraCoral,
-                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
             )
         }
         if (chapters.isEmpty()) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
             ) {
                 Text(
                     "暂无漫画下载任务，可在漫画详情或阅读器中点击下载按钮。",
@@ -1072,17 +1077,23 @@ private fun ComicDownloadProgressSheetContent(
         } else {
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp),
             ) {
                 items(chapters.size, key = { chapters[it].id }) { idx ->
                     val record = chapters[idx]
                     val maxPages = maxOf(record.totalPages, record.downloadedPages)
                     val pct = (record.progress.coerceIn(0f, 1f) * 100).toInt()
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                        shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        modifier = Modifier.fillMaxWidth(),
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateItem(),
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -1095,14 +1106,13 @@ private fun ComicDownloadProgressSheetContent(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                                 Text(
                                     record.chapterTitle,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = AuroraCoral,
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                                 val statusLine = when (record.status) {
                                     ComicDownloadStatus.QUEUED -> "排队等待 · $maxPages 页"
@@ -1123,10 +1133,11 @@ private fun ComicDownloadProgressSheetContent(
                                     record.status == ComicDownloadStatus.RESOLVING ||
                                     record.status == ComicDownloadStatus.QUEUED
                                 ) {
-                                    LinearProgressIndicator(
+                                    AuroraWavyProgressBar(
                                         progress = { record.progress.coerceIn(0f, 1f) },
-                                        color = AuroraCoral,
-                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 4.dp),
                                     )
                                 }
                             }
@@ -1157,19 +1168,35 @@ private fun ComicDetailsScreen(
     onOpenDownloadProgress: () -> Unit = {},
     onRetryComicDownload: ((String) -> Unit)? = null,
 ) {
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
+    val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalAuroraSemanticColors.current
+    Surface(
+        color = MaterialTheme.colorScheme.background,
+        modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
+    ) {
         LazyColumn(
             contentPadding = PaddingValues(bottom = 126.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
             stickyHeader {
-                Surface(color = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)) {
+                Surface(color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f)) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 8.dp, vertical = 6.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .statusBarsPadding()
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
                     ) {
-                        IconButton(onClick = onBack) {
+                        IconButton(
+                            onClick = {
+                                AuroraHaptics.tap(haptic)
+                                onBack()
+                            },
+                            modifier = Modifier.minimumInteractiveComponentSize(),
+                        ) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回漫画列表", tint = MaterialTheme.colorScheme.onSurface)
                         }
                         Text(
@@ -1189,63 +1216,73 @@ private fun ComicDetailsScreen(
                 }
             }
             item {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                 ) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.Top,
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier.width(120.dp).aspectRatio(0.72f),
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            modifier = Modifier
+                                .width(120.dp)
+                                .aspectRatio(0.72f),
                         ) {
                             ComicCoverImage(comic = details.comic, modifier = Modifier.fillMaxSize())
                         }
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
-                            Text(details.comic.title, style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, fontWeight = FontWeight.ExtraBold), color = MaterialTheme.colorScheme.onSurface)
+                            Text(details.comic.title, style = MaterialTheme.typography.titleMedium.copy(fontSize = 17.sp, fontWeight = FontWeight.ExtraBold))
                             if (details.comic.subtitle.isNotBlank()) {
                                 Text(details.comic.subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                                 details.comic.tags.take(6).forEach { tag ->
-                                    Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.surfaceVariant) {
-                                        Text(tag, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp))
+                                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                                        Text(tag, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
                                     }
                                 }
                             }
                             if (details.chapters.isNotEmpty()) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                                     Button(
-                                        onClick = { onChapter(0) },
-                                        shape = RoundedCornerShape(4.dp),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                                        ),
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                        modifier = if (onDownloadAll != null) Modifier.weight(1f).heightIn(min = 44.dp) else Modifier.heightIn(min = 44.dp),
+                                        onClick = {
+                                            AuroraHaptics.confirm(haptic)
+                                            onChapter(0)
+                                        },
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                        modifier = if (onDownloadAll != null) Modifier.weight(1f).heightIn(min = 48.dp) else Modifier.heightIn(min = 48.dp),
                                     ) {
-                                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(4.dp))
                                         Text("开始阅读", fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                                     }
 
                                     if (onDownloadAll != null) {
                                         OutlinedButton(
-                                            onClick = onDownloadAll,
-                                            shape = RoundedCornerShape(4.dp),
-                                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                                            modifier = Modifier.weight(1f).heightIn(min = 44.dp),
+                                            onClick = {
+                                                AuroraHaptics.tap(haptic)
+                                                onDownloadAll()
+                                            },
+                                            shape = CircleShape,
+                                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .heightIn(min = 48.dp),
                                         ) {
-                                            Icon(Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(16.dp))
+                                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                                             Spacer(Modifier.width(4.dp))
                                             Text(
                                                 text = "下载全本",
@@ -1264,14 +1301,18 @@ private fun ComicDetailsScreen(
             }
             if (details.description.isNotBlank()) {
                 item {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surface,
-                        shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(16.dp)) {
-                            Text("简介", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                            Text("简介", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                             Text(details.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -1283,29 +1324,38 @@ private fun ComicDetailsScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .padding(horizontal = 18.dp, vertical = 4.dp)
+                        .semantics { heading() },
                 )
             }
             itemsIndexed(details.chapters, key = { _, ch -> ch.id }) { index, chapter ->
                 val downloadRecord = downloadedChapters.find { it.comicId == details.comic.id && it.chapterId == chapter.id }
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
+                Card(
+                    onClick = {
+                        AuroraHaptics.tap(haptic)
+                        onChapter(index)
+                    },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
-                        .clickable { onChapter(index) },
+                        .animateItem(),
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
                     ) {
                         Text(
                             chapter.title,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                         )
 
@@ -1313,35 +1363,44 @@ private fun ComicDetailsScreen(
                             Icon(
                                 Icons.Default.CheckCircle,
                                 contentDescription = "已离线",
-                                tint = Color(0xFF34C759),
-                                modifier = Modifier.size(20.dp).padding(end = 8.dp),
+                                tint = semanticColors.onDirectContainer,
+                                modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .size(20.dp),
                             )
                         } else if (downloadRecord?.status == ComicDownloadStatus.DOWNLOADING ||
-                                   downloadRecord?.status == ComicDownloadStatus.RESOLVING ||
-                                   downloadRecord?.status == ComicDownloadStatus.QUEUED) {
+                            downloadRecord?.status == ComicDownloadStatus.RESOLVING ||
+                            downloadRecord?.status == ComicDownloadStatus.QUEUED
+                        ) {
                             val pct = (downloadRecord.progress.coerceIn(0f, 1f) * 100).toInt()
                             Text(
                                 text = "${downloadRecord.downloadedPages}/${maxOf(downloadRecord.totalPages, downloadRecord.downloadedPages)}页 · $pct%",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = AuroraCoral,
+                                color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(end = 6.dp),
                             )
                             CircularProgressIndicator(
                                 progress = { downloadRecord.progress },
-                                color = AuroraCoral,
-                                modifier = Modifier.size(18.dp).padding(end = 8.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(end = 8.dp)
+                                    .size(18.dp),
                                 strokeWidth = 2.dp,
                             )
                         } else if (downloadRecord?.status == ComicDownloadStatus.FAILED) {
                             IconButton(
                                 onClick = {
+                                    AuroraHaptics.tap(haptic)
                                     if (onRetryComicDownload != null) {
                                         onRetryComicDownload(downloadRecord.id)
                                     } else {
                                         onDownloadChapter?.invoke(chapter)
                                     }
                                 },
-                                modifier = Modifier.minimumInteractiveComponentSize().size(28.dp).padding(end = 6.dp),
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .size(32.dp)
+                                    .padding(end = 6.dp),
                             ) {
                                 Icon(
                                     Icons.Default.Refresh,
@@ -1352,8 +1411,14 @@ private fun ComicDetailsScreen(
                             }
                         } else if (onDownloadChapter != null) {
                             IconButton(
-                                onClick = { onDownloadChapter(chapter) },
-                                modifier = Modifier.minimumInteractiveComponentSize().size(28.dp).padding(end = 6.dp),
+                                onClick = {
+                                    AuroraHaptics.tap(haptic)
+                                    onDownloadChapter(chapter)
+                                },
+                                modifier = Modifier
+                                    .minimumInteractiveComponentSize()
+                                    .size(32.dp)
+                                    .padding(end = 6.dp),
                             ) {
                                 Icon(
                                     Icons.Default.Download,
@@ -1385,19 +1450,19 @@ private fun ComicReader(
     onNextChapter: () -> Unit,
     onRetry: () -> Unit,
     onDownloadChapter: ((ComicChapter) -> Unit)? = null,
-    downloadedChapters: List<com.aurorashelf.app.data.comic.DownloadedComicChapter> = emptyList(),
+    downloadedChapters: List<DownloadedComicChapter> = emptyList(),
 ) {
     val reader = requireNotNull(state.reader)
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
+    val semanticColors = LocalAuroraSemanticColors.current
     val targetPageWidthPx = LocalWindowInfo.current.containerSize.width.coerceIn(720, JmUnscrambleTransformation.MAX_TEXTURE_WIDTH)
     val listState = rememberLazyListState()
 
-    // Reset reader scroll position to top when chapter changes
     LaunchedEffect(reader.chapterIndex) {
         listState.scrollToItem(0)
     }
 
-    // Sliding window page prefetch: pre-resolves and warms ahead 3 pages off the main thread
     LaunchedEffect(listState, reader.pages, targetPageWidthPx) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
             .distinctUntilChanged()
@@ -1414,7 +1479,7 @@ private fun ComicReader(
                                 .httpHeaders(
                                     NetworkHeaders.Builder()
                                         .set("Referer", resolved.referer)
-                                        .set("User-Agent", "Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/139 Mobile Safari/537.36")
+                                        .set("User-Agent", "Mozilla/5.0 (Linux; Android 17) AppleWebKit/537.36 Chrome/142 Mobile Safari/537.36")
                                         .build(),
                                 )
                                 .memoryCacheKey("${resolved.imageUrl}#segments=${resolved.verticalSegments}")
@@ -1436,10 +1501,16 @@ private fun ComicReader(
             }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    val currentRecord = downloadedChapters.find { it.comicId == reader.details.comic.id && it.chapterId == reader.chapter.id }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AuroraImmersiveBackground),
+    ) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(top = 72.dp, bottom = 110.dp),
+            contentPadding = PaddingValues(top = 72.dp, bottom = 124.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
             if (state.isReaderLoading) {
@@ -1447,12 +1518,15 @@ private fun ComicReader(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 140.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 28.dp, vertical = 140.dp),
                     ) {
-                        CircularProgressIndicator(color = Color.White)
+                        AuroraLoadingIndicator(color = Color.White)
                         Text("正在加载章节…", color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
                         OutlinedButton(
                             onClick = onBack,
+                            shape = CircleShape,
                             border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)),
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                         ) {
@@ -1465,7 +1539,9 @@ private fun ComicReader(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 120.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 28.dp, vertical = 120.dp),
                     ) {
                         Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color.White, modifier = Modifier.size(42.dp))
                         Text(
@@ -1475,9 +1551,10 @@ private fun ComicReader(
                             textAlign = TextAlign.Center,
                         )
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = onRetry) { Text("重试") }
+                            Button(onClick = onRetry, shape = CircleShape) { Text("重试") }
                             OutlinedButton(
                                 onClick = onBack,
+                                shape = CircleShape,
                                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             ) {
@@ -1491,14 +1568,17 @@ private fun ComicReader(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 120.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 28.dp, vertical = 120.dp),
                     ) {
                         Icon(Icons.Default.BrokenImage, contentDescription = null, tint = Color.White, modifier = Modifier.size(42.dp))
                         Text("此章节暂时没有可显示的图片。", color = Color.White, style = MaterialTheme.typography.bodyLarge)
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Button(onClick = onRetry) { Text("重新加载") }
+                            Button(onClick = onRetry, shape = CircleShape) { Text("重新加载") }
                             OutlinedButton(
                                 onClick = onBack,
+                                shape = CircleShape,
                                 border = BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                             ) {
@@ -1511,48 +1591,31 @@ private fun ComicReader(
                 itemsIndexed(reader.pages, key = { index, page -> "$index:${page.imageUrl}" }) { index, page ->
                     ComicPageImage(page = page, pageNumber = index + 1)
                 }
-                item {
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 24.dp),
-                    ) {
-                        TextButton(
-                            onClick = onPreviousChapter,
-                            enabled = reader.chapterIndex > 0,
-                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null)
-                            Text("上一章")
-                        }
-                        Text(
-                            "${reader.chapterIndex + 1} / ${reader.details.chapters.size}",
-                            color = Color.White.copy(alpha = 0.72f),
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                        TextButton(
-                            onClick = onNextChapter,
-                            enabled = reader.chapterIndex < reader.details.chapters.lastIndex,
-                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
-                        ) {
-                            Text("下一章")
-                            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
-                        }
-                    }
-                }
             }
         }
 
+        // Top reader chrome
         Surface(
-            color = Color.Black.copy(alpha = 0.82f),
+            color = Color.Black.copy(alpha = 0.84f),
             contentColor = Color.White,
-            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth(),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.statusBarsPadding().height(64.dp).padding(horizontal = 8.dp),
+                modifier = Modifier
+                    .statusBarsPadding()
+                    .height(64.dp)
+                    .padding(horizontal = 8.dp),
             ) {
-                IconButton(onClick = onBack) {
+                IconButton(
+                    onClick = {
+                        AuroraHaptics.tap(haptic)
+                        onBack()
+                    },
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "退出阅读")
                 }
                 Column(modifier = Modifier.weight(1f)) {
@@ -1566,26 +1629,76 @@ private fun ComicReader(
                     Text(reader.chapter.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.72f))
                 }
 
-                val currentRecord = downloadedChapters.find { it.comicId == reader.details.comic.id && it.chapterId == reader.chapter.id }
-                if (currentRecord?.status == com.aurorashelf.app.data.comic.ComicDownloadStatus.COMPLETED) {
+                if (currentRecord?.status == ComicDownloadStatus.COMPLETED) {
                     Icon(
                         Icons.Default.CheckCircle,
                         contentDescription = "已离线缓存",
-                        tint = Color(0xFF34C759),
-                        modifier = Modifier.padding(end = 8.dp).size(22.dp),
+                        tint = semanticColors.onDirectContainer,
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(22.dp),
                     )
-                } else if (currentRecord?.status == com.aurorashelf.app.data.comic.ComicDownloadStatus.DOWNLOADING ||
-                           currentRecord?.status == com.aurorashelf.app.data.comic.ComicDownloadStatus.RESOLVING) {
+                } else if (currentRecord?.status == ComicDownloadStatus.DOWNLOADING ||
+                    currentRecord?.status == ComicDownloadStatus.RESOLVING
+                ) {
                     CircularProgressIndicator(
                         progress = { currentRecord.progress },
                         color = Color.White,
-                        modifier = Modifier.padding(end = 8.dp).size(20.dp),
+                        modifier = Modifier
+                            .padding(end = 12.dp)
+                            .size(20.dp),
                         strokeWidth = 2.dp,
                     )
                 } else if (onDownloadChapter != null) {
-                    IconButton(onClick = { onDownloadChapter(reader.chapter) }) {
+                    IconButton(
+                        onClick = {
+                            AuroraHaptics.tap(haptic)
+                            onDownloadChapter(reader.chapter)
+                        },
+                        modifier = Modifier.minimumInteractiveComponentSize(),
+                    ) {
                         Icon(Icons.Default.Download, contentDescription = "离线缓存本话", tint = Color.White)
                     }
+                }
+            }
+        }
+
+        // Native Material 3 Expressive Floating Toolbar for chapter navigation
+        if (!state.isReaderLoading && state.readerError == null && reader.pages.isNotEmpty()) {
+            HorizontalFloatingToolbar(
+                expanded = true,
+                colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp),
+            ) {
+                IconButton(
+                    onClick = {
+                        AuroraHaptics.segmentTick(haptic)
+                        onPreviousChapter()
+                    },
+                    enabled = reader.chapterIndex > 0,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "上一章")
+                }
+                Text(
+                    text = "${reader.chapterIndex + 1} / ${reader.details.chapters.size}",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier
+                        .align(Alignment.CenterVertically)
+                        .padding(horizontal = 10.dp),
+                )
+                IconButton(
+                    onClick = {
+                        AuroraHaptics.segmentTick(haptic)
+                        onNextChapter()
+                    },
+                    enabled = reader.chapterIndex < reader.details.chapters.lastIndex,
+                    modifier = Modifier.minimumInteractiveComponentSize(),
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "下一章")
                 }
             }
         }
@@ -1625,7 +1738,7 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
                     .httpHeaders(
                         NetworkHeaders.Builder()
                             .set("Referer", resolved.referer)
-                            .set("User-Agent", "Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/139 Mobile Safari/537.36")
+                            .set("User-Agent", "Mozilla/5.0 (Linux; Android 17) AppleWebKit/537.36 Chrome/142 Mobile Safari/537.36")
                             .build(),
                     )
                     .memoryCacheKey("${resolved.imageUrl}#segments=${resolved.verticalSegments}")
@@ -1649,14 +1762,18 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
     }
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.fillMaxWidth().background(AuroraReaderBackground),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(AuroraReaderBackground),
     ) {
         request?.let {
             AsyncImage(
                 model = it,
                 contentDescription = "第 $pageNumber 页",
                 contentScale = ContentScale.FillWidth,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp),
                 onLoading = { loadState = 0 },
                 onSuccess = { loadState = 1 },
                 onError = { loadState = 2 },
@@ -1671,7 +1788,7 @@ private fun ComicPageImage(page: ComicPage, pageNumber: Int) {
                 }
             }
             resolvedResult == null || loadState == 0 -> Box(Modifier.fillMaxWidth().height(360.dp), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(26.dp), strokeWidth = 2.dp)
+                AuroraLoadingIndicator(color = Color.White.copy(alpha = 0.85f), modifier = Modifier.size(28.dp))
             }
             loadState == 2 -> Box(Modifier.fillMaxWidth().height(240.dp), contentAlignment = Alignment.Center) {
                 TextButton(onClick = { retryKey++ }) {

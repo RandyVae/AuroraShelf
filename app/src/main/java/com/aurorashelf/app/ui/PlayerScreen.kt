@@ -1,27 +1,17 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class,
+)
+
 package com.aurorashelf.app.ui
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.content.pm.ActivityInfo
 import android.util.Log
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -31,91 +21,52 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.ScrollableDefaults
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.CastConnected
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.DownloadDone
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Fullscreen
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.LiveTv
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Cast
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.minimumInteractiveComponentSize
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -126,86 +77,50 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import coil3.compose.AsyncImage
-import com.aurorashelf.app.model.AppDestination
-import com.aurorashelf.app.model.ContentSource
-import com.aurorashelf.app.model.ContentSourceCatalog
-import com.aurorashelf.app.model.ComicSourceInfo
-import com.aurorashelf.app.model.FeedCategory
-import com.aurorashelf.app.model.VideoDetailMetadata
-import com.aurorashelf.app.model.VideoItem
-import com.aurorashelf.app.data.SourceAddress
-import com.aurorashelf.app.data.PlaybackEpisode
-import com.aurorashelf.app.data.PREFETCH_LOG_TAG
-import com.aurorashelf.app.data.PlaybackResolver
-import com.aurorashelf.app.data.PlaybackSource
-import com.aurorashelf.app.data.isPrefetchEnabled
-import com.aurorashelf.app.data.OfflineCacheManager
-import com.aurorashelf.app.data.OfflineCacheState
-import com.aurorashelf.app.data.OfflineVideo
 import com.aurorashelf.app.cast.CastDevice
 import com.aurorashelf.app.cast.CastManager
 import com.aurorashelf.app.cast.CastState
-import com.aurorashelf.app.ui.liquid.LiquidBottomNavigation
-import com.aurorashelf.app.ui.liquid.LiquidNavigationTab
-import com.aurorashelf.app.ui.theme.AuroraCoral
+import com.aurorashelf.app.data.OfflineCacheManager
+import com.aurorashelf.app.data.OfflineCacheState
+import com.aurorashelf.app.data.OfflineVideo
+import com.aurorashelf.app.data.PREFETCH_LOG_TAG
+import com.aurorashelf.app.data.PlaybackEpisode
+import com.aurorashelf.app.data.PlaybackResolver
+import com.aurorashelf.app.data.PlaybackSource
+import com.aurorashelf.app.data.isPrefetchEnabled
+import com.aurorashelf.app.model.ContentSourceCatalog
+import com.aurorashelf.app.model.VideoDetailMetadata
+import com.aurorashelf.app.model.VideoItem
+import com.aurorashelf.app.ui.theme.AuroraHaptics
+import com.aurorashelf.app.ui.theme.AuroraImmersiveBackground
+import com.aurorashelf.app.ui.theme.AuroraMotion
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.delay
-import dev.chrisbanes.haze.HazeInputScale
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.HazeMaterials
-import dev.chrisbanes.haze.rememberHazeState
-import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun PlayerScreen(
@@ -317,9 +232,10 @@ internal fun PlayerScreen(
         CoverPrefetcher.prefetchVideos(context, relatedVideos, limit = RECOMMENDATION_COVER_PREFETCH_LIMIT)
     }
     val haptic = LocalHapticFeedback.current
+    val flingCollapseSpec = AuroraMotion.fastSpatial<Float>()
 
     val onCache = {
-        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        AuroraHaptics.tap(haptic)
         when (cachedVideo?.state) {
             OfflineCacheState.RESOLVING,
             OfflineCacheState.QUEUED,
@@ -332,7 +248,7 @@ internal fun PlayerScreen(
     }
 
     Surface(
-        color = if (isFullscreen || isInPipMode) Color.Black else MaterialTheme.colorScheme.background,
+        color = if (isFullscreen || isInPipMode) AuroraImmersiveBackground else MaterialTheme.colorScheme.background,
         contentColor = if (isFullscreen || isInPipMode) Color.White else MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.fillMaxSize(),
     ) {
@@ -358,10 +274,7 @@ internal fun PlayerScreen(
             }
             val animatedPlayerHeight by animateDpAsState(
                 targetValue = targetPlayerHeight,
-                animationSpec = spring(
-                    dampingRatio = 0.82f,
-                    stiffness = 300f,
-                ),
+                animationSpec = AuroraMotion.defaultSpatial(),
                 label = "player-height-expansion",
             )
 
@@ -388,12 +301,9 @@ internal fun PlayerScreen(
                 listState.scrollToItem(0)
             }
 
-            val nestedScrollConnection = remember(maxCollapsePx) {
+            val nestedScrollConnection = remember(maxCollapsePx, flingCollapseSpec) {
                 object : NestedScrollConnection {
                     override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                        // When scrolling UP (available.y < 0, dragging content upwards):
-                        // Collapse the player height down to collapsedHeight (16:9) first,
-                        // before the LazyColumn scrolls its content!
                         if (available.y < 0f && maxCollapsePx > 0.5f && collapseOffsetPx < maxCollapsePx) {
                             val newOffset = (collapseOffsetPx - available.y).coerceAtMost(maxCollapsePx)
                             val consumedY = -(newOffset - collapseOffsetPx)
@@ -408,9 +318,6 @@ internal fun PlayerScreen(
                         available: Offset,
                         source: NestedScrollSource,
                     ): Offset {
-                        // When scrolling DOWN (available.y > 0, dragging content downwards):
-                        // After the LazyColumn has scrolled back to its top item (firstVisibleItem == 0),
-                        // any unconsumed downward scroll expands the player back towards expandedHeight!
                         if (available.y > 0f && maxCollapsePx > 0.5f && collapseOffsetPx > 0f) {
                             val newOffset = (collapseOffsetPx - available.y).coerceAtLeast(0f)
                             val consumedY = collapseOffsetPx - newOffset
@@ -428,13 +335,12 @@ internal fun PlayerScreen(
                                 0f
                             }
                             if (available.y < 0f && target == maxCollapsePx) {
-                                // Collapse concurrently so upward fling velocity flows smoothly into LazyColumn even before video finishes loading.
                                 scope.launch {
                                     animate(
                                         initialValue = collapseOffsetPx,
                                         targetValue = target,
                                         initialVelocity = -available.y,
-                                        animationSpec = spring(dampingRatio = 0.85f, stiffness = 320f),
+                                        animationSpec = flingCollapseSpec,
                                     ) { value, _ ->
                                         collapseOffsetPx = value
                                     }
@@ -445,7 +351,7 @@ internal fun PlayerScreen(
                                 initialValue = collapseOffsetPx,
                                 targetValue = target,
                                 initialVelocity = -available.y,
-                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 320f),
+                                animationSpec = flingCollapseSpec,
                             ) { value, _ ->
                                 collapseOffsetPx = value
                             }
@@ -460,7 +366,7 @@ internal fun PlayerScreen(
                                 initialValue = collapseOffsetPx,
                                 targetValue = 0f,
                                 initialVelocity = -available.y,
-                                animationSpec = spring(dampingRatio = 0.85f, stiffness = 320f),
+                                animationSpec = flingCollapseSpec,
                             ) { value, _ ->
                                 collapseOffsetPx = value
                             }
@@ -480,7 +386,7 @@ internal fun PlayerScreen(
 
             val currentPlayerHeight = effectivePlayerHeight
             val handleEpisodeSelect: (PlaybackEpisode) -> Unit = { episode ->
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                AuroraHaptics.segmentTick(haptic)
                 playbackUrl = episode.pageUrl
                 currentPositionMs = 0L
                 currentDurationMs = 0L
@@ -498,80 +404,54 @@ internal fun PlayerScreen(
                 }
             }
             val topBarBackButton: @Composable () -> Unit = {
-                Surface(
+                FilledIconButton(
                     onClick = {
+                        AuroraHaptics.tap(haptic)
                         localDismissing = true
                         onBack()
                     },
-                    shape = CircleShape,
-                    color = Color.Black.copy(alpha = 0.54f),
-                    contentColor = Color.White,
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-                    modifier = Modifier.size(44.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.56f),
+                        contentColor = Color.White,
+                    ),
+                    modifier = Modifier.size(48.dp),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
-                    }
+                    Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "返回")
                 }
             }
             val topBarRightControls: @Composable () -> Unit = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (isCasting) {
-                        FilledIconButton(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                isCastSheetVisible = true
-                            },
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = AuroraCoral,
-                                contentColor = Color.White,
-                            ),
-                            modifier = Modifier.size(44.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.CastConnected,
-                                contentDescription = "投屏中",
-                            )
-                        }
-                    } else {
-                        Surface(
-                            onClick = {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                isCastSheetVisible = true
-                            },
-                            shape = CircleShape,
-                            color = Color.Black.copy(alpha = 0.54f),
-                            contentColor = Color.White,
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-                            modifier = Modifier.size(44.dp),
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Outlined.Cast,
-                                    contentDescription = "投屏",
-                                    modifier = Modifier.size(20.dp),
-                                )
-                            }
-                        }
-                    }
-                    Surface(
+                    FilledIconButton(
                         onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            AuroraHaptics.tap(haptic)
+                            isCastSheetVisible = true
+                        },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = if (isCasting) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.56f),
+                            contentColor = if (isCasting) MaterialTheme.colorScheme.onPrimary else Color.White,
+                        ),
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
+                            contentDescription = if (isCasting) "投屏中" else "投屏",
+                        )
+                    }
+                    FilledIconButton(
+                        onClick = {
+                            AuroraHaptics.tap(haptic)
                             onFullscreenChange(true)
                         },
-                        shape = CircleShape,
-                        color = Color.Black.copy(alpha = 0.54f),
-                        contentColor = Color.White,
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.16f)),
-                        modifier = Modifier.size(44.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = Color.Black.copy(alpha = 0.56f),
+                            contentColor = Color.White,
+                        ),
+                        modifier = Modifier.size(48.dp),
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                Icons.Default.Fullscreen,
-                                contentDescription = "全屏播放",
-                                modifier = Modifier.size(22.dp),
-                            )
-                        }
+                        Icon(
+                            Icons.Default.Fullscreen,
+                            contentDescription = "全屏播放",
+                        )
                     }
                 }
             }
@@ -609,10 +489,19 @@ internal fun PlayerScreen(
                             currentEpisodeProgress = calculateVideoProgressFraction(currentPositionMs, currentDurationMs),
                             isEpisodePickerVisible = isEpisodePickerVisible,
                             isCasting = isCasting,
-                            onFavorite = onFavorite,
+                            onFavorite = {
+                                AuroraHaptics.toggle(haptic, !isFavorite)
+                                onFavorite()
+                            },
                             onCache = onCache,
-                            onCast = { isCastSheetVisible = true },
-                            onToggleEpisodes = { isEpisodePickerVisible = !isEpisodePickerVisible },
+                            onCast = {
+                                AuroraHaptics.tap(haptic)
+                                isCastSheetVisible = true
+                            },
+                            onToggleEpisodes = {
+                                AuroraHaptics.tap(haptic)
+                                isEpisodePickerVisible = !isEpisodePickerVisible
+                            },
                             onEpisode = handleEpisodeSelect,
                         )
                     }
@@ -634,6 +523,7 @@ internal fun PlayerScreen(
                                 isFavorite = related.id in favoriteIds,
                                 onClick = { onVideo(related) },
                                 onFavorite = { onRelatedFavorite(related) },
+                                modifier = Modifier.animateItem(),
                             )
                         }
                     }
@@ -680,6 +570,7 @@ internal fun PlayerScreen(
                                         isFavorite = related.id in favoriteIds,
                                         onClick = { onVideo(related) },
                                         onFavorite = { onRelatedFavorite(related) },
+                                        modifier = Modifier.animateItem(),
                                     )
                                 }
                             }
@@ -691,7 +582,7 @@ internal fun PlayerScreen(
                     modifier = Modifier
                         .align(Alignment.TopStart)
                         .fillMaxWidth(leftPaneWidthFraction)
-                        .background(Color.Black)
+                        .background(AuroraImmersiveBackground)
                         .statusBarsPadding(),
                 )
             }
@@ -771,43 +662,49 @@ private fun FloatingCastStatusBanner(
     onOpenSheet: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val haptic = LocalHapticFeedback.current
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn() + slideInVertically(),
-        exit = fadeOut() + slideOutVertically(),
+        enter = AuroraMotion.expressiveBarEnter(),
+        exit = AuroraMotion.expressiveBarExit(),
         modifier = modifier,
     ) {
         if (connected != null) {
             Surface(
-                color = Color(0xDD14171F),
-                shape = RoundedCornerShape(20.dp),
-                border = BorderStroke(1.dp, AuroraCoral.copy(alpha = 0.5f)),
+                color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.94f),
+                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                shape = CircleShape,
+                tonalElevation = 4.dp,
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable(onClick = onOpenSheet),
+                    .clip(CircleShape)
+                    .clickable {
+                        AuroraHaptics.tap(haptic)
+                        onOpenSheet()
+                    },
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 4.dp, bottom = 4.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Filled.CastConnected,
                         contentDescription = null,
-                        tint = AuroraCoral,
+                        tint = MaterialTheme.colorScheme.inversePrimary,
                         modifier = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
                         text = "正在投屏至 ${connected.device.name}",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = Color.White,
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.inverseOnSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false),
                     )
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(4.dp))
                     IconButton(
                         onClick = {
+                            AuroraHaptics.tap(haptic)
                             if (connected.isPlaying) castManager.pause() else castManager.play()
                         },
                         modifier = Modifier
@@ -817,12 +714,15 @@ private fun FloatingCastStatusBanner(
                         Icon(
                             imageVector = if (connected.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                             contentDescription = if (connected.isPlaying) "暂停电视" else "播放",
-                            tint = Color.White,
+                            tint = MaterialTheme.colorScheme.inverseOnSurface,
                             modifier = Modifier.size(18.dp),
                         )
                     }
                     IconButton(
-                        onClick = { castManager.disconnect() },
+                        onClick = {
+                            AuroraHaptics.tap(haptic)
+                            castManager.disconnect()
+                        },
                         modifier = Modifier
                             .minimumInteractiveComponentSize()
                             .size(36.dp),
@@ -830,7 +730,7 @@ private fun FloatingCastStatusBanner(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "断开投屏",
-                            tint = Color.White.copy(alpha = 0.7f),
+                            tint = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.78f),
                             modifier = Modifier.size(16.dp),
                         )
                     }
@@ -857,6 +757,7 @@ private fun PlayerDetails(
     onToggleEpisodes: () -> Unit,
     onEpisode: (PlaybackEpisode) -> Unit,
 ) {
+    val haptic = LocalHapticFeedback.current
     var isIntroExpanded by remember(video.id) { mutableStateOf(false) }
     val cacheStateDescription = when (cachedVideo?.state) {
         OfflineCacheState.RESOLVING -> "正在解析视频地址"
@@ -882,7 +783,7 @@ private fun PlayerDetails(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
             .padding(horizontal = 18.dp, vertical = 18.dp)
-            .animateContentSize(),
+            .animateContentSize(animationSpec = AuroraMotion.defaultSpatial()),
     ) {
         Text(
             text = video.title,
@@ -920,14 +821,13 @@ private fun PlayerDetails(
                     pills.take(10).forEach { badge ->
                         Surface(
                             shape = CircleShape,
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         ) {
                             Text(
                                 text = badge,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             )
                         }
                     }
@@ -940,18 +840,18 @@ private fun PlayerDetails(
         ) {
             PlayerActionButton(
                 label = if (isFavorite) "已收藏" else "收藏",
+                selected = isFavorite,
                 onClick = onFavorite,
                 modifier = Modifier.weight(1f),
-            )
-            {
+            ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = null,
-                    tint = if (isFavorite) AuroraCoral else LocalContentColor.current,
                 )
             }
             PlayerActionButton(
                 label = cacheActionDescription,
+                selected = cachedVideo?.state == OfflineCacheState.COMPLETED,
                 stateDescriptionText = cacheStateDescription,
                 onClick = onCache,
                 enabled = cachedVideo?.state != OfflineCacheState.REMOVING,
@@ -960,35 +860,34 @@ private fun PlayerDetails(
                 when (cachedVideo?.state) {
                     OfflineCacheState.RESOLVING,
                     OfflineCacheState.QUEUED,
-                    OfflineCacheState.DOWNLOADING -> CircularProgressIndicator(
+                    OfflineCacheState.DOWNLOADING,
+                    OfflineCacheState.REMOVING -> AuroraLoadingIndicator(
                         modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.primary,
                     )
                     OfflineCacheState.COMPLETED -> Icon(
                         Icons.Default.DownloadDone,
                         contentDescription = null,
-                        tint = AuroraCoral,
                     )
                     OfflineCacheState.FAILED -> Icon(Icons.Default.Refresh, contentDescription = null)
-                    OfflineCacheState.REMOVING -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                     null -> Icon(Icons.Default.Download, contentDescription = null)
                 }
             }
             PlayerActionButton(
                 label = if (isCasting) "投屏中" else "投屏",
+                selected = isCasting,
                 onClick = onCast,
                 modifier = Modifier.weight(1f),
             ) {
                 Icon(
                     imageVector = if (isCasting) Icons.Filled.CastConnected else Icons.Outlined.Cast,
                     contentDescription = null,
-                    tint = if (isCasting) AuroraCoral else LocalContentColor.current,
                 )
             }
             if (episodes.size > 1) {
                 PlayerActionButton(
                     label = "选集 ${selectedEpisode}/${episodes.size}",
+                    selected = isEpisodePickerVisible,
                     onClick = onToggleEpisodes,
                     modifier = Modifier.weight(1f),
                 ) {
@@ -998,8 +897,8 @@ private fun PlayerDetails(
         }
         AnimatedVisibility(
             visible = episodes.size > 1 && isEpisodePickerVisible,
-            enter = fadeIn() + scaleIn(initialScale = 0.98f),
-            exit = fadeOut() + scaleOut(targetScale = 0.98f),
+            enter = AuroraMotion.expressiveOverlayEnter(),
+            exit = AuroraMotion.expressiveOverlayExit(),
         ) {
             Row(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1015,64 +914,61 @@ private fun PlayerDetails(
                             .width(180.dp)
                             .clickable(role = Role.Button, onClick = { onEpisode(episode) }),
                     ) {
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            border = if (selected) BorderStroke(2.dp, AuroraCoral) else null,
+                        Card(
+                            shape = MaterialTheme.shapes.small,
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            ),
+                            border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
                             modifier = Modifier
                                 .width(180.dp)
                                 .height(101.dp),
-                            shadowElevation = if (selected) 6.dp else 2.dp,
                         ) {
                             Box(Modifier.fillMaxSize()) {
                                 MediaImage(
                                     video = video,
                                     modifier = Modifier.fillMaxSize(),
                                 )
-                                Box(
+                                Surface(
+                                    color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.72f),
+                                    shape = RoundedCornerShape(6.dp),
                                     modifier = Modifier
                                         .align(Alignment.TopStart)
-                                        .padding(6.dp)
-                                        .background(Color.Black.copy(alpha = 0.68f), RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                                        .padding(6.dp),
                                 ) {
                                     Text(
                                         text = "EP ${episode.number}",
                                         color = Color.White,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                                     )
                                 }
                                 if (selected) {
-                                    Box(
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                         modifier = Modifier
                                             .align(Alignment.Center)
-                                            .size(32.dp)
-                                            .background(AuroraCoral.copy(alpha = 0.88f), CircleShape),
-                                        contentAlignment = Alignment.Center,
+                                            .size(34.dp),
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.PlayArrow,
-                                            contentDescription = "正在播放",
-                                            tint = Color.White,
-                                            modifier = Modifier.size(20.dp),
-                                        )
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Filled.PlayArrow,
+                                                contentDescription = "正在播放",
+                                                modifier = Modifier.size(20.dp),
+                                            )
+                                        }
                                     }
-                                    // Apple TV 标志性红白实时进度微条
-                                    Box(
+                                    AuroraWavyProgressBar(
+                                        progress = { currentEpisodeProgress.coerceIn(0.05f, 1f) },
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = Color.White.copy(alpha = 0.30f),
                                         modifier = Modifier
                                             .align(Alignment.BottomCenter)
                                             .fillMaxWidth()
-                                            .height(3.dp)
-                                            .background(Color.White.copy(alpha = 0.3f)),
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxHeight()
-                                                .fillMaxWidth(currentEpisodeProgress.coerceIn(0.05f, 1f))
-                                                .background(AuroraCoral),
-                                        )
-                                    }
+                                            .height(4.dp),
+                                    )
                                 }
                             }
                         }
@@ -1083,14 +979,14 @@ private fun PlayerDetails(
                                 fontSize = 13.sp,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
                             ),
-                            color = if (selected) AuroraCoral else MaterialTheme.colorScheme.onSurface,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
                             text = if (selected) "正在播放" else "极速直连",
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -1123,9 +1019,9 @@ private fun PlayerDetails(
                 ) {
                     items(crewEntries, key = { "${it.first}-${it.second}" }) { (role, name) ->
                         Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            contentColor = MaterialTheme.colorScheme.onSurface,
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1135,13 +1031,12 @@ private fun PlayerDetails(
                                 Icon(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = null,
-                                    tint = if (role == "导演") AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = if (role == "导演") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(15.dp),
                                 )
                                 Text(
                                     text = "$name · $role",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -1153,10 +1048,12 @@ private fun PlayerDetails(
         }
         val synopsis = detailMetadata?.synopsis.orEmpty().trim()
         if (synopsis.isNotBlank()) {
-            Surface(
-                shape = RoundedCornerShape(14.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            Card(
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("player-intro-section"),
@@ -1183,10 +1080,15 @@ private fun PlayerDetails(
                     if (synopsis.length > 72) {
                         Text(
                             text = if (isIntroExpanded) "收起" else "展开全文",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = AuroraCoral,
-                            modifier = Modifier.clickable { isIntroExpanded = !isIntroExpanded },
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .clickable {
+                                    AuroraHaptics.tap(haptic)
+                                    isIntroExpanded = !isIntroExpanded
+                                },
                         )
                     }
                 }
@@ -1201,23 +1103,22 @@ private fun PlayerActionButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
     enabled: Boolean = true,
     stateDescriptionText: String? = null,
     icon: @Composable () -> Unit,
 ) {
-    val isLight = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val scheme = MaterialTheme.colorScheme
+    val containerColor = if (selected) scheme.primaryContainer else scheme.surfaceContainerHigh
+    val contentColor = (if (selected) scheme.onPrimaryContainer else scheme.onSurface).let { base ->
+        if (enabled) base else base.copy(alpha = 0.38f)
+    }
     Surface(
         onClick = onClick,
         enabled = enabled,
         shape = MaterialTheme.shapes.large,
-        color = if (isLight) MaterialTheme.colorScheme.surfaceVariant else Color.White.copy(alpha = 0.08f),
-        contentColor = MaterialTheme.colorScheme.onSurface.let { base ->
-            if (enabled) base else base.copy(alpha = 0.38f)
-        },
-        border = BorderStroke(
-            1.dp,
-            if (isLight) MaterialTheme.colorScheme.outlineVariant else Color.White.copy(alpha = 0.10f),
-        ),
+        color = containerColor,
+        contentColor = contentColor,
         modifier = modifier
             .height(68.dp)
             .then(
@@ -1245,11 +1146,10 @@ private fun PlayerActionButton(
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 11.sp,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
                     letterSpacing = 0.2.sp,
                 ),
-                color = if (enabled) LocalContentColor.current.copy(alpha = 0.92f) else LocalContentColor.current.copy(alpha = 0.38f),
+                color = LocalContentColor.current,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1265,15 +1165,16 @@ private fun PlayerRecommendationRow(
     isFavorite: Boolean,
     onClick: () -> Unit,
     onFavorite: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
     Row(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable(role = Role.Button) {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                AuroraHaptics.tap(haptic)
                 onClick()
             }
             .padding(horizontal = 18.dp, vertical = 10.dp)
@@ -1283,20 +1184,24 @@ private fun PlayerRecommendationRow(
             modifier = Modifier
                 .fillMaxWidth(0.43f)
                 .aspectRatio(16 / 9f)
-                .clip(RoundedCornerShape(14.dp)),
+                .clip(MaterialTheme.shapes.medium),
         ) {
             MediaImage(video = video, modifier = Modifier.fillMaxSize())
             if (video.duration.isNotBlank()) {
-                Text(
-                    text = video.duration,
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall,
+                Surface(
+                    color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.74f),
+                    shape = RoundedCornerShape(6.dp),
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(5.dp)
-                        .background(Color.Black.copy(alpha = 0.74f), RoundedCornerShape(5.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp),
-                )
+                        .padding(5.dp),
+                ) {
+                    Text(
+                        text = video.duration,
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                    )
+                }
             }
         }
         Column(
@@ -1341,7 +1246,7 @@ private fun PlayerRecommendationRow(
         }
         IconButton(
             onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                AuroraHaptics.toggle(haptic, !isFavorite)
                 onFavorite()
             },
             modifier = Modifier
@@ -1351,7 +1256,7 @@ private fun PlayerRecommendationRow(
             Icon(
                 imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Outlined.FavoriteBorder,
                 contentDescription = if (isFavorite) "取消收藏" else "收藏视频",
-                tint = if (isFavorite) AuroraCoral else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

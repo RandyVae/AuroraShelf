@@ -72,7 +72,7 @@ class GameSaveBridge(context: Context) {
 
     fun flushSync() {
         synchronized(writeLock) {
-            prefs.edit().commit()
+            prefs.edit(commit = true) {}
         }
     }
 

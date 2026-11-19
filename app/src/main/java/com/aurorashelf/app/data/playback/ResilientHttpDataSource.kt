@@ -2,6 +2,7 @@ package com.aurorashelf.app.data.playback
 
 import android.net.Uri
 import androidx.annotation.OptIn
+import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.util.UnstableApi
@@ -297,7 +298,7 @@ internal class ResilientOkHttpDataSource(
         val requestHost = dataSpec.uri.host?.lowercase()
         val originHeader = headers["Origin"]
         if (originHeader != null && requestHost != null) {
-            val originHost = runCatching { Uri.parse(originHeader).host?.lowercase() }.getOrNull()
+            val originHost = runCatching { originHeader.toUri().host?.lowercase() }.getOrNull()
             // Avoid sending cross-origin Origin headers on third-party GET CDN segments where it can trip strict CDN rules.
             if (originHost != null && originHost != requestHost && dataSpec.httpMethod == DataSpec.HTTP_METHOD_GET) {
                 headers.remove("Origin")

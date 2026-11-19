@@ -175,17 +175,12 @@ class AuroraFlowTest {
         compose.onNodeWithTag("home-feed").performScrollToIndex(0)
     }
 
-    @Test fun bottomNavigationSupportsDragSelection() {
-        compose.onNodeWithContentDescription("首页").performClick()
-        compose.onNodeWithTag("liquid-navigation").performTouchInput {
-            swipe(
-                start = centerLeft + Offset(20f, 0f),
-                end = centerRight - Offset(20f, 0f),
-                durationMillis = 1_200,
-            )
-        }
+    @Test fun bottomNavigationSupportsSelectionAcrossAllTabs() {
+        compose.onNodeWithTag("m3-navigation-bar").assertExists()
+        compose.onNodeWithContentDescription("我的").performClick()
         compose.onNodeWithTag("personal-overview").assertExists()
         compose.onNodeWithContentDescription("首页").performClick()
+        compose.onNodeWithTag("home-feed").assertExists()
     }
 
     @Test fun playerFullscreenHidesDetailsAndBackReturnsToDetails() {

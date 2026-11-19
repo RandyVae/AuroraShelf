@@ -1,10 +1,10 @@
 # Project
 
-Netgrey · Android & iOS 2.17.6
+Netgrey · Android & iOS 2.18.0
 
 # Objective
 
-按用户选定的「方案 1」重新实现的 Android 客户端。采用 Kotlin、Jetpack Compose、Material 3、Haze 与 AndroidLiquidGlass/Backdrop；Material You 界面保留真实视频源能力，并以浮动玻璃导航、吸顶分类和弹性选中动效重构视觉层级，不是网页套壳首页。2.9.0 保留首个大幅推荐视频并将后续内容改为 YouTube 式双列信息层级；2.9.1 新增完整日间与夜间主题，默认跟随系统即时切换。当前交付包可从 [GitHub Releases](https://github.com/RandyVae/AuroraShelf/releases/latest) 下载。
+Android 客户端全面对齐 Google Android 17 (API 37) SDK 与 100% 原生 Material 3 Expressive 设计系统（`MaterialExpressiveTheme`、`MotionScheme.expressive()`、`ShortNavigationBar`、`WideNavigationRail`、`LoadingIndicator`、`LinearWavyProgressIndicator`、`PullToRefreshBox`、连接式 `ToggleButton`、`HorizontalFloatingToolbar`、`SharedTransitionLayout`、原生 `PredictiveBackHandler`、Android 17 `ACCESS_LOCAL_NETWORK` 与大屏全向自适应）。保留全部真实视频、短剧、漫画、直播、社区论坛与内置游戏能力，支持完整日间/夜间/高对比度主题与 Material You 动态取色。当前交付包可从 [GitHub Releases](https://github.com/RandyVae/AuroraShelf/releases/latest) 下载。
 
 # Tech Stack
 
