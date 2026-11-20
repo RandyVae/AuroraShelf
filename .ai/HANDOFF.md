@@ -1,4 +1,18 @@
-## 最新交接：2026-11-20 — Android 播放器控件全面重构、全量 18 视频源无限分页加载与 iOS 看齐、Material 3 `1.5.0` GA 升级及双端全通道同步上线 · v2.19.0 (Build 275)
+## 最新交接：2026-11-20 — 根治 iOS / iPadOS 顶部磨砂栏常态遮挡 Hero 海报缺陷（`UIScrollView.topEdgeEffect` 双向同步 + 五屏统一沉浸顶栏）、双端 Release 全规模验收与三通道同步上线 · v2.19.1 (Build 276)
+
+### 本次完成
+1. **双层真实根因查明（已验证）**：
+   - **第一层（iOS 26/27 `UIScrollEdgeEffect` 越界误判）**：`HomeScreen`、`ComicsScreen`、`LiveScreen`、`ForumScreen` 与 `VideoDetailSheet` 的 `ScrollView` 使用 `.ignoresSafeArea(edges: .top)` 使海报铺满顶部；在静止未滑动（`contentOffset.y == 0`）时，内容顶边 `y = 0` 已位于 `UINavigationBar` / iPad 顶置 `TabBar` 底边（`116pt` / `76pt`）之上，触发 `UIScrollView.topEdgeEffect`（默认 `isHidden = false`）常驻渲染带硬切分界线的磨砂遮罩（即便原 `LiveScreen` 设置了 `.toolbarBackground(.hidden)` 在实机截屏中仍存在该磨砂条）。
+   - **第二层（顶栏背景显隐缺失与 SwiftUI 单向滞留 Bug）**：`v2.17.6` 移除弃用 `.toolbarBackground` 时遗漏为 `HomeScreen`/`ComicsScreen`/`ForumScreen` 迁移 `.toolbarBackgroundVisibility`，且单测实测捕获 iOS 27.2 SwiftUI `HostingScrollView` 在 `.scrollEdgeEffectHidden(true -> false)` 动态切换时未回写 `UIScrollView.topEdgeEffect.isHidden = false` 的框架缺陷。
+2. **全端跨形态统一修复**：
+   - 新增 [ImmersiveHeroTopBarChrome.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/ImmersiveHeroTopBarChrome.swift)：提供 `ImmersiveHeroTopBarChrome` 纯函数规约（`scrollActivationThreshold = 20pt`，结合 `contentOffset.y + contentInsets.top` 兼容下拉刷新弹性与 Sheet 容器）与零尺寸 `TopScrollEdgeEffectSyncBridge`（双向即时同步 `UIScrollView.topEdgeEffect.isHidden`），并封装 `.auroraImmersiveHeroScrollEdge(...)` 与 `.auroraImmersiveHeroNavigationBar(...)`。
+   - 同步接入 [HomeScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/HomeScreen.swift)、[ComicsScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/ComicsScreen.swift)、[LiveScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/LiveScreen.swift)、[ForumScreen.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/ForumScreen.swift) 与 [VideoDetailSheet.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Screens/VideoDetailSheet.swift)，覆盖 iPhone（含 Duo 折叠/展开）与 iPad（`.sidebarAdaptable` 顶置胶囊栏）；同时将 [HeroBanner.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/HeroBanner.swift) 及四屏 Hero 顶部压暗遮罩由 `120pt / 0.65~0.70` 收轻为浅/深色自适应微距可读渐晕（`72pt/88pt / 0.28`）并优化浅色模式底部衬底过渡。
+3. **双端全规模验收与三通道同步发布（`v2.19.1 Build 276`）**：
+   - 在 [IOS27AuditRemediationTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/IOS27AuditRemediationTests.swift) 新增状态单测与 `UIScrollView.topEdgeEffect.isHidden` 静止→上滑→回顶往返单测；iOS Release 构建 `0` 警告、离线单测与在线全源审计 `59/59` 全通；Android 单测 + 在线全源审计 + `lintVitalRelease` + 16 KB 对齐 + `RSA-4096` V2/V3 验签全通。
+   - `iPhone 18 Pro`、`iPad Pro 13-inch (M5)` 与 Android `emulator-5554` 正式 Release 构建全板块（深浅色常态无遮挡与滑动磨砂浮现、视频实播、漫画、直播、论坛、资料库/设置 `2.19.1 (Build 276)` 与游戏 `v2.19.1`）实测通过。
+   - 网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,645,792` B、`Netgrey.ipa` `140,457,974` B，`/` 剩 `11G`）、TestFlight `Build 276` 与 GitHub Release `v2.19.1` 同步上线。
+
+## 历史交接：2026-11-20 — Android 播放器控件全面重构、全量 18 视频源无限分页加载与 iOS 看齐、Material 3 `1.5.0` GA 升级及双端全通道同步上线 · v2.19.0 (Build 275)
 
 ### 本次完成
 1. **Material 3 `1.5.0` GA 升级**：

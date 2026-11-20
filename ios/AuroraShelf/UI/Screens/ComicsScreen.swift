@@ -386,11 +386,14 @@ public struct ComicHeroBanner: View {
 
             VStack(spacing: 0) {
                 LinearGradient(
-                    colors: [Color.black.opacity(0.65), Color.clear],
+                    colors: [
+                        (colorScheme == .light ? Color.white.opacity(0.28) : Color.black.opacity(0.28)),
+                        Color.clear
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 120)
+                .frame(height: colorScheme == .light ? 72 : 88)
 
                 Spacer()
 
@@ -659,12 +662,12 @@ public struct ComicsScreen: View {
                     Spacer().frame(height: max(AuroraMetrics.spacingXXL, 96))
                 }
             }
+            .auroraImmersiveHeroScrollEdge(
+                isScrolled: $isScrolled,
+                hasHeroContent: spotlightComic != nil || repo.isLoading,
+                reduceMotion: reduceMotion
+            )
             .ignoresSafeArea(edges: .top)
-            .onScrollGeometryChange(for: Bool.self) { geo in
-                geo.contentOffset.y > 60
-            } action: { _, newValue in
-                isScrolled = newValue
-            }
             .refreshable {
                 repo.loadComics(for: repo.currentSource)
                 try? await Task.sleep(nanoseconds: 500_000_000)
@@ -672,6 +675,10 @@ public struct ComicsScreen: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .auroraImmersiveHeroNavigationBar(
+            isScrolled: isScrolled,
+            hasHeroContent: spotlightComic != nil || repo.isLoading
+        )
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 NetgreyMarkView(width: 20, height: 28)

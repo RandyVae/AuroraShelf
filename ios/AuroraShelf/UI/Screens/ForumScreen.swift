@@ -360,11 +360,14 @@ public struct ForumHeroBillboard: View {
 
             VStack(spacing: 0) {
                 LinearGradient(
-                    colors: [Color.black.opacity(0.65), Color.clear],
+                    colors: [
+                        (colorScheme == .light ? Color.white.opacity(0.28) : Color.black.opacity(0.28)),
+                        Color.clear
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 120)
+                .frame(height: colorScheme == .light ? 72 : 88)
 
                 Spacer()
 
@@ -603,18 +606,22 @@ public struct ForumScreen: View {
                     Spacer().frame(height: max(AuroraMetrics.spacingXXL, 96))
                 }
             }
+            .auroraImmersiveHeroScrollEdge(
+                isScrolled: $isScrolled,
+                hasHeroContent: spotlightPost != nil || repo.isLoading,
+                reduceMotion: reduceMotion
+            )
             .ignoresSafeArea(edges: .top)
-            .onScrollGeometryChange(for: Bool.self) { geo in
-                geo.contentOffset.y > 60
-            } action: { _, newValue in
-                isScrolled = newValue
-            }
             .refreshable {
                 await repo.reloadPosts()
             }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .auroraImmersiveHeroNavigationBar(
+            isScrolled: isScrolled,
+            hasHeroContent: spotlightPost != nil || repo.isLoading
+        )
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 NetgreyMarkView(width: 20, height: 28)

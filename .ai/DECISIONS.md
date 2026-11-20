@@ -1,5 +1,15 @@
 # Existing Architectural Decisions
 
+## iOS / iPadOS Immersive Hero Top-Bar & `UIScrollEdgeEffect` Bidirectional Sync (v2.19.1 Build 276)
+
+Date: 2026-11-20
+
+Status: Implemented, verified via XCTest (`UIScrollView.topEdgeEffect.isHidden` round-trip) + 59/59 iOS live audit + Android live audit + iPhone/iPad/Android Release simulators, and published in `v2.19.1 (Build 276)`.
+
+Decisions:
+1. **Dual-Layer Root-Cause Resolution (`toolbarBackgroundVisibility` + `UIScrollView.topEdgeEffect`)**: Full-bleed Hero `ScrollView`s using `.ignoresSafeArea(edges: .top)` place `contentMinY = 0` above `UINavigationBar.frame.maxY` (`~116pt` on iPhone, `~76pt` on iPad) at rest (`contentOffset.y == 0`), causing iOS 26/27's `UIScrollView.topEdgeEffect` (`isHidden == false` by default) to permanently render a hard-edged frosted band across the top of Hero posters even when `.toolbarBackground(.hidden)` is set. Centralize scroll-gated top-bar behavior in `ImmersiveHeroTopBarChrome` (`scrollActivationThreshold = 20pt` over normalized `contentOffset.y + contentInsets.top`) across `HomeScreen`, `ComicsScreen`, `LiveScreen`, `ForumScreen`, and `VideoDetailSheet` so both `toolbarBackgroundVisibility` (`.hidden`) and `topEdgeEffect` (`isHidden = true`) stay completely hidden at rest and smoothly reveal only when scrolling.
+2. **`TopScrollEdgeEffectSyncBridge` Workaround for SwiftUI `HostingScrollView` One-Way Stickiness**: XCTest verification on iOS 27.2 SDK proved that toggling SwiftUI's `.scrollEdgeEffectHidden(true -> false, for: .top)` sets `UIScrollView.topEdgeEffect.isHidden = true` initially but fails to reset `isHidden = false` on subsequent state transitions. Pair `.scrollEdgeEffectHidden` with a zero-size non-interactive `UIViewRepresentable` (`TopScrollEdgeEffectSyncBridge`) that deterministically synchronizes `UIScrollView.topEdgeEffect.isHidden` in both directions (rest -> scrolled -> back to top) across iPhone and iPad `.sidebarAdaptable` hierarchies.
+
 ## Android Video/Live Player Orthogonal Redesign, 18-Source Unlimited Pagination & Material 3 1.5.0 GA (v2.19.0 Build 275)
 
 Date: 2026-11-20

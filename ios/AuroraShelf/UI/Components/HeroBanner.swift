@@ -20,6 +20,7 @@ public struct HeroBanner: View {
     @Environment(\.appearsActive) private var appearsActive
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
 
@@ -146,22 +147,33 @@ public struct HeroBanner: View {
 
             VStack(spacing: 0) {
                 LinearGradient(
-                    colors: [Color.black.opacity(0.65), Color.clear],
+                    colors: [
+                        (colorScheme == .light ? Color.white.opacity(0.28) : Color.black.opacity(0.28)),
+                        Color.clear
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 120)
+                .frame(height: colorScheme == .light ? 72 : 88)
 
                 Spacer()
 
                 LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0.0),
-                        .init(color: AuroraColor.canvas.opacity(0.18), location: 0.40),
-                        .init(color: AuroraColor.canvas.opacity(0.62), location: 0.68),
-                        .init(color: AuroraColor.canvas.opacity(0.90), location: 0.86),
-                        .init(color: AuroraColor.canvas, location: 1.0)
-                    ],
+                    stops: colorScheme == .light
+                        ? [
+                            .init(color: .clear, location: 0.0),
+                            .init(color: AuroraColor.canvas.opacity(0.45), location: 0.34),
+                            .init(color: AuroraColor.canvas.opacity(0.84), location: 0.64),
+                            .init(color: AuroraColor.canvas.opacity(0.96), location: 0.85),
+                            .init(color: AuroraColor.canvas, location: 1.0)
+                        ]
+                        : [
+                            .init(color: .clear, location: 0.0),
+                            .init(color: AuroraColor.canvas.opacity(0.18), location: 0.40),
+                            .init(color: AuroraColor.canvas.opacity(0.62), location: 0.68),
+                            .init(color: AuroraColor.canvas.opacity(0.90), location: 0.86),
+                            .init(color: AuroraColor.canvas, location: 1.0)
+                        ],
                     startPoint: .top,
                     endPoint: .bottom
                 )

@@ -346,11 +346,14 @@ public struct LiveHeroBanner: View {
 
             VStack(spacing: 0) {
                 LinearGradient(
-                    colors: [Color.black.opacity(0.7), Color.clear],
+                    colors: [
+                        (colorScheme == .light ? Color.white.opacity(0.28) : Color.black.opacity(0.28)),
+                        Color.clear
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 120)
+                .frame(height: colorScheme == .light ? 72 : 88)
 
                 Spacer()
 
@@ -688,6 +691,11 @@ public struct LiveScreen: View {
                     Spacer().frame(height: max(AuroraMetrics.spacingXXL, 96))
                 }
             }
+            .auroraImmersiveHeroScrollEdge(
+                isScrolled: $isScrolled,
+                hasHeroContent: spotlightStream != nil || repo.isLoading,
+                reduceMotion: reduceMotion
+            )
             .ignoresSafeArea(edges: .top)
             .refreshable {
                 repo.loadStreams()
@@ -696,15 +704,13 @@ public struct LiveScreen: View {
                     try? await Task.sleep(for: .milliseconds(80))
                 }
             }
-            .onScrollGeometryChange(for: Bool.self) { geo in
-                geo.contentOffset.y > 60
-            } action: { _, newValue in
-                isScrolled = newValue
-            }
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground((isScrolled || spotlightStream == nil) ? .visible : .hidden, for: .navigationBar)
+        .auroraImmersiveHeroNavigationBar(
+            isScrolled: isScrolled,
+            hasHeroContent: spotlightStream != nil || repo.isLoading
+        )
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 NetgreyMarkView(width: 20, height: 28)

@@ -158,4 +158,88 @@ final class IOS27AuditRemediationTests: XCTestCase {
         }
         XCTAssertNil(ZoomTransitionSourceRegistry.shared.sourceView(for: route))
     }
+
+    func testImmersiveHeroTopBarChromeHidesFrostedBarAtRestAndRevealsOnScroll() {
+        // 1. 常态静止（contentOffset = 0）与下拉橡皮筋（contentOffset < 0）：不触发滚动态
+        XCTAssertFalse(ImmersiveHeroTopBarChrome.isScrolled(contentOffsetY: 0, topContentInset: 0))
+        XCTAssertFalse(ImmersiveHeroTopBarChrome.isScrolled(contentOffsetY: -72, topContentInset: 0))
+        XCTAssertFalse(ImmersiveHeroTopBarChrome.isScrolled(contentOffsetY: -60, topContentInset: 60))
+        XCTAssertFalse(ImmersiveHeroTopBarChrome.isScrolled(contentOffsetY: 16, topContentInset: 0))
+
+        // 常态有 Hero 海报：隐藏顶栏背景与顶部 ScrollEdgeEffect 磨砂带
+        XCTAssertFalse(ImmersiveHeroTopBarChrome.shouldShowTopBarMaterial(isScrolled: false, hasHeroContent: true))
+        XCTAssertEqual(ImmersiveHeroTopBarChrome.toolbarBackgroundVisibility(isScrolled: false, hasHeroContent: true), .hidden)
+        XCTAssertTrue(ImmersiveHeroTopBarChrome.isTopScrollEdgeEffectHidden(isScrolled: false, hasHeroContent: true))
+
+        // 2. 向上滑动超过阈值：平滑浮现顶栏磨砂与顶部 ScrollEdgeEffect
+        XCTAssertTrue(ImmersiveHeroTopBarChrome.isScrolled(contentOffsetY: 28, topContentInset: 0))
+        XCTAssertTrue(ImmersiveHeroTopBarChrome.shouldShowTopBarMaterial(isScrolled: true, hasHeroContent: true))
+        XCTAssertEqual(ImmersiveHeroTopBarChrome.toolbarBackgroundVisibility(isScrolled: true, hasHeroContent: true), .visible)
+        XCTAssertFalse(ImmersiveHeroTopBarChrome.isTopScrollEdgeEffectHidden(isScrolled: true, hasHeroContent: true))
+
+        // 3. 无 Hero 海报的空/错误态：常态展示标准顶栏
+        XCTAssertTrue(ImmersiveHeroTopBarChrome.shouldShowTopBarMaterial(isScrolled: false, hasHeroContent: false))
+        XCTAssertEqual(ImmersiveHeroTopBarChrome.toolbarBackgroundVisibility(isScrolled: false, hasHeroContent: false), .visible)
+        XCTAssertFalse(ImmersiveHeroTopBarChrome.isTopScrollEdgeEffectHidden(isScrolled: false, hasHeroContent: false))
+    }
+
+    func testImmersiveHeroScrollEdgePropagatesToUnderlyingUIScrollViewTopEdgeEffect() {
+        final class ScrollProbeModel: ObservableObject {
+            @Published var isScrolled: Bool = false
+        }
+        struct ProbeView: View {
+            @ObservedObject var model: ScrollProbeModel
+            var body: some View {
+                NavigationStack {
+                    ScrollView(.vertical) {
+                        Color.red.frame(height: 1200)
+                    }
+                    .auroraImmersiveHeroScrollEdge(
+                        isScrolled: $model.isScrolled,
+                        hasHeroContent: true,
+                        reduceMotion: true
+                    )
+                    .ignoresSafeArea(edges: .top)
+                    .auroraImmersiveHeroNavigationBar(
+                        isScrolled: model.isScrolled,
+                        hasHeroContent: true
+                    )
+                }
+            }
+        }
+        func findScrollView(in view: UIView) -> UIScrollView? {
+            if let sv = view as? UIScrollView { return sv }
+            for sub in view.subviews {
+                if let found = findScrollView(in: sub) { return found }
+            }
+            return nil
+        }
+
+        let model = ScrollProbeModel()
+        let host = UIHostingController(rootView: ProbeView(model: model))
+        let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
+        window.rootViewController = host
+        window.makeKeyAndVisible()
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+
+        guard let scrollView = findScrollView(in: host.view) else {
+            XCTFail("Expected underlying UIScrollView in hosted hierarchy")
+            return
+        }
+        XCTAssertTrue(scrollView.topEdgeEffect.isHidden, "At rest over Hero poster, UIScrollView.topEdgeEffect.isHidden must be true")
+
+        model.isScrolled = true
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        XCTAssertFalse(scrollView.topEdgeEffect.isHidden, "When scrolled, UIScrollView.topEdgeEffect.isHidden must become false")
+
+        model.isScrolled = false
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        XCTAssertTrue(scrollView.topEdgeEffect.isHidden, "When scrolled back to top, UIScrollView.topEdgeEffect.isHidden must return to true")
+    }
 }

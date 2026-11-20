@@ -12,7 +12,7 @@
   3. 内屏双联展开态：460pt 剧院高度与 420pt 居中操作组、280pt 待播卡片与 3 列大图自适应流展，顶栏自动切为 `NetgreyMarkView`；
   4. 自动化测试：新增 `DeviceLayoutTests` 5 项测试，全量 101 项单元测试 100% 全部通过（0 failures, 5 skipped，耗时 4.277 秒）。
 
-# Netgrey · Android & iOS 2.19.0 · 跨 Agent 记忆
+# Netgrey · Android & iOS 2.19.1 · 跨 Agent 记忆
 
 > 本文件是所有 AI Agent（DSH / Codex / Claude / Hermes / Antigravity）进入本项目的统一入口。
 > 开工先读本文件，再按「权威来源」读细节；收工前更新「当前状态」。
@@ -23,11 +23,11 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `38b0159`（2026-11-20），未提交 0 个文件
+- Git：`main` @ `fa0e9ab`（2026-11-20），未提交 21 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-20（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-20（今天）
-  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-19（今天）
+  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-20（今天）
   - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-20（今天）
   - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（25 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-20（今天）
@@ -36,19 +36,21 @@
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-20 01:25 by `sync.py`
+- 最后同步：2026-11-20 10:43 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-20 · Build 275 / v2.19.0）：完成 Android 音视频播放器控件全量功能重构、全源无限分页加载与 iOS 100% 看齐、Material 3 `1.5.0` GA 升级及双端 `v2.19.0 (Build 275)` 全规模验收与三通道同步发布。核心变更：(1) **Material 3 `1.5.0` GA 升级**：[build.gradle.kts](file:///Users/itou/Documents/ChatGPT/91pron/app/build.gradle.kts) 将 `androidx.compose.material3:material3` 从 `1.5.0-rc01` 升级至正式稳定版 `1.5.0` GA，实机复验 `ShortNavigationBar` 5 Tab 均匀排布与全站 Expressive 动效无回归；(2) **Android 全视频源无限分页根治（18/18 源看齐 iOS）**：① 修复全量 13 个 PipePipe HTML `KioskExtractor`（`XVideos`、`85po`、`Pornhub`、`TokyoMotion`、`KissJAV`、`MissAV`、`MrDouga`、`OHentai`、`SpankBang`、`xHamster`、`XNXX`、`JavNoni`、`JavSb`）跨页直接游标跳转时因 `document == null` 抛出 `NullPointerException` 与 `assertPageFetched()` 崩溃导致退化为 `O(N²)` 从第 1 页重爬与翻页超时的问题，并将单页卡片提取上限由 `40/48/54` 提升至 `120`，补齐 `XVideos` 确定性路径分页兜底；② 扩大 [PipePipeBridge.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/PipePipeBridge.kt)（`64 -> 256`）与 [X134Repository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/X134Repository.kt) 游标缓存，修复 [VideoRepository.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/VideoRepository.kt) `91动漫` 总览第 2 页跳页与 `黄果短剧` `recommend` P2+ 404 续翻，修复 [SourceAddress.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/SourceAddress.kt) 与 `MrDougaService.java` 路径特殊字符（`[`/`]`/空格）校验修复 `MRDOUGA` 播放解析；③ 在 [AuroraViewModel.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/AuroraViewModel.kt)（及 `ComicViewModel` / `LiveViewModel` / `ForumViewModel`）拆分 `refreshJob`/`loadMoreJob` 并引入 `isRefreshing` 与单调 `feedGeneration`，彻底根治 SWR 首帧命中旧缓存时 `HomeScreen` 提前以 `nextPage = 1` 触发 `loadMore()` 返回 0 新项并永久锁死 `canLoadMore = false` 的竞态缺陷，加入连续 3 页重叠自动续翻容错并将 `MAX_KNOWN_VIDEOS` 扩至 `2,000`；④ 精简 [HomeScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/HomeScreen.kt) 移除吞噬 20+ 首屏内容的冗余横排货架，首屏直出多列「全部作品」无限流与实时数量提示（`已加载 48+ 部视频 · 上滑持续加载`）及手动续载安全按钮；(3) **Android 视频/直播播放器控件逻辑全面重构**：① [NativeSitePlayer.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/NativeSitePlayer.kt) 与 [PlayerScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/PlayerScreen.kt) 消除内嵌顶栏 6 键拥挤、投屏按钮双处重复及全屏按钮位置漂移：全屏/退出全屏永远统一锚定于右下角，内嵌顶栏收敛为 `[←]` + `[投屏][画中画][⚙ 播放设置]`（点击弹出统一暗色 Material 3 `ModalBottomSheet` 集成倍速/画幅/静音/字幕），详情区收敛为正交 `[收藏][缓存][选集]`；全屏新增标题+剧集顶栏、`[🔒 锁屏]`（含独立悬浮解锁胶囊并屏蔽误触）、全屏投屏、两层电影底栏（进度条 + 倍速/画幅/静音/字幕/选集抽屉/下一集 + 右下退出全屏）、中央双击改为播放/暂停（取代原误切画幅）与长按 `2.0x` 临时倍速快进；② [LiveScreen.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/ui/LiveScreen.kt) 修复全屏左上返回键误退出直播间（改为退出全屏）、移除内嵌态无效的顶栏「弹幕 开」与 `StreamerInfoBar` 重复全屏键、全屏底栏保留单一弹幕开关并补齐 `48dp` 热区与挖孔/导航栏安全区；(4) **全规模双端验收与三通道同步发布**：Android 离线单测 + `lintDebug`（`0` error / `0` warning）+ `lintVitalRelease` + 在线全源探针（**18/18 视频源 Feed + Playback 全 `[PASS]`、18/18 源 P1→P3 多页增长 `[GROW]` 单源 60–200 条、9/9 免登漫画全通**）+ `20/20` 仪器化测试全绿；`emulator-5554` 正式签名 R8 Release APK（`targetSdk=37`、16 KB 页对齐、V2/V3 验签）实测无限加载、内嵌播放器、播放设置抽屉、横屏全屏、全屏锁屏、漫画、直播播放器、论坛、设置 `v2.19.0 (Build 275)`、游戏 `Version 2.19.0` 与平板 `WideNavigationRail` 全部通过；iOS / iPadOS 在线全源 XCTest `59/59` 全通（同步增强 `ComicRepositoryTests` 容错单个上游死分片节点）且 `iPhone 18 Pro` / `iPad Pro 13-inch (M5)` Release 模拟器全模块验收通过；网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,645,799` B / `Netgrey.ipa` `140,446,242` B，`/` 剩 `11G`）、TestFlight Build `275` 与 GitHub Release `v2.19.0` 同步上线。
-- 进行中：无阻塞任务；`v2.19.0 (Build 275)` 全量改造、双端 Release 模拟器验收及三通道发布均已闭环。
+- 当前阶段（2026-11-20 · Build 276 / v2.19.1）：根治 iOS / iPadOS 全板块顶部磨砂栏在常态未滚动下一直出现、遮挡顶部 Hero 海报的缺陷，完成双端 `v2.19.1 (Build 276)` Release 全规模验收并同步上线网页 OTA、TestFlight 与 GitHub Release。核心变更：(1) **双层根因定位（已验证）**：① iOS 26/27 默认启用 `UIScrollView.topEdgeEffect`（`isHidden = false`），当 `HomeScreen`、`ComicsScreen`、`LiveScreen`、`ForumScreen` 与 `VideoDetailSheet` 在 `ScrollView` 上使用 `.ignoresSafeArea(edges: .top)` 使海报铺满顶部时，未滚动状态下 `contentMinY = 0` 已位于顶栏下沿（iPhone `~116pt` / iPad `~76pt`）之上，触发系统常驻渲染带硬切分界线的磨砂条（即使设置 `.toolbarBackground(.hidden)` 仍会出现）；② `v2.17.6` 移除弃用 API 时遗漏为三屏补齐 `.toolbarBackgroundVisibility`，且单测捕获 iOS 27.2 SwiftUI `HostingScrollView` 在 `.scrollEdgeEffectHidden(true -> false)` 切换时存在不回写 `UIScrollView.topEdgeEffect.isHidden = false` 的单向滞留缺陷；(2) **全形态统一修复**：新增 [ImmersiveHeroTopBarChrome.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/ImmersiveHeroTopBarChrome.swift)（含 `20pt` 归一化滚动判定与 `TopScrollEdgeEffectSyncBridge` 双向同步桥接），统一接入主页、漫画、直播、社区与影视详情弹窗（覆盖 iPhone、Duo 与 iPad `.sidebarAdaptable` 顶置胶囊栏），常态未滑动时 100% 隐藏顶栏磨砂与边缘遮罩，滑动后平滑显现、回顶即隐，并收轻四屏 Hero 顶部状态栏渐晕（`72pt/88pt`、`0.28` 透明度）与浅色模式衬底过渡；(3) **全规模验收与三通道同步上线**：新增 `IOS27AuditRemediationTests` 双向往返单测，iOS Release `0` 警告 + 在线全源审计 `59/59` 全通，Android 单测 + 在线全源审计 + `lintVitalRelease` + 16 KB 对齐 + `RSA-4096` V2/V3 验签全通；`iPhone 18 Pro`、`iPad Pro 13-inch (M5)` 与 `emulator-5554` 正式 Release 包全模块及游戏 `v2.19.1` 验收通过；网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,645,792` B / `Netgrey.ipa` `140,457,974` B，`/` 剩 `11G`）、TestFlight Build `276` 与 GitHub Release `v2.19.1` 同步上线。
+- 进行中：无阻塞任务；`v2.19.1 (Build 276)` 全量修复、双端 Release 模拟器验收及三通道发布均已闭环。
 - 下一步：常规版本演进与线上监控。
 - 阻塞：无。
 - 最近一次更新：2026-11-20 by Antigravity (Gemini 4 Carbon)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-20（Antigravity）：根治 iOS / iPadOS 顶部磨砂栏常态遮挡 Hero 海报缺陷并发布 `v2.19.1 (Build 276)`。针对 `.ignoresSafeArea(edges: .top)` 全幅海报 `ScrollView` 在 `contentOffset.y == 0` 时因内容顶边高于顶栏底边而误触发 iOS 26/27 `UIScrollView.topEdgeEffect` 硬切磨砂条，以及 SwiftUI `.scrollEdgeEffectHidden(true -> false)` 不回写 `isHidden = false` 的框架缺陷，新增 `ImmersiveHeroTopBarChrome` + `TopScrollEdgeEffectSyncBridge` 统一接入 `HomeScreen`、`ComicsScreen`、`LiveScreen`、`ForumScreen` 与 `VideoDetailSheet`（iPhone + iPad 双端同步生效），实现常态静止零磨砂遮挡、滑动超过 `20pt` 平滑浮现原生磨砂栏、回顶即隐。
 
 - 2026-11-20（Antigravity）：重构 Android 播放器交互体系、打通全视频源无限分页加载并升级 Material 3 `1.5.0` GA，发布 `v2.19.0 (Build 275)`。(1) **全源无限加载根治**：修复全量 13 个 PipePipe HTML `KioskExtractor` 直接游标分页时的 `document == null` NPE 与 `assertPageFetched()` 崩溃并放宽单页提取上限至 `120`；在 `AuroraViewModel` 及漫画/直播/论坛 ViewModel 中用 `refreshJob`/`loadMoreJob` 分离与 `isRefreshing` / `feedGeneration` 彻底消除 SWR 缓存首帧触发 `page=1` 重复拉取导致 `canLoadMore` 永久锁死的竞态，加入最多 3 页连续重叠自动续翻，精简 `HomeScreen` 冗余横排货架直出多列无限流；同时修补 `SourceAddress.resolve` 与 `MrDougaService.requestUrl` 对路径 `[`/`]`/空格的编码，恢复 `18/18` 视频源全量播放与 `18/18` 源多页持续增长；(2) **播放器正交重构**：遵循 YouTube / Material 3 Expressive 肌肉记忆将全屏/退出全屏统一固定于右下角，将内嵌顶栏收敛至 `[←]` + `[投屏][画中画][⚙ 播放设置]` 并把倍速/画幅/静音/字幕收入统一暗色 `ModalBottomSheet`，在全屏模式补齐标题/剧集头、防误触锁屏、两层底栏（含全屏选集抽屉与下一集）、中央双击播放/暂停与长按 `2.0x` 快进，并同步清理 `LiveScreen` 全屏返回误退出及重复弹幕/全屏控件。
 
@@ -439,6 +441,7 @@
 - 2026-11-18：SWR 异步刷新链路不能裁剪固定子分类货架数，且代理环境下系统 DNS 若返回 `198.18.0.0/15` TUN Fake-IP 严禁用 DoH 真实 IP 覆盖。此外 Apple App Store Connect REST `/v1/apps` 出现间歇 HTTP 500 导致 `xcodebuild -exportArchive (destination=upload)` 超时时，可先以 `destination=export` 本地导出再调用 `xcrun altool --use-old-altool --upload-package` 绑定 App ID（见私有凭据配置）完成 TestFlight 上传。
 - 2026-11-18（2）：HLS 主清单 HTTP 200 `#EXTM3U` 假阳性与直播广告桩陷阱：Stripchat 启用 Mouflon v2 后，未携带有效 `pkey` 的 master M3U8 仍返回 HTTP 200 `#EXTM3U`，但其子变体 M3U8 会下发 `#EXT-X-MOUFLON-ADVERT` 12 秒静态 VOD 片段；若探针仅检查 master 首部是否含 `#EXTM3U`，原生播放器会播完 12 秒广告桩后触发 `STATE_ENDED` 误报「主播已离线」且不触发 Web 降级。做法是同时检查首个子变体是否含 `#EXT-X-MOUFLON-ADVERT` / `#EXT-X-MOUFLON:FILE:`，支持从官方 MMP `main.js` 动态提取刷新 `pkey`，并对 `<25s` 结束事件挂接 WebRTC 兜底。
 - 2026-11-19：① iOS 26/27 `TabView` 在 Compact 宽度（iPhone）挂载超过 5 个 `Tab`（含 `Tab(role: .search)` 第 6 槽）会触发 UIKit `UIMoreNavigationController`（`More ...`）吞掉第 4、5 个核心 Tab；必须仅在 `horizontalSizeClass == .regular`（iPad）挂载第 6 槽 `Tab(role: .search)`，Compact 维持 5 核心 Tab 并以 Sheet 承载搜索；② iPadOS 27 `Tab(role: .search)` 内嵌 `NavigationStack` 若使用 `.searchable(placement: .automatic)` 会折叠为右上角重复放大镜并激活半透明搜索遮罩，应显式指定 `.navigationBarDrawer(displayMode: .always)`；③ macOS 非交互自动化子进程无 `/dev/tty` 会导致 `sshpass` 报 `read_passphrase: can't open /dev/tty`，应优先使用 OpenSSH 原生 `SSH_ASKPASS` + `SSH_ASKPASS_REQUIRE=force` 临时 `0700` 辅助脚本并在 `EXIT` trap 销毁；④ iOS 26/27 `MCProfileConnection` 对动态生成的未签名明文 XML `.mobileconfig`（`Profile Service`）直接弹窗拒绝（「无法下载描述文件」），后端动态生成描述文件后必须调用 `openssl smime -sign -signer cert.pem -inkey privkey.pem -certfile chain.pem -nodetach -outform der` 附加受信任 TLS 证书链 DER CMS 签名，才会被系统接受并写入「设置 → 已下载描述文件」。
+- 2026-11-20：iOS 26/27 全幅海报 `ScrollView` + `.ignoresSafeArea(edges: .top)` 常态误触发顶部磨砂栏及 SwiftUI `.scrollEdgeEffectHidden(true -> false)` 单向滞留陷阱：① 在 iOS 26/27 中，`UIScrollView.topEdgeEffect` 默认 `isHidden = false`；当 `ScrollView` 使用 `.ignoresSafeArea(edges: .top)` 使 Hero 海报铺满顶部时，即使静止未滚动（`contentOffset.y == 0`），内容顶边 `y = 0` 也已高于 `UINavigationBar` / iPad 顶置 `TabBar` 底边（`116pt` / `76pt`），因此仅设置 `.toolbarBackgroundVisibility(.hidden, for: .navigationBar)` 仍会在顶部常驻显示带硬切分界线的 `UIScrollEdgeEffect` 磨砂遮罩，必须同时控制 `topEdgeEffect.isHidden`；② 进一步实测发现 iOS 27.2 SwiftUI `HostingScrollView` 在 `.scrollEdgeEffectHidden(true -> false)` 动态切换时不会将底层 `UIScrollView.topEdgeEffect.isHidden` 重置回 `false`，需搭配零尺寸非交互 `UIViewRepresentable` 桥接体在 `updateUIView`/`layoutSubviews` 中双向同步 `scrollView.topEdgeEffect.isHidden`，才能实现「常态零遮挡、滑动即显、回顶即隐」。
 
 ## 权威来源（细节以这些文件为准）
 

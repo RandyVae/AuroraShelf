@@ -35,6 +35,10 @@ public struct HomeScreen: View {
         return list
     }
 
+    private var hasHeroContent: Bool {
+        !spotlightVideos.isEmpty || repo.isLoading
+    }
+
     public init(
         onPlayVideo: @escaping (VideoItem) -> Void,
         onOpenSearch: @escaping () -> Void,
@@ -302,14 +306,12 @@ public struct HomeScreen: View {
                     repo.loadFeed(for: repo.currentSource, category: repo.currentCategory)
                     try? await Task.sleep(nanoseconds: 550_000_000)
                 }
+                .auroraImmersiveHeroScrollEdge(
+                    isScrolled: $isScrolled,
+                    hasHeroContent: hasHeroContent,
+                    reduceMotion: reduceMotion
+                )
                 .ignoresSafeArea(edges: .top)
-                .onScrollGeometryChange(for: Bool.self) { geo in
-                    geo.contentOffset.y > 60
-                } action: { _, newValue in
-                    if isScrolled != newValue {
-                        isScrolled = newValue
-                    }
-                }
                 .onScrollGeometryChange(for: CGFloat.self) { geo in
                     geo.contentOffset.y < 0 ? -geo.contentOffset.y : 0
                 } action: { oldValue, newValue in
@@ -336,6 +338,7 @@ public struct HomeScreen: View {
         }
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .auroraImmersiveHeroNavigationBar(isScrolled: isScrolled, hasHeroContent: hasHeroContent)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 NetgreyMarkView(width: 20, height: 28)

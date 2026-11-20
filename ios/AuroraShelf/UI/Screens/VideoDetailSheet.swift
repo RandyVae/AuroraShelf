@@ -20,6 +20,7 @@ public struct VideoDetailSheet: View {
     @State private var selectedSeasonIndex: Int = 0
     @State private var isLoadingEpisodes: Bool = false
     @State private var isShowingEpisodePicker: Bool = false
+    @State private var isScrolled: Bool = false
     @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -686,9 +687,15 @@ public struct VideoDetailSheet: View {
                         }
                     }
                 }
+                .auroraImmersiveHeroScrollEdge(
+                    isScrolled: $isScrolled,
+                    hasHeroContent: true,
+                    reduceMotion: reduceMotion
+                )
                 .ignoresSafeArea(edges: .top)
                 .background(AuroraColor.canvas.ignoresSafeArea())
                 .navigationBarTitleDisplayMode(.inline)
+                .auroraImmersiveHeroNavigationBar(isScrolled: isScrolled, hasHeroContent: true)
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("common.close".localized, systemImage: "xmark") {
