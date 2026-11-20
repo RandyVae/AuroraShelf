@@ -1,5 +1,16 @@
 # Existing Architectural Decisions
 
+## Local Simulator Minimization & Developer Disk Protection Policy
+
+Date: 2026-11-20
+
+Status: Implemented, verified on host (`df -h /` available space `10 Gi -> 94 Gi`, APFS free `12.3 GB -> 100.7 GB`), and codified in `AGENTS.md` + global agent rules.
+
+Decisions:
+1. **Zero Idle Simulators & Strict Serial Execution**: Keep `0` simulators running during normal development; during pre-release full audits, run at most `1` simulator at any moment (`iPhone 18 Pro` -> `simctl shutdown all` -> ephemeral `iPad Pro 13-inch (M5)` via `simctl create` -> `simctl delete` -> `netgrey_phone` AVD -> `adb emu kill`). Prevents exhausting 18 GB host RAM into 20+ GB macOS Swap and stops background iOS `MobileAsset`/`PRBPosterExtensionDataStore` bloat.
+2. **Minimal Persistent Footprint & Deduplicated Android SDK**: Retain only 1 iOS Runtime (`24B8117`), 1 persistent iOS device (`iPhone 18 Pro`, erased when `> 2 GB`), 1 snapshot-free Android AVD (`netgrey_phone` capped at `4G` userdata), and 1 physical Android SDK at `/opt/homebrew/share/android-commandlinetools` with `~/Library/Android/sdk` symlinked to it.
+3. **Single Shared DerivedData & Automated Cleanup**: Ban ad-hoc per-task `-derivedDataPath` directories; route Xcode CLI archives/builds through `ios/build.nosync/DerivedData`, auto-delete transient `.xcarchive`/duplicate IPA outputs after packaging/upload in `scripts/build_ios_signed.sh` and `scripts/publish_testflight.sh`, and provide `scripts/cleanup_dev_disk.sh` with a `25 GB` free-space health floor.
+
 ## iOS / iPadOS Immersive Hero Top-Bar & `UIScrollEdgeEffect` Bidirectional Sync (v2.19.1 Build 276)
 
 Date: 2026-11-20

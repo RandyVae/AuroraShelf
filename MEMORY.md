@@ -23,32 +23,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `22bfada`（2026-11-20），未提交 0 个文件
+- Git：`main` @ `d20bb48`（2026-11-20），未提交 7 个文件
 - 权威记忆文件：
   - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-20（今天）
   - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-20（今天）
   - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-20（今天）
   - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-20（今天）
-  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（25 天前）
+  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（26 天前）
   - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-20（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-20 10:44 by `sync.py`
+- 最后同步：2026-11-20 23:45 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
 - 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
 - 当前阶段（2026-11-20 · Build 276 / v2.19.1）：根治 iOS / iPadOS 全板块顶部磨砂栏在常态未滚动下一直出现、遮挡顶部 Hero 海报的缺陷，完成双端 `v2.19.1 (Build 276)` Release 全规模验收并同步上线网页 OTA、TestFlight 与 GitHub Release。核心变更：(1) **双层根因定位（已验证）**：① iOS 26/27 默认启用 `UIScrollView.topEdgeEffect`（`isHidden = false`），当 `HomeScreen`、`ComicsScreen`、`LiveScreen`、`ForumScreen` 与 `VideoDetailSheet` 在 `ScrollView` 上使用 `.ignoresSafeArea(edges: .top)` 使海报铺满顶部时，未滚动状态下 `contentMinY = 0` 已位于顶栏下沿（iPhone `~116pt` / iPad `~76pt`）之上，触发系统常驻渲染带硬切分界线的磨砂条（即使设置 `.toolbarBackground(.hidden)` 仍会出现）；② `v2.17.6` 移除弃用 API 时遗漏为三屏补齐 `.toolbarBackgroundVisibility`，且单测捕获 iOS 27.2 SwiftUI `HostingScrollView` 在 `.scrollEdgeEffectHidden(true -> false)` 切换时存在不回写 `UIScrollView.topEdgeEffect.isHidden = false` 的单向滞留缺陷；(2) **全形态统一修复**：新增 [ImmersiveHeroTopBarChrome.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/ImmersiveHeroTopBarChrome.swift)（含 `20pt` 归一化滚动判定与 `TopScrollEdgeEffectSyncBridge` 双向同步桥接），统一接入主页、漫画、直播、社区与影视详情弹窗（覆盖 iPhone、Duo 与 iPad `.sidebarAdaptable` 顶置胶囊栏），常态未滑动时 100% 隐藏顶栏磨砂与边缘遮罩，滑动后平滑显现、回顶即隐，并收轻四屏 Hero 顶部状态栏渐晕（`72pt/88pt`、`0.28` 透明度）与浅色模式衬底过渡；(3) **全规模验收与三通道同步上线**：新增 `IOS27AuditRemediationTests` 双向往返单测，iOS Release `0` 警告 + 在线全源审计 `59/59` 全通，Android 单测 + 在线全源审计 + `lintVitalRelease` + 16 KB 对齐 + `RSA-4096` V2/V3 验签全通；`iPhone 18 Pro`、`iPad Pro 13-inch (M5)` 与 `emulator-5554` 正式 Release 包全模块及游戏 `v2.19.1` 验收通过；网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,645,792` B / `Netgrey.ipa` `140,457,974` B，`/` 剩 `11G`）、TestFlight Build `276` 与 GitHub Release `v2.19.1` 同步上线。
-- 进行中：无阻塞任务；`v2.19.1 (Build 276)` 全量修复、双端 Release 模拟器验收及三通道发布均已闭环。
-- 下一步：常规版本演进与线上监控。
+- 进行中：无阻塞任务；`v2.19.1 (Build 276)` 发布已闭环，并已完成本机模拟器与研发磁盘最小化治理（实测 APFS 可用空间由 `12.3 GB` 提升至 `100.7 GB` / `df -h /` 由 `10 Gi` 提升至 `94 Gi`，新增 `scripts/cleanup_dev_disk.sh` 并固化跨 Agent 防爆盘规范）。
+- 下一步：常规版本演进与线上监控；后续发版验收严格执行「单台串行、用完即关、iPad 按需临时创建测完即删、收尾执行 `./scripts/cleanup_dev_disk.sh`」。
 - 阻塞：无。
-- 最近一次更新：2026-11-20 by Antigravity (Gemini 4 Carbon)
+- 最近一次更新：2026-11-20 by Antigravity (Gemini 4 Neon)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-20（Antigravity / 用户 Randy 指令）：落地「本地模拟器最小化与研发磁盘防爆机制」并完成全盘瘦身（实测净释放 `88.4 GB` APFS 可用空间，`df -h /` 从 `10 Gi` 恢复至 `94 Gi`，VM Swap 从 `22.5 GB` 回落至 `9.7 GB`）。根因查明：4 台模拟器同时常驻开机挤爆 `18 GB` 内存生成 `22.5 GB` Swap 并触发 iOS 后台下载 `17.5 GB` `MobileAsset`/`Poster` 资产，叠加闲置 `7.8 GB` `iPhone19-4` Runtime、双份重复 Android SDK (`7.0 GB`)、膨胀至 `9.9 GB` 的 `netgrey_phone` AVD（`10G` 上限 + `2.5 GB` 快照）及 45 个历史临时 `DerivedData` 目录 (`17.1 GB`)。整改：(1) 仅保留 1 份 `iOS 27.2 (24B8117)` Runtime + 1 台 `iPhone 18 Pro`（默认关机、`18 MB`）+ 1 台 `netgrey_phone` AVD（`4G` 上限、禁本地快照、`26 MB`），iPad 改为验收时临时 `simctl create` 测完即 `delete`；(2) 将 `~/Library/Android/sdk` 合并软链至 `/opt/homebrew/share/android-commandlinetools` 并更新 Android Studio SDK 路径；(3) 新增 [cleanup_dev_disk.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/cleanup_dev_disk.sh)，加固 [build_ios_signed.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/build_ios_signed.sh) 与 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh) 复用唯一 `ios/build.nosync/DerivedData` 并在导出/上传后回收 `.xcarchive` 与双份 IPA，同时将防爆盘铁律同步写入项目 [AGENTS.md](file:///Users/itou/Documents/ChatGPT/91pron/AGENTS.md) 及全局规则。
 
 - 2026-11-20（Antigravity）：根治 iOS / iPadOS 顶部磨砂栏常态遮挡 Hero 海报缺陷并发布 `v2.19.1 (Build 276)`。针对 `.ignoresSafeArea(edges: .top)` 全幅海报 `ScrollView` 在 `contentOffset.y == 0` 时因内容顶边高于顶栏底边而误触发 iOS 26/27 `UIScrollView.topEdgeEffect` 硬切磨砂条，以及 SwiftUI `.scrollEdgeEffectHidden(true -> false)` 不回写 `isHidden = false` 的框架缺陷，新增 `ImmersiveHeroTopBarChrome` + `TopScrollEdgeEffectSyncBridge` 统一接入 `HomeScreen`、`ComicsScreen`、`LiveScreen`、`ForumScreen` 与 `VideoDetailSheet`（iPhone + iPad 双端同步生效），实现常态静止零磨砂遮挡、滑动超过 `20pt` 平滑浮现原生磨砂栏、回顶即隐。
 

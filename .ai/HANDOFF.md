@@ -1,4 +1,17 @@
-## 最新交接：2026-11-20 — 根治 iOS / iPadOS 顶部磨砂栏常态遮挡 Hero 海报缺陷（`UIScrollView.topEdgeEffect` 双向同步 + 五屏统一沉浸顶栏）、双端 Release 全规模验收与三通道同步上线 · v2.19.1 (Build 276)
+## 最新交接：2026-11-20 — 本地研发磁盘与模拟器最小化治理（实测净释放 `88.4 GB`、`df -h /` 从 `10 Gi` 恢复至 `94 Gi`）、脚本防爆加固与跨 Agent 规范固化
+
+### 本次完成
+1. **本机磁盘爆满根因定位与全量清理（已验证）**：
+   - 停掉全部 4 台同时常驻的模拟器（3 台 iOS `Booted` + 1 台 Android QEMU），删除冗余 `iPhone 17`、`iPad Pro 13-inch (M5)` 及 0 设备闲置 `iOS 27.2 (24B91016s / iPhone19-4)` Runtime (`7.8 GB`)，重置唯一保留的 `iPhone 18 Pro`（`CoreSimulator` 从 `25.2 GB` 降至 `18 MB`）。
+   - 收敛 `netgrey_phone` AVD（`disk.dataPartition.size` 从 `10G` 降至 `4G`、关闭本地快照并清掉 `2.5 GB` 快照与 `7.0 GB` qcow2，降至 `26 MB`）；合并重复双份 Android SDK（将 Android Studio 配置改指 `/opt/homebrew/share/android-commandlinetools`，并将 `~/Library/Android/sdk` 转为软链接，立省 `7.0 GB`）。
+   - 清理根目录 `build.nosync/` 26 个历史 iOS 构建目录、`ios/build.nosync/` 18 个历史目录、全局 `~/Library/Developer/Xcode/DerivedData`、`captures/` 未跟踪录屏及废弃 `~/.gradle/caches/9.3.1`。
+   - 实测收益：APFS 可用空间由 `12.3 GB (2.5%)` 升至 `100.7 GB (20.4%)`，`df -h /` 由 `10 Gi` 升至 `94 Gi`，系统 VM Swap 由 `22.5 GB` 自动回落至 `9.7 GB`。
+2. **工具链与制度长效防复发**：
+   - 新增 [cleanup_dev_disk.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/cleanup_dev_disk.sh)（支持 `--dry-run` / `--erase-sim` / `--prune-xcode`，一键关停模拟器、删除非白名单 iOS 设备、阈值自动 `erase`、清 AVD 快照、清非白名单 `build.nosync` 目录并检查 `>= 25 GB` 磁盘红线），已实测 `--dry-run` 与实跑全绿。
+   - 加固 [build_ios_signed.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/build_ios_signed.sh) 与 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh)：统一绑定 `-derivedDataPath "${BUILD_DIR}/DerivedData"`，以 `mv -f` 消除本地双份 IPA，并在导出/上传成功后自动清理临时 `.xcarchive`。
+   - 将「本地模拟器最小化与防爆盘规范（平时 0 台常驻、验收严格单台串行、iPad 按需临时创建测完即删、唯一 DerivedData、收尾执行清理脚本）」同步写入项目 [AGENTS.md](file:///Users/itou/Documents/ChatGPT/91pron/AGENTS.md) 与全局规则（Antigravity / Codex / Claude Code）。
+
+## 历史交接：2026-11-20 — 根治 iOS / iPadOS 顶部磨砂栏常态遮挡 Hero 海报缺陷（`UIScrollView.topEdgeEffect` 双向同步 + 五屏统一沉浸顶栏）、双端 Release 全规模验收与三通道同步上线 · v2.19.1 (Build 276)
 
 ### 本次完成
 1. **双层真实根因查明（已验证）**：

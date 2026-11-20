@@ -101,6 +101,17 @@ Check `git status` before editing. Update `.ai` after each meaningful stage. Rec
 - **发布硬条件**：
   **测试全部通过以后才可以发布，绝对不可以随意发布**；若检查中发现任何失败项，必须阻断发布直至问题修复并重测全绿。
 
+## 本地模拟器最小化与防爆盘规范（核心强制）
+
+- **单台串行、用完即关（核心强制）**：
+  1. **平时 0 台常驻**：日常改代码、静态分析、纯编译或离线单测时，严禁挂着任何空闲 iOS / Android 模拟器；
+  2. **任意时刻最多 1 台在线**：执行发布前全规模检查时，必须严格**串行**——先启 `iPhone 18 Pro` 验完立即 `xcrun simctl shutdown all` → 再临时创建/启动 `iPad Pro 13-inch (M5)` 验完立即关闭并删除（`xcrun simctl delete <udid>`）→ 再启 `netgrey_phone` 验完立即 `adb emu kill`。严禁同时开机多台模拟器挤爆 18 GB 内存引发 20+ GB Swap 与后台下载 `MobileAsset` / 壁纸数据；
+  3. **设备数量最小化**：本机长期仅保留 **1 份 iOS Runtime** + **1 台 `iPhone 18 Pro`**（定期 `erase` 保持 `< 2 GB`）+ **1 台 `netgrey_phone` AVD**（`disk.dataPartition.size=4G`、关闭本地快照、`~/Library/Android/sdk` 软链指向 `/opt/homebrew/share/android-commandlinetools`）。
+- **构建缓存单一复用（核心强制）**：
+  1. **严禁新建带版本号/任务名的临时 `-derivedDataPath`**（如 `ios-v243-tests-iphone`、`sim_release_v273`）；
+  2. iOS 统一复用唯一目录 `ios/build.nosync/DerivedData`，Android 统一复用 `build.nosync/app`；
+  3. 每次发版验收收尾或发现本地可用磁盘 `< 25 GB` 时，**必须执行 `./scripts/cleanup_dev_disk.sh`** 回收残留模拟器、快照、构建碎片与临时截图。
+
 ## Apple UI / UX 持久规范
 
 所有 UI 任务必须遵循本项目的 Apple HIG 产品设计基线，并完成构建、运行和视觉验收。具体规则：[docs/ui/design-system.md](docs/ui/design-system.md)；验收流程：[docs/ui/visual-qa.md](docs/ui/visual-qa.md)。现有项目规则继续有效；平台差异以目标平台原生规范和当前官方文档为准。

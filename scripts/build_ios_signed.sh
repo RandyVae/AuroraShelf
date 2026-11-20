@@ -54,11 +54,15 @@ cat <<EOF > "${EXPORT_OPTIONS}"
 EOF
 
 echo "[1/2] 正在执行 Xcode Archive 归档与自动签名..."
+DERIVED_DATA_PATH="${BUILD_DIR}/DerivedData"
+mkdir -p "${DERIVED_DATA_PATH}"
+rm -rf "${ARCHIVE_PATH}"
 xcodebuild archive \
   -project "${IOS_DIR}/AuroraShelf.xcodeproj" \
   -scheme AuroraShelf \
   -configuration "${CONFIGURATION}" \
   -destination "generic/platform=iOS" \
+  -derivedDataPath "${DERIVED_DATA_PATH}" \
   -archivePath "${ARCHIVE_PATH}" \
   -allowProvisioningUpdates \
   -allowProvisioningDeviceRegistration \
@@ -80,7 +84,8 @@ if [ ! -f "${OUTPUT_DIR}/AuroraShelf.ipa" ]; then
   exit 1
 fi
 
-cp -f "${OUTPUT_DIR}/AuroraShelf.ipa" "${OUTPUT_DIR}/Netgrey.ipa"
+# 原子重命名避免在本地保留双份 IPA（省 ~140 MB）
+mv -f "${OUTPUT_DIR}/AuroraShelf.ipa" "${OUTPUT_DIR}/Netgrey.ipa"
 
 ARCHIVE_APP="${ARCHIVE_PATH}/Products/Applications/AuroraShelf.app"
 echo "=========================================="
@@ -90,4 +95,6 @@ if [ -d "${ARCHIVE_APP}" ]; then
   echo "归档包签名信息:"
   codesign -dv --verbose=4 "${ARCHIVE_APP}" 2>&1 || true
 fi
+# 导出完成后即刻回收临时 xcarchive，避免占用本机空间（省 ~210 MB）
+rm -rf "${ARCHIVE_PATH}"
 echo "=========================================="

@@ -228,12 +228,16 @@ if [ "${HAS_ASC_API_KEY}" -eq 1 ]; then
 fi
 
 echo "[3/3] 正在执行 Xcode Archive 归档与导出/上传 (${EXPORT_DEST})..."
+DERIVED_DATA_PATH="${BUILD_DIR}/DerivedData"
+mkdir -p "${DERIVED_DATA_PATH}"
 if [ "${SKIP_ARCHIVE}" -eq 0 ] || [ ! -d "${ARCHIVE_PATH}" ]; then
+  rm -rf "${ARCHIVE_PATH}"
   if ! xcodebuild archive \
     -project "${IOS_DIR}/AuroraShelf.xcodeproj" \
     -scheme AuroraShelf \
     -configuration "${CONFIGURATION}" \
     -destination "generic/platform=iOS" \
+    -derivedDataPath "${DERIVED_DATA_PATH}" \
     -archivePath "${ARCHIVE_PATH}" \
     -allowProvisioningUpdates \
     DEVELOPMENT_TEAM="${TEAM_ID}" \
@@ -320,7 +324,9 @@ echo "=========================================="
 if [ "${MODE}" = "export" ]; then
   echo "TestFlight IPA 导出成功: ${OUTPUT_DIR}"
 else
-  echo "已成功归档并上传至 App Store Connect / TestFlight！"
+  # 上传成功后即刻回收本地临时归档与中转 IPA，防止占据研发磁盘
+  rm -rf "${ARCHIVE_PATH}" "${OUTPUT_DIR}"/*.ipa
+  echo "已成功归档并上传至 App Store Connect / TestFlight（已自动回收本地临时归档与 IPA）！"
   echo "请在 App Store Connect -> TestFlight -> 内部测试 中添加测试员邮箱。"
 fi
 echo "=========================================="
