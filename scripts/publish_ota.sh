@@ -324,9 +324,21 @@ done
 
 STAGE_OTA_SERVICE=0
 if [ -f "${SCRIPT_DIR}/server/ota_service.py" ]; then
-  echo "  -> 上传后端守护脚本 ota_service.py (临时暂存)..."
+  echo "  -> 上传后端守护脚本 ota_service.py & analytics_store.py (临时暂存)..."
   run_scp "${SCRIPT_DIR}/server/ota_service.py" "/tmp/ota_service.py.tmp.${RUN_ID}"
+  if [ -f "${SCRIPT_DIR}/server/analytics_store.py" ]; then
+    run_scp "${SCRIPT_DIR}/server/analytics_store.py" "/tmp/analytics_store.py.tmp.${RUN_ID}"
+  fi
   STAGE_OTA_SERVICE=1
+fi
+
+STAGE_ADMIN_WEB=0
+if [ -f "${SCRIPT_DIR}/admin_web/index.html" ] && [ -f "${SCRIPT_DIR}/admin_web/styles.css" ] && [ -f "${SCRIPT_DIR}/admin_web/app.js" ]; then
+  echo "  -> 上传管理后台静态资源 admin_web/* (临时暂存)..."
+  run_scp "${SCRIPT_DIR}/admin_web/index.html" "/tmp/admin_index.html.tmp.${RUN_ID}"
+  run_scp "${SCRIPT_DIR}/admin_web/styles.css" "/tmp/admin_styles.css.tmp.${RUN_ID}"
+  run_scp "${SCRIPT_DIR}/admin_web/app.js" "/tmp/admin_app.js.tmp.${RUN_ID}"
+  STAGE_ADMIN_WEB=1
 fi
 
 run_ssh "set -e
@@ -349,11 +361,15 @@ for target_file in Netgrey.ipa Netgrey.apk provisioned_udids.json icon57.png ico
   fi
 done
 
-# 同步更新远端 ota_service.py 至独立目录 /usr/local/lib/netgrey-ota/ota_service.py 并移除 Web 根目录旧脚本
+# 同步更新远端 ota_service.py 与 analytics_store.py 至独立目录 /usr/local/lib/netgrey-ota/ 并移除 Web 根目录旧脚本
 if [ '${STAGE_OTA_SERVICE}' = '1' ] && [ -f '/tmp/ota_service.py.tmp.${RUN_ID}' ]; then
   OTA_SCRIPT_DEST='/usr/local/lib/netgrey-ota/ota_service.py'
   mkdir -p \"\$(dirname \"\${OTA_SCRIPT_DEST}\")\" /var/lib/netgrey-ota
   chmod 700 /var/lib/netgrey-ota
+  if [ -f '/tmp/analytics_store.py.tmp.${RUN_ID}' ]; then
+    install -o root -g root -m 755 '/tmp/analytics_store.py.tmp.${RUN_ID}' '/usr/local/lib/netgrey-ota/analytics_store.py'
+    rm -f '/tmp/analytics_store.py.tmp.${RUN_ID}'
+  fi
   install -o root -g root -m 755 '/tmp/ota_service.py.tmp.${RUN_ID}' \"\${OTA_SCRIPT_DEST}\"
   rm -f '/tmp/ota_service.py.tmp.${RUN_ID}' '${REMOTE_DIR}/ota_service.py'
   if [ -f /etc/systemd/system/netgrey-ota.service ] && grep -q '/var/www/netgrey/ota_service.py' /etc/systemd/system/netgrey-ota.service; then
@@ -363,6 +379,14 @@ if [ '${STAGE_OTA_SERVICE}' = '1' ] && [ -f '/tmp/ota_service.py.tmp.${RUN_ID}' 
   if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files netgrey-ota.service 2>/dev/null | grep -q 'netgrey-ota.service'; then
     systemctl restart netgrey-ota.service
   fi
+fi
+
+if [ '${STAGE_ADMIN_WEB}' = '1' ] && [ -f '/tmp/admin_index.html.tmp.${RUN_ID}' ]; then
+  mkdir -p '${REMOTE_DIR}/admin'
+  install -o root -g root -m 644 '/tmp/admin_index.html.tmp.${RUN_ID}' '${REMOTE_DIR}/admin/index.html'
+  install -o root -g root -m 644 '/tmp/admin_styles.css.tmp.${RUN_ID}' '${REMOTE_DIR}/admin/styles.css'
+  install -o root -g root -m 644 '/tmp/admin_app.js.tmp.${RUN_ID}' '${REMOTE_DIR}/admin/app.js'
+  rm -f '/tmp/admin_index.html.tmp.${RUN_ID}' '/tmp/admin_styles.css.tmp.${RUN_ID}' '/tmp/admin_app.js.tmp.${RUN_ID}'
 fi
 
 # 清理任何历史残留、临时碎片与备份文件

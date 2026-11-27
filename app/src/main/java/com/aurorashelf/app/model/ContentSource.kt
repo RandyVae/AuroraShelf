@@ -204,14 +204,14 @@ object ContentSourceCatalog {
         }
         if (is91(baseUrl)) {
             return listOf(
+                SourceCategory("top", "本月最热", path = "v.php?category=top&viewtype=basic", legacy = FeedCategory.MONTHLY_HOT),
+                SourceCategory("tf", "收藏最多", path = "v.php?category=tf&viewtype=basic", legacy = FeedCategory.FAVORITES),
+                SourceCategory("top-prev", "上月最热", path = "v.php?category=top&m=-1&viewtype=basic"),
                 SourceCategory("hot", "当前最热", path = "v.php?category=hot&viewtype=basic", legacy = FeedCategory.CURRENT_HOT),
                 SourceCategory("rf", "最近加精", path = "v.php?category=rf&viewtype=basic", legacy = FeedCategory.RECENT),
                 SourceCategory("ori", "91原创", path = "v.php?category=ori&viewtype=basic"),
-                SourceCategory("top", "本月最热", path = "v.php?category=top&viewtype=basic", legacy = FeedCategory.MONTHLY_HOT),
-                SourceCategory("top-prev", "上月最热", path = "v.php?category=top&m=-1&viewtype=basic"),
                 SourceCategory("long", "10分钟以上", path = "v.php?category=long&viewtype=basic"),
                 SourceCategory("longer", "20分钟以上", path = "v.php?category=longer&viewtype=basic"),
-                SourceCategory("tf", "收藏最多", path = "v.php?category=tf&viewtype=basic", legacy = FeedCategory.FAVORITES),
                 SourceCategory("mf", "本月收藏", path = "v.php?category=mf&viewtype=basic"),
                 SourceCategory("md", "本月讨论", path = "v.php?category=md&viewtype=basic"),
                 SourceCategory("hd", "高清", path = "v.php?category=hd&viewtype=basic"),

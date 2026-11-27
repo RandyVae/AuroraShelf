@@ -1,6 +1,23 @@
 # Project State
 
-## 最新工作状态（2026年11月20日 · iOS / iPadOS 全板块顶部 Hero 海报常态磨砂栏遮挡根治＋`UIScrollView.topEdgeEffect` 双向同步桥接＋双端 Release 模拟器全规模验收与三通道同步上线 · v2.19.1 Build 276）
+## 最新工作状态（2026年11月28日 · 网页项目管理后台（`/admin/`）＋双端低功耗使用遥测引擎（安装/停留/7板块时长）＋`91视频` 游客分类修复＋双端 Release 全规模验收与三通道同步上线 · v2.19.2 Build 277）
+
+- **版本号全链路同步至 `v2.19.2 (Build 277)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`（`publish_ota.sh --check-versions` 校验通过）。
+- **服务端 SQLite 分析引擎与管理后台落地（[analytics_store.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/analytics_store.py) + [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) + [netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf) + [deploy_admin_portal.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/deploy_admin_portal.sh)）**：
+  - 持久化存储于 `/var/lib/netgrey-ota/analytics.db`（WAL 模式，`0600`），涵盖 `installations`（含管理员 `alias`/`notes` 防覆盖）、`sessions`、`section_daily`（HKT UTC+8）、`hourly_activity`、`download_events`、`telemetry_dedup` 与 `admin_sessions`；只读聚合存量 OTA UDID 设备（7 台）、TestFlight 邀请（5 条）与 PocketBase `users`（6 人）。
+  - 管理认证采用 PBKDF2-HMAC-SHA256 + `HttpOnly; Secure; SameSite=Strict` 会话 Cookie + 同源 CSRF 校验，Nginx `location ^~ /admin/` 设置 `no-store`、`X-Frame-Options: DENY` 与 `X-Robots-Tag: noindex, nofollow`，公开下载页无任何管理后台链接。
+- **Apple HIG 网页管理控制台（`scripts/admin_web/{index.html,styles.css,app.js}`）**：
+  - 零外部 CDN，内置 Light / Dark / High-Contrast 三态令牌、原生 SVG 趋势/圆环/柱状图与 4 大视图（总览仪表盘、安装与设备 + 右侧详情抽屉可编辑备注名、7 板块时长与子行为深度拆解、分发与账号 + 下载漏斗 + 管理员改密）及 UTF-8 BOM CSV 导出。
+- **双端遥测 SDK 接入与 `91视频` 上游游客限制修复**：
+  - Android 新增 [TelemetryManager.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/TelemetryManager.kt) 与 [TelemetryManagerTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/data/TelemetryManagerTest.kt)（接入 `AuroraApplication`、`AuroraShelfApp` 7 板块状态、`GameActivity` 跨页面连续会话）；iOS/iPadOS 新增 [TelemetryManager.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/TelemetryManager.swift) 与 [TelemetryManagerTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/TelemetryManagerTests.swift)（接入 `AuroraShelfApp`、`MainContainerView` 5+1 Tab 与 5 大沉浸路由，并补全 [PrivacyInfo.xcprivacy](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Resources/PrivacyInfo.xcprivacy) 声明）。
+  - 针对 `91视频` 站方新增「最新视频仅限登录用户观看，游客仅可观看 3 天前视频」限制，双端（[VideoSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoSourceCatalog.swift)、[VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift)、[ContentSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/ContentSource.kt)）将默认分类切为可播的 `本月最热 (category=top)` 并补充友好提示。
+- **全量验证与验收通过（`v2.19.2 Build 277`）**：
+  - 服务端 `test_analytics_store.py` 4/4 通过，Web 游戏 `verify-game-logic.js` / `verify-fixes.js` 全绿。
+  - Android：`testDebugUnitTest` + `lintDebug` + `lintVitalRelease` + `assembleRelease`（16 KB 对齐 + `RSA-4096` V2/V3 验签）+ `FullSystemSourceProbeTest` 全绿。
+  - iOS / iPadOS：Release 编译（`SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`）0 警告，离线 XCTest 与在线全源审计（18/18 视频源 + 分页 + 漫画 + 论坛 + 直播）全绿。
+  - 串行 Release 模拟器实机（`iPhone 18 Pro`、临时 `iPad Pro 13-inch (M5)`、`netgrey_phone`）走查与真实遥测上报全通；Playwright 实测登录 `https://bananarey.us/admin/` 验收三端上报数据、备注持久化、6 账号 / 7 UDID / 5 TF 邀请展示及 `390×844` 零溢出通过；网页 OTA 已原子上线（`Netgrey.apk` `137M` / `Netgrey.ipa` `134M`，`/` 剩 `11G`）。
+
+## 历史工作状态（2026年11月20日 · iOS / iPadOS 全板块顶部 Hero 海报常态磨砂栏遮挡根治＋`UIScrollView.topEdgeEffect` 双向同步桥接＋双端 Release 模拟器全规模验收与三通道同步上线 · v2.19.1 Build 276）
 
 - **版本号全链路同步至 `v2.19.1 (Build 276)`**：同步更新 `AGENTS.md`、`app/build.gradle.kts`、`ios/project.yml`、`ios/AuroraShelf.xcodeproj/project.pbxproj`、`app/src/main/assets/www/index.html`、`scripts/ota_web/manifest.plist`、`scripts/ota_web/index.html` 与 `scripts/ota_web/source-manifest.json`（`publish_ota.sh --check-versions` 校验通过）。
 - **iOS / iPadOS 顶部磨砂栏常态遮挡海报双层根因定位与彻底修复（覆盖 iPhone + iPad 全形态 5 大沉浸海报页）**：

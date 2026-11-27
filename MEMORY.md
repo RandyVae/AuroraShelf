@@ -12,7 +12,7 @@
   3. 内屏双联展开态：460pt 剧院高度与 420pt 居中操作组、280pt 待播卡片与 3 列大图自适应流展，顶栏自动切为 `NetgreyMarkView`；
   4. 自动化测试：新增 `DeviceLayoutTests` 5 项测试，全量 101 项单元测试 100% 全部通过（0 failures, 5 skipped，耗时 4.277 秒）。
 
-# Netgrey · Android & iOS 2.19.1 · 跨 Agent 记忆
+# Netgrey · Android & iOS 2.19.2 · 跨 Agent 记忆
 
 > 本文件是所有 AI Agent（DSH / Codex / Claude / Hermes / Antigravity）进入本项目的统一入口。
 > 开工先读本文件，再按「权威来源」读细节；收工前更新「当前状态」。
@@ -23,32 +23,34 @@
 <!-- AUTO:START -->
 - 项目路径：`/Users/itou/Documents/ChatGPT/91pron`
 - 技术栈：build.gradle.kts, Kotlin/Android
-- Git：`main` @ `d516e71`（2026-11-20），未提交 0 个文件
+- Git：`main` @ `118f57d`（2026-11-20），未提交 32 个文件
 - 权威记忆文件：
-  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-20（今天）
-  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-20（今天）
-  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-20（今天）
-  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-20（今天）
-  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（26 天前）
-  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-20（今天）
+  - `.ai/PROJECT_STATE.md` — 项目状态（当前阶段/目标/进行中），最后更新 2026-11-28（今天）
+  - `.ai/HANDOFF.md` — 最新交接，最后更新 2026-11-28（今天）
+  - `.ai/TASKS.md` — 任务清单，最后更新 2026-11-20（7 天前）
+  - `.ai/DECISIONS.md` — 关键决策，最后更新 2026-11-28（今天）
+  - `.ai/ENVIRONMENT.md` — 环境与构建基线，最后更新 2026-10-25（33 天前）
+  - `AGENTS.md` — Agent 协作规则（自动读取），最后更新 2026-11-27（今天）
 - Codex 全局记忆（只读参考）：
   - 2026-11-05：iOS source integration audit: `RUN_IOS_LIVE_SOURCE_AUDIT`, `ForumScreen.swift`, `Nav
   - 2026-11-04：iOS migration/HIG audit and offline SVG request: `iOS 27`, `NavigationStack`, `TabVi
   - 2026-10-27：AuroraShelf audit report source review: `PlaybackResolver.kt`, Huavod, `putIfAbsent`
   - 来源：`~/.codex/memories/memory_summary.md`
-- 最后同步：2026-11-20 23:45 by `sync.py`
+- 最后同步：2026-11-28 00:15 by `sync.py`
 <!-- AUTO:END -->
 
 ## 当前状态（Agent 收工前必须更新）
 
-- 当前目标：完善 iOS/Android 漫画、视频、直播及游戏体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
-- 当前阶段（2026-11-20 · Build 276 / v2.19.1）：根治 iOS / iPadOS 全板块顶部磨砂栏在常态未滚动下一直出现、遮挡顶部 Hero 海报的缺陷，完成双端 `v2.19.1 (Build 276)` Release 全规模验收并同步上线网页 OTA、TestFlight 与 GitHub Release。核心变更：(1) **双层根因定位（已验证）**：① iOS 26/27 默认启用 `UIScrollView.topEdgeEffect`（`isHidden = false`），当 `HomeScreen`、`ComicsScreen`、`LiveScreen`、`ForumScreen` 与 `VideoDetailSheet` 在 `ScrollView` 上使用 `.ignoresSafeArea(edges: .top)` 使海报铺满顶部时，未滚动状态下 `contentMinY = 0` 已位于顶栏下沿（iPhone `~116pt` / iPad `~76pt`）之上，触发系统常驻渲染带硬切分界线的磨砂条（即使设置 `.toolbarBackground(.hidden)` 仍会出现）；② `v2.17.6` 移除弃用 API 时遗漏为三屏补齐 `.toolbarBackgroundVisibility`，且单测捕获 iOS 27.2 SwiftUI `HostingScrollView` 在 `.scrollEdgeEffectHidden(true -> false)` 切换时存在不回写 `UIScrollView.topEdgeEffect.isHidden = false` 的单向滞留缺陷；(2) **全形态统一修复**：新增 [ImmersiveHeroTopBarChrome.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/UI/Components/ImmersiveHeroTopBarChrome.swift)（含 `20pt` 归一化滚动判定与 `TopScrollEdgeEffectSyncBridge` 双向同步桥接），统一接入主页、漫画、直播、社区与影视详情弹窗（覆盖 iPhone、Duo 与 iPad `.sidebarAdaptable` 顶置胶囊栏），常态未滑动时 100% 隐藏顶栏磨砂与边缘遮罩，滑动后平滑显现、回顶即隐，并收轻四屏 Hero 顶部状态栏渐晕（`72pt/88pt`、`0.28` 透明度）与浅色模式衬底过渡；(3) **全规模验收与三通道同步上线**：新增 `IOS27AuditRemediationTests` 双向往返单测，iOS Release `0` 警告 + 在线全源审计 `59/59` 全通，Android 单测 + 在线全源审计 + `lintVitalRelease` + 16 KB 对齐 + `RSA-4096` V2/V3 验签全通；`iPhone 18 Pro`、`iPad Pro 13-inch (M5)` 与 `emulator-5554` 正式 Release 包全模块及游戏 `v2.19.1` 验收通过；网页 OTA（`https://bananarey.us`，`Netgrey.apk` `143,645,792` B / `Netgrey.ipa` `140,457,974` B，`/` 剩 `11G`）、TestFlight Build `276` 与 GitHub Release `v2.19.1` 同步上线。
-- 进行中：无阻塞任务；`v2.19.1 (Build 276)` 发布已闭环，并已完成本机模拟器与研发磁盘最小化治理（实测 APFS 可用空间由 `12.3 GB` 提升至 `100.7 GB` / `df -h /` 由 `10 Gi` 提升至 `94 Gi`，新增 `scripts/cleanup_dev_disk.sh` 并固化跨 Agent 防爆盘规范）。
-- 下一步：常规版本演进与线上监控；后续发版验收严格执行「单台串行、用完即关、iPad 按需临时创建测完即删、收尾执行 `./scripts/cleanup_dev_disk.sh`」。
+- 当前目标：完善 iOS/Android 漫画、视频、直播、论坛、内置游戏及运营监测体验；严格执行持续交付、双端同步、全源连通性及 UI 防错位核验铁律：(1) 修复 iPhone 缺陷时必须同步排查并修复 iPad/Android 对应实现，严禁单端修复另一端遗留；(2) 修复 Bug 或更新后必须核验全部支持源的连通性与可用性（杜绝单源测试即交付），并全面核验多端多形态 UI 防错位；(3) 无论是 iOS 还是 Android，只要完成新的实质性功能开发、UI 调整或缺陷修复，必须立即执行自动化签名打包并上传发布至 OTA 服务器（`https://bananarey.us`，纯净标准 443 端口），递增版本号并全量推送到 Git 远程仓库与 GitHub Release；(4) 服务器严禁保留任何老版本安装包，每次发布执行同名原子覆盖并即时清理远端碎片，确保磁盘空间健康；(5) 模拟器核验必须与交付包一致，严禁使用独立无混淆 Debug 包检验。
+- 当前阶段（2026-11-28 · Build 277 / v2.19.2）：全新落地「Netgrey 网页项目管理与运营分析后台」（`https://bananarey.us/admin/`）及双端低功耗遥测系统，同步解决 `91视频` 上游新增 3 天游客限制并完成双端 `v2.19.2 (Build 277)` Release 全规模验收与三通道上线。核心变更：(1) **服务端 SQLite 分析引擎与安全认证**：新增 [analytics_store.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/analytics_store.py)（WAL 模式 `/var/lib/netgrey-ota/analytics.db`，7 大统一板块 + 子行为拆解 + HKT UTC+8 日/时分桶 + `event_id` 幂等去重 + `alias/notes` 备注持久化 + PBKDF2-HMAC-SHA256 管理员认证与 `HttpOnly/Secure/SameSite=Strict` 会话 Cookie），只读聚合存量 7 台 iOS OTA UDID 设备、5 条 TestFlight 邀请与 6 个 PocketBase 注册账号；扩展 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py) 接入 `/api/telemetry/*` 与 `/api/admin/*` 及 CSV 导出，并在 [netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf) 隔离 `/admin/`（`noindex, nofollow`，OTA 首页零入口暴露）；(2) **Apple HIG 网页管理后台**：新增 `scripts/admin_web/{index.html,styles.css,app.js}`（零外部 CDN、Light/Dark/High-Contrast 三态、手写响应式 SVG 图表、总览/安装与设备+右侧详情抽屉/板块时长/分发与账号 4 大视图）；(3) **双端低功耗遥测接入与 `91视频` 默认分类修复**：Android 新增 [TelemetryManager.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/TelemetryManager.kt)（`ActivityLifecycleCallbacks` 跨 `MainActivity`/`GameActivity` 连续会话 + 30s 心跳 + 200 条离线队列），iOS/iPadOS 新增 [TelemetryManager.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/TelemetryManager.swift)（Keychain 持久 `install_id` + 后台 `beginBackgroundTask` flush + 同步更新 `PrivacyInfo.xcprivacy`）；同步将 `91视频` 默认分类由受 3 天游客限制的 `当前最热` 调整为可播的 `本月最热`；(4) **全量验收与上线**：`test_analytics_store.py` 4/4、Web 游戏校验、Android 单测+Lint+`FullSystemSourceProbeTest`+16KB/V2+V3 验签、iOS 零警告 Release 编译+离线单测+全源实网（18/18 视频+漫画+论坛+直播）、三台 Release 模拟器串行实测及 Playwright 浏览器端到端/390px 响应式验收全部通过，已同步发布网页 OTA 与 TestFlight Build `277`。
+- 进行中：完成 Git 同步、GitHub Release 及本机磁盘清理收尾。
+- 下一步：常规运营监测，可通过 `https://bananarey.us/admin/` 实时查看全员安装设备、软件停留时长、7 板块耗时分布及分发/账号状态。
 - 阻塞：无。
-- 最近一次更新：2026-11-20 by Antigravity (Gemini 4 Neon)
+- 最近一次更新：2026-11-28 by Antigravity (Gemini 4 Neon)
 
 ## 关键决策（日期 + 决定 + 原因；只追加）
+
+- 2026-11-28（Antigravity）：新增网页项目管理与运营分析后台（`https://bananarey.us/admin/`）及双端低功耗遥测引擎，发布 `v2.19.2 (Build 277)`。采用 `Python 3.13 + SQLite WAL` 扩展既有 `ota_service.py` 复用服务器既有数据（OTA UDID / TestFlight 邀请 / PocketBase `users` 表）并保持零新增运维进程与独立 `HttpOnly/Secure/SameSite=Strict` 会话 Cookie 隔离；客户端（Android/iOS/iPadOS）统一采用 `install_id` + `session_id` + 7 板块状态机（`video`/`comics`/`live`/`forum`/`game`/`search`/`library`）+ 30 秒心跳增量去重 + 离线 200 条重试队列，仅在 HTTPS 超时内非阻塞上报，匿名功能路径零阻断。同步针对 `91视频` 站方新增「游客仅可观看 3 天前视频」限制，将双端默认分类调整为 `本月最热`（`category=top`）恢复全源开箱可播。
 
 - 2026-11-20（Antigravity / 用户 Randy 指令）：落地「本地模拟器最小化与研发磁盘防爆机制」并完成全盘瘦身（实测净释放 `88.4 GB` APFS 可用空间，`df -h /` 从 `10 Gi` 恢复至 `94 Gi`，VM Swap 从 `22.5 GB` 回落至 `9.7 GB`）。根因查明：4 台模拟器同时常驻开机挤爆 `18 GB` 内存生成 `22.5 GB` Swap 并触发 iOS 后台下载 `17.5 GB` `MobileAsset`/`Poster` 资产，叠加闲置 `7.8 GB` `iPhone19-4` Runtime、双份重复 Android SDK (`7.0 GB`)、膨胀至 `9.9 GB` 的 `netgrey_phone` AVD（`10G` 上限 + `2.5 GB` 快照）及 45 个历史临时 `DerivedData` 目录 (`17.1 GB`)。整改：(1) 仅保留 1 份 `iOS 27.2 (24B8117)` Runtime + 1 台 `iPhone 18 Pro`（默认关机、`18 MB`）+ 1 台 `netgrey_phone` AVD（`4G` 上限、禁本地快照、`26 MB`），iPad 改为验收时临时 `simctl create` 测完即 `delete`；(2) 将 `~/Library/Android/sdk` 合并软链至 `/opt/homebrew/share/android-commandlinetools` 并更新 Android Studio SDK 路径；(3) 新增 [cleanup_dev_disk.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/cleanup_dev_disk.sh)，加固 [build_ios_signed.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/build_ios_signed.sh) 与 [publish_testflight.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_testflight.sh) 复用唯一 `ios/build.nosync/DerivedData` 并在导出/上传后回收 `.xcarchive` 与双份 IPA，同时将防爆盘铁律同步写入项目 [AGENTS.md](file:///Users/itou/Documents/ChatGPT/91pron/AGENTS.md) 及全局规则。
 

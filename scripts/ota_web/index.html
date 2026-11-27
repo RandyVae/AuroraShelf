@@ -456,7 +456,7 @@
         <!-- ==================== iOS / iPadOS 面板 ==================== -->
         <div id="panelIos" class="tab-panel active" role="tabpanel">
             <div class="app-meta">
-                <span>v2.19.1 (Build 276)</span>
+                <span>v2.19.2 (Build 277)</span>
                 <span class="badge">Universal 通用</span>
                 <span class="badge">iOS 26.0+</span>
                 <span class="badge">Apple HIG</span>
@@ -540,7 +540,7 @@
         <!-- ==================== Android 面板 ==================== -->
         <div id="panelAndroid" class="tab-panel" role="tabpanel">
             <div class="app-meta">
-                <span>v2.19.1 (Build 276)</span>
+                <span>v2.19.2 (Build 277)</span>
                 <span class="badge">Android 8.0+</span>
                 <span class="badge">Material You 3</span>
             </div>
@@ -583,20 +583,20 @@
                     <div class="step-desc">
                         全面对齐 Google Android 17 (API 37) SDK 与 Material 3 Expressive 1.5.0 正式版；重构音视频播放器控件（独立播放设置面板、全屏锁屏/选集/下一集、长按 2x 快进与右下角统一全屏锚点），打通全视频源无限分页加载，多架构通用包（arm64-v8a / armeabi-v7a / x86_64），内置完整音视频硬解引擎与本地离线游戏。
                     </div>
-                    <a class="action-btn android" href="/Netgrey.apk?v=2.19.1" download="Netgrey-v2.19.1.apk">
+                    <a id="btnAndroidDownload" class="action-btn android" href="/Netgrey.apk?v=2.19.2" download="Netgrey-v2.19.2.apk" onclick="trackDownloadEvent('android_apk_click', 'android')">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
                             <line x1="12" y1="15" x2="12" y2="3"/>
                         </svg>
-                        立即下载 Android APK (v2.19.1)
+                        立即下载 Android APK (v2.19.2)
                     </a>
                 </div>
             </div>
 
             <div class="guide-box">
                 <strong>Android 安装提示：</strong><br>
-                • 点击上方按钮下载最新安装包（<code>Netgrey-v2.19.1.apk</code>）；若浏览器弹窗提示「是否重新下载文件？」，请点击 <strong>「再次下载 / 下载」</strong>，切勿直接点击旧缓存文件。<br>
+                • 点击上方按钮下载最新安装包（<code>Netgrey-v2.19.2.apk</code>）；若浏览器弹窗提示「是否重新下载文件？」，请点击 <strong>「再次下载 / 下载」</strong>，切勿直接点击旧缓存文件。<br>
                 • <strong>请勿在微信 / QQ 内直接下载安装</strong>，请点右上角 <code>···</code> 选择 <strong>「在浏览器中打开」</strong>（推荐 Chrome 或系统浏览器）。<br>
                 • <strong>提示「未安装应用」或「签名不一致」时</strong>：v2.17.2 起启用正式 Release 数字签名；若手机内已安装旧版（含安全文件夹 / 应用双开内），请先<strong>彻底卸载旧版 Netgrey</strong>，刷新本页重新下载后再安装，后续版本均可直接覆盖升级。<br>
                 • <strong>三星手机（One UI）若跳转「安装未知应用」或无法安装</strong>：请先进入 <strong>设置 &gt; 安全和隐私 &gt; 自动阻止程序</strong> 将其关闭；并在「安装未知应用」列表里找到<strong>当前使用的浏览器</strong>或系统 <strong>「我的文件」</strong> 打开右侧开关（未安装前列表里不会显示 Netgrey）。<br>
@@ -606,7 +606,7 @@
     </div>
 
     <footer class="footer">
-        <div class="footer-title">Netgrey v2.19.1 · Dedicated Over-The-Air Distribution</div>
+        <div class="footer-title">Netgrey v2.19.2 · Dedicated Over-The-Air Distribution</div>
         <div>
             开源合规声明：Android 视频解析组件基于 <strong>PipePipeExtractor (GPLv3)</strong> 构建；内置游戏骨骼渲染集成 <strong>Spine Runtimes License</strong>；其余网络、图像与 Material 3 Expressive 组件遵循 <strong>Apache-2.0 / MIT</strong> 许可。完整源代码与第三方许可证见
             <a href="https://github.com/RandyVae/AuroraShelf" target="_blank" rel="noopener noreferrer">GitHub 源码仓库</a>
@@ -617,7 +617,28 @@
 
     <script>
         const INVITE_CODE_STORAGE_KEY = 'netgrey_invite_code';
+        const APP_VERSION_TAG = '2.19.2';
         const PENDING_PROVISION_COPY = '设备 UDID 已成功写入 Apple 开发者名录（排队等待下一次重签打包生效）。如需立即免等待安装，请直接使用下方 TestFlight 内部测试通道！';
+
+        function trackDownloadEvent(eventType, platform) {
+            try {
+                const payload = JSON.stringify({
+                    event_type: eventType,
+                    platform: platform || 'web',
+                    app_version: APP_VERSION_TAG
+                });
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon('/api/telemetry/download-event', new Blob([payload], { type: 'application/json' }));
+                } else {
+                    fetch('/api/telemetry/download-event', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: payload,
+                        keepalive: true
+                    }).catch(function () {});
+                }
+            } catch (_) {}
+        }
 
         function switchPlatform(platform) {
             const tabIos = document.getElementById('tabIos');
@@ -729,6 +750,7 @@
                 btnStep2.classList.remove('disabled');
                 btnStep2.classList.add('success');
                 btnStep2.innerText = '第二步：直接安装 Netgrey';
+                btnStep2.onclick = function () { trackDownloadEvent('ios_ota_install_click', 'ios'); };
             } else {
                 statusPill.classList.remove('success');
                 statusPill.classList.add('pending');
@@ -821,6 +843,7 @@
                     return;
                 }
                 setUdidEnrollStatus('ok', '验证通过，正在拉起系统描述文件下载，随后请前往「系统设置 > 已下载描述文件」完成安装。');
+                trackDownloadEvent('ios_udid_enroll_click', 'ios');
                 window.location.href = data.mobileconfig_url;
             } catch (e) {
                 setUdidEnrollStatus('err', '网络请求失败，请检查网络连接后重试。');
@@ -839,8 +862,10 @@
 
             if (queryPlatform === 'android' || (!queryPlatform && /Android/i.test(ua))) {
                 switchPlatform('android');
+                trackDownloadEvent('page_view', 'android');
             } else {
                 switchPlatform('ios');
+                trackDownloadEvent('page_view', /iPad|iPhone|iPod/i.test(ua) ? 'ios' : 'web');
             }
 
             const udidParam = (urlParams.get('udid') || '').trim();
@@ -934,6 +959,7 @@
             setTfStatus('', resend ? '正在重新触发 Apple 发送团队邀请邮件…' : '正在向 Apple 提交内部测试邀请…', false, false);
 
             try {
+                trackDownloadEvent('ios_testflight_submit', 'ios');
                 const resp = await fetch('/api/testflight/invite', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

@@ -8,6 +8,7 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import com.aurorashelf.app.data.OfflineCacheManager
+import com.aurorashelf.app.data.TelemetryManager
 import com.aurorashelf.app.data.resilience.ResilientDns
 import com.aurorashelf.app.data.resilience.SourceHealthRegistry
 import com.aurorashelf.app.data.resilience.SourceResilienceBootstrap
@@ -32,6 +33,8 @@ class AuroraApplication : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         // 初始化全链路端侧自愈与网络预热基础设施（SWR 多槽位快照 / TUN-Safe DNS / 镜像健康度注册中心）
         SourceResilienceBootstrap.initialize(this)
+        // 初始化匿名/实名使用遥测与各板块停留采集器（非阻塞后台上报）
+        TelemetryManager.initialize(this)
         // Install the process-wide cover memory/disk cache before any cover request can start.
         CoverImageLoader.initialize(this)
         // Recreate Media3's persistent download manager as soon as the app process starts, but

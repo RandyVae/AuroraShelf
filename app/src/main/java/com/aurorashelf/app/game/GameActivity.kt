@@ -32,6 +32,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.aurorashelf.app.data.TelemetryManager
 import kotlin.math.max
 
 /**
@@ -358,6 +359,7 @@ class GameActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        TelemetryManager.leaveGameSection()
         webView?.evaluateJavascript("window.APP && APP.pauseGame && APP.pauseGame()", null)
         webView?.onPause()
         saveBridge?.flushSync()
@@ -365,6 +367,7 @@ class GameActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        TelemetryManager.enterGameSection()
         webView?.onResume()
         webView?.evaluateJavascript("window.APP && APP.resumeGame && APP.resumeGame()", null)
     }

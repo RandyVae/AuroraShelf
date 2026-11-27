@@ -1,5 +1,17 @@
 # Existing Architectural Decisions
 
+## Web Project Management Dashboard & Dual-Platform Usage Telemetry (v2.19.2 Build 277)
+
+Date: 2026-11-28
+
+Status: Implemented, unit-tested, E2E verified on iPhone/iPad/Android Release simulators + Playwright browser QA at `https://bananarey.us/admin/`, and published in `v2.19.2 (Build 277)`.
+
+Decisions:
+1. **Extend `ota_service.py` with SQLite WAL (`analytics_store.py`) Instead of Adding a Separate Runtime Stack**: Reuse Python 3.13 stdlib `sqlite3` (WAL mode, `/var/lib/netgrey-ota/analytics.db`, `0600`) inside the existing `netgrey-ota.service` process, read-only aggregating existing `/var/lib/netgrey-ota/{registered_devices,testflight_invites}.json`, `/var/www/netgrey/provisioned_udids.json`, and PocketBase `users` (`file:...?mode=ro`). Keeps server footprint minimal with zero new runtime dependencies or ports.
+2. **Cookie-Based Admin Auth & Strict Isolation (`/admin/`)**: Protect `/api/admin/*` with PBKDF2-HMAC-SHA256 (`310,000` iterations) credentials in `/etc/netgrey-ota/admin_auth.json` (`0600`), `HttpOnly; Secure; SameSite=Strict` session cookies, same-origin CSRF checks on mutations, and Nginx `noindex, nofollow` + `X-Frame-Options: DENY` headers, with zero public links from the OTA download page.
+3. **Unified 7-Section Client Telemetry State Machine (`TelemetryManager.kt` & `TelemetryManager.swift`)**: Track per-install UUID (`SharedPreferences` / Keychain+`UserDefaults`), session lifecycle across foreground/background (including `MainActivity` <-> `GameActivity` continuity), 7 canonical sections (`video`, `comics`, `live`, `forum`, `game`, `search`, `library`) + sub-section dwell, 30s incremental heartbeats without double counting, 200-event offline retry queue, and `event_id` server-side deduplication. All uploads are non-blocking HTTPS with short timeouts and zero impact on anonymous media browsing.
+4. **91Porn Default Category Shift (`category=top`)**: Upstream `h1014.sol148.com` restricted videos uploaded within the last 3 days to logged-in users only, breaking guest playback on `category=hot`; promote `本月最热` (`category=top`) to the primary default across iOS and Android.
+
 ## Local Simulator Minimization & Developer Disk Protection Policy
 
 Date: 2026-11-20

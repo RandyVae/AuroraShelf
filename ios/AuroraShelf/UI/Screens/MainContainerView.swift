@@ -52,6 +52,29 @@ public struct MainContainerView: View {
         AuroraThemeMode(rawValue: themeModeRaw)?.preferredColorScheme
     }
 
+    private var activeTelemetrySection: (section: String, subSection: String) {
+        if showSearchSheet || selectedTab == .search {
+            return ("search", "search")
+        }
+        if let route = playerCoordinator.activeRoute {
+            switch route {
+            case .video: return ("video", "video_play")
+            case .comic: return ("comics", "comic_read")
+            case .live: return ("live", "live_watch")
+            case .forumPost: return ("forum", "forum_read")
+            case .game: return ("game", "game_play")
+            }
+        }
+        switch selectedTab {
+        case .home: return ("video", "video_browse")
+        case .comics: return ("comics", "comic_browse")
+        case .live: return ("live", "live_browse")
+        case .forum: return ("forum", "forum_browse")
+        case .profile: return ("library", "library")
+        case .search: return ("search", "search")
+        }
+    }
+
     public var body: some View {
         @Bindable var coordinator = playerCoordinator
 
@@ -122,6 +145,14 @@ public struct MainContainerView: View {
         }
         .preferredColorScheme(activePreferredColorScheme)
         .ignoresSafeArea()
+        .onAppear {
+            let sec = activeTelemetrySection
+            TelemetryManager.shared.setSection(sec.section, subSection: sec.subSection)
+        }
+        .onChange(of: "\(activeTelemetrySection.section):\(activeTelemetrySection.subSection)") { _, _ in
+            let sec = activeTelemetrySection
+            TelemetryManager.shared.setSection(sec.section, subSection: sec.subSection)
+        }
     }
 
     private func triggerSearch(scope: SearchSheetView.SearchScope) {

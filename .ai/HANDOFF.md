@@ -1,4 +1,19 @@
-## 最新交接：2026-11-20 — 本地研发磁盘与模拟器最小化治理（实测净释放 `88.4 GB`、`df -h /` 从 `10 Gi` 恢复至 `94 Gi`）、脚本防爆加固与跨 Agent 规范固化
+## 最新交接：2026-11-28 — 网页项目管理后台（`/admin/`）、双端低功耗遥测系统、`91视频` 游客分类修复与 `v2.19.2 (Build 277)` 全通道发布
+
+### 本次完成
+1. **服务端分析引擎、认证与 Nginx 安全隔离**：
+   - 新增 [analytics_store.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/analytics_store.py)（SQLite WAL `/var/lib/netgrey-ota/analytics.db`，`event_id` 幂等去重、HKT UTC+8 统计、只读聚合 PocketBase `users`/OTA UDID/TestFlight 邀请、PBKDF2 管理员认证与会话管理）及 [test_analytics_store.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/test_analytics_store.py)（4/4 通过）。
+   - 扩展 [ota_service.py](file:///Users/itou/Documents/ChatGPT/91pron/scripts/server/ota_service.py)、[netgrey-auth-location.conf](file:///Users/itou/Documents/ChatGPT/91pron/server/pocketbase/netgrey-auth-location.conf)、[deploy_admin_portal.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/deploy_admin_portal.sh) 与 [publish_ota.sh](file:///Users/itou/Documents/ChatGPT/91pron/scripts/publish_ota.sh)，并上线 `https://bananarey.us/admin/`。
+2. **Apple HIG 网页管理控制台（`scripts/admin_web/`）**：
+   - 新建 `index.html`、`styles.css`、`app.js`（Light/Dark/High-Contrast 三态令牌、零外部 CDN、手写 SVG 图表、4 大视图 + 设备详情抽屉备注编辑 + UTF-8 BOM CSV 导出），并在下载页 [index.html](file:///Users/itou/Documents/ChatGPT/91pron/scripts/ota_web/index.html) 接入匿名下载漏斗埋点（无任何后台入口链接）。
+3. **双端遥测 SDK、`91视频` 修复与版本同步 `v2.19.2 (Build 277)`**：
+   - Android：[TelemetryManager.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/data/TelemetryManager.kt) + [TelemetryManagerTest.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/test/java/com/aurorashelf/app/data/TelemetryManagerTest.kt) + `AuroraApplication`/`AuroraShelfApp`/`GameActivity` 接入。
+   - iOS / iPadOS：[TelemetryManager.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Services/TelemetryManager.swift) + [TelemetryManagerTests.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelfTests/TelemetryManagerTests.swift) + `AuroraShelfApp`/`MainContainerView`/`PrivacyInfo.xcprivacy` 接入。
+   - `91视频` 修复：[VideoSourceCatalog.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoSourceCatalog.swift)、[VideoRepository.swift](file:///Users/itou/Documents/ChatGPT/91pron/ios/AuroraShelf/Data/Video/VideoRepository.swift) 与 [ContentSource.kt](file:///Users/itou/Documents/ChatGPT/91pron/app/src/main/java/com/aurorashelf/app/model/ContentSource.kt) 将默认分类切至可游客播放的 `本月最热 (category=top)`。
+4. **全量验证与发布**：
+   - 双端构建/单测/Lint/在线全源审计、3 台串行 Release 模拟器实机遥测及 Playwright `https://bananarey.us/admin/` 全链路验收均通过；网页 OTA 已上线，TestFlight Build `277` 与 Git 同步收尾。
+
+## 历史交接：2026-11-20 — 本地研发磁盘与模拟器最小化治理（实测净释放 `88.4 GB`、`df -h /` 从 `10 Gi` 恢复至 `94 Gi`）、脚本防爆加固与跨 Agent 规范固化
 
 ### 本次完成
 1. **本机磁盘爆满根因定位与全量清理（已验证）**：

@@ -93,6 +93,7 @@ import androidx.window.core.layout.WindowSizeClass
 import com.aurorashelf.app.LocalIsInPipMode
 import com.aurorashelf.app.cast.CastManager
 import com.aurorashelf.app.cast.CastState
+import com.aurorashelf.app.data.TelemetryManager
 import com.aurorashelf.app.game.GameActivity
 import com.aurorashelf.app.model.AppDestination
 import com.aurorashelf.app.model.VideoItem
@@ -155,6 +156,29 @@ fun AuroraShelfApp(
     val isExpandedScreenWindow = adaptiveInfo.windowSizeClass.isWidthAtLeastBreakpoint(
         WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND,
     )
+
+    val telemetrySection = when {
+        state.selectedVideo != null -> "video" to "video_play"
+        state.isSearchOpen ||
+            (state.destination == AppDestination.LIVE && liveState.isSearchOpen) ||
+            (state.destination == AppDestination.FORUM && forumState.isSearchOpen) ||
+            (state.destination == AppDestination.COMICS && comicState.activeQuery.isNotBlank()) -> "search" to "search"
+        state.destination == AppDestination.HOME -> "video" to "video_browse"
+        state.destination == AppDestination.COMICS -> {
+            if (comicState.reader != null) "comics" to "comic_read" else "comics" to "comic_browse"
+        }
+        state.destination == AppDestination.LIVE -> {
+            if (liveState.selectedItem != null) "live" to "live_watch" else "live" to "live_browse"
+        }
+        state.destination == AppDestination.FORUM -> {
+            if (forumState.selectedPost != null) "forum" to "forum_read" else "forum" to "forum_browse"
+        }
+        state.destination == AppDestination.ME -> "library" to "library"
+        else -> "video" to "video_browse"
+    }
+    LaunchedEffect(telemetrySection) {
+        TelemetryManager.setAppSection(telemetrySection.first, telemetrySection.second)
+    }
 
     LaunchedEffect(
         activity,

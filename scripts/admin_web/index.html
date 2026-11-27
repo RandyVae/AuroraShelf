@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="system" data-contrast="standard">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="robots" content="noindex, nofollow">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Netgrey · 项目管理与运营分析后台</title>
+    <link rel="stylesheet" href="/admin/styles.css">
+</head>
+<body>
+    <!-- 登录门禁视图 -->
+    <main id="loginView" class="login-shell" aria-label="管理员登录">
+        <section class="login-card" aria-labelledby="loginTitle">
+            <div class="brand-lockup">
+                <div class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 36 44" fill="none">
+                        <path d="M5 39V5L31 39V5" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 id="loginTitle" class="login-title">Netgrey 管理后台</h1>
+                    <p class="login-subtitle">安装监测 · 停留分析 · 板块时长 · 分发统筹</p>
+                </div>
+            </div>
+
+            <form id="loginForm" class="login-form" novalidate>
+                <div class="field-group">
+                    <label for="loginUsername" class="field-label">管理员账号</label>
+                    <input id="loginUsername" name="username" type="text" autocomplete="username" value="admin" required class="text-input" placeholder="admin">
+                </div>
+                <div class="field-group">
+                    <label for="loginPassword" class="field-label">登录密码</label>
+                    <input id="loginPassword" name="password" type="password" autocomplete="current-password" required class="text-input" placeholder="请输入管理员密码">
+                </div>
+                <div id="loginError" class="inline-alert error" role="alert" hidden></div>
+                <button id="loginSubmitBtn" type="submit" class="btn primary full-width">
+                    登录控制台
+                </button>
+            </form>
+
+            <div class="login-footer-controls">
+                <button type="button" class="btn ghost small" id="loginThemeToggle" aria-label="切换浅色或深色外观">
+                    切换外观
+                </button>
+                <button type="button" class="btn ghost small" id="loginContrastToggle" aria-label="切换高对比度">
+                    高对比度
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 主控制台外壳 -->
+    <div id="appShell" class="app-shell" hidden>
+        <aside class="sidebar" aria-label="主导航">
+            <div class="sidebar-header">
+                <div class="brand-lockup compact">
+                    <div class="brand-mark small" aria-hidden="true">
+                        <svg viewBox="0 0 36 44" fill="none">
+                            <path d="M5 39V5L31 39V5" stroke="currentColor" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="brand-text">
+                        <div class="brand-name">Netgrey</div>
+                        <div class="brand-tag">运营管理台</div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="nav-list" aria-label="后台视图切换">
+                <button type="button" class="nav-item active" data-view="overview" aria-current="page">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="3" width="7" height="9" rx="1.5"/>
+                        <rect x="14" y="3" width="7" height="5" rx="1.5"/>
+                        <rect x="14" y="12" width="7" height="9" rx="1.5"/>
+                        <rect x="3" y="16" width="7" height="5" rx="1.5"/>
+                    </svg>
+                    <span>总览仪表盘</span>
+                </button>
+                <button type="button" class="nav-item" data-view="installations">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <rect x="5" y="2" width="14" height="20" rx="2.5"/>
+                        <line x1="12" y1="18" x2="12.01" y2="18"/>
+                    </svg>
+                    <span>安装与设备</span>
+                    <span id="navInstallCount" class="nav-badge">0</span>
+                </button>
+                <button type="button" class="nav-item" data-view="sections">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="18" y1="20" x2="18" y2="10"/>
+                        <line x1="12" y1="20" x2="12" y2="4"/>
+                        <line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                    <span>板块时长</span>
+                </button>
+                <button type="button" class="nav-item" data-view="distribution">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    <span>分发与账号</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="appearance-panel" role="group" aria-label="界面外观设置">
+                    <div class="appearance-row">
+                        <span class="appearance-label">外观</span>
+                        <div class="mini-segmented" id="themeSegmented">
+                            <button type="button" data-theme-val="system" class="active">自动</button>
+                            <button type="button" data-theme-val="light">浅色</button>
+                            <button type="button" data-theme-val="dark">深色</button>
+                        </div>
+                    </div>
+                    <div class="appearance-row">
+                        <span class="appearance-label">高对比度</span>
+                        <button type="button" id="contrastToggleBtn" class="switch-pill" role="switch" aria-checked="false">
+                            <span class="switch-thumb"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="admin-user-bar">
+                    <div class="admin-user-info">
+                        <div class="online-dot"></div>
+                        <span id="adminUsernameLabel">admin</span>
+                    </div>
+                    <button type="button" id="logoutBtn" class="btn ghost small">退出</button>
+                </div>
+            </div>
+        </aside>
+
+        <div class="main-column">
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1 id="viewHeading" class="view-heading">总览仪表盘</h1>
+                    <span id="lastUpdatedBadge" class="meta-pill">正在同步…</span>
+                </div>
+
+                <div class="topbar-controls">
+                    <div class="segmented-group" id="rangeFilter" role="group" aria-label="统计时间范围">
+                        <button type="button" data-range="today">今日</button>
+                        <button type="button" data-range="7d" class="active">7天</button>
+                        <button type="button" data-range="14d">14天</button>
+                        <button type="button" data-range="30d">30天</button>
+                        <button type="button" data-range="all">全部</button>
+                    </div>
+
+                    <select id="platformFilter" class="select-input" aria-label="平台筛选">
+                        <option value="all">全部平台</option>
+                        <option value="ios">iPhone (iOS)</option>
+                        <option value="ipados">iPad (iPadOS)</option>
+                        <option value="android">Android</option>
+                    </select>
+
+                    <select id="simFilter" class="select-input" aria-label="设备来源筛选">
+                        <option value="1">含模拟器与测试</option>
+                        <option value="0">仅正式安装包</option>
+                    </select>
+
+                    <button type="button" id="refreshBtn" class="btn secondary" aria-label="立即刷新数据">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="23 4 23 10 17 10"/>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                        </svg>
+                        <span>刷新</span>
+                    </button>
+
+                    <button type="button" id="exportCsvBtn" class="btn secondary" aria-label="导出 CSV 报表">
+                        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span>导出 CSV</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- 移动端快捷导航条 -->
+            <nav class="mobile-nav" aria-label="移动端导航">
+                <button type="button" class="mobile-nav-item active" data-view="overview">总览</button>
+                <button type="button" class="mobile-nav-item" data-view="installations">设备</button>
+                <button type="button" class="mobile-nav-item" data-view="sections">板块</button>
+                <button type="button" class="mobile-nav-item" data-view="distribution">分发</button>
+            </nav>
+
+            <div class="content-area">
+                <div id="globalErrorBanner" class="inline-alert error" role="alert" hidden></div>
+
+                <!-- 视图 1：总览仪表盘 -->
+                <section id="viewOverview" class="view-panel active" aria-labelledby="viewHeading">
+                    <div class="kpi-grid" id="overviewKpis"></div>
+
+                    <div class="charts-grid two-col">
+                        <article class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h2 class="card-title">每日活跃与停留趋势</h2>
+                                    <p class="card-subtitle">按香港时间（UTC+8）自然日统计</p>
+                                </div>
+                                <div class="mini-segmented" id="trendMetricToggle" role="group" aria-label="趋势指标切换">
+                                    <button type="button" data-metric="dwell_sec" class="active">停留时长</button>
+                                    <button type="button" data-metric="active_devices">活跃设备</button>
+                                    <button type="button" data-metric="sessions">启动次数</button>
+                                </div>
+                            </div>
+                            <div id="trendChartContainer" class="chart-box"></div>
+                        </article>
+
+                        <article class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h2 class="card-title">各板块使用时长分布</h2>
+                                    <p class="card-subtitle">点击任意板块可下钻查看子行为与排行</p>
+                                </div>
+                            </div>
+                            <div id="sectionsOverviewContainer" class="chart-box"></div>
+                        </article>
+                    </div>
+
+                    <div class="charts-grid three-col">
+                        <article class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h2 class="card-title">平台与设备形态</h2>
+                                    <p class="card-subtitle">iPhone / iPad / Android 安装分布</p>
+                                </div>
+                            </div>
+                            <div id="platformDonutContainer" class="chart-box"></div>
+                        </article>
+
+                        <article class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h2 class="card-title">客户端版本升级情况</h2>
+                                    <p id="latestVersionSubtitle" class="card-subtitle">正在读取最新版本…</p>
+                                </div>
+                            </div>
+                            <div id="versionDistContainer" class="chart-box"></div>
+                        </article>
+
+                        <article class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h2 class="card-title">24 小时活跃时段</h2>
+                                    <p class="card-subtitle">香港时间（00:00 – 23:59 HKT）</p>
+                                </div>
+                            </div>
+                            <div id="hourlyChartContainer" class="chart-box"></div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- 视图 2：安装与设备 -->
+                <section id="viewInstallations" class="view-panel" hidden aria-label="所有设备安装与使用详情">
+                    <div class="card">
+                        <div class="toolbar-row">
+                            <div class="search-box-wrap">
+                                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="8"/>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                                </svg>
+                                <input id="installSearchInput" type="search" class="text-input with-icon" placeholder="搜索备注名、邮箱、设备型号、版本号或 Install ID…">
+                            </div>
+
+                            <div class="toolbar-filters">
+                                <select id="channelFilter" class="select-input" aria-label="安装渠道筛选">
+                                    <option value="all">全部渠道</option>
+                                    <option value="testflight">TestFlight</option>
+                                    <option value="ota">iOS OTA</option>
+                                    <option value="apk">Android APK</option>
+                                    <option value="simulator">模拟器</option>
+                                    <option value="debug">Debug 测试</option>
+                                </select>
+
+                                <select id="installSortSelect" class="select-input" aria-label="排序方式">
+                                    <option value="last_seen">按最近活跃排序</option>
+                                    <option value="range_dwell">按区间停留时长排序</option>
+                                    <option value="total_dwell">按累计总停留排序</option>
+                                    <option value="sessions">按会话次数排序</option>
+                                    <option value="first_seen">按首次安装时间排序</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div id="installationsCountBar" class="table-meta-bar"></div>
+                        <div class="table-wrap">
+                            <table class="data-table" id="installationsTable">
+                                <thead>
+                                    <tr>
+                                        <th>状态 / 设备</th>
+                                        <th>平台与版本</th>
+                                        <th>渠道 / 关联账号</th>
+                                        <th>首次安装</th>
+                                        <th>最近活跃</th>
+                                        <th class="num">区间停留</th>
+                                        <th class="num">累计停留</th>
+                                        <th>常用板块</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="installationsTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 视图 3：板块时长分析 -->
+                <section id="viewSections" class="view-panel" hidden aria-label="各板块使用时长深度分析">
+                    <div class="section-cards-grid" id="sectionCardsGrid"></div>
+
+                    <div class="charts-grid two-col" id="sectionDetailPanels">
+                        <article class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h2 id="selectedSectionTitle" class="card-title">板块子行为与每日趋势</h2>
+                                    <p id="selectedSectionSubtitle" class="card-subtitle">浏览 vs 沉浸观看/阅读/游玩时长拆解</p>
+                                </div>
+                            </div>
+                            <div id="subSectionBreakdownContainer" class="sub-breakdown"></div>
+                            <div id="sectionTrendChartContainer" class="chart-box compact"></div>
+                        </article>
+
+                        <article class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h2 class="card-title">该板块活跃设备排行</h2>
+                                    <p class="card-subtitle">点击任一行可打开该设备的完整画像</p>
+                                </div>
+                            </div>
+                            <div class="table-wrap">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>设备 / 备注</th>
+                                            <th>平台</th>
+                                            <th class="num">访问次数</th>
+                                            <th class="num">停留时长</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sectionTopDevicesTbody"></tbody>
+                                </table>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- 视图 4：分发与账号 -->
+                <section id="viewDistribution" class="view-panel" hidden aria-label="账号体系、分发渠道与安全设置">
+                    <div class="subtab-bar" id="distSubtabs" role="tablist">
+                        <button type="button" role="tab" aria-selected="true" class="subtab-btn active" data-subtab="accounts">注册账号 (PocketBase)</button>
+                        <button type="button" role="tab" aria-selected="false" class="subtab-btn" data-subtab="ota">iOS OTA 设备 (UDID)</button>
+                        <button type="button" role="tab" aria-selected="false" class="subtab-btn" data-subtab="tf">TestFlight 邀请</button>
+                        <button type="button" role="tab" aria-selected="false" class="subtab-btn" data-subtab="funnel">下载漏斗与安全</button>
+                    </div>
+
+                    <div id="distSubPanelAccounts" class="card"></div>
+                    <div id="distSubPanelOta" class="card" hidden></div>
+                    <div id="distSubPanelTf" class="card" hidden></div>
+                    <div id="distSubPanelFunnel" class="charts-grid two-col" hidden>
+                        <article class="card" id="downloadFunnelCard"></article>
+                        <article class="card">
+                            <div class="card-header">
+                                <div>
+                                    <h2 class="card-title">管理员安全设置</h2>
+                                    <p class="card-subtitle">修改管理后台登录密码（修改后其他登录会话将自动失效）</p>
+                                </div>
+                            </div>
+                            <form id="changePasswordForm" class="stack-form">
+                                <div class="field-group">
+                                    <label for="oldPasswordInput" class="field-label">当前密码</label>
+                                    <input id="oldPasswordInput" type="password" class="text-input" required autocomplete="current-password">
+                                </div>
+                                <div class="field-group">
+                                    <label for="newPasswordInput" class="field-label">新密码（至少 10 位）</label>
+                                    <input id="newPasswordInput" type="password" class="text-input" required minlength="10" autocomplete="new-password">
+                                </div>
+                                <div class="field-group">
+                                    <label for="confirmPasswordInput" class="field-label">确认新密码</label>
+                                    <input id="confirmPasswordInput" type="password" class="text-input" required minlength="10" autocomplete="new-password">
+                                </div>
+                                <div id="changePwdMessage" class="inline-alert" hidden></div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn primary">更新管理员密码</button>
+                                    <button type="button" id="securityLogoutBtn" class="btn secondary">退出当前登录</button>
+                                </div>
+                            </form>
+                        </article>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧设备详情抽屉 -->
+    <div id="drawerBackdrop" class="drawer-backdrop" hidden></div>
+    <aside id="deviceDrawer" class="device-drawer" role="dialog" aria-modal="true" aria-labelledby="drawerTitle" hidden>
+        <div class="drawer-header">
+            <div>
+                <h2 id="drawerTitle" class="drawer-title">设备详情</h2>
+                <p id="drawerSubtitle" class="drawer-subtitle"></p>
+            </div>
+            <button type="button" id="drawerCloseBtn" class="btn icon-btn" aria-label="关闭设备详情">✕</button>
+        </div>
+        <div id="drawerBody" class="drawer-body"></div>
+    </aside>
+
+    <!-- 悬浮 Tooltip -->
+    <div id="chartTooltip" class="chart-tooltip" hidden role="status" aria-live="polite"></div>
+
+    <script src="/admin/app.js"></script>
+</body>
+</html>

@@ -1318,7 +1318,7 @@ public final class VideoRepository: ObservableObject {
         case "本月讨论": queryPrefix = "category=md"
         case "高清": queryPrefix = "category=hd"
         case "最新上传": queryPrefix = "next=watch"
-        default: queryPrefix = "category=hot"
+        default: queryPrefix = "category=top"
         }
 
         let p = max(page, 1)
@@ -1572,6 +1572,14 @@ public final class VideoRepository: ObservableObject {
                     return PlaybackSourceResult(url: streamUrl, headers: headers, referer: "https://h1014.sol148.com/", title: title)
                 }
             }
+        }
+
+        if html.contains("游客可以观看") || html.contains("仅限登录用户观看") {
+            throw NSError(
+                domain: "VideoRepository",
+                code: 403,
+                userInfo: [NSLocalizedDescriptionKey: "91视频站方限制游客仅可观看 3 天前的视频，请切换「本月最热」或「收藏最多」分类"]
+            )
         }
 
         throw NSError(domain: "VideoRepository", code: 404, userInfo: [NSLocalizedDescriptionKey: "未找到有效的 91视频 播放流"])

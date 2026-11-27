@@ -18,6 +18,10 @@ struct AuroraShelfApp: App {
         _ = VideoRepository.shared
         // 启动全平台全面预热系统（涵盖视频、论坛与漫画，实现即点即看）
         GlobalStartupPrefetchEngine.shared.startGlobalWarmup()
+        // 启动低功耗遥测引擎（仅统计使用时长与各板块停留，非阻塞后台上报）
+        Task { @MainActor in
+            TelemetryManager.shared.start()
+        }
     }
     
     var body: some Scene {

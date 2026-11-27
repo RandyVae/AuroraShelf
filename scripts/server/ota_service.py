@@ -2,6 +2,7 @@ import collections
 import concurrent.futures
 import hashlib
 import hmac
+import http.cookies
 import http.server
 import json
 import os
@@ -10,6 +11,7 @@ import re
 import secrets
 import socketserver
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -17,6 +19,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import analytics_store
 
 try:
     import jwt
@@ -58,6 +64,12 @@ MAX_ENROLL_NONCES = 4096
 BOOT_SECRET = secrets.token_bytes(32)
 
 MAX_POLLER_RETRIES = 15
+
+ADMIN_COOKIE_NAME = 'netgrey_admin_session'
+ADMIN_LOGIN_FAIL_WINDOW = 900
+ADMIN_LOGIN_FAIL_LIMIT = 8
+GLOBAL_ADMIN_FAIL_TIMESTAMPS = collections.deque()
+GLOBAL_ADMIN_FAIL_LIMIT = 30
 
 APPLE_JWT_LOCK = threading.Lock()
 APPLE_JWT_CACHE = {'token': None, 'exp': 0}
@@ -969,16 +981,71 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
             return 200, b''
         return 200, self.rfile.read(content_length)
 
-    def send_json(self, status_code, payload):
+    def send_json(self, status_code, payload, extra_headers=None):
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
         self.send_response(status_code)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('X-Frame-Options', 'DENY')
         self.send_header('Access-Control-Allow-Origin', ALLOWED_ORIGIN)
         self.send_header('Vary', 'Origin')
+        if extra_headers:
+            for k, v in extra_headers:
+                self.send_header(k, v)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def get_admin_session_cookie(self):
+        cookie_hdr = self.headers.get('Cookie') or ''
+        if not cookie_hdr:
+            return ''
+        jar = http.cookies.SimpleCookie()
+        try:
+            jar.load(cookie_hdr)
+        except Exception:
+            return ''
+        morsel = jar.get(ADMIN_COOKIE_NAME)
+        return morsel.value.strip() if morsel and morsel.value else ''
+
+    def check_admin_auth(self):
+        token = self.headers.get('X-Admin-Token')
+        if token and verify_admin_token(token):
+            return {'username': 'token-admin', 'auth_type': 'token', 'token': ''}
+        cookie_token = self.get_admin_session_cookie()
+        if cookie_token:
+            sess = analytics_store.verify_admin_session(cookie_token)
+            if sess:
+                return {'username': sess['username'], 'auth_type': 'cookie', 'token': cookie_token}
+        return None
+
+    def is_same_origin_write(self):
+        origin = (self.headers.get('Origin') or '').strip()
+        if origin:
+            return origin == ALLOWED_ORIGIN
+        referer = (self.headers.get('Referer') or '').strip()
+        if referer:
+            return referer.startswith(ALLOWED_ORIGIN + '/') or referer == ALLOWED_ORIGIN
+        return False
+
+    def read_json_body(self, max_bytes):
+        status, raw_body = self.read_bounded_body(max_bytes)
+        if status == 413:
+            self.send_json(413, {'ok': False, 'error': '请求体过大'})
+            return None
+        if status != 200 or raw_body is None:
+            self.send_json(400, {'ok': False, 'error': '无效的 Content-Length'})
+            return None
+        try:
+            data = json.loads(raw_body.decode('utf-8'))
+        except Exception:
+            self.send_json(400, {'ok': False, 'error': '请求体必须是有效的 JSON'})
+            return None
+        if not isinstance(data, dict):
+            self.send_json(400, {'ok': False, 'error': '请求体必须是 JSON 对象'})
+            return None
+        return data
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -1124,6 +1191,120 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(code, result)
             return
 
+        if parsed.path == '/api/telemetry/batch':
+            if is_rate_limited(f'telemetry_ip:{client_ip}', limit=120, window_seconds=300):
+                self.send_json(429, {'ok': False, 'error': 'Too many telemetry requests'})
+                return
+            body = self.read_json_body(32768)
+            if body is None:
+                return
+            iid = str(body.get('install_id') or '').strip()
+            if iid and is_rate_limited(f'telemetry_id:{iid}', limit=60, window_seconds=300):
+                self.send_json(429, {'ok': False, 'error': 'Too many device telemetry requests'})
+                return
+            ok, result, code = analytics_store.ingest_telemetry_batch(body, client_ip=client_ip)
+            self.send_json(code, result if ok else {'ok': False, **result})
+            return
+
+        if parsed.path == '/api/telemetry/download-event':
+            if is_rate_limited(f'dl_ev:{client_ip}', limit=30, window_seconds=300):
+                self.send_json(429, {'ok': False, 'error': 'Too many requests'})
+                return
+            body = self.read_json_body(2048)
+            if body is None:
+                return
+            ok, msg = analytics_store.record_download_event(
+                body.get('event_type'),
+                platform=body.get('platform', ''),
+                app_version=body.get('app_version', ''),
+                client_ip=client_ip,
+                user_agent=self.headers.get('User-Agent', ''),
+            )
+            self.send_json(200 if ok else 400, {'ok': ok, 'message': msg})
+            return
+
+        if parsed.path == '/api/admin/login':
+            now_ts = time.time()
+            with RATE_LIMIT_LOCK:
+                while GLOBAL_ADMIN_FAIL_TIMESTAMPS and (now_ts - GLOBAL_ADMIN_FAIL_TIMESTAMPS[0]) >= ADMIN_LOGIN_FAIL_WINDOW:
+                    GLOBAL_ADMIN_FAIL_TIMESTAMPS.popleft()
+                if len(GLOBAL_ADMIN_FAIL_TIMESTAMPS) >= GLOBAL_ADMIN_FAIL_LIMIT:
+                    self.send_json(429, {'ok': False, 'error': '管理员登录失败次数过多，请 15 分钟后再试'})
+                    return
+            if is_rate_limited(f'admin_login_ip:{client_ip}', limit=ADMIN_LOGIN_FAIL_LIMIT * 2, window_seconds=ADMIN_LOGIN_FAIL_WINDOW):
+                self.send_json(429, {'ok': False, 'error': '请求过于频繁，请 15 分钟后再试'})
+                return
+
+            body = self.read_json_body(4096)
+            if body is None:
+                return
+            username = str(body.get('username') or 'admin').strip()
+            password = str(body.get('password') or '')
+            if not analytics_store.verify_admin_credentials(username, password):
+                with RATE_LIMIT_LOCK:
+                    GLOBAL_ADMIN_FAIL_TIMESTAMPS.append(time.time())
+                self.send_json(401, {'ok': False, 'error': '用户名或密码错误'})
+                return
+
+            token, expires_at = analytics_store.create_admin_session(username, client_ip=client_ip)
+            cookie_val = (
+                f'{ADMIN_COOKIE_NAME}={token}; HttpOnly; Secure; SameSite=Strict; '
+                f'Path=/; Max-Age={analytics_store.ADMIN_SESSION_TTL_SEC}'
+            )
+            self.send_json(
+                200,
+                {'ok': True, 'username': username, 'expires_at': expires_at},
+                extra_headers=[('Set-Cookie', cookie_val)],
+            )
+            return
+
+        if parsed.path == '/api/admin/logout':
+            cookie_token = self.get_admin_session_cookie()
+            if cookie_token:
+                analytics_store.revoke_admin_session(cookie_token)
+            clear_cookie = f'{ADMIN_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0'
+            self.send_json(200, {'ok': True}, extra_headers=[('Set-Cookie', clear_cookie)])
+            return
+
+        if parsed.path == '/api/admin/change-password':
+            auth = self.check_admin_auth()
+            if not auth:
+                self.send_json(401, {'ok': False, 'error': '未登录或会话已过期'})
+                return
+            if auth['auth_type'] == 'cookie' and not self.is_same_origin_write():
+                self.send_json(403, {'ok': False, 'error': 'Origin check failed'})
+                return
+            body = self.read_json_body(4096)
+            if body is None:
+                return
+            ok, msg = analytics_store.change_admin_password(
+                str(body.get('old_password') or ''),
+                str(body.get('new_password') or ''),
+                current_token=auth.get('token') or None,
+            )
+            self.send_json(200 if ok else 400, {'ok': ok, 'message': msg} if ok else {'ok': False, 'error': msg})
+            return
+
+        if parsed.path.startswith('/api/admin/installations/') and parsed.path.endswith('/meta'):
+            auth = self.check_admin_auth()
+            if not auth:
+                self.send_json(401, {'ok': False, 'error': '未登录或会话已过期'})
+                return
+            if auth['auth_type'] == 'cookie' and not self.is_same_origin_write():
+                self.send_json(403, {'ok': False, 'error': 'Origin check failed'})
+                return
+            install_id = urllib.parse.unquote(
+                parsed.path[len('/api/admin/installations/'):-len('/meta')]
+            ).strip('/')
+            body = self.read_json_body(8192)
+            if body is None:
+                return
+            alias = body.get('alias') if 'alias' in body else None
+            notes = body.get('notes') if 'notes' in body else None
+            ok, res, code = analytics_store.update_installation_meta(install_id, alias=alias, notes=notes)
+            self.send_json(code, res if ok else {'ok': False, **res})
+            return
+
         self.send_response(404)
         self.end_headers()
 
@@ -1235,12 +1416,79 @@ class OTAHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(200, {'ok': True, 'record': rec})
             return
 
+        if parsed.path == '/api/admin/me':
+            auth = self.check_admin_auth()
+            if not auth:
+                self.send_json(401, {'ok': False, 'authenticated': False})
+                return
+            self.send_json(200, {'ok': True, 'authenticated': True, 'username': auth['username']})
+            return
+
+        if parsed.path.startswith('/api/admin/'):
+            auth = self.check_admin_auth()
+            if not auth:
+                self.send_json(401, {'ok': False, 'error': '未登录或会话已过期'})
+                return
+            qs = urllib.parse.parse_qs(parsed.query)
+            range_key = (qs.get('range', ['7d'])[0] or '7d').strip()
+            platform_filter = (qs.get('platform', ['all'])[0] or 'all').strip()
+            channel_filter = (qs.get('channel', ['all'])[0] or 'all').strip()
+            include_sim = (qs.get('include_sim', ['1'])[0] or '1').strip() not in ('0', 'false', 'no')
+
+            if parsed.path == '/api/admin/overview':
+                self.send_json(200, analytics_store.get_overview(range_key, platform_filter, include_sim))
+                return
+
+            if parsed.path == '/api/admin/installations':
+                search = (qs.get('search', [''])[0] or '').strip()
+                sort_by = (qs.get('sort', ['last_seen'])[0] or 'last_seen').strip()
+                order = (qs.get('order', ['desc'])[0] or 'desc').strip()
+                self.send_json(200, analytics_store.list_installations(
+                    range_key=range_key,
+                    platform_filter=platform_filter,
+                    channel_filter=channel_filter,
+                    search=search,
+                    sort_by=sort_by,
+                    order=order,
+                    include_sim=include_sim,
+                ))
+                return
+
+            if parsed.path.startswith('/api/admin/installations/'):
+                install_id = urllib.parse.unquote(parsed.path[len('/api/admin/installations/'):]).strip('/')
+                ok, res, code = analytics_store.get_installation_detail(install_id, range_key=range_key)
+                self.send_json(code, res if ok else {'ok': False, **res})
+                return
+
+            if parsed.path == '/api/admin/sections':
+                self.send_json(200, analytics_store.get_sections_report(range_key, platform_filter, include_sim))
+                return
+
+            if parsed.path == '/api/admin/distribution':
+                self.send_json(200, analytics_store.get_distribution_summary())
+                return
+
+            if parsed.path == '/api/admin/export.csv':
+                csv_bytes = analytics_store.export_csv(range_key=range_key, include_sim=include_sim)
+                day_tag = datetime.now().strftime('%Y%m%d')
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/csv; charset=utf-8')
+                self.send_header('Content-Disposition', f'attachment; filename="netgrey-analytics-{day_tag}.csv"')
+                self.send_header('Cache-Control', 'no-store')
+                self.send_header('X-Content-Type-Options', 'nosniff')
+                self.send_header('X-Frame-Options', 'DENY')
+                self.send_header('Content-Length', str(len(csv_bytes)))
+                self.end_headers()
+                self.wfile.write(csv_bytes)
+                return
+
         self.send_response(404)
         self.end_headers()
 
 
 if __name__ == '__main__':
     migrate_legacy_state_files()
+    analytics_store.init_db()
     poller = threading.Thread(target=testflight_poller_loop, daemon=True)
     poller.start()
     with BoundedThreadingTCPServer(('127.0.0.1', PORT), OTAHandler, max_workers=16) as httpd:
